@@ -1,6 +1,6 @@
 -- CreateTable
 CREATE TABLE `users` (
-    `id` VARCHAR(191) NOT NULL,
+    `id` VARCHAR(36) NOT NULL,
     `email` VARCHAR(191) NOT NULL,
     `phone` VARCHAR(191) NULL,
     `passwordHash` VARCHAR(191) NOT NULL,
@@ -21,9 +21,9 @@ CREATE TABLE `users` (
 
 -- CreateTable
 CREATE TABLE `refresh_tokens` (
-    `id` VARCHAR(191) NOT NULL,
+    `id` VARCHAR(36) NOT NULL,
     `token` VARCHAR(191) NOT NULL,
-    `userId` VARCHAR(191) NOT NULL,
+    `userId` VARCHAR(36) NOT NULL,
     `expiresAt` DATETIME(3) NOT NULL,
     `revokedAt` DATETIME(3) NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
@@ -35,12 +35,12 @@ CREATE TABLE `refresh_tokens` (
 
 -- CreateTable
 CREATE TABLE `categories` (
-    `id` VARCHAR(191) NOT NULL,
+    `id` VARCHAR(36) NOT NULL,
     `name` VARCHAR(191) NOT NULL,
     `slug` VARCHAR(191) NOT NULL,
     `description` TEXT NULL,
     `iconUrl` VARCHAR(191) NULL,
-    `parentId` VARCHAR(191) NULL,
+    `parentId` VARCHAR(36) NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
     UNIQUE INDEX `categories_slug_key`(`slug`),
@@ -50,12 +50,12 @@ CREATE TABLE `categories` (
 
 -- CreateTable
 CREATE TABLE `businesses` (
-    `id` VARCHAR(191) NOT NULL,
-    `ownerId` VARCHAR(191) NOT NULL,
+    `id` VARCHAR(36) NOT NULL,
+    `ownerId` VARCHAR(36) NOT NULL,
     `name` VARCHAR(191) NOT NULL,
     `slug` VARCHAR(191) NOT NULL,
     `description` TEXT NULL,
-    `categoryId` VARCHAR(191) NOT NULL,
+    `categoryId` VARCHAR(36) NOT NULL,
     `status` ENUM('DRAFT', 'PENDING_APPROVAL', 'PUBLISHED', 'SUSPENDED') NOT NULL DEFAULT 'DRAFT',
     `subscriptionPlan` ENUM('FREE', 'BASIC', 'PREMIUM', 'ENTERPRISE') NOT NULL DEFAULT 'FREE',
     `email` VARCHAR(191) NULL,
@@ -63,8 +63,8 @@ CREATE TABLE `businesses` (
     `website` VARCHAR(191) NULL,
     `addressLine1` VARCHAR(191) NOT NULL,
     `addressLine2` VARCHAR(191) NULL,
-    `city` VARCHAR(191) NOT NULL,
-    `state` VARCHAR(191) NOT NULL,
+    `city` VARCHAR(100) NOT NULL,
+    `state` VARCHAR(50) NOT NULL,
     `postalCode` VARCHAR(191) NOT NULL,
     `country` VARCHAR(191) NOT NULL DEFAULT 'IN',
     `latitude` DOUBLE NOT NULL,
@@ -88,8 +88,8 @@ CREATE TABLE `businesses` (
 
 -- CreateTable
 CREATE TABLE `business_photos` (
-    `id` VARCHAR(191) NOT NULL,
-    `businessId` VARCHAR(191) NOT NULL,
+    `id` VARCHAR(36) NOT NULL,
+    `businessId` VARCHAR(36) NOT NULL,
     `url` VARCHAR(191) NOT NULL,
     `caption` VARCHAR(191) NULL,
     `sortOrder` INTEGER NOT NULL DEFAULT 0,
@@ -101,8 +101,8 @@ CREATE TABLE `business_photos` (
 
 -- CreateTable
 CREATE TABLE `business_hours` (
-    `id` VARCHAR(191) NOT NULL,
-    `businessId` VARCHAR(191) NOT NULL,
+    `id` VARCHAR(36) NOT NULL,
+    `businessId` VARCHAR(36) NOT NULL,
     `dayOfWeek` INTEGER NOT NULL,
     `openTime` VARCHAR(191) NOT NULL,
     `closeTime` VARCHAR(191) NOT NULL,
@@ -114,8 +114,8 @@ CREATE TABLE `business_hours` (
 
 -- CreateTable
 CREATE TABLE `services` (
-    `id` VARCHAR(191) NOT NULL,
-    `businessId` VARCHAR(191) NOT NULL,
+    `id` VARCHAR(36) NOT NULL,
+    `businessId` VARCHAR(36) NOT NULL,
     `name` VARCHAR(191) NOT NULL,
     `description` TEXT NULL,
     `priceCents` INTEGER NOT NULL,
@@ -130,9 +130,9 @@ CREATE TABLE `services` (
 
 -- CreateTable
 CREATE TABLE `reviews` (
-    `id` VARCHAR(191) NOT NULL,
-    `businessId` VARCHAR(191) NOT NULL,
-    `userId` VARCHAR(191) NOT NULL,
+    `id` VARCHAR(36) NOT NULL,
+    `businessId` VARCHAR(36) NOT NULL,
+    `userId` VARCHAR(36) NOT NULL,
     `rating` INTEGER NOT NULL,
     `title` VARCHAR(191) NULL,
     `comment` TEXT NULL,
@@ -149,9 +149,9 @@ CREATE TABLE `reviews` (
 
 -- CreateTable
 CREATE TABLE `leads` (
-    `id` VARCHAR(191) NOT NULL,
-    `businessId` VARCHAR(191) NOT NULL,
-    `customerId` VARCHAR(191) NULL,
+    `id` VARCHAR(36) NOT NULL,
+    `businessId` VARCHAR(36) NOT NULL,
+    `customerId` VARCHAR(36) NULL,
     `name` VARCHAR(191) NOT NULL,
     `phone` VARCHAR(191) NOT NULL,
     `email` VARCHAR(191) NULL,
@@ -167,10 +167,10 @@ CREATE TABLE `leads` (
 
 -- CreateTable
 CREATE TABLE `bookings` (
-    `id` VARCHAR(191) NOT NULL,
-    `businessId` VARCHAR(191) NOT NULL,
-    `serviceId` VARCHAR(191) NOT NULL,
-    `customerId` VARCHAR(191) NOT NULL,
+    `id` VARCHAR(36) NOT NULL,
+    `businessId` VARCHAR(36) NOT NULL,
+    `serviceId` VARCHAR(36) NOT NULL,
+    `customerId` VARCHAR(36) NOT NULL,
     `scheduledAt` DATETIME(3) NOT NULL,
     `status` ENUM('PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED', 'NO_SHOW') NOT NULL DEFAULT 'PENDING',
     `notes` TEXT NULL,
@@ -186,9 +186,9 @@ CREATE TABLE `bookings` (
 
 -- CreateTable
 CREATE TABLE `payments` (
-    `id` VARCHAR(191) NOT NULL,
-    `userId` VARCHAR(191) NOT NULL,
-    `bookingId` VARCHAR(191) NULL,
+    `id` VARCHAR(36) NOT NULL,
+    `userId` VARCHAR(36) NOT NULL,
+    `bookingId` VARCHAR(36) NULL,
     `type` ENUM('BOOKING', 'SUBSCRIPTION', 'LEAD_UNLOCK') NOT NULL,
     `amountCents` INTEGER NOT NULL,
     `currency` VARCHAR(191) NOT NULL DEFAULT 'INR',
@@ -206,16 +206,16 @@ CREATE TABLE `payments` (
 
 -- CreateTable
 CREATE TABLE `rfqs` (
-    `id` VARCHAR(191) NOT NULL,
-    `buyerId` VARCHAR(191) NOT NULL,
-    `categoryId` VARCHAR(191) NOT NULL,
+    `id` VARCHAR(36) NOT NULL,
+    `buyerId` VARCHAR(36) NOT NULL,
+    `categoryId` VARCHAR(36) NOT NULL,
     `title` VARCHAR(191) NOT NULL,
     `description` TEXT NOT NULL,
     `quantity` INTEGER NOT NULL DEFAULT 1,
     `budgetCents` INTEGER NULL,
     `currency` VARCHAR(191) NOT NULL DEFAULT 'INR',
-    `city` VARCHAR(191) NOT NULL,
-    `state` VARCHAR(191) NOT NULL,
+    `city` VARCHAR(100) NOT NULL,
+    `state` VARCHAR(50) NOT NULL,
     `status` ENUM('OPEN', 'QUOTED', 'AWARDED', 'CLOSED', 'CANCELLED') NOT NULL DEFAULT 'OPEN',
     `deadline` DATETIME(3) NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
@@ -227,9 +227,9 @@ CREATE TABLE `rfqs` (
 
 -- CreateTable
 CREATE TABLE `rfq_invites` (
-    `id` VARCHAR(191) NOT NULL,
-    `rfqId` VARCHAR(191) NOT NULL,
-    `businessId` VARCHAR(191) NOT NULL,
+    `id` VARCHAR(36) NOT NULL,
+    `rfqId` VARCHAR(36) NOT NULL,
+    `businessId` VARCHAR(36) NOT NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
     UNIQUE INDEX `rfq_invites_rfqId_businessId_key`(`rfqId`, `businessId`),
@@ -238,10 +238,10 @@ CREATE TABLE `rfq_invites` (
 
 -- CreateTable
 CREATE TABLE `quotes` (
-    `id` VARCHAR(191) NOT NULL,
-    `rfqId` VARCHAR(191) NOT NULL,
-    `businessId` VARCHAR(191) NOT NULL,
-    `supplierId` VARCHAR(191) NOT NULL,
+    `id` VARCHAR(36) NOT NULL,
+    `rfqId` VARCHAR(36) NOT NULL,
+    `businessId` VARCHAR(36) NOT NULL,
+    `supplierId` VARCHAR(36) NOT NULL,
     `priceCents` INTEGER NOT NULL,
     `currency` VARCHAR(191) NOT NULL DEFAULT 'INR',
     `message` TEXT NULL,
@@ -257,8 +257,8 @@ CREATE TABLE `quotes` (
 
 -- CreateTable
 CREATE TABLE `notifications` (
-    `id` VARCHAR(191) NOT NULL,
-    `userId` VARCHAR(191) NOT NULL,
+    `id` VARCHAR(36) NOT NULL,
+    `userId` VARCHAR(36) NOT NULL,
     `channel` ENUM('EMAIL', 'SMS', 'IN_APP') NOT NULL,
     `title` VARCHAR(191) NOT NULL,
     `body` TEXT NOT NULL,
@@ -340,3 +340,4 @@ ALTER TABLE `quotes` ADD CONSTRAINT `quotes_supplierId_fkey` FOREIGN KEY (`suppl
 
 -- AddForeignKey
 ALTER TABLE `notifications` ADD CONSTRAINT `notifications_userId_fkey` FOREIGN KEY (`userId`) REFERENCES `users`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+

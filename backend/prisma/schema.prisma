@@ -28,7 +28,7 @@ enum UserStatus {
 }
 
 model User {
-  id              String     @id @default(uuid())
+  id              String     @id @default(uuid()) @db.VarChar(36)
   email           String     @unique
   phone           String?    @unique
   passwordHash    String
@@ -56,9 +56,9 @@ model User {
 }
 
 model RefreshToken {
-  id        String    @id @default(uuid())
+  id        String    @id @default(uuid()) @db.VarChar(36)
   token     String    @unique
-  userId    String
+  userId    String    @db.VarChar(36)
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   expiresAt DateTime
   revokedAt DateTime?
@@ -87,12 +87,12 @@ enum SubscriptionPlan {
 }
 
 model Category {
-  id          String     @id @default(uuid())
+  id          String     @id @default(uuid()) @db.VarChar(36)
   name        String
   slug        String     @unique
   description String?    @db.Text
   iconUrl     String?
-  parentId    String?
+  parentId    String?    @db.VarChar(36)
   parent      Category?  @relation("CategoryTree", fields: [parentId], references: [id])
   children    Category[] @relation("CategoryTree")
   businesses  Business[]
@@ -104,13 +104,13 @@ model Category {
 }
 
 model Business {
-  id               String           @id @default(uuid())
-  ownerId          String
+  id               String           @id @default(uuid()) @db.VarChar(36)
+  ownerId          String           @db.VarChar(36)
   owner            User             @relation("BusinessOwner", fields: [ownerId], references: [id])
   name             String
   slug             String           @unique
   description      String?          @db.Text
-  categoryId       String
+  categoryId       String           @db.VarChar(36)
   category         Category         @relation(fields: [categoryId], references: [id])
   status           BusinessStatus   @default(DRAFT)
   subscriptionPlan SubscriptionPlan @default(FREE)
@@ -121,8 +121,8 @@ model Business {
   website      String?
   addressLine1 String
   addressLine2 String?
-  city         String
-  state        String
+  city         String  @db.VarChar(100)
+  state        String  @db.VarChar(50)
   postalCode   String
   country      String  @default("IN")
   latitude     Float
@@ -156,8 +156,8 @@ model Business {
 }
 
 model BusinessPhoto {
-  id         String   @id @default(uuid())
-  businessId String
+  id         String   @id @default(uuid()) @db.VarChar(36)
+  businessId String   @db.VarChar(36)
   business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
   url        String
   caption    String?
@@ -169,8 +169,8 @@ model BusinessPhoto {
 }
 
 model BusinessHours {
-  id         String   @id @default(uuid())
-  businessId String
+  id         String   @id @default(uuid()) @db.VarChar(36)
+  businessId String   @db.VarChar(36)
   business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
   dayOfWeek  Int // 0=Sunday .. 6=Saturday
   openTime   String // "09:00"
@@ -182,8 +182,8 @@ model BusinessHours {
 }
 
 model Service {
-  id           String   @id @default(uuid())
-  businessId   String
+  id           String   @id @default(uuid()) @db.VarChar(36)
+  businessId   String   @db.VarChar(36)
   business     Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
   name         String
   description  String?  @db.Text
@@ -204,10 +204,10 @@ model Service {
 // ---------------------------------------------------------------------------
 
 model Review {
-  id             String    @id @default(uuid())
-  businessId     String
+  id             String    @id @default(uuid()) @db.VarChar(36)
+  businessId     String    @db.VarChar(36)
   business       Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  userId         String
+  userId         String    @db.VarChar(36)
   user           User      @relation(fields: [userId], references: [id])
   rating         Int // 1-5
   title          String?
@@ -244,10 +244,10 @@ enum LeadSource {
 }
 
 model Lead {
-  id         String     @id @default(uuid())
-  businessId String
+  id         String     @id @default(uuid()) @db.VarChar(36)
+  businessId String     @db.VarChar(36)
   business   Business   @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  customerId String?
+  customerId String?    @db.VarChar(36)
   customer   User?      @relation("LeadCustomer", fields: [customerId], references: [id])
   name       String
   phone      String
@@ -275,12 +275,12 @@ enum BookingStatus {
 }
 
 model Booking {
-  id          String        @id @default(uuid())
-  businessId  String
+  id          String        @id @default(uuid()) @db.VarChar(36)
+  businessId  String        @db.VarChar(36)
   business    Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  serviceId   String
+  serviceId   String        @db.VarChar(36)
   service     Service       @relation(fields: [serviceId], references: [id])
-  customerId  String
+  customerId  String        @db.VarChar(36)
   customer    User          @relation("BookingCustomer", fields: [customerId], references: [id])
   scheduledAt DateTime
   status      BookingStatus @default(PENDING)
@@ -315,10 +315,10 @@ enum PaymentType {
 }
 
 model Payment {
-  id                    String        @id @default(uuid())
-  userId                String
+  id                    String        @id @default(uuid()) @db.VarChar(36)
+  userId                String        @db.VarChar(36)
   user                  User          @relation(fields: [userId], references: [id])
-  bookingId             String?       @unique
+  bookingId             String?       @unique @db.VarChar(36)
   booking               Booking?      @relation(fields: [bookingId], references: [id])
   type                  PaymentType
   amountCents           Int
@@ -353,18 +353,18 @@ enum QuoteStatus {
 }
 
 model Rfq {
-  id          String    @id @default(uuid())
-  buyerId     String
+  id          String    @id @default(uuid()) @db.VarChar(36)
+  buyerId     String    @db.VarChar(36)
   buyer       User      @relation("RfqBuyer", fields: [buyerId], references: [id])
-  categoryId  String
+  categoryId  String    @db.VarChar(36)
   category    Category  @relation(fields: [categoryId], references: [id])
   title       String
   description String    @db.Text
   quantity    Int       @default(1)
   budgetCents Int?
   currency    String    @default("INR")
-  city        String
-  state       String
+  city        String    @db.VarChar(100)
+  state       String    @db.VarChar(50)
   status      RfqStatus @default(OPEN)
   deadline    DateTime?
   createdAt   DateTime  @default(now())
@@ -378,10 +378,10 @@ model Rfq {
 }
 
 model RfqInvite {
-  id         String   @id @default(uuid())
-  rfqId      String
+  id         String   @id @default(uuid()) @db.VarChar(36)
+  rfqId      String   @db.VarChar(36)
   rfq        Rfq      @relation(fields: [rfqId], references: [id], onDelete: Cascade)
-  businessId String
+  businessId String   @db.VarChar(36)
   business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
   createdAt  DateTime @default(now())
 
@@ -390,12 +390,12 @@ model RfqInvite {
 }
 
 model Quote {
-  id           String      @id @default(uuid())
-  rfqId        String
+  id           String      @id @default(uuid()) @db.VarChar(36)
+  rfqId        String      @db.VarChar(36)
   rfq          Rfq         @relation(fields: [rfqId], references: [id], onDelete: Cascade)
-  businessId   String
+  businessId   String      @db.VarChar(36)
   business     Business    @relation("QuoteBusiness", fields: [businessId], references: [id])
-  supplierId   String
+  supplierId   String      @db.VarChar(36)
   supplier     User        @relation("QuoteSupplier", fields: [supplierId], references: [id])
   priceCents   Int
   currency     String      @default("INR")
@@ -421,8 +421,8 @@ enum NotificationChannel {
 }
 
 model Notification {
-  id        String              @id @default(uuid())
-  userId    String
+  id        String              @id @default(uuid()) @db.VarChar(36)
+  userId    String              @db.VarChar(36)
   user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   channel   NotificationChannel
   title     String
