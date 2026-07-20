@@ -37,6 +37,7 @@ export interface Business {
   longitude: number;
   avgRating: number;
   reviewCount: number;
+  isVerified?: boolean;
   logoUrl?: string | null;
   status: string;
   category?: Category;
