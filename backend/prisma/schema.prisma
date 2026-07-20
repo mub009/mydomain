@@ -1,0 +1,436 @@
+// Local Business Directory & Marketplace Platform
+// Enterprise domain model covering: identity, listings, search, reviews,
+// lead generation, bookings, payments, and B2B services.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Identity & Access
+// ---------------------------------------------------------------------------
+
+enum UserRole {
+  CUSTOMER
+  BUSINESS_OWNER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  PENDING_VERIFICATION
+}
+
+model User {
+  id             String     @id @default(uuid())
+  email          String     @unique
+  phone          String?    @unique
+  passwordHash   String
+  firstName      String
+  lastName       String
+  role           UserRole   @default(CUSTOMER)
+  status         UserStatus @default(PENDING_VERIFICATION)
+  avatarUrl      String?
+  emailVerifiedAt DateTime?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  businesses     Business[]        @relation("BusinessOwner")
+  reviews        Review[]
+  leads          Lead[]            @relation("LeadCustomer")
+  bookings       Booking[]         @relation("BookingCustomer")
+  payments       Payment[]
+  rfqs           Rfq[]             @relation("RfqBuyer")
+  quotes         Quote[]           @relation("QuoteSupplier")
+  refreshTokens  RefreshToken[]
+  notifications  Notification[]
+
+  @@index([role])
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+// ---------------------------------------------------------------------------
+// Business Listings & Catalog
+// ---------------------------------------------------------------------------
+
+enum BusinessStatus {
+  DRAFT
+  PENDING_APPROVAL
+  PUBLISHED
+  SUSPENDED
+}
+
+enum SubscriptionPlan {
+  FREE
+  BASIC
+  PREMIUM
+  ENTERPRISE
+}
+
+model Category {
+  id          String     @id @default(uuid())
+  name        String
+  slug        String     @unique
+  description String?
+  iconUrl     String?
+  parentId    String?
+  parent      Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children    Category[] @relation("CategoryTree")
+  businesses  Business[]
+  rfqs        Rfq[]
+  createdAt   DateTime   @default(now())
+
+  @@index([parentId])
+  @@map("categories")
+}
+
+model Business {
+  id               String           @id @default(uuid())
+  ownerId          String
+  owner            User             @relation("BusinessOwner", fields: [ownerId], references: [id])
+  name             String
+  slug             String           @unique
+  description      String?
+  categoryId       String
+  category         Category         @relation(fields: [categoryId], references: [id])
+  status           BusinessStatus   @default(DRAFT)
+  subscriptionPlan SubscriptionPlan @default(FREE)
+
+  // Contact & location
+  email            String?
+  phone            String
+  website          String?
+  addressLine1     String
+  addressLine2     String?
+  city             String
+  state            String
+  postalCode       String
+  country          String           @default("IN")
+  latitude         Float
+  longitude        Float
+
+  // Marketplace metadata
+  logoUrl          String?
+  coverImageUrl    String?
+  isVerified       Boolean          @default(false)
+  avgRating        Float            @default(0)
+  reviewCount      Int              @default(0)
+  leadCount        Int              @default(0)
+  viewCount        Int              @default(0)
+
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  photos           BusinessPhoto[]
+  hours            BusinessHours[]
+  services         Service[]
+  reviews          Review[]
+  leads            Lead[]
+  bookings         Booking[]
+  quotes           Quote[]          @relation("QuoteBusiness")
+  rfqInvites       RfqInvite[]
+
+  @@index([categoryId])
+  @@index([city, state])
+  @@index([status])
+  @@map("businesses")
+}
+
+model BusinessPhoto {
+  id         String   @id @default(uuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  url        String
+  caption    String?
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  @@index([businessId])
+  @@map("business_photos")
+}
+
+model BusinessHours {
+  id         String   @id @default(uuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  dayOfWeek  Int // 0=Sunday .. 6=Saturday
+  openTime   String // "09:00"
+  closeTime  String // "18:00"
+  isClosed   Boolean  @default(false)
+
+  @@unique([businessId, dayOfWeek])
+  @@map("business_hours")
+}
+
+model Service {
+  id           String    @id @default(uuid())
+  businessId   String
+  business     Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name         String
+  description  String?
+  priceCents   Int
+  currency     String    @default("INR")
+  durationMins Int       @default(60)
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+
+  bookings     Booking[]
+
+  @@index([businessId])
+  @@map("services")
+}
+
+// ---------------------------------------------------------------------------
+// Reviews & Ratings
+// ---------------------------------------------------------------------------
+
+model Review {
+  id           String   @id @default(uuid())
+  businessId   String
+  business     Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  rating       Int // 1-5
+  title        String?
+  comment      String?
+  ownerReply    String?
+  ownerRepliedAt DateTime?
+  isFlagged    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([businessId, userId])
+  @@index([businessId])
+  @@map("reviews")
+}
+
+// ---------------------------------------------------------------------------
+// Lead Generation
+// ---------------------------------------------------------------------------
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  CONVERTED
+  LOST
+}
+
+enum LeadSource {
+  SEARCH
+  BUSINESS_PROFILE
+  CALLBACK_REQUEST
+  QUOTE_REQUEST
+  B2B_RFQ
+}
+
+model Lead {
+  id           String     @id @default(uuid())
+  businessId   String
+  business     Business   @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customerId   String?
+  customer     User?      @relation("LeadCustomer", fields: [customerId], references: [id])
+  name         String
+  phone        String
+  email        String?
+  message      String?
+  source       LeadSource @default(SEARCH)
+  status       LeadStatus @default(NEW)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@index([businessId, status])
+  @@map("leads")
+}
+
+// ---------------------------------------------------------------------------
+// Bookings & Appointments
+// ---------------------------------------------------------------------------
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+model Booking {
+  id           String        @id @default(uuid())
+  businessId   String
+  business     Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  serviceId    String
+  service      Service       @relation(fields: [serviceId], references: [id])
+  customerId   String
+  customer     User          @relation("BookingCustomer", fields: [customerId], references: [id])
+  scheduledAt  DateTime
+  status       BookingStatus @default(PENDING)
+  notes        String?
+  priceCents   Int
+  currency     String        @default("INR")
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  payment      Payment?
+
+  @@index([businessId, scheduledAt])
+  @@index([customerId])
+  @@map("bookings")
+}
+
+// ---------------------------------------------------------------------------
+// Payments
+// ---------------------------------------------------------------------------
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+}
+
+enum PaymentType {
+  BOOKING
+  SUBSCRIPTION
+  LEAD_UNLOCK
+}
+
+model Payment {
+  id                    String        @id @default(uuid())
+  userId                String
+  user                  User          @relation(fields: [userId], references: [id])
+  bookingId             String?       @unique
+  booking               Booking?      @relation(fields: [bookingId], references: [id])
+  type                  PaymentType
+  amountCents           Int
+  currency              String        @default("INR")
+  status                PaymentStatus @default(PENDING)
+  provider              String        @default("stripe")
+  providerPaymentIntent String?       @unique
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  @@index([userId])
+  @@map("payments")
+}
+
+// ---------------------------------------------------------------------------
+// B2B Services (RFQ / Quote marketplace)
+// ---------------------------------------------------------------------------
+
+enum RfqStatus {
+  OPEN
+  QUOTED
+  AWARDED
+  CLOSED
+  CANCELLED
+}
+
+enum QuoteStatus {
+  SUBMITTED
+  ACCEPTED
+  REJECTED
+  WITHDRAWN
+}
+
+model Rfq {
+  id          String      @id @default(uuid())
+  buyerId     String
+  buyer       User        @relation("RfqBuyer", fields: [buyerId], references: [id])
+  categoryId  String
+  category    Category    @relation(fields: [categoryId], references: [id])
+  title       String
+  description String
+  quantity    Int         @default(1)
+  budgetCents Int?
+  currency    String      @default("INR")
+  city        String
+  state       String
+  status      RfqStatus   @default(OPEN)
+  deadline    DateTime?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  invites     RfqInvite[]
+  quotes      Quote[]
+
+  @@index([categoryId, status])
+  @@map("rfqs")
+}
+
+model RfqInvite {
+  id         String   @id @default(uuid())
+  rfqId      String
+  rfq        Rfq      @relation(fields: [rfqId], references: [id], onDelete: Cascade)
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([rfqId, businessId])
+  @@map("rfq_invites")
+}
+
+model Quote {
+  id           String      @id @default(uuid())
+  rfqId        String
+  rfq          Rfq         @relation(fields: [rfqId], references: [id], onDelete: Cascade)
+  businessId   String
+  business     Business    @relation("QuoteBusiness", fields: [businessId], references: [id])
+  supplierId   String
+  supplier     User        @relation("QuoteSupplier", fields: [supplierId], references: [id])
+  priceCents   Int
+  currency     String      @default("INR")
+  message      String?
+  deliveryDays Int?
+  status       QuoteStatus @default(SUBMITTED)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@unique([rfqId, businessId])
+  @@index([rfqId])
+  @@map("quotes")
+}
+
+// ---------------------------------------------------------------------------
+// Notifications (in-app / email / sms fan-out log)
+// ---------------------------------------------------------------------------
+
+enum NotificationChannel {
+  EMAIL
+  SMS
+  IN_APP
+}
+
+model Notification {
+  id        String              @id @default(uuid())
+  userId    String
+  user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channel   NotificationChannel
+  title     String
+  body      String
+  readAt    DateTime?
+  createdAt DateTime            @default(now())
+
+  @@index([userId, readAt])
+  @@map("notifications")
+}
+
