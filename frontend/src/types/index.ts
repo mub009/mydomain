@@ -23,6 +23,12 @@ export interface Category {
   children?: Category[];
 }
 
+export interface PopularCity {
+  city: string;
+  state: string;
+  businessCount: number;
+}
+
 export interface Business {
   id: string;
   name: string;

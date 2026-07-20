@@ -7,6 +7,7 @@ import {
   Category,
   Lead,
   PaginatedResponse,
+  PopularCity,
   Review,
   Rfq,
 } from "@/types";
@@ -26,6 +27,7 @@ export const categoriesApi = {
 export const searchApi = {
   search: (params: Record<string, unknown>) =>
     api.get<PaginatedResponse<Business>>("/search", { params }).then((r) => r.data),
+  popularCities: () => api.get<ApiResponse<PopularCity[]>>("/search/cities").then((r) => r.data.data),
 };
 
 export const businessesApi = {

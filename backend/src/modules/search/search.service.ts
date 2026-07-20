@@ -93,3 +93,21 @@ export async function searchBusinesses(query: SearchQuery): Promise<{ items: Sea
 
   return { items, total: Number(countRows[0]?.count ?? 0), page, pageSize };
 }
+
+export interface PopularCity {
+  city: string;
+  state: string;
+  businessCount: number;
+}
+
+export async function listPopularCities(limit = 12): Promise<PopularCity[]> {
+  const rows = await prisma.business.groupBy({
+    by: ["city", "state"],
+    where: { status: "PUBLISHED" },
+    _count: { _all: true },
+    orderBy: { _count: { id: "desc" } },
+    take: limit,
+  });
+
+  return rows.map((r) => ({ city: r.city, state: r.state, businessCount: r._count._all }));
+}

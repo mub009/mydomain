@@ -7,11 +7,18 @@ import { Business, Category } from "@/types";
 import StarRating from "@/components/StarRating";
 import PromoCarousel from "@/components/PromoCarousel";
 import CategoryShowcase from "@/components/CategoryShowcase";
+import LocationInput from "@/components/LocationInput";
 import { getCategoryIcon } from "@/lib/categoryIcons";
+
+interface GeoPoint {
+  lat: number;
+  lng: number;
+}
 
 export default function Home() {
   const [query, setQuery] = useState("");
   const [city, setCity] = useState("");
+  const [geo, setGeo] = useState<GeoPoint | null>(null);
   const [categorySlug, setCategorySlug] = useState("");
   const [categories, setCategories] = useState<Category[]>([]);
   const [results, setResults] = useState<Business[]>([]);
@@ -24,16 +31,19 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function runSearch(e?: React.FormEvent, overrideCategory?: string, overrideQuery?: string) {
+  async function runSearch(e?: React.FormEvent, overrideCategory?: string, overrideQuery?: string, overrideGeo?: GeoPoint | null) {
     e?.preventDefault();
     setLoading(true);
     setError("");
+    const activeGeo = overrideGeo !== undefined ? overrideGeo : geo;
     try {
       const res = await searchApi.search({
         q: (overrideQuery ?? query) || undefined,
-        city: city || undefined,
+        city: activeGeo ? undefined : city || undefined,
+        lat: activeGeo?.lat,
+        lng: activeGeo?.lng,
+        sort: activeGeo ? "distance" : "rating",
         categorySlug: overrideCategory ?? categorySlug ?? undefined,
-        sort: "rating",
       });
       setResults(res.data);
     } catch (err) {
@@ -41,6 +51,17 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
+  }
+
+  function handleCityChange(next: string) {
+    setCity(next);
+    if (geo) setGeo(null);
+  }
+
+  function handleDetect(lat: number, lng: number) {
+    const point = { lat, lng };
+    setGeo(point);
+    runSearch(undefined, undefined, undefined, point);
   }
 
   function selectCategory(slug: string) {
@@ -64,15 +85,7 @@ export default function Home() {
           Search across local <span className="text-brand-600">Products &amp; Services</span>
         </h1>
         <form onSubmit={runSearch} className="flex flex-col sm:flex-row gap-2.5">
-          <div className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3.5 py-3 sm:w-64 focus-within:ring-2 focus-within:ring-brand-500/40 focus-within:border-brand-500">
-            <MapPin size={18} className="text-brand-600 shrink-0" />
-            <input
-              value={city}
-              onChange={(e) => setCity(e.target.value)}
-              placeholder="City / Location"
-              className="w-full text-sm text-ink-900 placeholder:text-gray-400 focus:outline-none"
-            />
-          </div>
+          <LocationInput value={city} onChange={handleCityChange} onDetect={handleDetect} className="sm:w-64" />
           <div className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3.5 py-3 flex-1 focus-within:ring-2 focus-within:ring-brand-500/40 focus-within:border-brand-500">
             <Search size={18} className="text-gray-400 shrink-0" />
             <input
@@ -130,7 +143,7 @@ export default function Home() {
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-bold text-ink-900 flex items-center gap-1.5">
             <TrendingUp size={18} className="text-brand-600" />
-            Top rated businesses
+            {geo ? "Businesses near you" : "Top rated businesses"}
           </h2>
           {results.length > 0 && <span className="text-sm text-ink-500">{results.length} results</span>}
         </div>
@@ -167,6 +180,9 @@ export default function Home() {
                 <p className="text-sm text-ink-500 mb-3 flex items-center gap-1">
                   <MapPin size={13} />
                   {b.city}, {b.state}
+                  {b.distanceKm !== undefined && b.distanceKm !== null && (
+                    <span className="text-ink-400">· {b.distanceKm.toFixed(1)} km away</span>
+                  )}
                 </p>
                 <StarRating rating={b.avgRating} count={b.reviewCount} />
               </Link>
