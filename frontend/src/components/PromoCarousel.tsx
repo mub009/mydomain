@@ -86,10 +86,10 @@ export default function PromoCarousel() {
   const slide = SLIDES[active];
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 mb-8">
+    <div className="grid grid-cols-2 sm:grid-cols-7 gap-3 mb-8">
       <Link
         to={slide.to}
-        className="col-span-2 sm:col-span-2 lg:col-span-3 relative overflow-hidden rounded-xl2 bg-brand-700 p-6 flex flex-col justify-between min-h-[160px] group"
+        className="col-span-2 sm:col-span-3 relative overflow-hidden rounded-xl2 bg-brand-700 p-6 flex flex-col justify-between min-h-[160px] group"
       >
         <BgPhoto key={slide.seed} seed={slide.seed} alt={slide.title} />
         <div className="absolute inset-0 bg-gradient-to-r from-brand-900/90 via-brand-800/50 to-transparent" />
