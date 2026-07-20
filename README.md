@@ -9,7 +9,7 @@ domain modules.
 
 | Layer     | Choice                                                             |
 |-----------|---------------------------------------------------------------------|
-| Backend   | Node.js, TypeScript, Express, Prisma ORM, PostgreSQL, Redis, Stripe |
+| Backend   | Node.js, TypeScript, Express, Prisma ORM, MySQL, Redis, Stripe      |
 | Frontend  | React 18, TypeScript, Vite, Tailwind CSS, Zustand, React Router     |
 | Auth      | JWT access + rotating refresh tokens, bcrypt password hashing       |
 | Tests     | Vitest + Supertest (backend)                                        |
@@ -23,7 +23,7 @@ module boundaries.
 backend/    Express API — modular monolith, one folder per domain module
 frontend/   React SPA consuming the API
 docs/       Architecture notes
-docker-compose.yml   Postgres + Redis + backend + frontend for local dev
+docker-compose.yml   MySQL + Redis + backend + frontend for local dev
 ```
 
 ## Getting started
@@ -31,7 +31,7 @@ docker-compose.yml   Postgres + Redis + backend + frontend for local dev
 ### 1. Infrastructure
 
 ```bash
-docker compose up -d postgres redis
+docker compose up -d mysql redis
 ```
 
 ### 2. Backend
@@ -40,7 +40,7 @@ docker compose up -d postgres redis
 cd backend
 cp .env.example .env       # fill in secrets (JWT, Stripe keys)
 npm install
-npm run prisma:migrate     # creates schema in Postgres
+npm run prisma:migrate     # creates schema in MySQL
 npm run prisma:seed        # sample categories/businesses/users
 npm run dev                # http://localhost:4000
 ```
@@ -102,5 +102,6 @@ core domain — not a byte-for-byte clone of any commercial product. A few
 things are intentionally scaffolded rather than fully productionized:
 image upload is URL-based (no object storage integration), SMS/email
 notifications are not wired to a provider, and geo-search uses a Haversine
-SQL query rather than PostGIS/Elasticsearch (noted as the natural next step
-in `search.service.ts` once listing volume warrants it).
+SQL query rather than a spatial index or a dedicated search engine (noted
+as the natural next step in `search.service.ts` once listing volume
+warrants it).

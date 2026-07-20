@@ -1,18 +1,19 @@
 version: "3.9"
 
 services:
-  postgres:
-    image: postgres:16-alpine
+  mysql:
+    image: mysql:8.4
     environment:
-      POSTGRES_USER: mydomain
-      POSTGRES_PASSWORD: mydomain
-      POSTGRES_DB: mydomain
+      MYSQL_DATABASE: mydomain
+      MYSQL_USER: mydomain
+      MYSQL_PASSWORD: mydomain
+      MYSQL_ROOT_PASSWORD: mydomain
     ports:
-      - "5432:5432"
+      - "3306:3306"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - mysql_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U mydomain"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "mydomain", "-pmydomain"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -33,10 +34,10 @@ services:
     env_file:
       - ./backend/.env
     environment:
-      DATABASE_URL: postgresql://mydomain:mydomain@postgres:5432/mydomain?schema=public
+      DATABASE_URL: mysql://mydomain:mydomain@mysql:3306/mydomain
       REDIS_URL: redis://redis:6379
     depends_on:
-      postgres:
+      mysql:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -52,4 +53,4 @@ services:
       - "5173:5173"
 
 volumes:
-  postgres_data:
+  mysql_data:

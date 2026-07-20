@@ -14,7 +14,9 @@ export async function listRfqs(query: { categoryId?: string; city?: string; stat
   const { page, pageSize, skip, take } = parsePagination(query);
   const where: Record<string, unknown> = {};
   if (query.categoryId) where.categoryId = query.categoryId;
-  if (query.city) where.city = { equals: query.city, mode: "insensitive" };
+  // MySQL's default collation is already case-insensitive, so a plain
+  // equality filter behaves the same as Postgres's `mode: "insensitive"`.
+  if (query.city) where.city = query.city;
   where.status = query.status ?? RfqStatus.OPEN;
 
   const [items, total] = await Promise.all([

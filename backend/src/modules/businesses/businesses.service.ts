@@ -30,7 +30,9 @@ export async function listBusinesses(query: { page?: number; pageSize?: number; 
   const { page, pageSize, skip, take } = parsePagination(query);
   const where: Record<string, unknown> = { status: BusinessStatus.PUBLISHED };
   if (query.categoryId) where.categoryId = query.categoryId;
-  if (query.city) where.city = { equals: query.city, mode: "insensitive" };
+  // MySQL's default collation is already case-insensitive, so a plain
+  // equality filter behaves the same as Postgres's `mode: "insensitive"`.
+  if (query.city) where.city = query.city;
 
   const [items, total] = await Promise.all([
     prisma.business.findMany({

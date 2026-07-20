@@ -17,7 +17,7 @@ modules/<domain>/
 This keeps route/HTTP concerns out of business logic, and business logic
 out of the ORM's model shape (services return the fields callers need, not
 raw Prisma rows), while avoiding a premature microservice split — the
-domains share one Postgres database and one deploy unit, which is the right
+domains share one MySQL database and one deploy unit, which is the right
 tradeoff at this stage. A domain module is intentionally the seam along
 which this could later split into services (e.g., extracting `payments` or
 `search` behind a queue) without cross-cutting rewrites, because each
@@ -76,13 +76,14 @@ Design decisions worth calling out:
 
 `search.service.ts` builds a parameterized raw SQL query (via
 `Prisma.sql`/`Prisma.join`, never string concatenation) combining keyword
-`ILIKE`, category/city filters, and a Haversine great-circle distance
-expression for geo radius + distance sorting. This was chosen over
-PostGIS/Elasticsearch to keep the local dev stack to "just Postgres" while
-the catalog is small; the query is shaped so that swapping the distance
-expression for `ST_DWithin`/`ST_Distance` (PostGIS) or moving the whole
-query to a dedicated search index is a contained change, not a rewrite of
-calling code.
+`LIKE`, category/city filters, and a Haversine great-circle distance
+expression for geo radius + distance sorting. This was chosen over a spatial
+index or a dedicated search engine to keep the local dev stack to "just
+MySQL" while the catalog is small; the query is shaped so that swapping the
+distance expression for a `POINT` column + `ST_Distance_Sphere`/spatial
+index, or moving the whole query to a dedicated search index
+(Elasticsearch/Meilisearch), is a contained change, not a rewrite of calling
+code.
 
 ## Auth
 

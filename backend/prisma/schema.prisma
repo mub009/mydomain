@@ -7,7 +7,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
@@ -28,41 +28,41 @@ enum UserStatus {
 }
 
 model User {
-  id             String     @id @default(uuid())
-  email          String     @unique
-  phone          String?    @unique
-  passwordHash   String
-  firstName      String
-  lastName       String
-  role           UserRole   @default(CUSTOMER)
-  status         UserStatus @default(PENDING_VERIFICATION)
-  avatarUrl      String?
+  id              String     @id @default(uuid())
+  email           String     @unique
+  phone           String?    @unique
+  passwordHash    String
+  firstName       String
+  lastName        String
+  role            UserRole   @default(CUSTOMER)
+  status          UserStatus @default(PENDING_VERIFICATION)
+  avatarUrl       String?
   emailVerifiedAt DateTime?
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
 
-  businesses     Business[]        @relation("BusinessOwner")
-  reviews        Review[]
-  leads          Lead[]            @relation("LeadCustomer")
-  bookings       Booking[]         @relation("BookingCustomer")
-  payments       Payment[]
-  rfqs           Rfq[]             @relation("RfqBuyer")
-  quotes         Quote[]           @relation("QuoteSupplier")
-  refreshTokens  RefreshToken[]
-  notifications  Notification[]
+  businesses    Business[]     @relation("BusinessOwner")
+  reviews       Review[]
+  leads         Lead[]         @relation("LeadCustomer")
+  bookings      Booking[]      @relation("BookingCustomer")
+  payments      Payment[]
+  rfqs          Rfq[]          @relation("RfqBuyer")
+  quotes        Quote[]        @relation("QuoteSupplier")
+  refreshTokens RefreshToken[]
+  notifications Notification[]
 
   @@index([role])
   @@map("users")
 }
 
 model RefreshToken {
-  id        String   @id @default(uuid())
-  token     String   @unique
+  id        String    @id @default(uuid())
+  token     String    @unique
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   expiresAt DateTime
   revokedAt DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   @@index([userId])
   @@map("refresh_tokens")
@@ -90,7 +90,7 @@ model Category {
   id          String     @id @default(uuid())
   name        String
   slug        String     @unique
-  description String?
+  description String?    @db.Text
   iconUrl     String?
   parentId    String?
   parent      Category?  @relation("CategoryTree", fields: [parentId], references: [id])
@@ -109,45 +109,45 @@ model Business {
   owner            User             @relation("BusinessOwner", fields: [ownerId], references: [id])
   name             String
   slug             String           @unique
-  description      String?
+  description      String?          @db.Text
   categoryId       String
   category         Category         @relation(fields: [categoryId], references: [id])
   status           BusinessStatus   @default(DRAFT)
   subscriptionPlan SubscriptionPlan @default(FREE)
 
   // Contact & location
-  email            String?
-  phone            String
-  website          String?
-  addressLine1     String
-  addressLine2     String?
-  city             String
-  state            String
-  postalCode       String
-  country          String           @default("IN")
-  latitude         Float
-  longitude        Float
+  email        String?
+  phone        String
+  website      String?
+  addressLine1 String
+  addressLine2 String?
+  city         String
+  state        String
+  postalCode   String
+  country      String  @default("IN")
+  latitude     Float
+  longitude    Float
 
   // Marketplace metadata
-  logoUrl          String?
-  coverImageUrl    String?
-  isVerified       Boolean          @default(false)
-  avgRating        Float            @default(0)
-  reviewCount      Int              @default(0)
-  leadCount        Int              @default(0)
-  viewCount        Int              @default(0)
+  logoUrl       String?
+  coverImageUrl String?
+  isVerified    Boolean @default(false)
+  avgRating     Float   @default(0)
+  reviewCount   Int     @default(0)
+  leadCount     Int     @default(0)
+  viewCount     Int     @default(0)
 
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  photos           BusinessPhoto[]
-  hours            BusinessHours[]
-  services         Service[]
-  reviews          Review[]
-  leads            Lead[]
-  bookings         Booking[]
-  quotes           Quote[]          @relation("QuoteBusiness")
-  rfqInvites       RfqInvite[]
+  photos     BusinessPhoto[]
+  hours      BusinessHours[]
+  services   Service[]
+  reviews    Review[]
+  leads      Lead[]
+  bookings   Booking[]
+  quotes     Quote[]         @relation("QuoteBusiness")
+  rfqInvites RfqInvite[]
 
   @@index([categoryId])
   @@index([city, state])
@@ -182,18 +182,18 @@ model BusinessHours {
 }
 
 model Service {
-  id           String    @id @default(uuid())
+  id           String   @id @default(uuid())
   businessId   String
-  business     Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  business     Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
   name         String
-  description  String?
+  description  String?  @db.Text
   priceCents   Int
-  currency     String    @default("INR")
-  durationMins Int       @default(60)
-  isActive     Boolean   @default(true)
-  createdAt    DateTime  @default(now())
+  currency     String   @default("INR")
+  durationMins Int      @default(60)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
 
-  bookings     Booking[]
+  bookings Booking[]
 
   @@index([businessId])
   @@map("services")
@@ -204,19 +204,19 @@ model Service {
 // ---------------------------------------------------------------------------
 
 model Review {
-  id           String   @id @default(uuid())
-  businessId   String
-  business     Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  userId       String
-  user         User     @relation(fields: [userId], references: [id])
-  rating       Int // 1-5
-  title        String?
-  comment      String?
-  ownerReply    String?
+  id             String    @id @default(uuid())
+  businessId     String
+  business       Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User      @relation(fields: [userId], references: [id])
+  rating         Int // 1-5
+  title          String?
+  comment        String?   @db.Text
+  ownerReply     String?   @db.Text
   ownerRepliedAt DateTime?
-  isFlagged    Boolean  @default(false)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  isFlagged      Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   @@unique([businessId, userId])
   @@index([businessId])
@@ -244,19 +244,19 @@ enum LeadSource {
 }
 
 model Lead {
-  id           String     @id @default(uuid())
-  businessId   String
-  business     Business   @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  customerId   String?
-  customer     User?      @relation("LeadCustomer", fields: [customerId], references: [id])
-  name         String
-  phone        String
-  email        String?
-  message      String?
-  source       LeadSource @default(SEARCH)
-  status       LeadStatus @default(NEW)
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  id         String     @id @default(uuid())
+  businessId String
+  business   Business   @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customerId String?
+  customer   User?      @relation("LeadCustomer", fields: [customerId], references: [id])
+  name       String
+  phone      String
+  email      String?
+  message    String?    @db.Text
+  source     LeadSource @default(SEARCH)
+  status     LeadStatus @default(NEW)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
 
   @@index([businessId, status])
   @@map("leads")
@@ -275,22 +275,22 @@ enum BookingStatus {
 }
 
 model Booking {
-  id           String        @id @default(uuid())
-  businessId   String
-  business     Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  serviceId    String
-  service      Service       @relation(fields: [serviceId], references: [id])
-  customerId   String
-  customer     User          @relation("BookingCustomer", fields: [customerId], references: [id])
-  scheduledAt  DateTime
-  status       BookingStatus @default(PENDING)
-  notes        String?
-  priceCents   Int
-  currency     String        @default("INR")
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  id          String        @id @default(uuid())
+  businessId  String
+  business    Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  serviceId   String
+  service     Service       @relation(fields: [serviceId], references: [id])
+  customerId  String
+  customer    User          @relation("BookingCustomer", fields: [customerId], references: [id])
+  scheduledAt DateTime
+  status      BookingStatus @default(PENDING)
+  notes       String?       @db.Text
+  priceCents  Int
+  currency    String        @default("INR")
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
 
-  payment      Payment?
+  payment Payment?
 
   @@index([businessId, scheduledAt])
   @@index([customerId])
@@ -353,25 +353,25 @@ enum QuoteStatus {
 }
 
 model Rfq {
-  id          String      @id @default(uuid())
+  id          String    @id @default(uuid())
   buyerId     String
-  buyer       User        @relation("RfqBuyer", fields: [buyerId], references: [id])
+  buyer       User      @relation("RfqBuyer", fields: [buyerId], references: [id])
   categoryId  String
-  category    Category    @relation(fields: [categoryId], references: [id])
+  category    Category  @relation(fields: [categoryId], references: [id])
   title       String
-  description String
-  quantity    Int         @default(1)
+  description String    @db.Text
+  quantity    Int       @default(1)
   budgetCents Int?
-  currency    String      @default("INR")
+  currency    String    @default("INR")
   city        String
   state       String
-  status      RfqStatus   @default(OPEN)
+  status      RfqStatus @default(OPEN)
   deadline    DateTime?
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
-  invites     RfqInvite[]
-  quotes      Quote[]
+  invites RfqInvite[]
+  quotes  Quote[]
 
   @@index([categoryId, status])
   @@map("rfqs")
@@ -399,7 +399,7 @@ model Quote {
   supplier     User        @relation("QuoteSupplier", fields: [supplierId], references: [id])
   priceCents   Int
   currency     String      @default("INR")
-  message      String?
+  message      String?     @db.Text
   deliveryDays Int?
   status       QuoteStatus @default(SUBMITTED)
   createdAt    DateTime    @default(now())
@@ -426,11 +426,10 @@ model Notification {
   user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   channel   NotificationChannel
   title     String
-  body      String
+  body      String              @db.Text
   readAt    DateTime?
   createdAt DateTime            @default(now())
 
   @@index([userId, readAt])
   @@map("notifications")
 }
-

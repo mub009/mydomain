@@ -12,7 +12,7 @@ export default defineConfig({
     globals: true,
     env: {
       NODE_ENV: "test",
-      DATABASE_URL: "postgresql://mydomain:mydomain@localhost:5432/mydomain_test?schema=public",
+      DATABASE_URL: "mysql://mydomain:mydomain@localhost:3306/mydomain_test",
       JWT_ACCESS_SECRET: "test-access-secret-not-for-prod",
       JWT_REFRESH_SECRET: "test-refresh-secret-not-for-prod",
     },
