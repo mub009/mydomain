@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { MapPin, Search, ShieldCheck, TrendingUp } from "lucide-react";
 import { searchApi, categoriesApi } from "@/api/endpoints";
@@ -9,6 +9,10 @@ import PromoCarousel from "@/components/PromoCarousel";
 import CategoryShowcase from "@/components/CategoryShowcase";
 import LocationInput from "@/components/LocationInput";
 import { getCategoryIcon } from "@/lib/categoryIcons";
+import { CATEGORY_SHOWCASE } from "@/data/categoryShowcase";
+
+const MAX_PLACEHOLDER_TERMS = 10;
+const DEFAULT_SEARCH_PLACEHOLDER = "Search for restaurants, plumbers, salons…";
 
 interface GeoPoint {
   lat: number;
@@ -24,6 +28,25 @@ export default function Home() {
   const [results, setResults] = useState<Business[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [placeholderIndex, setPlaceholderIndex] = useState(0);
+
+  // Rotating placeholder examples for the search box: real category names
+  // first (so it reflects what's actually listed), topped up with curated
+  // showcase terms, deduplicated and capped so the cycle stays short.
+  const placeholderTerms = useMemo(() => {
+    const fromCategories = categories.map((c) => c.name);
+    const fromShowcase = CATEGORY_SHOWCASE.flatMap((group) => group.items.map((item) => item.label));
+    return Array.from(new Set([...fromCategories, ...fromShowcase])).slice(0, MAX_PLACEHOLDER_TERMS);
+  }, [categories]);
+
+  const searchPlaceholder =
+    placeholderTerms.length > 0 ? `Search for ${placeholderTerms[placeholderIndex % placeholderTerms.length]}…` : DEFAULT_SEARCH_PLACEHOLDER;
+
+  useEffect(() => {
+    if (placeholderTerms.length === 0) return;
+    const id = setInterval(() => setPlaceholderIndex((i) => i + 1), 2200);
+    return () => clearInterval(id);
+  }, [placeholderTerms.length]);
 
   useEffect(() => {
     categoriesApi.list().then(setCategories).catch(() => undefined);
@@ -91,7 +114,7 @@ export default function Home() {
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search for restaurants, plumbers, salons…"
+              placeholder={searchPlaceholder}
               className="w-full text-sm text-ink-900 placeholder:text-gray-400 focus:outline-none"
             />
             <button type="submit" className="btn-primary h-10 px-5 shrink-0">
