@@ -114,7 +114,7 @@ export default function LocationInput({ value, onChange, onDetect, placeholder, 
 
   return (
     <div className={`relative ${className ?? ""}`}>
-      <div className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3.5 py-3 focus-within:ring-2 focus-within:ring-brand-500/40 focus-within:border-brand-500">
+      <div className="flex items-center gap-2 h-[52px] rounded-lg border border-gray-300 bg-white px-3.5 focus-within:ring-2 focus-within:ring-brand-500/40 focus-within:border-brand-500">
         <MapPin size={18} className="text-brand-600 shrink-0" />
         <input
           value={value}

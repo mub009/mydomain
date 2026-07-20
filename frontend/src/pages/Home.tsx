@@ -86,7 +86,7 @@ export default function Home() {
         </h1>
         <form onSubmit={runSearch} className="flex flex-col sm:flex-row gap-2.5">
           <LocationInput value={city} onChange={handleCityChange} onDetect={handleDetect} className="sm:w-64" />
-          <div className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3.5 py-3 flex-1 focus-within:ring-2 focus-within:ring-brand-500/40 focus-within:border-brand-500">
+          <div className="flex items-center gap-2 h-[52px] rounded-lg border border-gray-300 bg-white pl-3.5 pr-1.5 flex-1 focus-within:ring-2 focus-within:ring-brand-500/40 focus-within:border-brand-500">
             <Search size={18} className="text-gray-400 shrink-0" />
             <input
               value={query}
@@ -94,7 +94,7 @@ export default function Home() {
               placeholder="Search for restaurants, plumbers, salons…"
               className="w-full text-sm text-ink-900 placeholder:text-gray-400 focus:outline-none"
             />
-            <button type="submit" className="btn-primary px-5 py-2 -my-1 shrink-0">
+            <button type="submit" className="btn-primary h-10 px-5 shrink-0">
               <Search size={15} />
               <span className="hidden sm:inline">Search</span>
             </button>
