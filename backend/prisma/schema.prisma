@@ -122,7 +122,11 @@ model Business {
   addressLine1 String
   addressLine2 String?
   city         String  @db.VarChar(100)
+<<<<<<< HEAD
   state        String  @db.VarChar(50)
+=======
+  state        String  @db.VarChar(100)
+>>>>>>> 70d236f4b17a6892db8e79e87539afb4dfb8d4af
   postalCode   String
   country      String  @default("IN")
   latitude     Float
