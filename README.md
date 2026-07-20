@@ -1,4 +1,4 @@
-# MyDomain — Local Business Directory & Marketplace Platform
+# Markkito — Local Business Directory & Marketplace Platform
 
 A Justdial-style local business directory and marketplace: search, listings,
 reviews, lead generation, bookings, payments, and a B2B RFQ/quote

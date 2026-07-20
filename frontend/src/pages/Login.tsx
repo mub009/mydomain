@@ -35,7 +35,7 @@ export default function Login() {
           <Building2 size={24} />
         </span>
         <h1 className="text-2xl font-extrabold text-ink-900">Welcome back</h1>
-        <p className="text-sm text-ink-500 mt-1">Log in to your MyDomain account</p>
+        <p className="text-sm text-ink-500 mt-1">Log in to your Markkito account</p>
       </div>
 
       <form onSubmit={submit} className="card p-6 space-y-4">

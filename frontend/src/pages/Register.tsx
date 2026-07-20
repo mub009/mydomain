@@ -34,7 +34,7 @@ export default function Register() {
           <Building2 size={24} />
         </span>
         <h1 className="text-2xl font-extrabold text-ink-900">Create your account</h1>
-        <p className="text-sm text-ink-500 mt-1">Join MyDomain in seconds</p>
+        <p className="text-sm text-ink-500 mt-1">Join Markkito in seconds</p>
       </div>
 
       <form onSubmit={submit} className="card p-6 space-y-4">

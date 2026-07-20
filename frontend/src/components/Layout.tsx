@@ -10,7 +10,7 @@ function Logo() {
         <Building2 size={20} strokeWidth={2.25} />
       </span>
       <span className="text-xl font-extrabold tracking-tight text-ink-900">
-        My<span className="text-brand-600">Domain</span>
+        Mark<span className="text-brand-600">kito</span>
       </span>
     </Link>
   );
@@ -136,7 +136,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <span className="flex h-7 w-7 items-center justify-center rounded-md bg-brand-600 text-white">
                 <Building2 size={16} />
               </span>
-              <span className="font-bold text-ink-900">MyDomain</span>
+              <span className="font-bold text-ink-900">Markkito</span>
             </div>
             <p className="text-ink-500 text-xs leading-relaxed">
               Find, book, and review local businesses — plus a B2B marketplace for bulk sourcing.
@@ -170,7 +170,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
         <div className="border-t border-gray-100 py-4 text-center text-xs text-ink-500">
-          MyDomain — Local Business Directory &amp; Marketplace
+          Markkito — Local Business Directory &amp; Marketplace
         </div>
       </footer>
     </div>
