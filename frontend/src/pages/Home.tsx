@@ -6,6 +6,7 @@ import { apiErrorMessage } from "@/api/client";
 import { Business, Category } from "@/types";
 import StarRating from "@/components/StarRating";
 import PromoCarousel from "@/components/PromoCarousel";
+import CategoryShowcase from "@/components/CategoryShowcase";
 import { getCategoryIcon } from "@/lib/categoryIcons";
 
 export default function Home() {
@@ -23,13 +24,13 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function runSearch(e?: React.FormEvent, overrideCategory?: string) {
+  async function runSearch(e?: React.FormEvent, overrideCategory?: string, overrideQuery?: string) {
     e?.preventDefault();
     setLoading(true);
     setError("");
     try {
       const res = await searchApi.search({
-        q: query || undefined,
+        q: (overrideQuery ?? query) || undefined,
         city: city || undefined,
         categorySlug: overrideCategory ?? categorySlug ?? undefined,
         sort: "rating",
@@ -46,6 +47,13 @@ export default function Home() {
     const next = categorySlug === slug ? "" : slug;
     setCategorySlug(next);
     runSearch(undefined, next);
+  }
+
+  function selectShowcaseItem(showcaseQuery: string) {
+    setQuery(showcaseQuery);
+    setCategorySlug("");
+    runSearch(undefined, "", showcaseQuery);
+    document.getElementById("results")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   return (
@@ -114,8 +122,11 @@ export default function Home() {
         </section>
       )}
 
+      {/* Curated subcategory showcase */}
+      <CategoryShowcase onSelect={selectShowcaseItem} />
+
       {/* Results */}
-      <section>
+      <section id="results">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-bold text-ink-900 flex items-center gap-1.5">
             <TrendingUp size={18} className="text-brand-600" />
