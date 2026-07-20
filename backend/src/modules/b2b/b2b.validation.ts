@@ -8,7 +8,7 @@ export const createRfqSchema = z.object({
   budgetCents: z.number().int().min(0).optional(),
   currency: z.string().length(3).default("INR"),
   city: z.string().min(1).max(100),
-  state: z.string().min(1).max(100),
+  state: z.string().min(1).max(50),
   deadline: z.coerce.date().optional(),
 });
 

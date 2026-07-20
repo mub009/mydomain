@@ -122,7 +122,7 @@ model Business {
   addressLine1 String
   addressLine2 String?
   city         String  @db.VarChar(100)
-  state        String  @db.VarChar(100)
+  state        String  @db.VarChar(50)
   postalCode   String
   country      String  @default("IN")
   latitude     Float
@@ -363,8 +363,8 @@ model Rfq {
   quantity    Int       @default(1)
   budgetCents Int?
   currency    String    @default("INR")
-  city        String
-  state       String
+  city        String    @db.VarChar(100)
+  state       String    @db.VarChar(50)
   status      RfqStatus @default(OPEN)
   deadline    DateTime?
   createdAt   DateTime  @default(now())

@@ -15,7 +15,7 @@ export const createBusinessSchema = z.object({
   addressLine1: z.string().min(1).max(200),
   addressLine2: z.string().max(200).optional(),
   city: z.string().min(1).max(100),
-  state: z.string().min(1).max(100),
+  state: z.string().min(1).max(50),
   postalCode: z.string().min(1).max(20),
   country: z.string().min(2).max(2).default("IN"),
   latitude: z.number().min(-90).max(90),
