@@ -54,7 +54,9 @@ export const createServiceSchema = z.object({
   durationMins: z.number().int().min(5).max(1440).default(60),
 });
 
-export const updateServiceSchema = createServiceSchema.partial();
+export const updateServiceSchema = createServiceSchema.partial().extend({
+  isActive: z.boolean().optional(),
+});
 
 export const listBusinessesQuerySchema = z.object({
   page: z.coerce.number().int().min(1).optional(),

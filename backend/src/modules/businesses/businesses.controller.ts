@@ -25,6 +25,10 @@ export async function getBusinessHandler(req: Request, res: Response): Promise<v
   ok(res, await businessesService.getBusinessBySlug(req.params.slug));
 }
 
+export async function getBusinessForOwnerHandler(req: Request, res: Response): Promise<void> {
+  ok(res, await businessesService.getBusinessForOwner(actor(req), req.params.id));
+}
+
 export async function updateBusinessHandler(req: Request, res: Response): Promise<void> {
   ok(res, await businessesService.updateBusiness(actor(req), req.params.id, req.body));
 }

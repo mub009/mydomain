@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { Building2, CalendarClock, LayoutGrid, MessageSquare, Plus } from "lucide-react";
+import { Building2, CalendarClock, LayoutGrid, MapPin, MessageSquare, Plus, Settings2, X } from "lucide-react";
 import { businessesApi, categoriesApi, leadsApi, bookingsApi } from "@/api/endpoints";
 import { apiErrorMessage } from "@/api/client";
 import { Business, Category, Lead, Booking } from "@/types";
+import BusinessManager from "@/components/BusinessManager";
 
 type Tab = "businesses" | "leads" | "bookings";
 
@@ -40,6 +41,8 @@ export default function OwnerDashboard() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [notice, setNotice] = useState("");
+  const [manageId, setManageId] = useState<string | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
 
   const [newBusiness, setNewBusiness] = useState({
     name: "",
@@ -77,14 +80,17 @@ export default function OwnerDashboard() {
     e.preventDefault();
     setNotice("");
     try {
-      await businessesApi.create({
+      const created = await businessesApi.create({
         ...newBusiness,
         latitude: Number(newBusiness.latitude),
         longitude: Number(newBusiness.longitude),
         country: "IN",
       });
-      setNotice("Business created and submitted for approval.");
+      setNotice("Business created. Manage its details, hours, services, and photos below.");
+      setNewBusiness({ name: "", slug: "", categoryId: "", phone: "", addressLine1: "", city: "", state: "", postalCode: "", latitude: "", longitude: "" });
+      setShowCreate(false);
       loadBusinesses();
+      setManageId(created.id);
     } catch (err) {
       setNotice(apiErrorMessage(err));
     }
@@ -123,116 +129,86 @@ export default function OwnerDashboard() {
         })}
       </div>
 
-      {tab === "businesses" && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div>
-            <h2 className="font-bold text-ink-900 mb-3 flex items-center gap-1.5">
+      {tab === "businesses" && manageId && (
+        <BusinessManager
+          businessId={manageId}
+          categories={categories}
+          onBack={() => setManageId(null)}
+          onChanged={loadBusinesses}
+        />
+      )}
+
+      {tab === "businesses" && !manageId && (
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-bold text-ink-900 flex items-center gap-1.5">
               <Building2 size={16} className="text-brand-600" /> Your listings
             </h2>
-            <div className="space-y-2">
-              {businesses.map((b) => (
-                <div key={b.id} className="card p-3.5">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="font-semibold text-sm text-ink-900">{b.name}</p>
-                    <span className={`badge ${statusBadgeClass(b.status)}`}>{b.status.replace("_", " ")}</span>
-                  </div>
-                  <p className="text-xs text-ink-500 mt-1">
-                    {b.city}, {b.state}
-                  </p>
-                </div>
-              ))}
-              {businesses.length === 0 && (
-                <div className="card p-6 text-center text-sm text-ink-500">No businesses yet — add one to get started.</div>
+            <button onClick={() => setShowCreate((v) => !v)} className={showCreate ? "btn-secondary px-3 py-2 text-sm" : "btn-primary px-3 py-2 text-sm"}>
+              {showCreate ? (
+                <>
+                  <X size={15} /> Cancel
+                </>
+              ) : (
+                <>
+                  <Plus size={15} /> Add business
+                </>
               )}
-            </div>
+            </button>
           </div>
-          <form onSubmit={createBusiness} className="card p-5 space-y-3">
-            <h2 className="font-bold text-ink-900 flex items-center gap-1.5">
-              <Plus size={16} className="text-brand-600" /> Add a business
-            </h2>
-            {notice && <p className="text-sm text-brand-700 bg-brand-50 rounded-md px-3 py-2">{notice}</p>}
-            <input
-              required
-              placeholder="Business name"
-              value={newBusiness.name}
-              onChange={(e) => setNewBusiness({ ...newBusiness, name: e.target.value })}
-              className="input"
-            />
-            <input
-              required
-              placeholder="URL slug (e.g. joes-plumbing)"
-              value={newBusiness.slug}
-              onChange={(e) => setNewBusiness({ ...newBusiness, slug: e.target.value })}
-              className="input"
-            />
-            <select
-              required
-              value={newBusiness.categoryId}
-              onChange={(e) => setNewBusiness({ ...newBusiness, categoryId: e.target.value })}
-              className="input"
-            >
-              <option value="">Select category</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-            <input
-              required
-              placeholder="Phone"
-              value={newBusiness.phone}
-              onChange={(e) => setNewBusiness({ ...newBusiness, phone: e.target.value })}
-              className="input"
-            />
-            <input
-              required
-              placeholder="Address line 1"
-              value={newBusiness.addressLine1}
-              onChange={(e) => setNewBusiness({ ...newBusiness, addressLine1: e.target.value })}
-              className="input"
-            />
-            <div className="flex gap-3">
-              <input
-                required
-                placeholder="City"
-                value={newBusiness.city}
-                onChange={(e) => setNewBusiness({ ...newBusiness, city: e.target.value })}
-                className="input w-1/2"
-              />
-              <input
-                required
-                placeholder="State"
-                value={newBusiness.state}
-                onChange={(e) => setNewBusiness({ ...newBusiness, state: e.target.value })}
-                className="input w-1/2"
-              />
-            </div>
-            <input
-              required
-              placeholder="Postal code"
-              value={newBusiness.postalCode}
-              onChange={(e) => setNewBusiness({ ...newBusiness, postalCode: e.target.value })}
-              className="input"
-            />
-            <div className="flex gap-3">
-              <input
-                required
-                placeholder="Latitude"
-                value={newBusiness.latitude}
-                onChange={(e) => setNewBusiness({ ...newBusiness, latitude: e.target.value })}
-                className="input w-1/2"
-              />
-              <input
-                required
-                placeholder="Longitude"
-                value={newBusiness.longitude}
-                onChange={(e) => setNewBusiness({ ...newBusiness, longitude: e.target.value })}
-                className="input w-1/2"
-              />
-            </div>
-            <button className="btn-primary w-full py-2.5">Create listing</button>
-          </form>
+
+          {notice && <p className="text-sm text-brand-700 bg-brand-50 rounded-md px-3 py-2 mb-4">{notice}</p>}
+
+          {showCreate && (
+            <form onSubmit={createBusiness} className="card p-5 space-y-3 mb-6">
+              <h3 className="font-bold text-ink-900">Add a business</h3>
+              <p className="text-xs text-ink-500 -mt-2">Create the listing, then add hours, services, and photos.</p>
+              <input required placeholder="Business name" value={newBusiness.name} onChange={(e) => setNewBusiness({ ...newBusiness, name: e.target.value })} className="input" />
+              <input required placeholder="URL slug (e.g. joes-plumbing)" value={newBusiness.slug} onChange={(e) => setNewBusiness({ ...newBusiness, slug: e.target.value })} className="input" />
+              <select required value={newBusiness.categoryId} onChange={(e) => setNewBusiness({ ...newBusiness, categoryId: e.target.value })} className="input">
+                <option value="">Select category</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+              <input required placeholder="Phone" value={newBusiness.phone} onChange={(e) => setNewBusiness({ ...newBusiness, phone: e.target.value })} className="input" />
+              <input required placeholder="Address line 1" value={newBusiness.addressLine1} onChange={(e) => setNewBusiness({ ...newBusiness, addressLine1: e.target.value })} className="input" />
+              <div className="flex gap-3">
+                <input required placeholder="City" value={newBusiness.city} onChange={(e) => setNewBusiness({ ...newBusiness, city: e.target.value })} className="input w-1/2" />
+                <input required placeholder="State" value={newBusiness.state} onChange={(e) => setNewBusiness({ ...newBusiness, state: e.target.value })} className="input w-1/2" />
+              </div>
+              <input required placeholder="Postal code" value={newBusiness.postalCode} onChange={(e) => setNewBusiness({ ...newBusiness, postalCode: e.target.value })} className="input" />
+              <div className="flex gap-3">
+                <input required placeholder="Latitude" value={newBusiness.latitude} onChange={(e) => setNewBusiness({ ...newBusiness, latitude: e.target.value })} className="input w-1/2" />
+                <input required placeholder="Longitude" value={newBusiness.longitude} onChange={(e) => setNewBusiness({ ...newBusiness, longitude: e.target.value })} className="input w-1/2" />
+              </div>
+              <button className="btn-primary w-full py-2.5">Create listing</button>
+            </form>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {businesses.map((b) => (
+              <div key={b.id} className="card p-4 flex flex-col">
+                <div className="flex items-start justify-between gap-2">
+                  <p className="font-semibold text-ink-900">{b.name}</p>
+                  <span className={`badge ${statusBadgeClass(b.status)}`}>{b.status.replace("_", " ")}</span>
+                </div>
+                <p className="text-xs text-ink-500 mt-1 flex items-center gap-1">
+                  <MapPin size={12} /> {b.city}, {b.state}
+                </p>
+                <button onClick={() => setManageId(b.id)} className="btn-secondary w-full mt-3 py-2 text-sm">
+                  <Settings2 size={15} /> Manage
+                </button>
+              </div>
+            ))}
+            {businesses.length === 0 && !showCreate && (
+              <div className="card p-8 text-center text-sm text-ink-500 sm:col-span-2">
+                No businesses yet — click “Add business” to get started.
+              </div>
+            )}
+          </div>
         </div>
       )}
 

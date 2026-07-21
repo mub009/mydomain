@@ -18,6 +18,7 @@ import {
   createBusinessHandler,
   deleteBusinessHandler,
   deleteServiceHandler,
+  getBusinessForOwnerHandler,
   getBusinessHandler,
   listBusinessesHandler,
   listMyBusinessesHandler,
@@ -37,6 +38,7 @@ businessesRouter.get(
   requireRole(UserRole.BUSINESS_OWNER, UserRole.ADMIN),
   asyncHandler(listMyBusinessesHandler),
 );
+businessesRouter.get("/:id/manage", requireAuth, asyncHandler(getBusinessForOwnerHandler));
 businessesRouter.get("/:slug", asyncHandler(getBusinessHandler));
 
 businessesRouter.post(

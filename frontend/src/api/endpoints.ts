@@ -32,15 +32,22 @@ export const searchApi = {
 
 export const businessesApi = {
   get: (slug: string) => api.get<ApiResponse<Business>>(`/businesses/${slug}`).then((r) => r.data.data),
+  manage: (id: string) => api.get<ApiResponse<Business>>(`/businesses/${id}/manage`).then((r) => r.data.data),
   mine: () => api.get<ApiResponse<Business[]>>("/businesses/mine").then((r) => r.data.data),
   create: (payload: Record<string, unknown>) =>
     api.post<ApiResponse<Business>>("/businesses", payload).then((r) => r.data.data),
   update: (id: string, payload: Record<string, unknown>) =>
     api.patch<ApiResponse<Business>>(`/businesses/${id}`, payload).then((r) => r.data.data),
   submitForApproval: (id: string) => api.post<ApiResponse<Business>>(`/businesses/${id}/submit`).then((r) => r.data.data),
+  setHours: (id: string, hours: unknown[]) => api.put(`/businesses/${id}/hours`, { hours }).then((r) => r.data.data),
+  addPhoto: (id: string, payload: { url: string; caption?: string; sortOrder?: number }) =>
+    api.post(`/businesses/${id}/photos`, payload).then((r) => r.data.data),
+  removePhoto: (id: string, photoId: string) => api.delete(`/businesses/${id}/photos/${photoId}`),
   addService: (id: string, payload: Record<string, unknown>) =>
     api.post(`/businesses/${id}/services`, payload).then((r) => r.data.data),
-  setHours: (id: string, hours: unknown[]) => api.put(`/businesses/${id}/hours`, { hours }).then((r) => r.data.data),
+  updateService: (id: string, serviceId: string, payload: Record<string, unknown>) =>
+    api.patch(`/businesses/${id}/services/${serviceId}`, payload).then((r) => r.data.data),
+  deleteService: (id: string, serviceId: string) => api.delete(`/businesses/${id}/services/${serviceId}`),
 };
 
 export const reviewsApi = {

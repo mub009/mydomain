@@ -76,6 +76,25 @@ export async function getBusinessById(id: string) {
   return business;
 }
 
+// Owner-scoped full fetch for the management dashboard: includes ALL
+// services (not just active ones), every photo and hours row, and does not
+// increment the public view counter.
+export async function getBusinessForOwner(actor: Actor, id: string) {
+  const business = await prisma.business.findUnique({
+    where: { id },
+    include: {
+      category: true,
+      photos: { orderBy: { sortOrder: "asc" } },
+      hours: { orderBy: { dayOfWeek: "asc" } },
+      services: { orderBy: { createdAt: "asc" } },
+      _count: { select: { leads: true, bookings: true, reviews: true } },
+    },
+  });
+  if (!business) throw AppError.notFound("Business not found");
+  assertOwnerOrAdmin(actor, business.ownerId);
+  return business;
+}
+
 export async function updateBusiness(actor: Actor, id: string, data: Record<string, unknown>) {
   const business = await getBusinessById(id);
   assertOwnerOrAdmin(actor, business.ownerId);
