@@ -61,7 +61,7 @@ const PROMO_TILES = [
   },
 ];
 
-function BgPhoto({ seed, alt }: { seed: string; alt: string }) {
+function BgPhoto({ seed, alt, className }: { seed: string; alt: string; className?: string }) {
   const [failed, setFailed] = useState(false);
   if (failed) return null;
   return (
@@ -70,18 +70,20 @@ function BgPhoto({ seed, alt }: { seed: string; alt: string }) {
       alt={alt}
       loading="lazy"
       onError={() => setFailed(true)}
-      className="absolute inset-0 h-full w-full object-cover"
+      className={`absolute inset-0 h-full w-full object-cover ${className ?? ""}`}
     />
   );
 }
 
 export default function PromoCarousel() {
   const [active, setActive] = useState(0);
+  const [paused, setPaused] = useState(false);
 
   useEffect(() => {
+    if (paused) return;
     const id = setInterval(() => setActive((v) => (v + 1) % SLIDES.length), 4500);
     return () => clearInterval(id);
-  }, []);
+  }, [paused]);
 
   const slide = SLIDES[active];
 
@@ -89,22 +91,44 @@ export default function PromoCarousel() {
     <div className="grid grid-cols-2 sm:grid-cols-7 gap-3 mb-8">
       <Link
         to={slide.to}
+        onMouseEnter={() => setPaused(true)}
+        onMouseLeave={() => setPaused(false)}
         className="col-span-2 sm:col-span-3 relative overflow-hidden rounded-xl2 bg-brand-700 p-6 flex flex-col justify-between min-h-[160px] group"
       >
-        <BgPhoto key={slide.seed} seed={slide.seed} alt={slide.title} />
+        {/* Crossfading, slowly-panning backgrounds */}
+        {SLIDES.map((s, i) => (
+          <div
+            key={s.seed}
+            aria-hidden
+            className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${
+              i === active ? "opacity-100" : "opacity-0"
+            }`}
+          >
+            <BgPhoto seed={s.seed} alt="" className="animate-kenburns" />
+          </div>
+        ))}
         <div className="absolute inset-0 bg-gradient-to-r from-brand-900/90 via-brand-800/50 to-transparent" />
-        <div className="relative">
+
+        {/* Text re-mounts on slide change to replay the fade-up */}
+        <div key={active} className="relative animate-slide-fade-up">
           <h3 className="text-white text-xl font-extrabold leading-snug max-w-xs drop-shadow-sm">{slide.title}</h3>
           <p className="text-white/85 text-sm mt-1.5 max-w-xs drop-shadow-sm">{slide.subtitle}</p>
+          <span className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold bg-white text-brand-700 rounded-lg px-3.5 py-2 w-fit group-hover:gap-2.5 transition-all">
+            {slide.cta} <ArrowRight size={15} />
+          </span>
         </div>
-        <span className="relative inline-flex items-center gap-1.5 text-sm font-semibold bg-white text-brand-700 rounded-lg px-3.5 py-2 w-fit group-hover:gap-2.5 transition-all">
-          {slide.cta} <ArrowRight size={15} />
-        </span>
+
         <div className="relative flex gap-1.5 mt-3">
           {SLIDES.map((_, i) => (
-            <span
+            <button
               key={i}
-              className={`h-1.5 rounded-full transition-all ${i === active ? "w-5 bg-white" : "w-1.5 bg-white/50"}`}
+              type="button"
+              aria-label={`Go to slide ${i + 1}`}
+              onClick={(e) => {
+                e.preventDefault();
+                setActive(i);
+              }}
+              className={`h-1.5 rounded-full transition-all ${i === active ? "w-5 bg-white" : "w-1.5 bg-white/50 hover:bg-white/80"}`}
             />
           ))}
         </div>
@@ -116,7 +140,11 @@ export default function PromoCarousel() {
           to={tile.to}
           className="relative overflow-hidden rounded-xl2 bg-ink-900 p-4 flex flex-col justify-between min-h-[160px] group"
         >
-          <BgPhoto seed={tile.seed} alt={tile.label} />
+          <BgPhoto
+            seed={tile.seed}
+            alt={tile.label}
+            className="transition-transform duration-500 group-hover:scale-110"
+          />
           <div className={`absolute inset-0 bg-gradient-to-t ${tile.className} to-transparent`} />
           <span className="relative flex h-9 w-9 items-center justify-center rounded-lg bg-white/20 text-white backdrop-blur-sm">
             <tile.icon size={18} />
