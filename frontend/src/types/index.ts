@@ -31,20 +31,27 @@ export interface PopularCity {
 
 export interface Business {
   id: string;
+  ownerId?: string;
   name: string;
   slug: string;
   description?: string | null;
   addressLine1?: string;
+  addressLine2?: string | null;
   city: string;
   state: string;
+  postalCode?: string;
+  country?: string;
   phone: string;
   email?: string | null;
+  website?: string | null;
   latitude: number;
   longitude: number;
   avgRating: number;
   reviewCount: number;
+  viewCount?: number;
   isVerified?: boolean;
   logoUrl?: string | null;
+  coverImageUrl?: string | null;
   status: string;
   category?: Category;
   categoryName?: string;

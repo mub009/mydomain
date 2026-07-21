@@ -1,22 +1,63 @@
-import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useParams } from "react-router-dom";
 import {
+  Bookmark,
   Building2,
   Calendar,
+  ChevronLeft,
+  ChevronRight,
   Clock,
+  Copy,
+  Globe,
   Mail,
   MapPin,
   MessageSquare,
+  Navigation,
   Phone,
+  Share2,
   ShieldCheck,
+  Star,
+  ThumbsUp,
+  TrendingUp,
 } from "lucide-react";
 import { businessesApi, bookingsApi, leadsApi, reviewsApi } from "@/api/endpoints";
 import { apiErrorMessage } from "@/api/client";
-import { Business } from "@/types";
+import { Business, Review } from "@/types";
 import { useAuthStore } from "@/store/authStore";
 import StarRating, { StarRow } from "@/components/StarRating";
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const TABS = ["Overview", "Photos", "Services", "Reviews"] as const;
+type Tab = (typeof TABS)[number];
+type ReviewSort = "relevant" | "latest" | "high";
+
+// Photo with graceful fallback: user-uploaded URLs may 404, so swap in a
+// neutral placeholder rather than showing the browser's broken-image icon.
+function PhotoImage({ src, alt, className }: { src: string; alt: string; className?: string }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) {
+    return (
+      <div className={`flex items-center justify-center bg-gray-100 text-gray-300 ${className ?? ""}`}>
+        <Building2 size={32} />
+      </div>
+    );
+  }
+  return <img src={src} alt={alt} onError={() => setFailed(true)} className={className} />;
+}
+
+function formatDate(iso: string): string {
+  try {
+    return new Date(iso).toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
+  } catch {
+    return "";
+  }
+}
+
+function fullAddress(b: Business): string {
+  return [b.addressLine1, b.addressLine2, b.city, b.state, b.postalCode, b.country]
+    .filter(Boolean)
+    .join(", ");
+}
 
 export default function BusinessDetail() {
   const { slug } = useParams<{ slug: string }>();
@@ -24,6 +65,12 @@ export default function BusinessDetail() {
   const [business, setBusiness] = useState<Business | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [tab, setTab] = useState<Tab>("Overview");
+  const [numberShown, setNumberShown] = useState(false);
+  const [bookmarked, setBookmarked] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [reviewSort, setReviewSort] = useState<ReviewSort>("relevant");
+  const [photoIndex, setPhotoIndex] = useState(0);
 
   const [leadForm, setLeadForm] = useState({ name: "", phone: "", email: "", message: "" });
   const [reviewForm, setReviewForm] = useState({ rating: 5, title: "", comment: "" });
@@ -31,27 +78,41 @@ export default function BusinessDetail() {
 
   useEffect(() => {
     if (!slug) return;
+    setBusiness(null);
     businessesApi
       .get(slug)
       .then(setBusiness)
       .catch((err) => setError(apiErrorMessage(err)));
   }, [slug]);
 
+  const sortedReviews = useMemo<Review[]>(() => {
+    const list = [...(business?.reviews ?? [])];
+    if (reviewSort === "latest") return list.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
+    if (reviewSort === "high") return list.sort((a, b) => b.rating - a.rating);
+    return list;
+  }, [business?.reviews, reviewSort]);
+
   if (error) return <p className="text-red-600">{error}</p>;
   if (!business) {
     return (
       <div className="space-y-4">
-        <div className="h-40 rounded-2xl bg-gray-200 animate-pulse" />
         <div className="h-6 w-1/3 rounded bg-gray-200 animate-pulse" />
+        <div className="h-40 rounded-2xl bg-gray-200 animate-pulse" />
       </div>
     );
   }
+
+  const biz = business;
+  const photos = biz.photos ?? [];
+  const services = biz.services ?? [];
+  const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${biz.latitude},${biz.longitude}`;
+  const whatsappUrl = `https://wa.me/${biz.phone.replace(/[^0-9]/g, "")}`;
 
   async function submitLead(e: React.FormEvent) {
     e.preventDefault();
     setNotice("");
     try {
-      await leadsApi.create(business!.id, { ...leadForm, source: "BUSINESS_PROFILE" });
+      await leadsApi.create(biz.id, { ...leadForm, source: "BUSINESS_PROFILE" });
       setNotice("Thanks! The business will contact you shortly.");
       setLeadForm({ name: "", phone: "", email: "", message: "" });
     } catch (err) {
@@ -63,8 +124,9 @@ export default function BusinessDetail() {
     e.preventDefault();
     setNotice("");
     try {
-      await reviewsApi.create(business!.id, reviewForm);
+      await reviewsApi.create(biz.id, reviewForm);
       setNotice("Review submitted. Thank you!");
+      setReviewForm({ rating: 5, title: "", comment: "" });
       const refreshed = await businessesApi.get(slug!);
       setBusiness(refreshed);
     } catch (err) {
@@ -76,92 +138,245 @@ export default function BusinessDetail() {
     e.preventDefault();
     setNotice("");
     try {
-      await bookingsApi.create(business!.id, bookingForm);
+      await bookingsApi.create(biz.id, bookingForm);
       setNotice("Booking request sent!");
+      setBookingForm({ serviceId: "", scheduledAt: "" });
     } catch (err) {
       setNotice(apiErrorMessage(err));
     }
   }
 
+  async function copyAddress() {
+    try {
+      await navigator.clipboard.writeText(fullAddress(biz));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch {
+      // clipboard blocked — no-op
+    }
+  }
+
+  async function shareBusiness() {
+    const url = window.location.href;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: biz.name, url });
+        return;
+      } catch {
+        // user cancelled or unsupported — fall through to clipboard
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      setNotice("Link copied to clipboard.");
+    } catch {
+      // no-op
+    }
+  }
+
+  // Recent rating trend: newest first, capped at 9 (matches the reference strip)
+  const ratingTrend = (biz.reviews ?? []).slice(0, 9).map((r) => r.rating);
+
   return (
-    <div>
-      {/* Banner */}
-      <div className="h-32 sm:h-40 rounded-2xl bg-gradient-to-r from-brand-700 via-brand-600 to-brand-500 mb-[-3rem] sm:mb-[-3.5rem]" />
+    <div className="space-y-4">
+      {/* Breadcrumbs */}
+      <nav className="flex items-center gap-1.5 text-xs text-ink-500 flex-wrap">
+        <Link to="/" className="hover:text-brand-600">
+          {biz.city}
+        </Link>
+        <ChevronRight size={12} />
+        {biz.category && (
+          <>
+            <Link to={`/?category=${biz.category.slug}`} className="hover:text-brand-600">
+              {biz.category.name} in {biz.city}
+            </Link>
+            <ChevronRight size={12} />
+          </>
+        )}
+        <span className="text-ink-700 font-medium">{biz.name}</span>
+      </nav>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
-        <div className="lg:col-span-2 space-y-6">
-          {/* Header card */}
-          <div className="card p-5 relative">
-            <div className="flex items-start gap-4">
-              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600 border border-brand-100 shadow-sm">
+      {/* Header card */}
+      <div className="card p-5">
+        <div className="flex flex-col sm:flex-row sm:items-start gap-4 justify-between">
+          <div className="flex items-start gap-4 min-w-0">
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600 border border-brand-100 shadow-sm overflow-hidden">
+              {biz.logoUrl ? (
+                <img src={biz.logoUrl} alt={biz.name} className="h-full w-full object-cover" />
+              ) : (
                 <Building2 size={28} />
-              </div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="badge bg-brand-50 text-brand-700">{business.category?.name}</span>
-                  {business.isVerified && (
-                    <span className="badge bg-emerald-50 text-emerald-700">
-                      <ShieldCheck size={12} /> Verified
-                    </span>
-                  )}
-                </div>
-                <h1 className="text-2xl sm:text-3xl font-extrabold text-ink-900 mt-1 truncate">{business.name}</h1>
-                <p className="text-ink-500 mt-1 flex items-center gap-1 text-sm">
-                  <MapPin size={14} />
-                  {business.addressLine1 ? `${business.addressLine1}, ` : ""}
-                  {business.city}, {business.state}
-                </p>
-                <div className="mt-2">
-                  <StarRating rating={business.avgRating} count={business.reviewCount} />
-                </div>
-              </div>
-            </div>
-
-            {business.description && <p className="mt-4 text-sm text-ink-700 leading-relaxed">{business.description}</p>}
-
-            <div className="mt-4 flex flex-wrap gap-4 text-sm text-ink-700 border-t border-gray-100 pt-4">
-              <span className="flex items-center gap-1.5">
-                <Phone size={15} className="text-brand-600" /> {business.phone}
-              </span>
-              {business.email && (
-                <span className="flex items-center gap-1.5">
-                  <Mail size={15} className="text-brand-600" /> {business.email}
-                </span>
               )}
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-ink-900">{biz.name}</h1>
+              <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                <StarRating rating={biz.avgRating} count={biz.reviewCount} />
+                {biz.isVerified && (
+                  <span className="badge bg-emerald-50 text-emerald-700">
+                    <ShieldCheck size={12} /> Verified
+                  </span>
+                )}
+              </div>
+              <p className="text-ink-500 mt-1.5 flex items-center gap-1 text-sm">
+                <MapPin size={14} /> {biz.addressLine1 ? `${biz.addressLine1}, ` : ""}
+                {biz.city}, {biz.state}
+              </p>
             </div>
           </div>
 
-          {business.hours && business.hours.length > 0 && (
+          {/* Category pills + bookmark */}
+          <div className="flex items-start gap-2 shrink-0">
+            {biz.category && <span className="badge bg-gray-100 text-ink-700">{biz.category.name}</span>}
+            <button
+              onClick={() => setBookmarked((v) => !v)}
+              title={bookmarked ? "Saved" : "Save"}
+              className={`flex h-8 w-8 items-center justify-center rounded-lg border transition-colors ${
+                bookmarked ? "bg-brand-50 border-brand-200 text-brand-600" : "border-gray-300 text-ink-500 hover:bg-gray-50"
+              }`}
+            >
+              <Bookmark size={16} fill={bookmarked ? "currentColor" : "none"} />
+            </button>
+          </div>
+        </div>
+
+        {/* Action buttons */}
+        <div className="flex flex-wrap items-center gap-2 mt-4">
+          <button onClick={() => setNumberShown(true)} className="btn-primary px-4 py-2.5">
+            <Phone size={16} /> {numberShown ? biz.phone : "Show Number"}
+          </button>
+          <a href={whatsappUrl} target="_blank" rel="noreferrer" className="btn-secondary px-4 py-2.5 !text-emerald-700 !border-emerald-300">
+            <MessageSquare size={16} /> WhatsApp
+          </a>
+          <button onClick={shareBusiness} className="btn-secondary px-3 py-2.5" title="Share">
+            <Share2 size={16} />
+          </button>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="border-b border-gray-200 flex gap-1 sticky top-16 bg-gray-50 z-10">
+        {TABS.map((t) => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            className={`px-4 py-3 text-sm font-semibold border-b-2 -mb-px transition-colors ${
+              tab === t ? "border-brand-600 text-brand-600" : "border-transparent text-ink-500 hover:text-ink-900"
+            }`}
+          >
+            {t}
+          </button>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
+        {/* Main column */}
+        <div className="lg:col-span-2 space-y-6">
+          {notice && <p className="text-sm text-brand-700 bg-brand-50 rounded-md px-3 py-2">{notice}</p>}
+
+          {/* Photos (Overview + Photos tabs) */}
+          {(tab === "Overview" || tab === "Photos") && (
             <div className="card p-5">
-              <h2 className="text-base font-bold text-ink-900 mb-3 flex items-center gap-1.5">
-                <Clock size={16} className="text-brand-600" /> Hours
-              </h2>
-              <ul className="text-sm text-ink-700 divide-y divide-gray-100">
-                {business.hours.map((h) => (
-                  <li key={h.dayOfWeek} className="flex justify-between py-1.5">
-                    <span>{DAY_NAMES[h.dayOfWeek]}</span>
-                    <span className={h.isClosed ? "text-ink-500" : "font-medium"}>
-                      {h.isClosed ? "Closed" : `${h.openTime} – ${h.closeTime}`}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+              <h2 className="text-base font-bold text-ink-900 mb-3">Photos</h2>
+              {photos.length > 0 ? (
+                tab === "Photos" ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {photos.map((p) => (
+                      <div key={p.id} className="aspect-[4/3] rounded-lg overflow-hidden bg-gray-100">
+                        <PhotoImage src={p.url} alt={p.caption ?? biz.name} className="h-full w-full object-cover" />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <div className="aspect-video rounded-lg overflow-hidden bg-gray-100">
+                      <PhotoImage
+                        src={photos[photoIndex]?.url}
+                        alt={photos[photoIndex]?.caption ?? biz.name}
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                    {photos.length > 1 && (
+                      <>
+                        <button
+                          onClick={() => setPhotoIndex((i) => (i - 1 + photos.length) % photos.length)}
+                          className="absolute left-2 top-1/2 -translate-y-1/2 h-9 w-9 flex items-center justify-center rounded-full bg-white/90 shadow text-ink-700 hover:bg-white"
+                        >
+                          <ChevronLeft size={18} />
+                        </button>
+                        <button
+                          onClick={() => setPhotoIndex((i) => (i + 1) % photos.length)}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 h-9 w-9 flex items-center justify-center rounded-full bg-white/90 shadow text-ink-700 hover:bg-white"
+                        >
+                          <ChevronRight size={18} />
+                        </button>
+                        <div className="flex gap-2 mt-3 overflow-x-auto">
+                          {photos.map((p, i) => (
+                            <button
+                              key={p.id}
+                              onClick={() => setPhotoIndex(i)}
+                              className={`h-14 w-20 shrink-0 rounded-md overflow-hidden border-2 ${
+                                i === photoIndex ? "border-brand-500" : "border-transparent"
+                              }`}
+                            >
+                              <PhotoImage src={p.url} alt="" className="h-full w-full object-cover" />
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )
+              ) : (
+                <p className="text-sm text-ink-500">No photos uploaded yet.</p>
+              )}
             </div>
           )}
 
-          {business.services && business.services.length > 0 && (
+          {/* About + hours (Overview) */}
+          {tab === "Overview" && (
+            <>
+              {biz.description && (
+                <div className="card p-5">
+                  <h2 className="text-base font-bold text-ink-900 mb-2">About</h2>
+                  <p className="text-sm text-ink-700 leading-relaxed">{biz.description}</p>
+                </div>
+              )}
+
+              {biz.hours && biz.hours.length > 0 && (
+                <div className="card p-5">
+                  <h2 className="text-base font-bold text-ink-900 mb-3 flex items-center gap-1.5">
+                    <Clock size={16} className="text-brand-600" /> Hours
+                  </h2>
+                  <ul className="text-sm text-ink-700 divide-y divide-gray-100">
+                    {biz.hours.map((h) => (
+                      <li key={h.dayOfWeek} className="flex justify-between py-1.5">
+                        <span>{DAY_NAMES[h.dayOfWeek]}</span>
+                        <span className={h.isClosed ? "text-ink-500" : "font-medium"}>
+                          {h.isClosed ? "Closed" : `${h.openTime} – ${h.closeTime}`}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Services + booking */}
+          {(tab === "Overview" || tab === "Services") && services.length > 0 && (
             <div className="card p-5">
               <h2 className="text-base font-bold text-ink-900 mb-3 flex items-center gap-1.5">
                 <Calendar size={16} className="text-brand-600" /> Services &amp; booking
               </h2>
               <div className="space-y-2 mb-4">
-                {business.services.map((s) => (
+                {services.map((s) => (
                   <div key={s.id} className="border border-gray-100 rounded-lg p-3 flex justify-between items-center">
                     <div>
                       <p className="font-medium text-sm text-ink-900">{s.name}</p>
+                      {s.description && <p className="text-xs text-ink-500 mt-0.5">{s.description}</p>}
                       <p className="text-xs text-ink-500">{s.durationMins} mins</p>
                     </div>
-                    <p className="font-bold text-sm text-brand-700">
+                    <p className="font-bold text-sm text-brand-700 shrink-0 ml-3">
                       {s.priceCents > 0 ? `${s.currency} ${(s.priceCents / 100).toFixed(2)}` : "Free"}
                     </p>
                   </div>
@@ -177,7 +392,7 @@ export default function BusinessDetail() {
                     className="input"
                   >
                     <option value="">Select a service</option>
-                    {business.services.map((s) => (
+                    {services.map((s) => (
                       <option key={s.id} value={s.id}>
                         {s.name}
                       </option>
@@ -198,69 +413,218 @@ export default function BusinessDetail() {
             </div>
           )}
 
-          <div className="card p-5">
-            <h2 className="text-base font-bold text-ink-900 mb-3 flex items-center gap-1.5">
-              <MessageSquare size={16} className="text-brand-600" /> Reviews
-            </h2>
-            {user && (
-              <form onSubmit={submitReview} className="bg-gray-50 rounded-lg p-4 space-y-3 mb-4">
-                <select
-                  value={reviewForm.rating}
-                  onChange={(e) => setReviewForm({ ...reviewForm, rating: Number(e.target.value) })}
-                  className="input sm:w-40"
-                >
-                  {[5, 4, 3, 2, 1].map((r) => (
-                    <option key={r} value={r}>
-                      {r} stars
-                    </option>
-                  ))}
-                </select>
-                <input
-                  placeholder="Title (optional)"
-                  value={reviewForm.title}
-                  onChange={(e) => setReviewForm({ ...reviewForm, title: e.target.value })}
-                  className="input"
-                />
-                <textarea
-                  placeholder="Share your experience"
-                  value={reviewForm.comment}
-                  onChange={(e) => setReviewForm({ ...reviewForm, comment: e.target.value })}
-                  className="input min-h-20"
-                />
-                <button className="btn-primary px-5 py-2">Submit review</button>
-              </form>
-            )}
-            <div className="space-y-3">
-              {business.reviews?.map((r) => (
-                <div key={r.id} className="border border-gray-100 rounded-lg p-3">
-                  <div className="flex justify-between items-start gap-2">
-                    <p className="font-semibold text-sm text-ink-900">
-                      {r.user?.firstName} {r.user?.lastName}
-                    </p>
-                    <StarRow rating={r.rating} size={14} />
-                  </div>
-                  {r.title && <p className="font-medium text-sm text-ink-800 mt-1">{r.title}</p>}
-                  {r.comment && <p className="text-sm text-ink-700 mt-1">{r.comment}</p>}
-                  {r.ownerReply && (
-                    <div className="mt-2 bg-brand-50 rounded-md p-2.5 text-sm text-ink-700">
-                      <span className="font-semibold text-brand-700">Owner reply: </span>
-                      {r.ownerReply}
-                    </div>
-                  )}
+          {/* Reviews */}
+          {(tab === "Overview" || tab === "Reviews") && (
+            <div className="card p-5">
+              <h2 className="text-base font-bold text-ink-900 mb-4 flex items-center gap-1.5">
+                <MessageSquare size={16} className="text-brand-600" /> Reviews &amp; Ratings
+              </h2>
+
+              {/* Rating summary */}
+              <div className="flex items-center gap-4 mb-4">
+                <div className="flex h-16 w-16 flex-col items-center justify-center rounded-xl bg-brand-600 text-white">
+                  <span className="text-xl font-extrabold leading-none">{biz.avgRating.toFixed(1)}</span>
+                  <Star size={12} fill="currentColor" strokeWidth={0} className="mt-0.5" />
                 </div>
-              ))}
-              {(!business.reviews || business.reviews.length === 0) && (
-                <p className="text-sm text-ink-500">No reviews yet — be the first to leave one.</p>
+                <div>
+                  <p className="font-bold text-ink-900">{biz.reviewCount} Ratings</p>
+                  <p className="text-xs text-ink-500">Rating based on verified customer reviews</p>
+                </div>
+              </div>
+
+              {/* Recent rating trend */}
+              {ratingTrend.length > 0 && (
+                <div className="mb-5">
+                  <p className="text-xs font-semibold text-ink-700 mb-2 flex items-center gap-1">
+                    <TrendingUp size={13} /> Recent rating trend
+                  </p>
+                  <div className="flex gap-2 flex-wrap">
+                    {ratingTrend.map((r, i) => (
+                      <span
+                        key={i}
+                        className="inline-flex items-center gap-1 rounded-full border border-gray-200 px-2.5 py-1 text-xs font-medium text-ink-700"
+                      >
+                        {r.toFixed(1)} <Star size={11} className="text-gold-400" fill="currentColor" strokeWidth={0} />
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Write a review */}
+              {user && (
+                <form onSubmit={submitReview} className="bg-gray-50 rounded-lg p-4 space-y-3 mb-5">
+                  <h3 className="text-sm font-semibold text-ink-900">Write a review</h3>
+                  <div className="flex items-center gap-1">
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() => setReviewForm({ ...reviewForm, rating: n })}
+                        className="p-0.5"
+                        aria-label={`${n} star`}
+                      >
+                        <Star
+                          size={22}
+                          className={n <= reviewForm.rating ? "text-gold-400" : "text-gray-300"}
+                          fill={n <= reviewForm.rating ? "currentColor" : "none"}
+                          strokeWidth={n <= reviewForm.rating ? 0 : 1.5}
+                        />
+                      </button>
+                    ))}
+                  </div>
+                  <input
+                    placeholder="Title (optional)"
+                    value={reviewForm.title}
+                    onChange={(e) => setReviewForm({ ...reviewForm, title: e.target.value })}
+                    className="input"
+                  />
+                  <textarea
+                    placeholder="Share your experience"
+                    value={reviewForm.comment}
+                    onChange={(e) => setReviewForm({ ...reviewForm, comment: e.target.value })}
+                    className="input min-h-20"
+                  />
+                  <button className="btn-primary px-5 py-2">Submit review</button>
+                </form>
+              )}
+
+              {/* Sort tabs */}
+              {sortedReviews.length > 0 && (
+                <div className="flex items-center gap-2 mb-3">
+                  {([
+                    ["relevant", "Relevant"],
+                    ["latest", "Latest"],
+                    ["high", "High to Low"],
+                  ] as [ReviewSort, string][]).map(([key, label]) => (
+                    <button
+                      key={key}
+                      onClick={() => setReviewSort(key)}
+                      className={`text-xs font-medium rounded-md px-3 py-1.5 border transition-colors ${
+                        reviewSort === key
+                          ? "bg-brand-50 border-brand-200 text-brand-700"
+                          : "border-gray-200 text-ink-600 hover:bg-gray-50"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <div className="space-y-3">
+                {sortedReviews.map((r) => (
+                  <div key={r.id} className="border-b border-gray-100 pb-3 last:border-0">
+                    <div className="flex justify-between items-start gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-100 text-brand-700 text-xs font-bold">
+                          {(r.user?.firstName?.[0] ?? "U").toUpperCase()}
+                        </span>
+                        <p className="font-semibold text-sm text-ink-900">
+                          {r.user?.firstName} {r.user?.lastName}
+                        </p>
+                      </div>
+                      <span className="text-xs text-ink-400">{formatDate(r.createdAt)}</span>
+                    </div>
+                    <div className="mt-1.5">
+                      <StarRow rating={r.rating} size={14} />
+                    </div>
+                    {r.title && <p className="font-medium text-sm text-ink-800 mt-1">“{r.title}”</p>}
+                    {r.comment && <p className="text-sm text-ink-700 mt-1">{r.comment}</p>}
+                    {r.ownerReply && (
+                      <div className="mt-2 bg-brand-50 rounded-md p-2.5 text-sm text-ink-700">
+                        <span className="font-semibold text-brand-700">Owner reply: </span>
+                        {r.ownerReply}
+                      </div>
+                    )}
+                    <div className="flex items-center gap-4 mt-2 text-xs text-ink-500">
+                      <span className="flex items-center gap-1">
+                        <ThumbsUp size={13} /> Helpful
+                      </span>
+                      <button onClick={shareBusiness} className="flex items-center gap-1 hover:text-brand-600">
+                        <Share2 size={13} /> Share
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                {sortedReviews.length === 0 && (
+                  <p className="text-sm text-ink-500">No reviews yet — be the first to leave one.</p>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Sidebar */}
+        <div className="space-y-4">
+          {/* Contact card */}
+          <div className="card p-5 space-y-4">
+            <div>
+              <h3 className="font-bold text-ink-900 mb-1.5">Contact</h3>
+              <button
+                onClick={() => setNumberShown(true)}
+                className="flex items-center gap-2 text-sm text-brand-600 font-medium hover:underline"
+              >
+                <Phone size={15} /> {numberShown ? biz.phone : "Show Number"}
+              </button>
+            </div>
+
+            <div className="border-t border-gray-100 pt-4">
+              <h3 className="font-bold text-ink-900 mb-1.5">Address</h3>
+              <p className="text-sm text-ink-600 leading-relaxed">{fullAddress(biz)}</p>
+              <div className="flex items-center gap-4 mt-2 text-sm">
+                <a
+                  href={directionsUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-1 text-brand-600 font-medium hover:underline"
+                >
+                  <Navigation size={14} /> Get Directions
+                </a>
+                <button onClick={copyAddress} className="flex items-center gap-1 text-brand-600 font-medium hover:underline">
+                  <Copy size={14} /> {copied ? "Copied!" : "Copy"}
+                </button>
+              </div>
+            </div>
+
+            <div className="border-t border-gray-100 pt-4 space-y-3 text-sm">
+              {biz.email && (
+                <a href={`mailto:${biz.email}`} className="flex items-center gap-2 text-ink-700 hover:text-brand-600">
+                  <Mail size={15} className="text-brand-600" /> Send Enquiry by Email
+                </a>
+              )}
+              <button onClick={shareBusiness} className="flex items-center gap-2 text-ink-700 hover:text-brand-600">
+                <Share2 size={15} className="text-brand-600" /> Share
+              </button>
+              {biz.website && (
+                <a
+                  href={biz.website}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-2 text-ink-700 hover:text-brand-600"
+                >
+                  <Globe size={15} className="text-brand-600" /> Visit our Website
+                </a>
               )}
             </div>
           </div>
-        </div>
 
-        <div>
-          <form onSubmit={submitLead} className="card p-5 space-y-3 sticky top-20">
-            <h3 className="font-bold text-ink-900">Get in touch</h3>
-            <p className="text-xs text-ink-500 -mt-2">Send an inquiry and the business will contact you directly.</p>
-            {notice && <p className="text-sm text-brand-700 bg-brand-50 rounded-md px-3 py-2">{notice}</p>}
+          {/* Also listed in */}
+          {biz.category && (
+            <div className="card p-5">
+              <h3 className="font-bold text-ink-900 mb-3">Also listed in</h3>
+              <div className="flex flex-wrap gap-2">
+                <Link to={`/?category=${biz.category.slug}`} className="badge bg-gray-100 text-ink-700 hover:bg-gray-200">
+                  {biz.category.name}
+                </Link>
+              </div>
+            </div>
+          )}
+
+          {/* Send enquiry form */}
+          <form onSubmit={submitLead} className="card p-5 space-y-3">
+            <h3 className="font-bold text-ink-900">Send an enquiry</h3>
+            <p className="text-xs text-ink-500 -mt-2">The business will contact you directly.</p>
             <input
               required
               placeholder="Your name"
@@ -287,7 +651,7 @@ export default function BusinessDetail() {
               onChange={(e) => setLeadForm({ ...leadForm, message: e.target.value })}
               className="input min-h-20"
             />
-            <button className="btn-primary w-full py-2.5">Send inquiry</button>
+            <button className="btn-primary w-full py-2.5">Send enquiry</button>
           </form>
         </div>
       </div>
