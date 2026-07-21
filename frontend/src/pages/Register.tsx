@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { Building2, Briefcase, Mail, Lock, User as UserIcon } from "lucide-react";
+import { Briefcase, Mail, Lock, User as UserIcon } from "lucide-react";
 import { authApi } from "@/api/endpoints";
 import { apiErrorMessage } from "@/api/client";
 import { useAuthStore } from "@/store/authStore";
+import AuthLayout from "@/components/AuthLayout";
 
 export default function Register() {
   const [form, setForm] = useState({ firstName: "", lastName: "", email: "", password: "", role: "CUSTOMER" });
@@ -28,16 +29,19 @@ export default function Register() {
   }
 
   return (
-    <div className="max-w-sm mx-auto py-8">
-      <div className="flex flex-col items-center mb-6">
-        <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-600 text-white shadow-sm mb-3">
-          <Building2 size={24} />
-        </span>
-        <h1 className="text-2xl font-extrabold text-ink-900">Create your account</h1>
-        <p className="text-sm text-ink-500 mt-1">Join Markkito in seconds</p>
-      </div>
-
-      <form onSubmit={submit} className="card p-6 space-y-4">
+    <AuthLayout
+      title="Create your account"
+      subtitle="Join Markkito in seconds"
+      footer={
+        <>
+          Already have an account?{" "}
+          <Link to="/login" className="text-brand-600 font-semibold hover:underline">
+            Log in
+          </Link>
+        </>
+      }
+    >
+      <form onSubmit={submit} className="space-y-4">
         {error && <p className="text-sm text-red-700 bg-red-50 rounded-md px-3 py-2">{error}</p>}
         <div className="flex gap-3">
           <div className="w-1/2">
@@ -66,9 +70,10 @@ export default function Register() {
             <input
               required
               type="email"
+              placeholder="you@example.com"
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
-              className="input pl-10"
+              className="input pl-11"
             />
           </div>
         </div>
@@ -82,7 +87,7 @@ export default function Register() {
               placeholder="Min. 8 characters"
               value={form.password}
               onChange={(e) => setForm({ ...form, password: e.target.value })}
-              className="input pl-10"
+              className="input pl-11"
             />
           </div>
         </div>
@@ -117,12 +122,6 @@ export default function Register() {
           {loading ? "Creating account…" : "Sign up"}
         </button>
       </form>
-      <p className="text-sm text-ink-500 mt-4 text-center">
-        Already have an account?{" "}
-        <Link to="/login" className="text-brand-600 font-semibold hover:underline">
-          Log in
-        </Link>
-      </p>
-    </div>
+    </AuthLayout>
   );
 }
