@@ -4,7 +4,6 @@ import {
   Bookmark,
   Building2,
   Calendar,
-  ChevronLeft,
   ChevronRight,
   Clock,
   Copy,
@@ -45,6 +44,46 @@ function PhotoImage({ src, alt, className }: { src: string; alt: string; classNa
   return <img src={src} alt={alt} onError={() => setFailed(true)} className={className} />;
 }
 
+// Magazine-style photo mosaic: one large lead image + a 2x2 grid, with a
+// "See all photos" overlay. Falls back gracefully when there are few photos.
+function PhotoHero({
+  photos,
+  name,
+  onSeeAll,
+}: {
+  photos: NonNullable<Business["photos"]>;
+  name: string;
+  onSeeAll: () => void;
+}) {
+  if (photos.length === 0) return null;
+  const lead = photos[0];
+  const rest = photos.slice(1, 5);
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 rounded-2xl overflow-hidden h-64 sm:h-80">
+      <button onClick={onSeeAll} className="relative group h-40 sm:h-full bg-gray-100">
+        <PhotoImage src={lead.url} alt={lead.caption ?? name} className="h-full w-full object-cover" />
+        <span className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
+      </button>
+      {rest.length > 0 && (
+        <div className="hidden sm:grid grid-cols-2 grid-rows-2 gap-2">
+          {rest.map((p, i) => (
+            <button key={p.id} onClick={onSeeAll} className="relative group bg-gray-100 overflow-hidden">
+              <PhotoImage src={p.url} alt={p.caption ?? name} className="h-full w-full object-cover" />
+              <span className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
+              {i === rest.length - 1 && photos.length > 5 && (
+                <span className="absolute inset-0 flex items-center justify-center bg-black/45 text-white text-sm font-semibold">
+                  +{photos.length - 5} more
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function formatDate(iso: string): string {
   try {
     return new Date(iso).toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
@@ -59,6 +98,37 @@ function fullAddress(b: Business): string {
     .join(", ");
 }
 
+interface OpenStatus {
+  open: boolean;
+  label: string;
+  detail: string;
+}
+
+// Derive an "Open now / Closed" status from today's business hours.
+function getOpenStatus(hours: Business["hours"]): OpenStatus | null {
+  if (!hours || hours.length === 0) return null;
+  const now = new Date();
+  const today = hours.find((h) => h.dayOfWeek === now.getDay());
+  if (!today) return null;
+  if (today.isClosed) return { open: false, label: "Closed today", detail: "Opens as per weekly hours" };
+
+  const toMin = (t: string) => {
+    const [h, m] = t.split(":").map(Number);
+    return h * 60 + m;
+  };
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const open = toMin(today.openTime);
+  const close = toMin(today.closeTime);
+
+  if (nowMin >= open && nowMin < close) {
+    return { open: true, label: "Open now", detail: `Closes at ${today.closeTime}` };
+  }
+  if (nowMin < open) {
+    return { open: false, label: "Closed", detail: `Opens at ${today.openTime}` };
+  }
+  return { open: false, label: "Closed", detail: `Opens tomorrow` };
+}
+
 export default function BusinessDetail() {
   const { slug } = useParams<{ slug: string }>();
   const user = useAuthStore((s) => s.user);
@@ -70,7 +140,6 @@ export default function BusinessDetail() {
   const [bookmarked, setBookmarked] = useState(false);
   const [copied, setCopied] = useState(false);
   const [reviewSort, setReviewSort] = useState<ReviewSort>("relevant");
-  const [photoIndex, setPhotoIndex] = useState(0);
 
   const [leadForm, setLeadForm] = useState({ name: "", phone: "", email: "", message: "" });
   const [reviewForm, setReviewForm] = useState({ rating: 5, title: "", comment: "" });
@@ -107,6 +176,7 @@ export default function BusinessDetail() {
   const services = biz.services ?? [];
   const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${biz.latitude},${biz.longitude}`;
   const whatsappUrl = `https://wa.me/${biz.phone.replace(/[^0-9]/g, "")}`;
+  const openStatus = getOpenStatus(biz.hours);
 
   async function submitLead(e: React.FormEvent) {
     e.preventDefault();
@@ -196,6 +266,9 @@ export default function BusinessDetail() {
         <span className="text-ink-700 font-medium">{biz.name}</span>
       </nav>
 
+      {/* Photo hero */}
+      {photos.length > 0 && <PhotoHero photos={photos} name={biz.name} onSeeAll={() => setTab("Photos")} />}
+
       {/* Header card */}
       <div className="card p-5">
         <div className="flex flex-col sm:flex-row sm:items-start gap-4 justify-between">
@@ -216,11 +289,24 @@ export default function BusinessDetail() {
                     <ShieldCheck size={12} /> Verified
                   </span>
                 )}
+                {openStatus && (
+                  <span
+                    className={`badge ${openStatus.open ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-600"}`}
+                  >
+                    <span className={`h-1.5 w-1.5 rounded-full ${openStatus.open ? "bg-emerald-500" : "bg-red-500"}`} />
+                    {openStatus.label}
+                  </span>
+                )}
               </div>
               <p className="text-ink-500 mt-1.5 flex items-center gap-1 text-sm">
                 <MapPin size={14} /> {biz.addressLine1 ? `${biz.addressLine1}, ` : ""}
                 {biz.city}, {biz.state}
               </p>
+              {openStatus && (
+                <p className="text-xs mt-1 flex items-center gap-1 text-ink-500">
+                  <Clock size={12} /> {openStatus.detail}
+                </p>
+              )}
             </div>
           </div>
 
@@ -273,59 +359,18 @@ export default function BusinessDetail() {
         <div className="lg:col-span-2 space-y-6">
           {notice && <p className="text-sm text-brand-700 bg-brand-50 rounded-md px-3 py-2">{notice}</p>}
 
-          {/* Photos (Overview + Photos tabs) */}
-          {(tab === "Overview" || tab === "Photos") && (
+          {/* Photos (Photos tab — full grid) */}
+          {tab === "Photos" && (
             <div className="card p-5">
               <h2 className="text-base font-bold text-ink-900 mb-3">Photos</h2>
               {photos.length > 0 ? (
-                tab === "Photos" ? (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    {photos.map((p) => (
-                      <div key={p.id} className="aspect-[4/3] rounded-lg overflow-hidden bg-gray-100">
-                        <PhotoImage src={p.url} alt={p.caption ?? biz.name} className="h-full w-full object-cover" />
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="relative">
-                    <div className="aspect-video rounded-lg overflow-hidden bg-gray-100">
-                      <PhotoImage
-                        src={photos[photoIndex]?.url}
-                        alt={photos[photoIndex]?.caption ?? biz.name}
-                        className="h-full w-full object-cover"
-                      />
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {photos.map((p) => (
+                    <div key={p.id} className="aspect-[4/3] rounded-lg overflow-hidden bg-gray-100">
+                      <PhotoImage src={p.url} alt={p.caption ?? biz.name} className="h-full w-full object-cover" />
                     </div>
-                    {photos.length > 1 && (
-                      <>
-                        <button
-                          onClick={() => setPhotoIndex((i) => (i - 1 + photos.length) % photos.length)}
-                          className="absolute left-2 top-1/2 -translate-y-1/2 h-9 w-9 flex items-center justify-center rounded-full bg-white/90 shadow text-ink-700 hover:bg-white"
-                        >
-                          <ChevronLeft size={18} />
-                        </button>
-                        <button
-                          onClick={() => setPhotoIndex((i) => (i + 1) % photos.length)}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 h-9 w-9 flex items-center justify-center rounded-full bg-white/90 shadow text-ink-700 hover:bg-white"
-                        >
-                          <ChevronRight size={18} />
-                        </button>
-                        <div className="flex gap-2 mt-3 overflow-x-auto">
-                          {photos.map((p, i) => (
-                            <button
-                              key={p.id}
-                              onClick={() => setPhotoIndex(i)}
-                              className={`h-14 w-20 shrink-0 rounded-md overflow-hidden border-2 ${
-                                i === photoIndex ? "border-brand-500" : "border-transparent"
-                              }`}
-                            >
-                              <PhotoImage src={p.url} alt="" className="h-full w-full object-cover" />
-                            </button>
-                          ))}
-                        </div>
-                      </>
-                    )}
-                  </div>
-                )
+                  ))}
+                </div>
               ) : (
                 <p className="text-sm text-ink-500">No photos uploaded yet.</p>
               )}
