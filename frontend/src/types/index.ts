@@ -1,5 +1,14 @@
 export type UserRole = "CUSTOMER" | "BUSINESS_OWNER" | "DEALER" | "ADMIN";
 export type UserStatus = "ACTIVE" | "SUSPENDED" | "PENDING_VERIFICATION";
+export type Privilege = "MANAGE_LISTINGS" | "MANAGE_LEADS" | "MANAGE_BOOKINGS";
+
+export const PRIVILEGE_LABELS: Record<Privilege, string> = {
+  MANAGE_LISTINGS: "Manage listings",
+  MANAGE_LEADS: "Manage leads",
+  MANAGE_BOOKINGS: "Manage bookings",
+};
+
+export const ALL_PRIVILEGES: Privilege[] = ["MANAGE_LISTINGS", "MANAGE_LEADS", "MANAGE_BOOKINGS"];
 
 export interface AdminUser {
   id: string;
@@ -9,6 +18,7 @@ export interface AdminUser {
   lastName: string;
   role: UserRole;
   status: UserStatus;
+  privileges?: Privilege[] | null;
   avatarUrl?: string | null;
   createdAt: string;
   _count?: { businesses: number };
@@ -21,6 +31,7 @@ export interface User {
   lastName: string;
   role: UserRole;
   status: string;
+  privileges?: Privilege[];
 }
 
 export interface AuthResponse {

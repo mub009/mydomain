@@ -1,5 +1,8 @@
 import { z } from "zod";
 import { UserRole, UserStatus } from "@prisma/client";
+import { PRIVILEGES } from "@/common/privileges";
+
+const privilegesSchema = z.array(z.enum(PRIVILEGES));
 
 export const listUsersQuerySchema = z.object({
   page: z.coerce.number().int().min(1).optional(),
@@ -15,6 +18,7 @@ export const createUserSchema = z.object({
   lastName: z.string().min(1).max(80),
   phone: z.string().min(7).max(20).optional(),
   role: z.nativeEnum(UserRole).default(UserRole.DEALER),
+  privileges: privilegesSchema.optional(),
 });
 
 export const updateUserSchema = z.object({
@@ -24,6 +28,7 @@ export const updateUserSchema = z.object({
   phone: z.string().min(7).max(20).optional(),
   role: z.nativeEnum(UserRole).optional(),
   status: z.nativeEnum(UserStatus).optional(),
+  privileges: privilegesSchema.optional(),
 });
 
 export const listBusinessesQuerySchema = z.object({

@@ -3,6 +3,7 @@ import { BusinessStatus, Prisma, UserRole, UserStatus } from "@prisma/client";
 import { prisma } from "@/config/database";
 import { AppError } from "@/common/errors";
 import { parsePagination } from "@/common/pagination";
+import { DEFAULT_DEALER_PRIVILEGES, normalizePrivileges, Privilege } from "@/common/privileges";
 
 const USER_PUBLIC_SELECT = {
   id: true,
@@ -12,6 +13,7 @@ const USER_PUBLIC_SELECT = {
   lastName: true,
   role: true,
   status: true,
+  privileges: true,
   avatarUrl: true,
   createdAt: true,
 } satisfies Prisma.UserSelect;
@@ -80,9 +82,14 @@ export async function createUser(data: {
   lastName: string;
   phone?: string;
   role: UserRole;
+  privileges?: Privilege[];
 }) {
   const existing = await prisma.user.findUnique({ where: { email: data.email } });
   if (existing) throw AppError.conflict("A user with this email already exists");
+
+  // Only dealers carry a privilege list; default it if none was provided.
+  const privileges =
+    data.role === UserRole.DEALER ? normalizePrivileges(data.privileges ?? DEFAULT_DEALER_PRIVILEGES) : undefined;
 
   const passwordHash = await bcrypt.hash(data.password, 12);
   return prisma.user.create({
@@ -94,6 +101,7 @@ export async function createUser(data: {
       phone: data.phone,
       role: data.role,
       status: UserStatus.ACTIVE,
+      privileges: privileges ?? Prisma.DbNull,
     },
     select: USER_PUBLIC_SELECT,
   });
@@ -101,7 +109,15 @@ export async function createUser(data: {
 
 export async function updateUser(
   id: string,
-  data: Partial<{ firstName: string; lastName: string; email: string; phone: string; role: UserRole; status: UserStatus }>,
+  data: Partial<{
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone: string;
+    role: UserRole;
+    status: UserStatus;
+    privileges: Privilege[];
+  }>,
 ) {
   const user = await prisma.user.findUnique({ where: { id } });
   if (!user) throw AppError.notFound("User not found");
@@ -112,7 +128,19 @@ export async function updateUser(
     if (adminCount <= 1) throw AppError.badRequest("Cannot change the role of the last remaining admin");
   }
 
-  return prisma.user.update({ where: { id }, data, select: USER_PUBLIC_SELECT });
+  const { privileges, ...rest } = data;
+  const updateData: Prisma.UserUpdateInput = { ...rest };
+
+  // Keep privileges consistent with the effective role: dealers get a
+  // normalized list, everyone else has it cleared.
+  const effectiveRole = data.role ?? user.role;
+  if (effectiveRole === UserRole.DEALER) {
+    if (privileges !== undefined) updateData.privileges = normalizePrivileges(privileges);
+  } else {
+    updateData.privileges = Prisma.DbNull;
+  }
+
+  return prisma.user.update({ where: { id }, data: updateData, select: USER_PUBLIC_SELECT });
 }
 
 // ---------------------------------------------------------------------------

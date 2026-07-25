@@ -3,6 +3,8 @@ import jwt from "jsonwebtoken";
 import { UserRole } from "@prisma/client";
 import { env } from "@/config/env";
 import { AppError } from "@/common/errors";
+import { prisma } from "@/config/database";
+import { hasPrivilege, Privilege } from "@/common/privileges";
 
 export interface AccessTokenPayload {
   sub: string;
@@ -51,5 +53,28 @@ export function requireRole(...roles: UserRole[]) {
     if (!req.user) throw AppError.unauthorized();
     if (!roles.includes(req.user.role)) throw AppError.forbidden("Insufficient permissions");
     next();
+  };
+}
+
+// Gate a route on a dealer privilege. Non-dealer roles pass straight
+// through (their access is governed by role + ownership checks); only
+// DEALER accounts must hold the named privilege, which is read live from
+// the database so admin changes take effect without re-login.
+export function requirePrivilege(privilege: Privilege) {
+  return (req: Request, _res: Response, next: NextFunction): void => {
+    if (!req.user) throw AppError.unauthorized();
+    if (req.user.role !== UserRole.DEALER) {
+      next();
+      return;
+    }
+    prisma.user
+      .findUnique({ where: { id: req.user.sub }, select: { privileges: true } })
+      .then((user) => {
+        if (!hasPrivilege(UserRole.DEALER, user?.privileges, privilege)) {
+          throw AppError.forbidden("Your account doesn't have permission for this action");
+        }
+        next();
+      })
+      .catch(next);
   };
 }

@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { adminApi, categoriesApi } from "@/api/endpoints";
 import { apiErrorMessage } from "@/api/client";
-import { AdminUser, Business, Category, UserRole, UserStatus } from "@/types";
+import { AdminUser, ALL_PRIVILEGES, Business, Category, Privilege, PRIVILEGE_LABELS, UserRole, UserStatus } from "@/types";
 import Modal from "@/components/Modal";
 
 const TABS = ["Overview", "Users", "Businesses", "Approvals"] as const;
@@ -46,6 +46,26 @@ function statusBadge(status: string): string {
     DRAFT: "bg-gray-100 text-gray-600",
   };
   return map[status] ?? "bg-gray-100 text-gray-600";
+}
+
+function PrivilegeSelector({ value, onChange }: { value: Privilege[]; onChange: (next: Privilege[]) => void }) {
+  function toggle(p: Privilege) {
+    onChange(value.includes(p) ? value.filter((x) => x !== p) : [...value, p]);
+  }
+  return (
+    <div>
+      <label className="block text-xs font-semibold text-ink-700 mb-1">Dealer privileges</label>
+      <div className="space-y-1.5 rounded-lg border border-gray-200 bg-gray-50/60 p-3">
+        {ALL_PRIVILEGES.map((p) => (
+          <label key={p} className="flex items-center gap-2 text-sm text-ink-700 cursor-pointer">
+            <input type="checkbox" checked={value.includes(p)} onChange={() => toggle(p)} />
+            {PRIVILEGE_LABELS[p]}
+          </label>
+        ))}
+        <p className="text-xs text-ink-400 pt-1">Controls which dashboard features this dealer can access.</p>
+      </div>
+    </div>
+  );
 }
 
 const STAT_META: { key: string; label: string; icon: LucideIcon; tint: string }[] = [
@@ -161,7 +181,7 @@ function UsersPanel({ onChanged }: { onChanged: () => void }) {
           ))}
         </select>
         <button onClick={() => setCreating(true)} className="btn-primary px-4 py-2.5 whitespace-nowrap">
-          <UserPlus size={16} /> Add dealer
+          <UserPlus size={16} /> Add user
         </button>
       </div>
 
@@ -179,6 +199,13 @@ function UsersPanel({ onChanged }: { onChanged: () => void }) {
                   {u.firstName} {u.lastName}
                 </p>
                 <p className="text-xs text-ink-500 truncate">{u.email}</p>
+                {u.role === "DEALER" && (
+                  <p className="text-[11px] text-violet-600 truncate mt-0.5">
+                    {u.privileges && u.privileges.length > 0
+                      ? u.privileges.map((p) => PRIVILEGE_LABELS[p]).join(" · ")
+                      : "No privileges granted"}
+                  </p>
+                )}
               </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">
@@ -227,6 +254,7 @@ function UserEditModal({ user, onClose, onSaved }: { user: AdminUser; onClose: (
     role: user.role,
     status: user.status,
   });
+  const [privileges, setPrivileges] = useState<Privilege[]>(user.privileges ?? []);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -235,7 +263,7 @@ function UserEditModal({ user, onClose, onSaved }: { user: AdminUser; onClose: (
     setSaving(true);
     setError("");
     try {
-      await adminApi.updateUser(user.id, form);
+      await adminApi.updateUser(user.id, { ...form, ...(form.role === "DEALER" ? { privileges } : {}) });
       onSaved();
     } catch (err) {
       setError(apiErrorMessage(err));
@@ -275,6 +303,7 @@ function UserEditModal({ user, onClose, onSaved }: { user: AdminUser; onClose: (
             </select>
           </div>
         </div>
+        {form.role === "DEALER" && <PrivilegeSelector value={privileges} onChange={setPrivileges} />}
         <button disabled={saving} className="btn-primary w-full py-2.5">
           {saving ? "Saving…" : "Save changes"}
         </button>
@@ -285,6 +314,7 @@ function UserEditModal({ user, onClose, onSaved }: { user: AdminUser; onClose: (
 
 function UserCreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const [form, setForm] = useState({ firstName: "", lastName: "", email: "", password: "", role: "DEALER" as UserRole });
+  const [privileges, setPrivileges] = useState<Privilege[]>(["MANAGE_LISTINGS"]);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -293,7 +323,7 @@ function UserCreateModal({ onClose, onCreated }: { onClose: () => void; onCreate
     setSaving(true);
     setError("");
     try {
-      await adminApi.createUser(form);
+      await adminApi.createUser({ ...form, ...(form.role === "DEALER" ? { privileges } : {}) });
       onCreated();
     } catch (err) {
       setError(apiErrorMessage(err));
@@ -323,6 +353,7 @@ function UserCreateModal({ onClose, onCreated }: { onClose: () => void; onCreate
           </select>
           <p className="text-xs text-ink-500 mt-1">Dealers can add and manage stores on behalf of businesses.</p>
         </div>
+        {form.role === "DEALER" && <PrivilegeSelector value={privileges} onChange={setPrivileges} />}
         <button disabled={saving} className="btn-primary w-full py-2.5">
           {saving ? "Creating…" : "Create user"}
         </button>

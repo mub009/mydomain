@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { businessesApi, categoriesApi, leadsApi, bookingsApi } from "@/api/endpoints";
 import { apiErrorMessage } from "@/api/client";
-import { Business, Category, Lead, Booking } from "@/types";
+import { Business, Category, Lead, Booking, Privilege } from "@/types";
 import { useAuthStore } from "@/store/authStore";
 import BusinessManager from "@/components/BusinessManager";
 
@@ -44,10 +44,10 @@ function StatCard({
 
 type Tab = "businesses" | "leads" | "bookings";
 
-const TAB_META: Record<Tab, { label: string; icon: typeof LayoutGrid }> = {
-  businesses: { label: "Businesses", icon: LayoutGrid },
-  leads: { label: "Leads", icon: MessageSquare },
-  bookings: { label: "Bookings", icon: CalendarClock },
+const TAB_META: Record<Tab, { label: string; icon: typeof LayoutGrid; privilege: Privilege }> = {
+  businesses: { label: "Businesses", icon: LayoutGrid, privilege: "MANAGE_LISTINGS" },
+  leads: { label: "Leads", icon: MessageSquare, privilege: "MANAGE_LEADS" },
+  bookings: { label: "Bookings", icon: CalendarClock, privilege: "MANAGE_BOOKINGS" },
 };
 
 function statusBadgeClass(status: string): string {
@@ -72,7 +72,15 @@ function statusBadgeClass(status: string): string {
 
 export default function OwnerDashboard() {
   const user = useAuthStore((s) => s.user);
-  const [tab, setTab] = useState<Tab>("businesses");
+
+  // Dealers are gated by their granted privileges; business owners and admins
+  // implicitly hold every privilege on their own resources.
+  const isDealer = user?.role === "DEALER";
+  const can = (p: Privilege) => !isDealer || (user?.privileges ?? []).includes(p);
+  const canManageListings = can("MANAGE_LISTINGS");
+  const visibleTabs = (Object.keys(TAB_META) as Tab[]).filter((t) => can(TAB_META[t].privilege));
+
+  const [tab, setTab] = useState<Tab>(visibleTabs[0] ?? "businesses");
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedBusinessId, setSelectedBusinessId] = useState<string>("");
@@ -179,7 +187,7 @@ export default function OwnerDashboard() {
       </div>
 
       <div className="flex gap-2 mb-6 border-b border-gray-200">
-        {(Object.keys(TAB_META) as Tab[]).map((t) => {
+        {visibleTabs.map((t) => {
           const meta = TAB_META[t];
           const Icon = meta.icon;
           return (
@@ -196,7 +204,13 @@ export default function OwnerDashboard() {
         })}
       </div>
 
-      {tab === "businesses" && manageId && (
+      {visibleTabs.length === 0 && (
+        <div className="card p-8 text-center text-sm text-ink-500">
+          Your account doesn’t have any features enabled yet. Please contact your administrator to grant access.
+        </div>
+      )}
+
+      {tab === "businesses" && canManageListings && manageId && (
         <BusinessManager
           businessId={manageId}
           categories={categories}
@@ -205,7 +219,7 @@ export default function OwnerDashboard() {
         />
       )}
 
-      {tab === "businesses" && !manageId && (
+      {tab === "businesses" && canManageListings && !manageId && (
         <div>
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-bold text-ink-900 flex items-center gap-1.5">

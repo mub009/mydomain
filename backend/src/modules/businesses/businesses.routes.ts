@@ -2,7 +2,7 @@ import { Router } from "express";
 import { UserRole } from "@prisma/client";
 import { asyncHandler } from "@/common/asyncHandler";
 import { validate } from "@/middleware/validate";
-import { requireAuth, requireRole } from "@/middleware/auth";
+import { requireAuth, requirePrivilege, requireRole } from "@/middleware/auth";
 import {
   addPhotoSchema,
   createBusinessSchema,
@@ -41,27 +41,31 @@ businessesRouter.get(
 businessesRouter.get("/:id/manage", requireAuth, asyncHandler(getBusinessForOwnerHandler));
 businessesRouter.get("/:slug", asyncHandler(getBusinessHandler));
 
+const listingPriv = requirePrivilege("MANAGE_LISTINGS");
+
 businessesRouter.post(
   "/",
   requireAuth,
   requireRole(UserRole.BUSINESS_OWNER, UserRole.DEALER, UserRole.ADMIN),
+  listingPriv,
   validate({ body: createBusinessSchema }),
   asyncHandler(createBusinessHandler),
 );
-businessesRouter.patch("/:id", requireAuth, validate({ body: updateBusinessSchema }), asyncHandler(updateBusinessHandler));
-businessesRouter.delete("/:id", requireAuth, asyncHandler(deleteBusinessHandler));
-businessesRouter.post("/:id/submit", requireAuth, asyncHandler(submitForApprovalHandler));
+businessesRouter.patch("/:id", requireAuth, listingPriv, validate({ body: updateBusinessSchema }), asyncHandler(updateBusinessHandler));
+businessesRouter.delete("/:id", requireAuth, listingPriv, asyncHandler(deleteBusinessHandler));
+businessesRouter.post("/:id/submit", requireAuth, listingPriv, asyncHandler(submitForApprovalHandler));
 
-businessesRouter.post("/:id/photos", requireAuth, validate({ body: addPhotoSchema }), asyncHandler(addPhotoHandler));
-businessesRouter.delete("/:id/photos/:photoId", requireAuth, asyncHandler(removePhotoHandler));
+businessesRouter.post("/:id/photos", requireAuth, listingPriv, validate({ body: addPhotoSchema }), asyncHandler(addPhotoHandler));
+businessesRouter.delete("/:id/photos/:photoId", requireAuth, listingPriv, asyncHandler(removePhotoHandler));
 
-businessesRouter.put("/:id/hours", requireAuth, validate({ body: setHoursSchema }), asyncHandler(setHoursHandler));
+businessesRouter.put("/:id/hours", requireAuth, listingPriv, validate({ body: setHoursSchema }), asyncHandler(setHoursHandler));
 
-businessesRouter.post("/:id/services", requireAuth, validate({ body: createServiceSchema }), asyncHandler(addServiceHandler));
+businessesRouter.post("/:id/services", requireAuth, listingPriv, validate({ body: createServiceSchema }), asyncHandler(addServiceHandler));
 businessesRouter.patch(
   "/:id/services/:serviceId",
   requireAuth,
+  listingPriv,
   validate({ body: updateServiceSchema }),
   asyncHandler(updateServiceHandler),
 );
-businessesRouter.delete("/:id/services/:serviceId", requireAuth, asyncHandler(deleteServiceHandler));
+businessesRouter.delete("/:id/services/:serviceId", requireAuth, listingPriv, asyncHandler(deleteServiceHandler));

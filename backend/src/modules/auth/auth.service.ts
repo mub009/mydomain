@@ -5,6 +5,7 @@ import { UserRole, UserStatus } from "@prisma/client";
 import { prisma } from "@/config/database";
 import { env } from "@/config/env";
 import { AppError } from "@/common/errors";
+import { normalizePrivileges } from "@/common/privileges";
 import { LoginInput, RegisterInput } from "./auth.validation";
 
 const ACCESS_TOKEN_EXPIRY_SECONDS = ttlToSeconds(env.JWT_ACCESS_TTL);
@@ -31,6 +32,7 @@ export interface AuthResult {
     lastName: string;
     role: UserRole;
     status: UserStatus;
+    privileges: string[];
   };
   accessToken: string;
   refreshToken: string;
@@ -70,7 +72,7 @@ export async function register(input: RegisterInput): Promise<AuthResult> {
 
   const tokens = await issueTokens(user.id, user.role);
   return {
-    user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, role: user.role, status: user.status },
+    user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, role: user.role, status: user.status, privileges: normalizePrivileges(user.privileges) },
     ...tokens,
   };
 }
@@ -86,7 +88,7 @@ export async function login(input: LoginInput): Promise<AuthResult> {
 
   const tokens = await issueTokens(user.id, user.role);
   return {
-    user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, role: user.role, status: user.status },
+    user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, role: user.role, status: user.status, privileges: normalizePrivileges(user.privileges) },
     ...tokens,
   };
 }
@@ -119,6 +121,7 @@ export async function getProfile(userId: string) {
     lastName: user.lastName,
     role: user.role,
     status: user.status,
+    privileges: normalizePrivileges(user.privileges),
     avatarUrl: user.avatarUrl,
     createdAt: user.createdAt,
   };
