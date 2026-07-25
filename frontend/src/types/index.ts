@@ -49,6 +49,7 @@ export interface Business {
   avgRating: number;
   reviewCount: number;
   viewCount?: number;
+  leadCount?: number;
   isVerified?: boolean;
   logoUrl?: string | null;
   coverImageUrl?: string | null;

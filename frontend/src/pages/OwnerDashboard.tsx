@@ -1,9 +1,46 @@
-import { useEffect, useState } from "react";
-import { Building2, CalendarClock, LayoutGrid, MapPin, MessageSquare, Plus, Settings2, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  Building2,
+  CalendarClock,
+  Eye,
+  LayoutGrid,
+  type LucideIcon,
+  MapPin,
+  MessageSquare,
+  Plus,
+  Settings2,
+  Star,
+  X,
+} from "lucide-react";
 import { businessesApi, categoriesApi, leadsApi, bookingsApi } from "@/api/endpoints";
 import { apiErrorMessage } from "@/api/client";
 import { Business, Category, Lead, Booking } from "@/types";
+import { useAuthStore } from "@/store/authStore";
 import BusinessManager from "@/components/BusinessManager";
+
+function StatCard({
+  icon: Icon,
+  label,
+  value,
+  tint,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: string | number;
+  tint: string;
+}) {
+  return (
+    <div className="card p-4">
+      <div className="flex items-center justify-between">
+        <span className={`flex h-9 w-9 items-center justify-center rounded-lg ${tint}`}>
+          <Icon size={17} />
+        </span>
+      </div>
+      <p className="text-2xl font-extrabold text-ink-900 mt-3 leading-none">{value}</p>
+      <p className="text-xs text-ink-500 mt-1">{label}</p>
+    </div>
+  );
+}
 
 type Tab = "businesses" | "leads" | "bookings";
 
@@ -34,6 +71,7 @@ function statusBadgeClass(status: string): string {
 }
 
 export default function OwnerDashboard() {
+  const user = useAuthStore((s) => s.user);
   const [tab, setTab] = useState<Tab>("businesses");
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -63,6 +101,15 @@ export default function OwnerDashboard() {
       if (list.length && !selectedBusinessId) setSelectedBusinessId(list[0].id);
     });
   }
+
+  const stats = useMemo(() => {
+    const totalViews = businesses.reduce((s, b) => s + (b.viewCount ?? 0), 0);
+    const totalLeads = businesses.reduce((s, b) => s + (b.leadCount ?? 0), 0);
+    const ratedReviews = businesses.reduce((s, b) => s + b.reviewCount, 0);
+    const weighted = businesses.reduce((s, b) => s + b.avgRating * b.reviewCount, 0);
+    const avgRating = ratedReviews > 0 ? weighted / ratedReviews : 0;
+    return { listings: businesses.length, totalViews, totalLeads, avgRating, ratedReviews };
+  }, [businesses]);
 
   useEffect(() => {
     loadBusinesses();
@@ -108,8 +155,28 @@ export default function OwnerDashboard() {
 
   return (
     <div>
-      <h1 className="text-2xl font-extrabold text-ink-900 mb-1">My Business Dashboard</h1>
-      <p className="text-sm text-ink-500 mb-6">Manage your listings, leads, and bookings in one place.</p>
+      {/* Header banner */}
+      <div className="rounded-2xl bg-gradient-to-r from-brand-800 via-brand-700 to-brand-600 px-6 py-6 sm:px-8 sm:py-7 mb-5 relative overflow-hidden">
+        <div className="absolute inset-0 opacity-10 pointer-events-none [background-image:radial-gradient(circle_at_15%_20%,white,transparent_35%),radial-gradient(circle_at_85%_80%,white,transparent_30%)]" />
+        <div className="relative">
+          <p className="text-brand-50/80 text-sm">Welcome back{user?.firstName ? `, ${user.firstName}` : ""} 👋</p>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-white mt-0.5">My Business Dashboard</h1>
+          <p className="text-brand-50/80 text-sm mt-1">Manage your listings, leads, bookings, hours, and more.</p>
+        </div>
+      </div>
+
+      {/* KPI stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+        <StatCard icon={Building2} label="Active listings" value={stats.listings} tint="bg-brand-50 text-brand-600" />
+        <StatCard icon={Eye} label="Total profile views" value={stats.totalViews} tint="bg-sky-50 text-sky-600" />
+        <StatCard icon={MessageSquare} label="Leads received" value={stats.totalLeads} tint="bg-violet-50 text-violet-600" />
+        <StatCard
+          icon={Star}
+          label={`Avg rating · ${stats.ratedReviews} reviews`}
+          value={stats.avgRating > 0 ? stats.avgRating.toFixed(1) : "—"}
+          tint="bg-amber-50 text-amber-600"
+        />
+      </div>
 
       <div className="flex gap-2 mb-6 border-b border-gray-200">
         {(Object.keys(TAB_META) as Tab[]).map((t) => {
