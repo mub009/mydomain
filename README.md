@@ -48,6 +48,7 @@ npm run dev                # http://localhost:4000
 Seeded accounts (password `Password123!`):
 - `admin@mydomain.dev` — ADMIN
 - `owner@mydomain.dev` — BUSINESS_OWNER
+- `dealer@mydomain.dev` — DEALER (admin-managed; can add/manage stores)
 - `customer@mydomain.dev` — CUSTOMER
 
 ### 3. Frontend

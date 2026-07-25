@@ -35,7 +35,7 @@ businessesRouter.get("/", validate({ query: listBusinessesQuerySchema }), asyncH
 businessesRouter.get(
   "/mine",
   requireAuth,
-  requireRole(UserRole.BUSINESS_OWNER, UserRole.ADMIN),
+  requireRole(UserRole.BUSINESS_OWNER, UserRole.DEALER, UserRole.ADMIN),
   asyncHandler(listMyBusinessesHandler),
 );
 businessesRouter.get("/:id/manage", requireAuth, asyncHandler(getBusinessForOwnerHandler));
@@ -44,7 +44,7 @@ businessesRouter.get("/:slug", asyncHandler(getBusinessHandler));
 businessesRouter.post(
   "/",
   requireAuth,
-  requireRole(UserRole.BUSINESS_OWNER, UserRole.ADMIN),
+  requireRole(UserRole.BUSINESS_OWNER, UserRole.DEALER, UserRole.ADMIN),
   validate({ body: createBusinessSchema }),
   asyncHandler(createBusinessHandler),
 );

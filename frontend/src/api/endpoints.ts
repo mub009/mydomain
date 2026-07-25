@@ -1,5 +1,6 @@
 import { api } from "./client";
 import {
+  AdminUser,
   ApiResponse,
   AuthResponse,
   Booking,
@@ -87,8 +88,27 @@ export const b2bApi = {
 };
 
 export const adminApi = {
+  stats: () => api.get<ApiResponse<Record<string, number>>>("/admin/stats").then((r) => r.data.data),
+
+  // Approvals
   pendingBusinesses: () => api.get<PaginatedResponse<Business>>("/admin/businesses/pending").then((r) => r.data),
   approve: (id: string) => api.post(`/admin/businesses/${id}/approve`).then((r) => r.data.data),
   reject: (id: string) => api.post(`/admin/businesses/${id}/reject`).then((r) => r.data.data),
-  stats: () => api.get<ApiResponse<Record<string, number>>>("/admin/stats").then((r) => r.data.data),
+  suspend: (id: string) => api.post(`/admin/businesses/${id}/suspend`).then((r) => r.data.data),
+
+  // Users
+  users: (params: Record<string, unknown> = {}) =>
+    api.get<PaginatedResponse<AdminUser>>("/admin/users", { params }).then((r) => r.data),
+  createUser: (payload: Record<string, unknown>) =>
+    api.post<ApiResponse<AdminUser>>("/admin/users", payload).then((r) => r.data.data),
+  updateUser: (id: string, payload: Record<string, unknown>) =>
+    api.patch<ApiResponse<AdminUser>>(`/admin/users/${id}`, payload).then((r) => r.data.data),
+
+  // Businesses (admin-wide)
+  businesses: (params: Record<string, unknown> = {}) =>
+    api.get<PaginatedResponse<Business>>("/admin/businesses", { params }).then((r) => r.data),
+  updateBusiness: (id: string, payload: Record<string, unknown>) =>
+    api.patch<ApiResponse<Business>>(`/admin/businesses/${id}`, payload).then((r) => r.data.data),
+  reassignBusiness: (id: string, ownerId: string) =>
+    api.post<ApiResponse<Business>>(`/admin/businesses/${id}/reassign`, { ownerId }).then((r) => r.data.data),
 };

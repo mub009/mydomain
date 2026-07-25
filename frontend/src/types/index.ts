@@ -1,4 +1,18 @@
-export type UserRole = "CUSTOMER" | "BUSINESS_OWNER" | "ADMIN";
+export type UserRole = "CUSTOMER" | "BUSINESS_OWNER" | "DEALER" | "ADMIN";
+export type UserStatus = "ACTIVE" | "SUSPENDED" | "PENDING_VERIFICATION";
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  phone?: string | null;
+  firstName: string;
+  lastName: string;
+  role: UserRole;
+  status: UserStatus;
+  avatarUrl?: string | null;
+  createdAt: string;
+  _count?: { businesses: number };
+}
 
 export interface User {
   id: string;
@@ -57,6 +71,7 @@ export interface Business {
   category?: Category;
   categoryName?: string;
   categorySlug?: string;
+  owner?: { id: string; email: string; firstName: string; lastName: string; role: UserRole };
   distanceKm?: number | null;
   photos?: Array<{ id: string; url: string; caption?: string | null }>;
   hours?: Array<{ dayOfWeek: number; openTime: string; closeTime: string; isClosed: boolean }>;

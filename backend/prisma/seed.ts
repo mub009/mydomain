@@ -45,6 +45,19 @@ async function main(): Promise<void> {
     },
   });
 
+  await prisma.user.upsert({
+    where: { email: "dealer@mydomain.dev" },
+    update: {},
+    create: {
+      email: "dealer@mydomain.dev",
+      passwordHash,
+      firstName: "Derek",
+      lastName: "Dealer",
+      role: UserRole.DEALER,
+      status: UserStatus.ACTIVE,
+    },
+  });
+
   const restaurants = await prisma.category.upsert({
     where: { slug: "restaurants" },
     update: {},

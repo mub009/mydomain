@@ -18,6 +18,7 @@ datasource db {
 enum UserRole {
   CUSTOMER
   BUSINESS_OWNER
+  DEALER
   ADMIN
 }
 
