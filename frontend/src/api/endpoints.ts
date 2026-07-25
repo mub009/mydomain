@@ -9,8 +9,10 @@ import {
   Lead,
   PaginatedResponse,
   PopularCity,
+  RegistrationListResponse,
   Review,
   Rfq,
+  ShopRegistration,
 } from "@/types";
 
 export const authApi = {
@@ -87,8 +89,23 @@ export const b2bApi = {
     api.post(`/b2b/rfqs/${rfqId}/quotes/${quoteId}/award`).then((r) => r.data.data),
 };
 
+export const registrationsApi = {
+  register: (payload: Record<string, unknown>) =>
+    api
+      .post<ApiResponse<{ registration: ShopRegistration; ownerReused: boolean }>>("/registrations", payload)
+      .then((r) => r.data.data),
+  mine: (params: Record<string, unknown> = {}) =>
+    api.get<RegistrationListResponse>("/registrations/mine", { params }).then((r) => r.data),
+  all: (params: Record<string, unknown> = {}) =>
+    api.get<RegistrationListResponse>("/registrations/all", { params }).then((r) => r.data),
+};
+
 export const adminApi = {
   stats: () => api.get<ApiResponse<Record<string, number>>>("/admin/stats").then((r) => r.data.data),
+
+  // Registrations (admin-wide)
+  registrations: (params: Record<string, unknown> = {}) =>
+    api.get<RegistrationListResponse>("/registrations/all", { params }).then((r) => r.data),
 
   // Approvals
   pendingBusinesses: () => api.get<PaginatedResponse<Business>>("/admin/businesses/pending").then((r) => r.data),

@@ -155,6 +155,28 @@ export interface Quote {
   business?: { id: string; name: string; slug: string; avgRating: number };
 }
 
+export type RegistrationPaymentMethod = "CASH" | "UPI" | "CARD" | "BANK_TRANSFER";
+
+export interface ShopRegistration {
+  id: string;
+  amountCents: number;
+  currency: string;
+  paymentMethod: RegistrationPaymentMethod;
+  status: "COLLECTED" | "REFUNDED";
+  notes?: string | null;
+  createdAt: string;
+  business?: { id: string; name: string; slug: string; city: string; state: string; status: string };
+  owner?: { id: string; firstName: string; lastName: string; email: string; phone?: string | null };
+  dealer?: { id: string; firstName: string; lastName: string; email: string };
+}
+
+export interface RegistrationListResponse {
+  success: boolean;
+  data: ShopRegistration[];
+  meta: { page: number; pageSize: number; total: number; totalPages: number };
+  summary: { totalCollectedCents: number; collectedCount: number };
+}
+
 export interface PaginatedResponse<T> {
   success: boolean;
   data: T[];

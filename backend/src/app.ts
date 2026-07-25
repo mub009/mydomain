@@ -19,6 +19,7 @@ import { paymentsRouter } from "@/modules/payments/payments.routes";
 import { stripeWebhookHandler } from "@/modules/payments/payments.controller";
 import { b2bRouter } from "@/modules/b2b/b2b.routes";
 import { adminRouter } from "@/modules/admin/admin.routes";
+import { registrationsRouter } from "@/modules/registrations/registrations.routes";
 
 export function createApp(): Express {
   const app = express();
@@ -50,6 +51,7 @@ export function createApp(): Express {
   app.use("/api/v1/payments", paymentsRouter);
   app.use("/api/v1/b2b", b2bRouter);
   app.use("/api/v1/admin", adminRouter);
+  app.use("/api/v1/registrations", registrationsRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);
