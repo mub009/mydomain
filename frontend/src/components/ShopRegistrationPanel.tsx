@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { BadgeCheck, IndianRupee, Store, User, Wallet } from "lucide-react";
+import { BadgeCheck, Check, Copy, IndianRupee, KeyRound, RefreshCw, Store, User, Wallet } from "lucide-react";
 import { registrationsApi } from "@/api/endpoints";
 import { apiErrorMessage } from "@/api/client";
 import { Category, RegistrationPaymentMethod, ShopRegistration } from "@/types";
@@ -22,6 +22,27 @@ function slugify(value: string): string {
 function formatMoney(cents: number, currency = "INR"): string {
   const symbol = currency === "INR" ? "₹" : "";
   return `${symbol}${(cents / 100).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+}
+
+// A readable, reasonably strong default password the dealer can hand over.
+function generatePassword(): string {
+  const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  const lower = "abcdefghijkmnpqrstuvwxyz";
+  const digits = "23456789";
+  const all = upper + lower + digits;
+  const pick = (set: string) => set[Math.floor(Math.random() * set.length)];
+  let out = pick(upper) + pick(lower) + pick(digits);
+  for (let i = 0; i < 7; i++) out += pick(all);
+  return out
+    .split("")
+    .sort(() => Math.random() - 0.5)
+    .join("");
+}
+
+interface OwnerCredentials {
+  username: string;
+  password: string;
+  reused: boolean;
 }
 
 const emptyForm = {
@@ -47,11 +68,65 @@ const emptyForm = {
   notes: "",
 };
 
+function CopyField({ label, value }: { label: string; value: string }) {
+  const [copied, setCopied] = useState(false);
+  function copy() {
+    navigator.clipboard?.writeText(value).then(
+      () => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      },
+      () => undefined,
+    );
+  }
+  return (
+    <div>
+      <label className="block text-[11px] font-medium text-emerald-700/80 mb-1">{label}</label>
+      <div className="flex items-center gap-2">
+        <code className="flex-1 min-w-0 truncate rounded-md border border-emerald-200 bg-white px-3 py-2 text-sm font-mono text-ink-900">
+          {value}
+        </code>
+        <button type="button" onClick={copy} className="btn-secondary px-3 py-2 text-sm whitespace-nowrap">
+          {copied ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
+          {copied ? "Copied" : "Copy"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Shown after a successful registration so the dealer can hand the owner
+// their login. For a reused account only the username is shown.
+function CredentialsCard({ credentials, onDismiss }: { credentials: OwnerCredentials; onDismiss: () => void }) {
+  return (
+    <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <p className="font-bold text-emerald-800 flex items-center gap-1.5">
+          <KeyRound size={16} /> Owner login credentials
+        </p>
+        <button type="button" onClick={onDismiss} className="text-xs text-emerald-700/70 hover:text-emerald-900 underline">
+          Dismiss
+        </button>
+      </div>
+      <p className="text-xs text-emerald-700/90 mt-1 mb-3">
+        {credentials.reused
+          ? "This shop was linked to the owner's existing account — they sign in with the email below and their existing password."
+          : "Share these with the shop owner so they can sign in and manage their listing. This password won't be shown again."}
+      </p>
+      <div className="space-y-2.5">
+        <CopyField label="Username (email)" value={credentials.username} />
+        {!credentials.reused && <CopyField label="Password" value={credentials.password} />}
+      </div>
+    </div>
+  );
+}
+
 export default function ShopRegistrationPanel({ categories }: { categories: Category[] }) {
   const [form, setForm] = useState(emptyForm);
   const [registrations, setRegistrations] = useState<ShopRegistration[]>([]);
   const [summary, setSummary] = useState({ totalCollectedCents: 0, collectedCount: 0 });
   const [notice, setNotice] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+  const [credentials, setCredentials] = useState<OwnerCredentials | null>(null);
   const [saving, setSaving] = useState(false);
 
   function load() {
@@ -77,6 +152,11 @@ export default function ShopRegistrationPanel({ categories }: { categories: Cate
     e.preventDefault();
     setSaving(true);
     setNotice(null);
+    setCredentials(null);
+    // Capture the credentials the dealer entered before the form is reset,
+    // so they can be displayed and handed to the owner after registration.
+    const enteredUsername = form.ownerEmail;
+    const enteredPassword = form.ownerPassword;
     try {
       const res = await registrationsApi.register({
         owner: {
@@ -109,12 +189,9 @@ export default function ShopRegistrationPanel({ categories }: { categories: Cate
       const reused = res.ownerReused;
       setNotice({
         kind: "ok",
-        text: `Shop registered and ${formatMoney(res.registration.amountCents)} recorded as collected. ${
-          reused
-            ? "Linked to the owner's existing account."
-            : "A new owner account was created — share the login email and password with them."
-        } The listing is now pending admin approval.`,
+        text: `Shop registered and ${formatMoney(res.registration.amountCents)} recorded as collected. The listing is now pending admin approval.`,
       });
+      setCredentials({ username: enteredUsername, password: enteredPassword, reused });
       setForm(emptyForm);
       load();
     } catch (err) {
@@ -154,6 +231,8 @@ export default function ShopRegistrationPanel({ categories }: { categories: Cate
         </p>
       )}
 
+      {credentials && <CredentialsCard credentials={credentials} onDismiss={() => setCredentials(null)} />}
+
       {/* Registration form */}
       <form onSubmit={submit} className="card p-5 space-y-5">
         <div>
@@ -166,21 +245,39 @@ export default function ShopRegistrationPanel({ categories }: { categories: Cate
           </p>
         </div>
 
-        {/* Owner details */}
+        {/* Owner details + login */}
         <fieldset className="space-y-3">
           <legend className="text-xs font-bold uppercase tracking-wide text-ink-500 flex items-center gap-1.5 mb-1">
-            <User size={13} /> Owner details
+            <User size={13} /> Owner details &amp; login
           </legend>
           <div className="flex gap-3">
             <input required className="input" placeholder="First name" value={form.ownerFirstName} onChange={(e) => set({ ownerFirstName: e.target.value })} />
             <input required className="input" placeholder="Last name" value={form.ownerLastName} onChange={(e) => set({ ownerLastName: e.target.value })} />
           </div>
-          <div className="flex gap-3">
-            <input required type="email" className="input" placeholder="Owner email" value={form.ownerEmail} onChange={(e) => set({ ownerEmail: e.target.value })} />
-            <input className="input" placeholder="Owner phone (optional)" value={form.ownerPhone} onChange={(e) => set({ ownerPhone: e.target.value })} />
+          <input className="input" placeholder="Owner phone (optional)" value={form.ownerPhone} onChange={(e) => set({ ownerPhone: e.target.value })} />
+
+          <div className="rounded-lg border border-brand-100 bg-brand-50/50 p-3 space-y-2">
+            <p className="text-xs font-semibold text-brand-800 flex items-center gap-1.5">
+              <KeyRound size={13} /> Owner login credentials
+            </p>
+            <div>
+              <label className="block text-[11px] font-medium text-ink-600 mb-1">Login username (email)</label>
+              <input required type="email" className="input" placeholder="owner@example.com" value={form.ownerEmail} onChange={(e) => set({ ownerEmail: e.target.value })} />
+            </div>
+            <div>
+              <label className="block text-[11px] font-medium text-ink-600 mb-1">Login password (min 8 chars)</label>
+              <div className="flex gap-2">
+                <input required type="text" className="input font-mono" placeholder="Set a password" value={form.ownerPassword} onChange={(e) => set({ ownerPassword: e.target.value })} />
+                <button type="button" onClick={() => set({ ownerPassword: generatePassword() })} className="btn-secondary px-3 py-2 text-sm whitespace-nowrap">
+                  <RefreshCw size={14} /> Generate
+                </button>
+              </div>
+            </div>
+            <p className="text-[11px] text-ink-500">
+              The owner signs in with this email &amp; password. If the email already has an account, the shop is linked
+              to it and this password is ignored.
+            </p>
           </div>
-          <input required type="password" className="input" placeholder="Set a login password (min 8 chars)" value={form.ownerPassword} onChange={(e) => set({ ownerPassword: e.target.value })} />
-          <p className="text-xs text-ink-400 -mt-1">If the email already has an account, the shop is linked to it and this password is ignored.</p>
         </fieldset>
 
         {/* Business details */}
