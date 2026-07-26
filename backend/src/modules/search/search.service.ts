@@ -17,6 +17,11 @@ export interface SearchResultItem {
   categoryName: string;
   categorySlug: string;
   distanceKm: number | null;
+  // Fields the listing rows need: contact actions, locality line, badges.
+  phone: string;
+  addressLine1: string;
+  isVerified: boolean;
+  photoUrl: string | null;
 }
 
 // Earth-radius Haversine distance search. For very large catalogs this would
@@ -70,7 +75,9 @@ export async function searchBusinesses(query: SearchQuery): Promise<{ items: Sea
     SELECT
       b.id, b.name, b.slug, b.description, b.city, b.state, b.latitude, b.longitude,
       b.\`avgRating\` AS \`avgRating\`, b.\`reviewCount\` AS \`reviewCount\`, b.\`logoUrl\` AS \`logoUrl\`,
+      b.phone, b.\`addressLine1\` AS \`addressLine1\`, b.\`isVerified\` AS \`isVerified\`,
       c.name AS \`categoryName\`, c.slug AS \`categorySlug\`,
+      (SELECT p.url FROM business_photos p WHERE p.\`businessId\` = b.id ORDER BY p.\`sortOrder\` ASC LIMIT 1) AS \`photoUrl\`,
       ${distanceExpr} AS distance_km
     FROM businesses b
     JOIN categories c ON c.id = b.\`categoryId\`
@@ -88,6 +95,8 @@ export async function searchBusinesses(query: SearchQuery): Promise<{ items: Sea
 
   const items: SearchResultItem[] = rows.map((r) => ({
     ...r,
+    // MySQL returns TINYINT for booleans over the raw driver.
+    isVerified: !!r.isVerified,
     distanceKm: r.distance_km !== null && r.distance_km !== undefined ? Number(r.distance_km) : null,
   }));
 

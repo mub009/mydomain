@@ -104,6 +104,8 @@ export interface Business {
   category?: Category;
   categoryName?: string;
   categorySlug?: string;
+  // Populated by the search endpoint for listing rows.
+  photoUrl?: string | null;
   owner?: { id: string; email: string; firstName: string; lastName: string; role: UserRole };
   // Present on the create response when a dealer/admin supplied a login for
   // the business team; `created` is false when an existing account was linked.

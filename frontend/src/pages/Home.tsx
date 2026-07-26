@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { MapPin, Search, ShieldCheck, TrendingUp } from "lucide-react";
 import { searchApi, categoriesApi } from "@/api/endpoints";
 import { apiErrorMessage } from "@/api/client";
@@ -9,6 +9,7 @@ import PromoCarousel from "@/components/PromoCarousel";
 import CategoryShowcase from "@/components/CategoryShowcase";
 import LocationInput from "@/components/LocationInput";
 import Pagination from "@/components/Pagination";
+import { useLocationStore } from "@/store/locationStore";
 import { getCategoryIcon } from "@/lib/categoryIcons";
 import { CATEGORY_SHOWCASE } from "@/data/categoryShowcase";
 
@@ -21,8 +22,10 @@ interface GeoPoint {
 }
 
 export default function Home() {
+  const navigate = useNavigate();
+  const { city: savedCity, setCity: storeCity, setGeo: storeGeo } = useLocationStore();
   const [query, setQuery] = useState("");
-  const [city, setCity] = useState("");
+  const [city, setCity] = useState(savedCity);
   const [geo, setGeo] = useState<GeoPoint | null>(null);
   const [categorySlug, setCategorySlug] = useState("");
   const [categories, setCategories] = useState<Category[]>([]);
@@ -98,25 +101,37 @@ export default function Home() {
   function handleCityChange(next: string) {
     setCity(next);
     if (geo) setGeo(null);
+    // Remember the choice so listing pages open filtered to this location.
+    storeCity(next);
   }
 
   function handleDetect(lat: number, lng: number) {
     const point = { lat, lng };
     setGeo(point);
+    storeGeo(point);
     runSearch(undefined, undefined, undefined, point);
   }
 
+  // Category and showcase clicks open the dedicated listing page, filtered to
+  // the location the visitor has chosen.
+  function openListing(patch: { category?: string; q?: string }) {
+    const params = new URLSearchParams();
+    if (patch.category) params.set("category", patch.category);
+    if (patch.q) params.set("q", patch.q);
+    navigate(`/search?${params.toString()}`);
+  }
+
   function selectCategory(slug: string) {
-    const next = categorySlug === slug ? "" : slug;
-    setCategorySlug(next);
-    runSearch(undefined, next);
+    openListing({ category: slug });
   }
 
   function selectShowcaseItem(showcaseQuery: string) {
-    setQuery(showcaseQuery);
-    setCategorySlug("");
-    runSearch(undefined, "", showcaseQuery);
-    document.getElementById("results")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    openListing({ q: showcaseQuery });
+  }
+
+  function submitSearch(e: React.FormEvent) {
+    e.preventDefault();
+    openListing({ q: query || undefined, category: categorySlug || undefined });
   }
 
   return (
@@ -126,7 +141,7 @@ export default function Home() {
         <h1 className="text-2xl sm:text-[28px] font-extrabold text-ink-900 mb-4">
           Search across local <span className="text-brand-600">Products &amp; Services</span>
         </h1>
-        <form onSubmit={runSearch} className="flex flex-col sm:flex-row gap-2.5">
+        <form onSubmit={submitSearch} className="flex flex-col sm:flex-row gap-2.5">
           <LocationInput value={city} onChange={handleCityChange} onDetect={handleDetect} className="sm:w-64" />
           <div className="flex items-center gap-2 h-[52px] rounded-lg border border-gray-300 bg-white pl-3.5 pr-1.5 flex-1 focus-within:ring-2 focus-within:ring-brand-500/40 focus-within:border-brand-500">
             <Search size={18} className="text-gray-400 shrink-0" />

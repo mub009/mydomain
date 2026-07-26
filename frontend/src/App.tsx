@@ -5,6 +5,7 @@ import { useAuthStore } from "@/store/authStore";
 import Layout from "@/components/Layout";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Home from "@/pages/Home";
+import SearchResults from "@/pages/SearchResults";
 import BusinessDetail from "@/pages/BusinessDetail";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
@@ -28,6 +29,7 @@ export default function App() {
     <Layout>
       <Routes>
         <Route path="/" element={<Home />} />
+        <Route path="/search" element={<SearchResults />} />
         <Route path="/business/:slug" element={<BusinessDetail />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
