@@ -87,6 +87,14 @@ export const b2bApi = {
     api.post(`/b2b/rfqs/${rfqId}/quotes/${quoteId}/award`).then((r) => r.data.data),
 };
 
+export const usersApi = {
+  // Admin: any user; dealer: only accounts they created.
+  resetPassword: (id: string, password: string) =>
+    api.patch<ApiResponse<{ id: string; email: string }>>(`/users/${id}/password`, { password }).then((r) => r.data.data),
+  created: (params: Record<string, unknown> = {}) =>
+    api.get<PaginatedResponse<AdminUser>>("/users/created", { params }).then((r) => r.data),
+};
+
 export const adminApi = {
   stats: () => api.get<ApiResponse<Record<string, number>>>("/admin/stats").then((r) => r.data.data),
 

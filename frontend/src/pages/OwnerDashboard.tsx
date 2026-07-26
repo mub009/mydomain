@@ -2,8 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Building2,
   CalendarClock,
-  Check,
-  Copy,
   Eye,
   KeyRound,
   LayoutGrid,
@@ -14,13 +12,15 @@ import {
   RefreshCw,
   Settings2,
   Star,
+  UsersRound,
   X,
 } from "lucide-react";
-import { businessesApi, categoriesApi, leadsApi, bookingsApi } from "@/api/endpoints";
+import { businessesApi, categoriesApi, leadsApi, bookingsApi, usersApi } from "@/api/endpoints";
 import { apiErrorMessage } from "@/api/client";
-import { Business, Category, Lead, Booking, Privilege } from "@/types";
+import { AdminUser, Business, Category, Lead, Booking, Privilege } from "@/types";
 import { useAuthStore } from "@/store/authStore";
 import BusinessManager from "@/components/BusinessManager";
+import ResetPasswordModal, { CopyField, generatePassword } from "@/components/ResetPasswordModal";
 
 function StatCard({
   icon: Icon,
@@ -53,48 +53,6 @@ const TAB_META: Record<Tab, { label: string; icon: typeof LayoutGrid; privilege:
   leads: { label: "Leads", icon: MessageSquare, privilege: "MANAGE_LEADS" },
   bookings: { label: "Bookings", icon: CalendarClock, privilege: "MANAGE_BOOKINGS" },
 };
-
-// A readable, reasonably strong default password the dealer can hand over.
-function generatePassword(): string {
-  const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
-  const lower = "abcdefghijkmnpqrstuvwxyz";
-  const digits = "23456789";
-  const all = upper + lower + digits;
-  const pick = (set: string) => set[Math.floor(Math.random() * set.length)];
-  let out = pick(upper) + pick(lower) + pick(digits);
-  for (let i = 0; i < 7; i++) out += pick(all);
-  return out
-    .split("")
-    .sort(() => Math.random() - 0.5)
-    .join("");
-}
-
-function CopyField({ label, value }: { label: string; value: string }) {
-  const [copied, setCopied] = useState(false);
-  function copy() {
-    navigator.clipboard?.writeText(value).then(
-      () => {
-        setCopied(true);
-        setTimeout(() => setCopied(false), 1500);
-      },
-      () => undefined,
-    );
-  }
-  return (
-    <div>
-      <label className="block text-[11px] font-medium text-emerald-700/80 mb-1">{label}</label>
-      <div className="flex items-center gap-2">
-        <code className="flex-1 min-w-0 truncate rounded-md border border-emerald-200 bg-white px-3 py-2 text-sm font-mono text-ink-900">
-          {value}
-        </code>
-        <button type="button" onClick={copy} className="btn-secondary px-3 py-2 text-sm whitespace-nowrap">
-          {copied ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
-          {copied ? "Copied" : "Copy"}
-        </button>
-      </div>
-    </div>
-  );
-}
 
 interface OwnerCreds {
   businessName: string;
@@ -191,6 +149,19 @@ export default function OwnerDashboard() {
   const [ownerAccount, setOwnerAccount] = useState(emptyOwnerAccount);
   const [ownerCreds, setOwnerCreds] = useState<OwnerCreds | null>(null);
 
+  // The business logins this dealer has handed out; they can reset those
+  // passwords on the owner's behalf.
+  const [createdAccounts, setCreatedAccounts] = useState<AdminUser[]>([]);
+  const [resettingUser, setResettingUser] = useState<AdminUser | null>(null);
+
+  function loadCreatedAccounts() {
+    if (!isDealer) return;
+    usersApi
+      .created()
+      .then((r) => setCreatedAccounts(r.data))
+      .catch(() => undefined);
+  }
+
   function loadBusinesses() {
     businessesApi.mine().then((list) => {
       setBusinesses(list);
@@ -210,6 +181,7 @@ export default function OwnerDashboard() {
   useEffect(() => {
     loadBusinesses();
     categoriesApi.list().then(setCategories);
+    loadCreatedAccounts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -257,6 +229,7 @@ export default function OwnerDashboard() {
           created: created.ownerAccount?.created ?? true,
         });
         setOwnerAccount(emptyOwnerAccount);
+        loadCreatedAccounts();
       } else {
         setNotice("Business created. Manage its details, hours, services, and photos below.");
         setManageId(created.id);
@@ -453,6 +426,40 @@ export default function OwnerDashboard() {
               </div>
             )}
           </div>
+
+          {isDealer && createdAccounts.length > 0 && (
+            <div className="mt-8">
+              <h2 className="font-bold text-ink-900 flex items-center gap-1.5 mb-1">
+                <UsersRound size={16} className="text-brand-600" /> Business accounts you created
+              </h2>
+              <p className="text-xs text-ink-500 mb-3">
+                Logins you handed out with a listing. If an owner forgets their password, reset it here and share the
+                new one.
+              </p>
+              <div className="card divide-y divide-gray-100">
+                {createdAccounts.map((a) => (
+                  <div key={a.id} className="p-4 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-sm text-ink-900 truncate">
+                        {a.firstName} {a.lastName}
+                      </p>
+                      <p className="text-xs text-ink-500 truncate">{a.email}</p>
+                      {a._count && (
+                        <p className="text-[11px] text-ink-400 mt-0.5">
+                          {a._count.businesses} {a._count.businesses === 1 ? "business" : "businesses"}
+                        </p>
+                      )}
+                    </div>
+                    <button onClick={() => setResettingUser(a)} className="btn-secondary px-3 py-1.5 text-sm shrink-0 whitespace-nowrap">
+                      <KeyRound size={14} /> Reset password
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {resettingUser && <ResetPasswordModal user={resettingUser} onClose={() => setResettingUser(null)} />}
         </div>
       )}
 

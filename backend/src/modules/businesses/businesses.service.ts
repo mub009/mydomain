@@ -72,6 +72,9 @@ export async function createBusiness(actor: Actor, data: Record<string, unknown>
           lastName: owner.lastName,
           role: UserRole.BUSINESS_OWNER,
           status: UserStatus.ACTIVE,
+          // Remember who set this account up so the dealer can manage it
+          // later (e.g. reset the password on the owner's behalf).
+          createdById: actor.sub,
         },
       });
     }

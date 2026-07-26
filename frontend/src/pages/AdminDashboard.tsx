@@ -27,6 +27,7 @@ import {
   UserStatus,
 } from "@/types";
 import Modal from "@/components/Modal";
+import ResetPasswordModal from "@/components/ResetPasswordModal";
 
 const TABS = ["Overview", "Users", "Businesses", "Approvals"] as const;
 type Tab = (typeof TABS)[number];
@@ -158,6 +159,7 @@ function UsersPanel({ onChanged }: { onChanged: () => void }) {
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
   const [editing, setEditing] = useState<AdminUser | null>(null);
+  const [resetting, setResetting] = useState<AdminUser | null>(null);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
 
@@ -221,6 +223,9 @@ function UsersPanel({ onChanged }: { onChanged: () => void }) {
               <span className={`badge ${roleBadge(u.role)} hidden sm:inline-flex`}>{u.role.replace("_", " ")}</span>
               <span className={`badge ${statusBadge(u.status)} hidden md:inline-flex`}>{u.status.replace("_", " ")}</span>
               {u._count && u._count.businesses > 0 && <span className="text-xs text-ink-400 hidden lg:inline">{u._count.businesses} biz</span>}
+              <button onClick={() => setResetting(u)} className="btn-secondary px-3 py-1.5 text-sm whitespace-nowrap">
+                Reset password
+              </button>
               <button onClick={() => setEditing(u)} className="btn-secondary px-3 py-1.5 text-sm">
                 Edit
               </button>
@@ -251,6 +256,7 @@ function UsersPanel({ onChanged }: { onChanged: () => void }) {
           }}
         />
       )}
+      {resetting && <ResetPasswordModal user={resetting} onClose={() => setResetting(null)} />}
     </div>
   );
 }

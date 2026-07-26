@@ -75,15 +75,18 @@ export async function listUsers(query: { page?: number; pageSize?: number; role?
   return { items, meta: { page, pageSize, total } };
 }
 
-export async function createUser(data: {
-  email: string;
-  password: string;
-  firstName: string;
-  lastName: string;
-  phone?: string;
-  role: UserRole;
-  privileges?: Privilege[];
-}) {
+export async function createUser(
+  data: {
+    email: string;
+    password: string;
+    firstName: string;
+    lastName: string;
+    phone?: string;
+    role: UserRole;
+    privileges?: Privilege[];
+  },
+  createdById?: string,
+) {
   const existing = await prisma.user.findUnique({ where: { email: data.email } });
   if (existing) throw AppError.conflict("A user with this email already exists");
 
@@ -102,6 +105,7 @@ export async function createUser(data: {
       role: data.role,
       status: UserStatus.ACTIVE,
       privileges: privileges ?? Prisma.DbNull,
+      createdById,
     },
     select: USER_PUBLIC_SELECT,
   });

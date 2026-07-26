@@ -40,6 +40,9 @@ model User {
   privileges      Json? // dealer feature grants, e.g. ["MANAGE_LISTINGS","MANAGE_LEADS"]
   avatarUrl       String?
   emailVerifiedAt DateTime?
+  createdById     String?    @db.VarChar(36) // staff member (dealer/admin) who created this account
+  createdBy       User?      @relation("UserCreator", fields: [createdById], references: [id])
+  createdUsers    User[]     @relation("UserCreator")
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
 

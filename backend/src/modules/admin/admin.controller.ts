@@ -14,7 +14,7 @@ export async function listUsersHandler(req: Request, res: Response): Promise<voi
 }
 
 export async function createUserHandler(req: Request, res: Response): Promise<void> {
-  created(res, await adminService.createUser(req.body));
+  created(res, await adminService.createUser(req.body, req.user?.sub));
 }
 
 export async function updateUserHandler(req: Request, res: Response): Promise<void> {
