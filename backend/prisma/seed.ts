@@ -197,58 +197,7 @@ async function main(): Promise<void> {
     },
   });
 
-  // A shop the dealer registered on behalf of a new owner, with the
-  // collected onboarding fee recorded.
-  const registeredOwner = await prisma.user.upsert({
-    where: { email: "green-grocer@example.dev" },
-    update: {},
-    create: {
-      email: "green-grocer@example.dev",
-      passwordHash,
-      firstName: "Priya",
-      lastName: "Menon",
-      phone: "+91-9812345670",
-      role: UserRole.BUSINESS_OWNER,
-      status: UserStatus.ACTIVE,
-    },
-  });
-
-  const registeredBusiness = await prisma.business.upsert({
-    where: { slug: "green-grocer-mart" },
-    update: {},
-    create: {
-      ownerId: registeredOwner.id,
-      name: "Green Grocer Mart",
-      slug: "green-grocer-mart",
-      description: "Neighbourhood grocery and fresh produce store.",
-      categoryId: homeServices.id,
-      status: BusinessStatus.PENDING_APPROVAL,
-      phone: "+91-9812345670",
-      addressLine1: "45 Market Street",
-      city: "Kochi",
-      state: "Kerala",
-      postalCode: "682001",
-      country: "IN",
-      latitude: 9.9312,
-      longitude: 76.2673,
-    },
-  });
-
-  await prisma.shopRegistration.upsert({
-    where: { businessId: registeredBusiness.id },
-    update: {},
-    create: {
-      businessId: registeredBusiness.id,
-      ownerId: registeredOwner.id,
-      dealerId: dealer.id,
-      amountCents: 150000,
-      currency: "INR",
-      paymentMethod: "CASH",
-      notes: "Annual onboarding fee",
-    },
-  });
-
-  console.log({ admin: admin.email, owner: owner.email, customer: customer.email, dealer: dealer.email, categories: [restaurants.slug, homeServices.slug, manufacturing.slug], business: business.slug, registeredShop: registeredBusiness.slug, service: service.id });
+  console.log({ admin: admin.email, owner: owner.email, customer: customer.email, dealer: dealer.email, categories: [restaurants.slug, homeServices.slug, manufacturing.slug], business: business.slug, service: service.id });
 }
 
 main()

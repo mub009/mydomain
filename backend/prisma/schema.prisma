@@ -53,9 +53,6 @@ model User {
   refreshTokens RefreshToken[]
   notifications Notification[]
 
-  registrationsAsOwner  ShopRegistration[] @relation("RegistrationOwner")
-  registrationsAsDealer ShopRegistration[] @relation("RegistrationDealer")
-
   @@index([role])
   @@map("users")
 }
@@ -145,15 +142,14 @@ model Business {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  photos       BusinessPhoto[]
-  hours        BusinessHours[]
-  services     Service[]
-  reviews      Review[]
-  leads        Lead[]
-  bookings     Booking[]
-  quotes       Quote[]           @relation("QuoteBusiness")
-  rfqInvites   RfqInvite[]
-  registration ShopRegistration?
+  photos     BusinessPhoto[]
+  hours      BusinessHours[]
+  services   Service[]
+  reviews    Review[]
+  leads      Lead[]
+  bookings   Booking[]
+  quotes     Quote[]         @relation("QuoteBusiness")
+  rfqInvites RfqInvite[]
 
   @@index([categoryId])
   @@index([city, state])
@@ -337,45 +333,6 @@ model Payment {
 
   @@index([userId])
   @@map("payments")
-}
-
-// ---------------------------------------------------------------------------
-// Shop Registration (dealer-collected onboarding fee)
-// ---------------------------------------------------------------------------
-
-enum RegistrationPaymentMethod {
-  CASH
-  UPI
-  CARD
-  BANK_TRANSFER
-}
-
-enum RegistrationStatus {
-  COLLECTED
-  REFUNDED
-}
-
-// A record of a dealer registering a shop on behalf of an owner and
-// collecting the onboarding fee for it. One per business.
-model ShopRegistration {
-  id            String                    @id @default(uuid()) @db.VarChar(36)
-  businessId    String                    @unique @db.VarChar(36)
-  business      Business                  @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  ownerId       String                    @db.VarChar(36)
-  owner         User                      @relation("RegistrationOwner", fields: [ownerId], references: [id])
-  dealerId      String                    @db.VarChar(36)
-  dealer        User                      @relation("RegistrationDealer", fields: [dealerId], references: [id])
-  amountCents   Int
-  currency      String                    @default("INR")
-  paymentMethod RegistrationPaymentMethod @default(CASH)
-  status        RegistrationStatus        @default(COLLECTED)
-  notes         String?                   @db.Text
-  createdAt     DateTime                  @default(now())
-  updatedAt     DateTime                  @updatedAt
-
-  @@index([dealerId])
-  @@index([ownerId])
-  @@map("shop_registrations")
 }
 
 // ---------------------------------------------------------------------------

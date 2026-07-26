@@ -23,13 +23,12 @@ import {
   Category,
   Privilege,
   PRIVILEGE_LABELS,
-  ShopRegistration,
   UserRole,
   UserStatus,
 } from "@/types";
 import Modal from "@/components/Modal";
 
-const TABS = ["Overview", "Users", "Businesses", "Registrations", "Approvals"] as const;
+const TABS = ["Overview", "Users", "Businesses", "Approvals"] as const;
 type Tab = (typeof TABS)[number];
 
 const ROLES: UserRole[] = ["CUSTOMER", "BUSINESS_OWNER", "DEALER", "ADMIN"];
@@ -145,7 +144,6 @@ export default function AdminDashboard() {
 
       {tab === "Users" && <UsersPanel onChanged={() => adminApi.stats().then(setStats)} />}
       {tab === "Businesses" && <BusinessesPanel categories={categories} onChanged={() => adminApi.stats().then(setStats)} />}
-      {tab === "Registrations" && <RegistrationsPanel />}
       {tab === "Approvals" && <ApprovalsPanel onChanged={() => adminApi.stats().then(setStats)} />}
     </div>
   );
@@ -637,81 +635,6 @@ function ReassignModal({ business, onClose, onSaved }: { business: Business; onC
         {list.length === 0 && <div className="p-6 text-center text-sm text-ink-500">No eligible owners found.</div>}
       </div>
     </Modal>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Registrations panel (dealer-collected onboarding fees)
-// ---------------------------------------------------------------------------
-
-function formatMoney(cents: number, currency = "INR"): string {
-  const symbol = currency === "INR" ? "₹" : "";
-  return `${symbol}${(cents / 100).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
-}
-
-function RegistrationsPanel() {
-  const [items, setItems] = useState<ShopRegistration[]>([]);
-  const [summary, setSummary] = useState({ totalCollectedCents: 0, collectedCount: 0 });
-  const [search, setSearch] = useState("");
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    const id = setTimeout(() => {
-      adminApi
-        .registrations({ search: search || undefined })
-        .then((r) => {
-          setItems(r.data);
-          setSummary(r.summary);
-        })
-        .catch((e) => setError(apiErrorMessage(e)));
-    }, 250);
-    return () => clearTimeout(id);
-  }, [search]);
-
-  return (
-    <div>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
-        <div className="card p-4 sm:col-span-2 bg-gradient-to-r from-emerald-600 to-brand-600 text-white">
-          <p className="text-white/80 text-sm">Total fees collected by dealers</p>
-          <p className="text-3xl font-extrabold mt-1">{formatMoney(summary.totalCollectedCents)}</p>
-        </div>
-        <div className="card p-4">
-          <p className="text-2xl font-extrabold text-ink-900 leading-none">{summary.collectedCount}</p>
-          <p className="text-xs text-ink-500 mt-1">Shops registered</p>
-        </div>
-      </div>
-
-      <div className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 mb-4">
-        <Search size={16} className="text-gray-400" />
-        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by shop name…" className="w-full py-2.5 text-sm focus:outline-none" />
-      </div>
-
-      {error && <p className="text-sm text-red-700 bg-red-50 rounded-md px-3 py-2 mb-4">{error}</p>}
-
-      <div className="card divide-y divide-gray-100">
-        {items.map((r) => (
-          <div key={r.id} className="p-4 flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <p className="font-semibold text-sm text-ink-900 truncate">{r.business?.name}</p>
-                <span className={`badge ${statusBadge(r.business?.status ?? "")}`}>{(r.business?.status ?? "").replace("_", " ")}</span>
-              </div>
-              <p className="text-xs text-ink-500 truncate mt-0.5">
-                Owner: {r.owner?.firstName} {r.owner?.lastName} ({r.owner?.email})
-              </p>
-              <p className="text-[11px] text-ink-400 mt-0.5">
-                Collected by {r.dealer?.firstName} {r.dealer?.lastName} · {new Date(r.createdAt).toLocaleDateString()}
-              </p>
-            </div>
-            <div className="text-right shrink-0">
-              <p className="font-bold text-emerald-700">{formatMoney(r.amountCents, r.currency)}</p>
-              <span className="badge bg-gray-100 text-gray-600 mt-1">{r.paymentMethod.replace("_", " ")}</span>
-            </div>
-          </div>
-        ))}
-        {items.length === 0 && <div className="p-8 text-center text-sm text-ink-500">No registrations yet.</div>}
-      </div>
-    </div>
   );
 }
 

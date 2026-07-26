@@ -10,7 +10,6 @@ import {
   Plus,
   Settings2,
   Star,
-  Store,
   X,
 } from "lucide-react";
 import { businessesApi, categoriesApi, leadsApi, bookingsApi } from "@/api/endpoints";
@@ -18,7 +17,6 @@ import { apiErrorMessage } from "@/api/client";
 import { Business, Category, Lead, Booking, Privilege } from "@/types";
 import { useAuthStore } from "@/store/authStore";
 import BusinessManager from "@/components/BusinessManager";
-import ShopRegistrationPanel from "@/components/ShopRegistrationPanel";
 
 function StatCard({
   icon: Icon,
@@ -44,11 +42,10 @@ function StatCard({
   );
 }
 
-type Tab = "businesses" | "register" | "leads" | "bookings";
+type Tab = "businesses" | "leads" | "bookings";
 
-const TAB_META: Record<Tab, { label: string; icon: typeof LayoutGrid; privilege: Privilege; dealerOnly?: boolean }> = {
+const TAB_META: Record<Tab, { label: string; icon: typeof LayoutGrid; privilege: Privilege }> = {
   businesses: { label: "Businesses", icon: LayoutGrid, privilege: "MANAGE_LISTINGS" },
-  register: { label: "Register shop", icon: Store, privilege: "MANAGE_LISTINGS", dealerOnly: true },
   leads: { label: "Leads", icon: MessageSquare, privilege: "MANAGE_LEADS" },
   bookings: { label: "Bookings", icon: CalendarClock, privilege: "MANAGE_BOOKINGS" },
 };
@@ -79,15 +76,9 @@ export default function OwnerDashboard() {
   // Dealers are gated by their granted privileges; business owners and admins
   // implicitly hold every privilege on their own resources.
   const isDealer = user?.role === "DEALER";
-  const isDealerOrAdmin = isDealer || user?.role === "ADMIN";
   const can = (p: Privilege) => !isDealer || (user?.privileges ?? []).includes(p);
   const canManageListings = can("MANAGE_LISTINGS");
-  const visibleTabs = (Object.keys(TAB_META) as Tab[]).filter((t) => {
-    if (!can(TAB_META[t].privilege)) return false;
-    // The dealer-only "Register shop" flow is hidden from plain owners.
-    if (TAB_META[t].dealerOnly && !isDealerOrAdmin) return false;
-    return true;
-  });
+  const visibleTabs = (Object.keys(TAB_META) as Tab[]).filter((t) => can(TAB_META[t].privilege));
 
   const [tab, setTab] = useState<Tab>(visibleTabs[0] ?? "businesses");
   const [businesses, setBusinesses] = useState<Business[]>([]);
@@ -301,8 +292,6 @@ export default function OwnerDashboard() {
           </div>
         </div>
       )}
-
-      {tab === "register" && <ShopRegistrationPanel categories={categories} />}
 
       {(tab === "leads" || tab === "bookings") && (
         <div>
