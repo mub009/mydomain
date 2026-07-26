@@ -4,6 +4,7 @@ import { authApi } from "@/api/endpoints";
 import { useAuthStore } from "@/store/authStore";
 import Layout from "@/components/Layout";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import WelcomeModal from "@/components/WelcomeModal";
 import Home from "@/pages/Home";
 import SearchResults from "@/pages/SearchResults";
 import BusinessDetail from "@/pages/BusinessDetail";
@@ -52,6 +53,7 @@ export default function App() {
           }
         />
       </Routes>
+      <WelcomeModal />
     </Layout>
   );
 }

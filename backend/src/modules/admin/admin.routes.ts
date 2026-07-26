@@ -27,6 +27,8 @@ import {
 } from "./admin.validation";
 import { adjustPointsSchema, listTransactionsQuerySchema } from "@/modules/points/points.validation";
 import { adjustPointsHandler, userTransactionsHandler } from "@/modules/points/points.controller";
+import { listVisitorsQuerySchema } from "@/modules/visitors/visitors.validation";
+import { listVisitorsHandler } from "@/modules/visitors/visitors.controller";
 
 export const adminRouter = Router();
 
@@ -42,6 +44,7 @@ adminRouter.get(
 
 adminRouter.get("/stats", asyncHandler(platformStatsHandler));
 adminRouter.get("/reports/business-creators", asyncHandler(businessCreatorsReportHandler));
+adminRouter.get("/visitors", validate({ query: listVisitorsQuerySchema }), asyncHandler(listVisitorsHandler));
 
 // Users
 adminRouter.get("/users", validate({ query: listUsersQuerySchema }), asyncHandler(listUsersHandler));

@@ -182,6 +182,20 @@ export interface Quote {
   business?: { id: string; name: string; slug: string; avgRating: number };
 }
 
+export interface Visitor {
+  id: string;
+  phone: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  city?: string | null;
+  consentAt: string;
+  locationAt?: string | null;
+  userAgent?: string | null;
+  visitCount: number;
+  lastSeenAt: string;
+  createdAt: string;
+}
+
 export interface PaginatedResponse<T> {
   success: boolean;
   data: T[];

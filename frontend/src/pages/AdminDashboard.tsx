@@ -6,6 +6,7 @@ import {
   Check,
   Coins,
   type LucideIcon,
+  MapPin,
   MessageSquare,
   Search,
   ShieldCheck,
@@ -26,6 +27,7 @@ import {
   PRIVILEGE_LABELS,
   UserRole,
   UserStatus,
+  Visitor,
 } from "@/types";
 import { ListSkeleton, Spinner } from "@/components/Loading";
 import Modal from "@/components/Modal";
@@ -33,7 +35,7 @@ import Pagination from "@/components/Pagination";
 import PointsModal from "@/components/PointsModal";
 import ResetPasswordModal from "@/components/ResetPasswordModal";
 
-const TABS = ["Overview", "Users", "Businesses", "Approvals", "Reports"] as const;
+const TABS = ["Overview", "Users", "Businesses", "Approvals", "Visitors", "Reports"] as const;
 type Tab = (typeof TABS)[number];
 
 const ROLES: UserRole[] = ["CUSTOMER", "BUSINESS_OWNER", "DEALER", "ADMIN"];
@@ -150,6 +152,7 @@ export default function AdminDashboard() {
       {tab === "Users" && <UsersPanel onChanged={() => adminApi.stats().then(setStats)} />}
       {tab === "Businesses" && <BusinessesPanel categories={categories} onChanged={() => adminApi.stats().then(setStats)} />}
       {tab === "Approvals" && <ApprovalsPanel onChanged={() => adminApi.stats().then(setStats)} />}
+      {tab === "Visitors" && <VisitorsPanel />}
       {tab === "Reports" && <ReportsPanel />}
     </div>
   );
@@ -710,6 +713,124 @@ function ReassignModal({ business, onClose, onSaved }: { business: Business; onC
         {!loading && list.length === 0 && <div className="p-6 text-center text-sm text-ink-500">No eligible owners found.</div>}
       </div>
     </Modal>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Visitors panel — numbers captured by the welcome popup
+// ---------------------------------------------------------------------------
+
+function VisitorsPanel() {
+  const [visitors, setVisitors] = useState<Visitor[]>([]);
+  const [summary, setSummary] = useState({ located: 0, todayCount: 0 });
+  const [total, setTotal] = useState(0);
+  const [search, setSearch] = useState("");
+  const [locatedOnly, setLocatedOnly] = useState(false);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    setLoading(true);
+    const id = setTimeout(() => {
+      adminApi
+        .visitors({ search: search || undefined, withLocation: locatedOnly ? "true" : undefined, page })
+        .then((r) => {
+          setVisitors(r.data);
+          setTotalPages(r.meta.totalPages);
+          setTotal(r.meta.total);
+          setSummary(r.summary);
+        })
+        .catch((e) => setError(apiErrorMessage(e)))
+        .finally(() => setLoading(false));
+    }, 250);
+    return () => clearTimeout(id);
+  }, [search, locatedOnly, page]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, locatedOnly]);
+
+  return (
+    <div>
+      <div className="grid grid-cols-3 gap-3 mb-4">
+        <div className="card p-4">
+          <p className="text-2xl font-extrabold text-ink-900 leading-none">{total}</p>
+          <p className="text-xs text-ink-500 mt-1">Numbers captured</p>
+        </div>
+        <div className="card p-4">
+          <p className="text-2xl font-extrabold text-emerald-700 leading-none">{summary.located}</p>
+          <p className="text-xs text-ink-500 mt-1">Shared location</p>
+        </div>
+        <div className="card p-4 border-brand-200 bg-brand-50/40">
+          <p className="text-2xl font-extrabold text-brand-700 leading-none">{summary.todayCount}</p>
+          <p className="text-xs text-ink-500 mt-1">New today</p>
+        </div>
+      </div>
+
+      <div className="flex flex-col sm:flex-row gap-3 mb-4">
+        <div className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 flex-1">
+          <Search size={16} className="text-gray-400" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by number or city…"
+            className="w-full py-2.5 text-sm focus:outline-none"
+          />
+        </div>
+        <label className="flex items-center gap-2 text-sm text-ink-700 whitespace-nowrap">
+          <input type="checkbox" checked={locatedOnly} onChange={(e) => setLocatedOnly(e.target.checked)} />
+          With location only
+        </label>
+      </div>
+
+      {error && <p className="text-sm text-red-700 bg-red-50 rounded-md px-3 py-2 mb-4">{error}</p>}
+
+      {loading && <ListSkeleton rows={5} />}
+
+      {!loading && (
+        <div className="card divide-y divide-gray-100">
+          {visitors.map((v) => (
+            <div key={v.id} className="p-4 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="font-semibold text-sm text-ink-900">+91 {v.phone}</p>
+                <p className="text-xs text-ink-500 mt-0.5 flex items-center gap-1">
+                  {v.latitude != null && v.longitude != null ? (
+                    <>
+                      <MapPin size={11} className="text-emerald-600" />
+                      <a
+                        href={`https://www.google.com/maps?q=${v.latitude},${v.longitude}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="hover:text-brand-600 hover:underline"
+                      >
+                        {v.latitude.toFixed(4)}, {v.longitude.toFixed(4)}
+                      </a>
+                      {v.city && <span>· {v.city}</span>}
+                    </>
+                  ) : (
+                    <span className="text-ink-400">Location not shared</span>
+                  )}
+                </p>
+                <p className="text-[11px] text-ink-400 mt-0.5">
+                  First seen {new Date(v.createdAt).toLocaleDateString()} · {v.visitCount}{" "}
+                  {v.visitCount === 1 ? "visit" : "visits"} · last {new Date(v.lastSeenAt).toLocaleString()}
+                </p>
+              </div>
+              <div className="shrink-0 flex items-center gap-2">
+                {v.latitude != null && <span className="badge bg-emerald-50 text-emerald-700">Located</span>}
+                <a href={`tel:+91${v.phone}`} className="btn-secondary px-3 py-1.5 text-sm">
+                  Call
+                </a>
+              </div>
+            </div>
+          ))}
+          {visitors.length === 0 && <div className="p-8 text-center text-sm text-ink-500">No visitors captured yet.</div>}
+        </div>
+      )}
+      <Pagination page={page} totalPages={totalPages} onChange={setPage} />
+    </div>
   );
 }
 

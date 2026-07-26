@@ -21,6 +21,7 @@ import { b2bRouter } from "@/modules/b2b/b2b.routes";
 import { adminRouter } from "@/modules/admin/admin.routes";
 import { usersRouter } from "@/modules/users/users.routes";
 import { pointsRouter } from "@/modules/points/points.routes";
+import { visitorsRouter } from "@/modules/visitors/visitors.routes";
 
 export function createApp(): Express {
   const app = express();
@@ -54,6 +55,7 @@ export function createApp(): Express {
   app.use("/api/v1/admin", adminRouter);
   app.use("/api/v1/users", usersRouter);
   app.use("/api/v1/points", pointsRouter);
+  app.use("/api/v1/visitors", visitorsRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

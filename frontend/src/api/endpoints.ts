@@ -14,6 +14,7 @@ import {
   Review,
   Rfq,
   UserRole,
+  Visitor,
 } from "@/types";
 
 export const authApi = {
@@ -100,6 +101,20 @@ export const usersApi = {
     api.get<PaginatedResponse<AdminUser>>("/users/created", { params }).then((r) => r.data),
 };
 
+export const visitorsApi = {
+  capture: (payload: { phone: string; consent: true; latitude?: number; longitude?: number; city?: string }) =>
+    api.post<ApiResponse<{ id: string; phone: string }>>("/visitors", payload).then((r) => r.data.data),
+  updateLocation: (id: string, latitude: number, longitude: number, city?: string) =>
+    api.patch<ApiResponse<{ id: string }>>(`/visitors/${id}/location`, { latitude, longitude, city }).then((r) => r.data.data),
+};
+
+export interface VisitorListResponse {
+  success: boolean;
+  data: Visitor[];
+  meta: { page: number; pageSize: number; total: number; totalPages: number };
+  summary: { located: number; todayCount: number };
+}
+
 export const pointsApi = {
   mine: () => api.get<ApiResponse<PointsBalance>>("/points/mine").then((r) => r.data.data),
   myTransactions: (params: Record<string, unknown> = {}) =>
@@ -125,6 +140,10 @@ export const adminApi = {
   stats: () => api.get<ApiResponse<Record<string, number>>>("/admin/stats").then((r) => r.data.data),
   businessCreatorsReport: () =>
     api.get<ApiResponse<CreatorReport>>("/admin/reports/business-creators").then((r) => r.data.data),
+
+  // Visitors captured by the welcome popup
+  visitors: (params: Record<string, unknown> = {}) =>
+    api.get<VisitorListResponse>("/admin/visitors", { params }).then((r) => r.data),
 
   // Approvals
   pendingBusinesses: (params: Record<string, unknown> = {}) =>
