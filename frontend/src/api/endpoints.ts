@@ -8,6 +8,8 @@ import {
   Category,
   Lead,
   PaginatedResponse,
+  PointsBalance,
+  PointTransaction,
   PopularCity,
   Review,
   Rfq,
@@ -96,6 +98,12 @@ export const usersApi = {
     api.get<PaginatedResponse<AdminUser>>("/users/created", { params }).then((r) => r.data),
 };
 
+export const pointsApi = {
+  mine: () => api.get<ApiResponse<PointsBalance>>("/points/mine").then((r) => r.data.data),
+  myTransactions: (params: Record<string, unknown> = {}) =>
+    api.get<PaginatedResponse<PointTransaction>>("/points/mine/transactions", { params }).then((r) => r.data),
+};
+
 export interface CreatorReportRow {
   creator: { id: string; firstName: string; lastName: string; email: string; role: UserRole } | null;
   businessCount: number;
@@ -130,6 +138,12 @@ export const adminApi = {
     api.post<ApiResponse<AdminUser>>("/admin/users", payload).then((r) => r.data.data),
   updateUser: (id: string, payload: Record<string, unknown>) =>
     api.patch<ApiResponse<AdminUser>>(`/admin/users/${id}`, payload).then((r) => r.data.data),
+
+  // Dealer points
+  adjustPoints: (id: string, amount: number, note?: string) =>
+    api.patch<ApiResponse<AdminUser>>(`/admin/users/${id}/points`, { amount, note }).then((r) => r.data.data),
+  pointTransactions: (id: string, params: Record<string, unknown> = {}) =>
+    api.get<PaginatedResponse<PointTransaction>>(`/admin/users/${id}/points/transactions`, { params }).then((r) => r.data),
 
   // Businesses (admin-wide)
   businesses: (params: Record<string, unknown> = {}) =>

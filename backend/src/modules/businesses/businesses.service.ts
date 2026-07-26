@@ -4,6 +4,7 @@ import { prisma } from "@/config/database";
 import { AppError } from "@/common/errors";
 import { sendBusinessWelcomeEmail } from "@/common/mailer";
 import { parsePagination } from "@/common/pagination";
+import { assertHasPointsForBusiness, spendPointsForBusiness } from "@/modules/points/points.service";
 
 interface Actor {
   sub: string;
@@ -35,18 +36,26 @@ export async function createBusiness(actor: Actor, data: Record<string, unknown>
   const isStaff = actor.role === UserRole.DEALER || actor.role === UserRole.ADMIN;
   const initialStatus = isStaff ? BusinessStatus.PUBLISHED : BusinessStatus.PENDING_APPROVAL;
 
+  // Dealers spend a point per listing — check up front so we never create an
+  // owner account and then reject the request.
+  await assertHasPointsForBusiness(actor);
+
   // Plain owners always own their listings. Dealers and admins may instead
   // supply a login for the business's own team; the listing is then assigned
   // to that account so the business can sign in and manage it themselves.
   if (!owner || !isStaff) {
-    return prisma.business.create({
-      data: {
-        ...(businessData as any),
-        ownerId: actor.sub,
-        createdById: actor.sub,
-        status: initialStatus,
-        isVerified: isStaff,
-      },
+    return prisma.$transaction(async (tx) => {
+      const business = await tx.business.create({
+        data: {
+          ...(businessData as any),
+          ownerId: actor.sub,
+          createdById: actor.sub,
+          status: initialStatus,
+          isVerified: isStaff,
+        },
+      });
+      await spendPointsForBusiness(tx, actor, business.id);
+      return business;
     });
   }
 
@@ -96,6 +105,8 @@ export async function createBusiness(actor: Actor, data: Record<string, unknown>
         isVerified: isStaff,
       },
     });
+
+    await spendPointsForBusiness(tx, actor, business.id);
 
     // ownerAccount tells the client whether a fresh login was created (so it
     // can show the credentials) or an existing account was linked.

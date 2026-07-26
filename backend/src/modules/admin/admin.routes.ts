@@ -25,10 +25,20 @@ import {
   updateBusinessSchema,
   updateUserSchema,
 } from "./admin.validation";
+import { adjustPointsSchema, listTransactionsQuerySchema } from "@/modules/points/points.validation";
+import { adjustPointsHandler, userTransactionsHandler } from "@/modules/points/points.controller";
 
 export const adminRouter = Router();
 
 adminRouter.use(requireAuth, requireRole(UserRole.ADMIN));
+
+// Dealer points
+adminRouter.patch("/users/:id/points", validate({ body: adjustPointsSchema }), asyncHandler(adjustPointsHandler));
+adminRouter.get(
+  "/users/:id/points/transactions",
+  validate({ query: listTransactionsQuerySchema }),
+  asyncHandler(userTransactionsHandler),
+);
 
 adminRouter.get("/stats", asyncHandler(platformStatsHandler));
 adminRouter.get("/reports/business-creators", asyncHandler(businessCreatorsReportHandler));

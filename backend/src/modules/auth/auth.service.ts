@@ -122,6 +122,7 @@ export async function getProfile(userId: string) {
     role: user.role,
     status: user.status,
     privileges: normalizePrivileges(user.privileges),
+    points: user.points,
     avatarUrl: user.avatarUrl,
     createdAt: user.createdAt,
   };

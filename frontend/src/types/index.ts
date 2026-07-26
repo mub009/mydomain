@@ -19,9 +19,30 @@ export interface AdminUser {
   role: UserRole;
   status: UserStatus;
   privileges?: Privilege[] | null;
+  points?: number;
   avatarUrl?: string | null;
   createdAt: string;
   _count?: { businesses: number };
+}
+
+export type PointTransactionType = "ADMIN_GRANT" | "ADMIN_DEDUCTION" | "BUSINESS_CREATED";
+
+export interface PointTransaction {
+  id: string;
+  type: PointTransactionType;
+  amount: number;
+  balanceAfter: number;
+  note?: string | null;
+  createdAt: string;
+  grantedBy?: { id: string; firstName: string; lastName: string; email: string } | null;
+}
+
+export interface PointsBalance {
+  points: number;
+  pointsPerBusiness: number;
+  businessesRemaining: number;
+  totalSpent: number;
+  chargeable: boolean;
 }
 
 export interface User {
@@ -32,6 +53,7 @@ export interface User {
   role: UserRole;
   status: string;
   privileges?: Privilege[];
+  points?: number;
 }
 
 export interface AuthResponse {

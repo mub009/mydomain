@@ -56,8 +56,26 @@ async function main(): Promise<void> {
       role: UserRole.DEALER,
       status: UserStatus.ACTIVE,
       privileges: ["MANAGE_LISTINGS", "MANAGE_LEADS", "MANAGE_BOOKINGS"],
+      points: 10,
     },
   });
+
+  // Give the demo dealer an opening point balance (idempotent).
+  if (await prisma.pointTransaction.count({ where: { userId: dealer.id } }).then((c) => c === 0)) {
+    await prisma.$transaction([
+      prisma.user.update({ where: { id: dealer.id }, data: { points: 10 } }),
+      prisma.pointTransaction.create({
+        data: {
+          userId: dealer.id,
+          type: "ADMIN_GRANT",
+          amount: 10,
+          balanceAfter: 10,
+          note: "Seed allocation",
+          grantedById: admin.id,
+        },
+      }),
+    ]);
+  }
 
   const restaurants = await prisma.category.upsert({
     where: { slug: "restaurants" },

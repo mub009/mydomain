@@ -14,6 +14,7 @@ const USER_PUBLIC_SELECT = {
   role: true,
   status: true,
   privileges: true,
+  points: true,
   avatarUrl: true,
   createdAt: true,
 } satisfies Prisma.UserSelect;

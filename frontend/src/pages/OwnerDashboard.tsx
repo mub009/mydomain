@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Building2,
   CalendarClock,
+  Coins,
   Eye,
   KeyRound,
   LayoutGrid,
@@ -15,9 +16,9 @@ import {
   UsersRound,
   X,
 } from "lucide-react";
-import { businessesApi, categoriesApi, leadsApi, bookingsApi, usersApi } from "@/api/endpoints";
+import { businessesApi, categoriesApi, leadsApi, bookingsApi, pointsApi, usersApi } from "@/api/endpoints";
 import { apiErrorMessage } from "@/api/client";
-import { AdminUser, Business, Category, Lead, Booking, Privilege } from "@/types";
+import { AdminUser, Business, Category, Lead, Booking, PointsBalance, Privilege } from "@/types";
 import { useAuthStore } from "@/store/authStore";
 import BusinessManager from "@/components/BusinessManager";
 import Pagination from "@/components/Pagination";
@@ -157,6 +158,15 @@ export default function OwnerDashboard() {
 
   // The business logins this dealer has handed out; they can reset those
   // passwords on the owner's behalf.
+  // Registration points: dealers spend one per business.
+  const [points, setPoints] = useState<PointsBalance | null>(null);
+  const outOfPoints = isDealer && points !== null && points.points <= 0;
+
+  function loadPoints() {
+    if (!isDealer) return;
+    pointsApi.mine().then(setPoints).catch(() => undefined);
+  }
+
   const [createdAccounts, setCreatedAccounts] = useState<AdminUser[]>([]);
   const [accountsPage, setAccountsPage] = useState(1);
   const [accountsTotalPages, setAccountsTotalPages] = useState(1);
@@ -193,6 +203,7 @@ export default function OwnerDashboard() {
     loadBusinesses();
     categoriesApi.list().then(setCategories);
     loadCreatedAccounts();
+    loadPoints();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -248,6 +259,7 @@ export default function OwnerDashboard() {
       setNewBusiness({ name: "", slug: "", categoryId: "", phone: "", addressLine1: "", city: "", state: "", postalCode: "", latitude: "", longitude: "" });
       setShowCreate(false);
       loadBusinesses();
+      loadPoints();
       if (assignOwner) {
         // The listing belongs to the business team's account now — surface
         // the login so the dealer can hand it over.
@@ -293,8 +305,16 @@ export default function OwnerDashboard() {
       </div>
 
       {/* KPI stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+      <div className={`grid grid-cols-2 ${isDealer ? "lg:grid-cols-5" : "lg:grid-cols-4"} gap-3 mb-6`}>
         <StatCard icon={Building2} label="Active listings" value={stats.listings} tint="bg-brand-50 text-brand-600" />
+        {isDealer && (
+          <StatCard
+            icon={Coins}
+            label="Points available"
+            value={points?.points ?? "—"}
+            tint={outOfPoints ? "bg-red-50 text-red-600" : "bg-amber-50 text-amber-600"}
+          />
+        )}
         <StatCard icon={Eye} label="Total profile views" value={stats.totalViews} tint="bg-sky-50 text-sky-600" />
         <StatCard icon={MessageSquare} label="Leads received" value={stats.totalLeads} tint="bg-violet-50 text-violet-600" />
         <StatCard
@@ -304,6 +324,22 @@ export default function OwnerDashboard() {
           tint="bg-amber-50 text-amber-600"
         />
       </div>
+
+      {/* Out-of-points banner */}
+      {outOfPoints && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 mb-5 flex items-start gap-3">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-100 text-red-600">
+            <Coins size={17} />
+          </span>
+          <div>
+            <p className="font-bold text-red-800 text-sm">You're out of registration points</p>
+            <p className="text-xs text-red-700/90 mt-0.5">
+              Registering a business costs {points?.pointsPerBusiness ?? 1} point. Please contact the admin to add more
+              points to your account. You can still manage your existing listings.
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="flex gap-2 mb-6 border-b border-gray-200">
         {visibleTabs.map((t) => {
@@ -344,23 +380,32 @@ export default function OwnerDashboard() {
             <h2 className="font-bold text-ink-900 flex items-center gap-1.5">
               <Building2 size={16} className="text-brand-600" /> Your listings
             </h2>
-            <button
-              onClick={() => {
-                setShowCreate((v) => !v);
-                setCreateError("");
-              }}
-              className={showCreate ? "btn-secondary px-3 py-2 text-sm" : "btn-primary px-3 py-2 text-sm"}
-            >
-              {showCreate ? (
-                <>
-                  <X size={15} /> Cancel
-                </>
-              ) : (
-                <>
-                  <Plus size={15} /> Add business
-                </>
+            <div className="flex items-center gap-2">
+              {isDealer && points && !outOfPoints && (
+                <span className="badge bg-amber-50 text-amber-700 whitespace-nowrap">
+                  <Coins size={11} /> {points.points} points left
+                </span>
               )}
-            </button>
+              <button
+                onClick={() => {
+                  setShowCreate((v) => !v);
+                  setCreateError("");
+                }}
+                disabled={!showCreate && outOfPoints}
+                title={outOfPoints ? "No points left — contact the admin to add more" : undefined}
+                className={`${showCreate ? "btn-secondary" : "btn-primary"} px-3 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                {showCreate ? (
+                  <>
+                    <X size={15} /> Cancel
+                  </>
+                ) : (
+                  <>
+                    <Plus size={15} /> Add business
+                  </>
+                )}
+              </button>
+            </div>
           </div>
 
           {notice && <p className="text-sm text-brand-700 bg-brand-50 rounded-md px-3 py-2 mb-4">{notice}</p>}
@@ -371,6 +416,12 @@ export default function OwnerDashboard() {
             <form onSubmit={createBusiness} className="card p-5 space-y-3 mb-6">
               <h3 className="font-bold text-ink-900">Add a business</h3>
               <p className="text-xs text-ink-500 -mt-2">Create the listing, then add hours, services, and photos.</p>
+              {isDealer && points && (
+                <p className="text-xs text-amber-700 bg-amber-50 rounded-md px-3 py-2">
+                  <Coins size={12} className="inline -mt-0.5 mr-1" />
+                  This will use {points.pointsPerBusiness} of your {points.points} points.
+                </p>
+              )}
               <input required placeholder="Business name" value={newBusiness.name} onChange={(e) => setNewBusiness({ ...newBusiness, name: e.target.value })} className="input" />
               <input required placeholder="URL slug (e.g. joes-plumbing)" value={newBusiness.slug} onChange={(e) => setNewBusiness({ ...newBusiness, slug: e.target.value })} className="input" />
               <select required value={newBusiness.categoryId} onChange={(e) => setNewBusiness({ ...newBusiness, categoryId: e.target.value })} className="input">

@@ -4,6 +4,7 @@ import {
   Building2,
   Calendar,
   Check,
+  Coins,
   type LucideIcon,
   MessageSquare,
   Search,
@@ -28,6 +29,7 @@ import {
 } from "@/types";
 import Modal from "@/components/Modal";
 import Pagination from "@/components/Pagination";
+import PointsModal from "@/components/PointsModal";
 import ResetPasswordModal from "@/components/ResetPasswordModal";
 
 const TABS = ["Overview", "Users", "Businesses", "Approvals", "Reports"] as const;
@@ -164,6 +166,7 @@ function UsersPanel({ onChanged }: { onChanged: () => void }) {
   const [totalPages, setTotalPages] = useState(1);
   const [editing, setEditing] = useState<AdminUser | null>(null);
   const [resetting, setResetting] = useState<AdminUser | null>(null);
+  const [pointsFor, setPointsFor] = useState<AdminUser | null>(null);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
 
@@ -229,12 +232,23 @@ function UsersPanel({ onChanged }: { onChanged: () => void }) {
                       : "No privileges granted"}
                   </p>
                 )}
+                {u.role === "DEALER" && (
+                  <p className={`text-[11px] mt-0.5 font-semibold ${(u.points ?? 0) > 0 ? "text-amber-600" : "text-red-600"}`}>
+                    <Coins size={10} className="inline -mt-0.5 mr-0.5" />
+                    {u.points ?? 0} points{(u.points ?? 0) === 0 ? " — needs a top-up" : ""}
+                  </p>
+                )}
               </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <span className={`badge ${roleBadge(u.role)} hidden sm:inline-flex`}>{u.role.replace("_", " ")}</span>
               <span className={`badge ${statusBadge(u.status)} hidden md:inline-flex`}>{u.status.replace("_", " ")}</span>
               {u._count && u._count.businesses > 0 && <span className="text-xs text-ink-400 hidden lg:inline">{u._count.businesses} biz</span>}
+              {u.role === "DEALER" && (
+                <button onClick={() => setPointsFor(u)} className="btn-secondary px-3 py-1.5 text-sm whitespace-nowrap">
+                  <Coins size={14} /> Points
+                </button>
+              )}
               <button onClick={() => setResetting(u)} className="btn-secondary px-3 py-1.5 text-sm whitespace-nowrap">
                 Reset password
               </button>
@@ -270,6 +284,17 @@ function UsersPanel({ onChanged }: { onChanged: () => void }) {
         />
       )}
       {resetting && <ResetPasswordModal user={resetting} onClose={() => setResetting(null)} />}
+      {pointsFor && (
+        <PointsModal
+          user={pointsFor}
+          onClose={() => setPointsFor(null)}
+          onSaved={(points) => {
+            // Reflect the new balance in the row without a full reload.
+            setUsers((list) => list.map((u) => (u.id === pointsFor.id ? { ...u, points } : u)));
+            setPointsFor((u) => (u ? { ...u, points } : u));
+          }}
+        />
+      )}
     </div>
   );
 }
