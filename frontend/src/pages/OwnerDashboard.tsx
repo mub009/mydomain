@@ -166,6 +166,7 @@ export default function OwnerDashboard() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [notice, setNotice] = useState("");
+  const [createError, setCreateError] = useState("");
   const [manageId, setManageId] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
 
@@ -221,6 +222,7 @@ export default function OwnerDashboard() {
   async function createBusiness(e: React.FormEvent) {
     e.preventDefault();
     setNotice("");
+    setCreateError("");
     setOwnerCreds(null);
     const assignOwner = canAssignOwner && withOwner;
     try {
@@ -260,7 +262,8 @@ export default function OwnerDashboard() {
         setManageId(created.id);
       }
     } catch (err) {
-      setNotice(apiErrorMessage(err));
+      // Shown inside the form, next to the submit button.
+      setCreateError(apiErrorMessage(err));
     }
   }
 
@@ -338,7 +341,13 @@ export default function OwnerDashboard() {
             <h2 className="font-bold text-ink-900 flex items-center gap-1.5">
               <Building2 size={16} className="text-brand-600" /> Your listings
             </h2>
-            <button onClick={() => setShowCreate((v) => !v)} className={showCreate ? "btn-secondary px-3 py-2 text-sm" : "btn-primary px-3 py-2 text-sm"}>
+            <button
+              onClick={() => {
+                setShowCreate((v) => !v);
+                setCreateError("");
+              }}
+              className={showCreate ? "btn-secondary px-3 py-2 text-sm" : "btn-primary px-3 py-2 text-sm"}
+            >
               {showCreate ? (
                 <>
                   <X size={15} /> Cancel
@@ -369,7 +378,7 @@ export default function OwnerDashboard() {
                   </option>
                 ))}
               </select>
-              <input required placeholder="Phone" value={newBusiness.phone} onChange={(e) => setNewBusiness({ ...newBusiness, phone: e.target.value })} className="input" />
+              <input required minLength={7} maxLength={20} placeholder="Phone" value={newBusiness.phone} onChange={(e) => setNewBusiness({ ...newBusiness, phone: e.target.value })} className="input" />
               <input required placeholder="Address line 1" value={newBusiness.addressLine1} onChange={(e) => setNewBusiness({ ...newBusiness, addressLine1: e.target.value })} className="input" />
               <div className="flex gap-3">
                 <input required placeholder="City" value={newBusiness.city} onChange={(e) => setNewBusiness({ ...newBusiness, city: e.target.value })} className="input w-1/2" />
@@ -410,7 +419,7 @@ export default function OwnerDashboard() {
                           </button>
                         </div>
                       </div>
-                      <input className="input" placeholder="Contact phone (optional)" value={ownerAccount.phone} onChange={(e) => setOwnerAccount({ ...ownerAccount, phone: e.target.value })} />
+                      <input minLength={7} maxLength={20} className="input" placeholder="Contact phone (optional, min 7 digits)" value={ownerAccount.phone} onChange={(e) => setOwnerAccount({ ...ownerAccount, phone: e.target.value })} />
                     </>
                   ) : (
                     <p className="text-[11px] text-ink-500">The listing stays under your own account.</p>
@@ -418,6 +427,7 @@ export default function OwnerDashboard() {
                 </div>
               )}
 
+              {createError && <p className="text-sm text-red-700 bg-red-50 rounded-md px-3 py-2">{createError}</p>}
               <button className="btn-primary w-full py-2.5">Create listing</button>
             </form>
           )}

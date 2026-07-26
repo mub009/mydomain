@@ -49,9 +49,31 @@ api.interceptors.response.use(
   },
 );
 
+// "owner.phone" -> "Owner phone", "addressLine1" -> "Address line1"
+function humanizeFieldPath(path: string): string {
+  const words = path
+    .split(".")
+    .map((seg) => seg.replace(/([A-Z])/g, " $1"))
+    .join(" ")
+    .toLowerCase()
+    .trim();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
 export function apiErrorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {
-    return (error.response?.data as any)?.error?.message ?? error.message;
+    const apiError = (error.response?.data as any)?.error;
+    // Validation errors carry per-field issues — surface which field failed
+    // instead of the generic "Request validation failed".
+    const issues = apiError?.details?.issues;
+    if (Array.isArray(issues) && issues.length > 0) {
+      return issues
+        .map((i: { path?: string; message?: string }) =>
+          i.path ? `${humanizeFieldPath(i.path)}: ${i.message}` : i.message ?? "Invalid value",
+        )
+        .join(" · ");
+    }
+    return apiError?.message ?? error.message;
   }
   return "Something went wrong";
 }
