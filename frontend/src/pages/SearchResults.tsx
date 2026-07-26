@@ -12,6 +12,7 @@ import {
   SlidersHorizontal,
   Star,
   TrendingUp,
+  X,
 } from "lucide-react";
 import { searchApi, categoriesApi, leadsApi } from "@/api/endpoints";
 import { apiErrorMessage } from "@/api/client";
@@ -233,6 +234,9 @@ export default function SearchResults() {
   const q = params.get("q") ?? "";
   const sort = (params.get("sort") as SortKey) ?? "relevance";
   const minRating = params.get("minRating") ?? "";
+  // A 10km default silently hid everything when the visitor's captured
+  // location was far from any listing; a directory should reach wider.
+  const radiusKm = params.get("radiusKm") ?? "50";
   const page = Number(params.get("page") ?? 1);
 
   const [categories, setCategories] = useState<Category[]>([]);
@@ -278,6 +282,7 @@ export default function SearchResults() {
         city: geo ? undefined : city || undefined,
         lat: geo?.lat,
         lng: geo?.lng,
+        radiusKm: geo ? Number(radiusKm) : undefined,
         minRating: minRating || undefined,
         sort: geo && sort === "relevance" ? "distance" : sort,
         page,
@@ -288,7 +293,7 @@ export default function SearchResults() {
       })
       .catch((err) => setError(apiErrorMessage(err)))
       .finally(() => setLoading(false));
-  }, [q, categorySlug, city, geo, minRating, sort, page]);
+  }, [q, categorySlug, city, geo, minRating, sort, radiusKm, page]);
 
   return (
     <div>
@@ -321,6 +326,39 @@ export default function SearchResults() {
       </nav>
 
       <h1 className="text-xl font-extrabold text-ink-900 sm:text-2xl">{heading}</h1>
+
+      {/* Active filters — the location narrowing results must never be invisible */}
+      {(geo || city || minRating) && (
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <span className="text-xs text-ink-500">Filtered by:</span>
+          {geo && (
+            <button
+              onClick={() => setGeo(null)}
+              className="badge bg-brand-50 text-brand-700 hover:bg-brand-100"
+              title="Show results everywhere"
+            >
+              <MapPin size={11} /> Within {radiusKm} km of you <X size={11} />
+            </button>
+          )}
+          {city && (
+            <button
+              onClick={() => setCity("")}
+              className="badge bg-brand-50 text-brand-700 hover:bg-brand-100"
+              title="Show results everywhere"
+            >
+              <MapPin size={11} /> {city} <X size={11} />
+            </button>
+          )}
+          {minRating && (
+            <button
+              onClick={() => updateParams({ minRating: null })}
+              className="badge bg-brand-50 text-brand-700 hover:bg-brand-100"
+            >
+              {minRating}★ &amp; above <X size={11} />
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Filter bar */}
       <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -360,6 +398,20 @@ export default function SearchResults() {
             </option>
           ))}
         </select>
+
+        {geo && (
+          <select
+            value={radiusKm}
+            onChange={(e) => updateParams({ radiusKm: e.target.value })}
+            className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-ink-700 focus:border-brand-500 focus:outline-none"
+          >
+            {["5", "10", "25", "50", "100"].map((km) => (
+              <option key={km} value={km}>
+                Within {km} km
+              </option>
+            ))}
+          </select>
+        )}
 
         <button
           onClick={() => setShowFilters((v) => !v)}
@@ -408,12 +460,50 @@ export default function SearchResults() {
               <ResultRow key={b.id} business={b} index={i} />
             ))}
             {results.length === 0 && (
-              <div className="card py-16 text-center text-ink-500">
+              <div className="card py-14 text-center text-ink-500">
                 <Search size={30} className="mx-auto mb-3 text-gray-300" />
-                <p className="font-semibold text-ink-700">No businesses found here</p>
-                <p className="mt-1 text-sm">
-                  Try a different category{city ? ` or change the location from ${city}` : ""}.
+                <p className="font-semibold text-ink-700">
+                  No {category?.name.toLowerCase() ?? "businesses"} found
+                  {geo ? ` within ${radiusKm} km of you` : city ? ` in ${city}` : ""}
                 </p>
+
+                {/* The location filter is the usual reason, so lead with clearing it. */}
+                {(geo || city) && (
+                  <>
+                    <p className="mx-auto mt-1 max-w-md text-sm">
+                      {geo
+                        ? "Your saved location is limiting these results."
+                        : `Only listings in ${city} are being shown.`}
+                    </p>
+                    <div className="mt-4 flex flex-wrap justify-center gap-2">
+                      <button
+                        onClick={() => {
+                          setGeo(null);
+                          setCity("");
+                        }}
+                        className="btn-primary px-4 py-2.5 text-sm"
+                      >
+                        Search everywhere
+                      </button>
+                      {geo && Number(radiusKm) < 100 && (
+                        <button onClick={() => updateParams({ radiusKm: 100 })} className="btn-secondary px-4 py-2.5 text-sm">
+                          Widen to 100 km
+                        </button>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {!geo && !city && (
+                  <p className="mt-1 text-sm">
+                    Try a different category{q ? ` or search term` : ""}.
+                    {q && (
+                      <button onClick={() => updateParams({ q: null })} className="ml-1 font-semibold text-brand-600 hover:underline">
+                        Clear “{q}”
+                      </button>
+                    )}
+                  </p>
+                )}
               </div>
             )}
           </div>
