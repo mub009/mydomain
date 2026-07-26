@@ -1,4 +1,5 @@
-import { BusinessStatus, UserRole } from "@prisma/client";
+import bcrypt from "bcryptjs";
+import { BusinessStatus, UserRole, UserStatus } from "@prisma/client";
 import { prisma } from "@/config/database";
 import { AppError } from "@/common/errors";
 import { parsePagination } from "@/common/pagination";
@@ -8,21 +9,84 @@ interface Actor {
   role: UserRole;
 }
 
+interface OwnerAccountInput {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone?: string;
+  password: string;
+}
+
 function assertOwnerOrAdmin(actor: Actor, ownerId: string): void {
   if (actor.role === UserRole.ADMIN) return;
   if (actor.sub !== ownerId) throw AppError.forbidden("You do not own this business");
 }
 
-export async function createBusiness(ownerId: string, data: Record<string, unknown>) {
-  const category = await prisma.category.findUnique({ where: { id: data.categoryId as string } });
+export async function createBusiness(actor: Actor, data: Record<string, unknown>) {
+  const { owner, ...businessData } = data as { owner?: OwnerAccountInput } & Record<string, unknown>;
+
+  const category = await prisma.category.findUnique({ where: { id: businessData.categoryId as string } });
   if (!category) throw AppError.badRequest("Invalid categoryId");
 
-  return prisma.business.create({
-    data: {
-      ...(data as any),
-      ownerId,
-      status: BusinessStatus.PENDING_APPROVAL,
-    },
+  // Plain owners always own their listings. Dealers and admins may instead
+  // supply a login for the business's own team; the listing is then assigned
+  // to that account so the business can sign in and manage it themselves.
+  const canAssignOwner = actor.role === UserRole.DEALER || actor.role === UserRole.ADMIN;
+  if (!owner || !canAssignOwner) {
+    return prisma.business.create({
+      data: {
+        ...(businessData as any),
+        ownerId: actor.sub,
+        status: BusinessStatus.PENDING_APPROVAL,
+      },
+    });
+  }
+
+  const existing = await prisma.user.findUnique({ where: { email: owner.email } });
+  if (existing && (existing.role === UserRole.ADMIN || existing.role === UserRole.DEALER)) {
+    throw AppError.badRequest("This email belongs to a staff account and can't be used as a business login");
+  }
+  if (owner.phone && (!existing || existing.phone !== owner.phone)) {
+    const phoneTaken = await prisma.user.findUnique({ where: { phone: owner.phone } });
+    if (phoneTaken && phoneTaken.id !== existing?.id) {
+      throw AppError.conflict("That phone number is already registered to another account");
+    }
+  }
+
+  return prisma.$transaction(async (tx) => {
+    let ownerRecord = existing;
+
+    if (ownerRecord) {
+      // Reuse the account; promote a plain customer to a business owner.
+      if (ownerRecord.role === UserRole.CUSTOMER) {
+        ownerRecord = await tx.user.update({ where: { id: ownerRecord.id }, data: { role: UserRole.BUSINESS_OWNER } });
+      }
+    } else {
+      const passwordHash = await bcrypt.hash(owner.password, 12);
+      ownerRecord = await tx.user.create({
+        data: {
+          email: owner.email,
+          phone: owner.phone,
+          passwordHash,
+          firstName: owner.firstName,
+          lastName: owner.lastName,
+          role: UserRole.BUSINESS_OWNER,
+          status: UserStatus.ACTIVE,
+        },
+      });
+    }
+
+    const business = await tx.business.create({
+      data: {
+        ...(businessData as any),
+        ownerId: ownerRecord.id,
+        status: BusinessStatus.PENDING_APPROVAL,
+      },
+    });
+
+    // ownerAccount tells the client whether a fresh login was created (so it
+    // can show the credentials) or an existing account was linked.
+    return { ...business, ownerAccount: { email: ownerRecord.email, created: !existing } };
   });
 }
 

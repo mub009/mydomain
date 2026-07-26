@@ -24,6 +24,20 @@ export const createBusinessSchema = z.object({
   coverImageUrl: z.string().url().optional(),
 });
 
+// Login account for the business's own team, optionally created by a
+// dealer/admin at listing time. The email is the username they sign in with.
+export const ownerAccountSchema = z.object({
+  firstName: z.string().min(1).max(80),
+  lastName: z.string().min(1).max(80),
+  email: z.string().email(),
+  phone: z.string().min(7).max(20).optional(),
+  password: z.string().min(8).max(72),
+});
+
+export const createBusinessWithOwnerSchema = createBusinessSchema.extend({
+  owner: ownerAccountSchema.optional(),
+});
+
 export const updateBusinessSchema = createBusinessSchema.partial();
 
 export const addPhotoSchema = z.object({

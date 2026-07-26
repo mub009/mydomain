@@ -5,7 +5,7 @@ import { validate } from "@/middleware/validate";
 import { requireAuth, requirePrivilege, requireRole } from "@/middleware/auth";
 import {
   addPhotoSchema,
-  createBusinessSchema,
+  createBusinessWithOwnerSchema,
   createServiceSchema,
   listBusinessesQuerySchema,
   setHoursSchema,
@@ -48,7 +48,7 @@ businessesRouter.post(
   requireAuth,
   requireRole(UserRole.BUSINESS_OWNER, UserRole.DEALER, UserRole.ADMIN),
   listingPriv,
-  validate({ body: createBusinessSchema }),
+  validate({ body: createBusinessWithOwnerSchema }),
   asyncHandler(createBusinessHandler),
 );
 businessesRouter.patch("/:id", requireAuth, listingPriv, validate({ body: updateBusinessSchema }), asyncHandler(updateBusinessHandler));

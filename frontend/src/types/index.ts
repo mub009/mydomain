@@ -83,6 +83,9 @@ export interface Business {
   categoryName?: string;
   categorySlug?: string;
   owner?: { id: string; email: string; firstName: string; lastName: string; role: UserRole };
+  // Present on the create response when a dealer/admin supplied a login for
+  // the business team; `created` is false when an existing account was linked.
+  ownerAccount?: { email: string; created: boolean };
   distanceKm?: number | null;
   photos?: Array<{ id: string; url: string; caption?: string | null }>;
   hours?: Array<{ dayOfWeek: number; openTime: string; closeTime: string; isClosed: boolean }>;

@@ -2,12 +2,16 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Building2,
   CalendarClock,
+  Check,
+  Copy,
   Eye,
+  KeyRound,
   LayoutGrid,
   type LucideIcon,
   MapPin,
   MessageSquare,
   Plus,
+  RefreshCw,
   Settings2,
   Star,
   X,
@@ -49,6 +53,81 @@ const TAB_META: Record<Tab, { label: string; icon: typeof LayoutGrid; privilege:
   leads: { label: "Leads", icon: MessageSquare, privilege: "MANAGE_LEADS" },
   bookings: { label: "Bookings", icon: CalendarClock, privilege: "MANAGE_BOOKINGS" },
 };
+
+// A readable, reasonably strong default password the dealer can hand over.
+function generatePassword(): string {
+  const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  const lower = "abcdefghijkmnpqrstuvwxyz";
+  const digits = "23456789";
+  const all = upper + lower + digits;
+  const pick = (set: string) => set[Math.floor(Math.random() * set.length)];
+  let out = pick(upper) + pick(lower) + pick(digits);
+  for (let i = 0; i < 7; i++) out += pick(all);
+  return out
+    .split("")
+    .sort(() => Math.random() - 0.5)
+    .join("");
+}
+
+function CopyField({ label, value }: { label: string; value: string }) {
+  const [copied, setCopied] = useState(false);
+  function copy() {
+    navigator.clipboard?.writeText(value).then(
+      () => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      },
+      () => undefined,
+    );
+  }
+  return (
+    <div>
+      <label className="block text-[11px] font-medium text-emerald-700/80 mb-1">{label}</label>
+      <div className="flex items-center gap-2">
+        <code className="flex-1 min-w-0 truncate rounded-md border border-emerald-200 bg-white px-3 py-2 text-sm font-mono text-ink-900">
+          {value}
+        </code>
+        <button type="button" onClick={copy} className="btn-secondary px-3 py-2 text-sm whitespace-nowrap">
+          {copied ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
+          {copied ? "Copied" : "Copy"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+interface OwnerCreds {
+  businessName: string;
+  username: string;
+  password: string;
+  created: boolean;
+}
+
+// Shown after a dealer/admin creates a listing with a login for the business
+// team, so the credentials can be handed over.
+function OwnerCredsCard({ creds, onDismiss }: { creds: OwnerCreds; onDismiss: () => void }) {
+  return (
+    <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 mb-4">
+      <div className="flex items-start justify-between gap-3">
+        <p className="font-bold text-emerald-800 flex items-center gap-1.5">
+          <KeyRound size={16} /> Login for “{creds.businessName}”
+        </p>
+        <button type="button" onClick={onDismiss} className="text-xs text-emerald-700/70 hover:text-emerald-900 underline">
+          Dismiss
+        </button>
+      </div>
+      <p className="text-xs text-emerald-700/90 mt-1 mb-3">
+        {creds.created
+          ? "Share these with the business team so they can sign in and manage their listing. The password won't be shown again."
+          : "This listing was linked to an existing account — the business team signs in with the email below and their existing password."}
+      </p>
+      <div className="space-y-2.5">
+        <CopyField label="Username (email)" value={creds.username} />
+        {creds.created && <CopyField label="Password" value={creds.password} />}
+      </div>
+    </div>
+  );
+}
 
 function statusBadgeClass(status: string): string {
   const map: Record<string, string> = {
@@ -103,6 +182,14 @@ export default function OwnerDashboard() {
     longitude: "",
   });
 
+  // Dealers/admins can create a login for the business team while adding the
+  // listing; the listing is then assigned to that account.
+  const canAssignOwner = isDealer || user?.role === "ADMIN";
+  const emptyOwnerAccount = { firstName: "", lastName: "", email: "", phone: "", password: "" };
+  const [withOwner, setWithOwner] = useState(isDealer);
+  const [ownerAccount, setOwnerAccount] = useState(emptyOwnerAccount);
+  const [ownerCreds, setOwnerCreds] = useState<OwnerCreds | null>(null);
+
   function loadBusinesses() {
     businessesApi.mine().then((list) => {
       setBusinesses(list);
@@ -134,18 +221,44 @@ export default function OwnerDashboard() {
   async function createBusiness(e: React.FormEvent) {
     e.preventDefault();
     setNotice("");
+    setOwnerCreds(null);
+    const assignOwner = canAssignOwner && withOwner;
     try {
       const created = await businessesApi.create({
         ...newBusiness,
         latitude: Number(newBusiness.latitude),
         longitude: Number(newBusiness.longitude),
         country: "IN",
+        ...(assignOwner
+          ? {
+              owner: {
+                firstName: ownerAccount.firstName,
+                lastName: ownerAccount.lastName,
+                email: ownerAccount.email,
+                phone: ownerAccount.phone || undefined,
+                password: ownerAccount.password,
+              },
+            }
+          : {}),
       });
-      setNotice("Business created. Manage its details, hours, services, and photos below.");
       setNewBusiness({ name: "", slug: "", categoryId: "", phone: "", addressLine1: "", city: "", state: "", postalCode: "", latitude: "", longitude: "" });
       setShowCreate(false);
       loadBusinesses();
-      setManageId(created.id);
+      if (assignOwner) {
+        // The listing belongs to the business team's account now — surface
+        // the login so the dealer can hand it over.
+        setNotice("Business created and assigned to the business team's account. It's pending admin approval.");
+        setOwnerCreds({
+          businessName: created.name,
+          username: created.ownerAccount?.email ?? ownerAccount.email,
+          password: ownerAccount.password,
+          created: created.ownerAccount?.created ?? true,
+        });
+        setOwnerAccount(emptyOwnerAccount);
+      } else {
+        setNotice("Business created. Manage its details, hours, services, and photos below.");
+        setManageId(created.id);
+      }
     } catch (err) {
       setNotice(apiErrorMessage(err));
     }
@@ -240,6 +353,8 @@ export default function OwnerDashboard() {
 
           {notice && <p className="text-sm text-brand-700 bg-brand-50 rounded-md px-3 py-2 mb-4">{notice}</p>}
 
+          {ownerCreds && <OwnerCredsCard creds={ownerCreds} onDismiss={() => setOwnerCreds(null)} />}
+
           {showCreate && (
             <form onSubmit={createBusiness} className="card p-5 space-y-3 mb-6">
               <h3 className="font-bold text-ink-900">Add a business</h3>
@@ -265,6 +380,44 @@ export default function OwnerDashboard() {
                 <input required placeholder="Latitude" value={newBusiness.latitude} onChange={(e) => setNewBusiness({ ...newBusiness, latitude: e.target.value })} className="input w-1/2" />
                 <input required placeholder="Longitude" value={newBusiness.longitude} onChange={(e) => setNewBusiness({ ...newBusiness, longitude: e.target.value })} className="input w-1/2" />
               </div>
+
+              {canAssignOwner && (
+                <div className="rounded-lg border border-brand-100 bg-brand-50/50 p-3 space-y-2">
+                  <label className="flex items-center gap-2 text-sm font-semibold text-brand-800 cursor-pointer">
+                    <input type="checkbox" checked={withOwner} onChange={(e) => setWithOwner(e.target.checked)} />
+                    <KeyRound size={14} /> Create a login for the business team
+                  </label>
+                  {withOwner ? (
+                    <>
+                      <p className="text-[11px] text-ink-500">
+                        The listing is assigned to this account so the business can sign in and manage it. If the email
+                        already has an account, the listing is linked to it and the password is ignored.
+                      </p>
+                      <div className="flex gap-3">
+                        <input required className="input" placeholder="Contact first name" value={ownerAccount.firstName} onChange={(e) => setOwnerAccount({ ...ownerAccount, firstName: e.target.value })} />
+                        <input required className="input" placeholder="Contact last name" value={ownerAccount.lastName} onChange={(e) => setOwnerAccount({ ...ownerAccount, lastName: e.target.value })} />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-medium text-ink-600 mb-1">Login username (email)</label>
+                        <input required type="email" className="input" placeholder="owner@business.com" value={ownerAccount.email} onChange={(e) => setOwnerAccount({ ...ownerAccount, email: e.target.value })} />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-medium text-ink-600 mb-1">Login password (min 8 chars)</label>
+                        <div className="flex gap-2">
+                          <input required minLength={8} type="text" className="input font-mono" placeholder="Set a password" value={ownerAccount.password} onChange={(e) => setOwnerAccount({ ...ownerAccount, password: e.target.value })} />
+                          <button type="button" onClick={() => setOwnerAccount({ ...ownerAccount, password: generatePassword() })} className="btn-secondary px-3 py-2 text-sm whitespace-nowrap">
+                            <RefreshCw size={14} /> Generate
+                          </button>
+                        </div>
+                      </div>
+                      <input className="input" placeholder="Contact phone (optional)" value={ownerAccount.phone} onChange={(e) => setOwnerAccount({ ...ownerAccount, phone: e.target.value })} />
+                    </>
+                  ) : (
+                    <p className="text-[11px] text-ink-500">The listing stays under your own account.</p>
+                  )}
+                </div>
+              )}
+
               <button className="btn-primary w-full py-2.5">Create listing</button>
             </form>
           )}

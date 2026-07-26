@@ -9,7 +9,7 @@ function actor(req: Request) {
 }
 
 export async function createBusinessHandler(req: Request, res: Response): Promise<void> {
-  created(res, await businessesService.createBusiness(actor(req).sub, req.body));
+  created(res, await businessesService.createBusiness(actor(req), req.body));
 }
 
 export async function listBusinessesHandler(req: Request, res: Response): Promise<void> {
