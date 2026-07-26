@@ -129,6 +129,46 @@ export const qrCodesApi = {
     api.patch<ApiResponse<ReviewQrCode>>(`/businesses/${businessId}/qr-codes/${qrId}`, { channel }).then((r) => r.data.data),
 };
 
+export interface SiteEditorPayload {
+  businessId: string;
+  slug: string;
+  projectData: unknown | null;
+  isPublished: boolean;
+  publishedAt: string | null;
+  updatedAt: string | null;
+  hasSavedDraft: boolean;
+  starterHtml: string;
+  starterCss: string;
+  businessData: Record<string, unknown>;
+}
+
+export interface PublishedSite {
+  business: { id: string; name: string; slug: string; city: string; description: string | null };
+  html: string;
+  css: string;
+  publishedAt: string | null;
+}
+
+export const sitesApi = {
+  // Builder (owner only)
+  get: (businessId: string) =>
+    api.get<ApiResponse<SiteEditorPayload>>(`/businesses/${businessId}/site`).then((r) => r.data.data),
+  save: (businessId: string, payload: { projectData?: unknown; html?: string; css?: string }) =>
+    api
+      .put<ApiResponse<{ savedAt: string; isPublished: boolean }>>(`/businesses/${businessId}/site`, payload)
+      .then((r) => r.data.data),
+  publish: (businessId: string, isPublished: boolean) =>
+    api
+      .post<ApiResponse<{ isPublished: boolean; publishedAt: string | null; url: string }>>(
+        `/businesses/${businessId}/site/publish`,
+        { isPublished },
+      )
+      .then((r) => r.data.data),
+
+  // Public page
+  published: (slug: string) => api.get<ApiResponse<PublishedSite>>(`/sites/${slug}`).then((r) => r.data.data),
+};
+
 export const visitorsApi = {
   capture: (payload: { phone: string; consent: true; latitude?: number; longitude?: number; city?: string }) =>
     api.post<ApiResponse<{ id: string; phone: string }>>("/visitors", payload).then((r) => r.data.data),

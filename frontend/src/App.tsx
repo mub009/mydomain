@@ -8,6 +8,7 @@ import WelcomeModal from "@/components/WelcomeModal";
 import Home from "@/pages/Home";
 import SearchResults from "@/pages/SearchResults";
 import QrClaim from "@/pages/QrClaim";
+import PublicSite from "@/pages/PublicSite";
 import BusinessDetail from "@/pages/BusinessDetail";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
@@ -36,6 +37,8 @@ export default function App() {
         <Route path="/qr" element={<QrClaim />} />
         <Route path="/qr/:code" element={<QrClaim />} />
         <Route path="/business/:slug" element={<BusinessDetail />} />
+        {/* A business's own published website */}
+        <Route path="/site/:slug" element={<PublicSite />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/b2b" element={<B2BMarketplace />} />

@@ -123,3 +123,26 @@ notifications are not wired to a provider, and geo-search uses a Haversine
 SQL query rather than a spatial index or a dedicated search engine (noted
 as the natural next step in `search.service.ts` once listing volume
 warrants it).
+
+### Business websites (GrapesJS builder)
+
+Each business can build a one-page website from its dashboard:
+**Manage → Website**.
+
+The first draft is generated server-side from the data already in the listing —
+name, description, contact details, address, opening hours, active services and
+photos — so a shop has a usable page before touching anything. The owner then
+edits it with drag-and-drop blocks; their saved document becomes the source of
+truth, and "Reset" rebuilds the draft from the current listing data.
+
+- Draft and published states are separate: **Save** stores the draft,
+  **Publish** makes it live at `/site/<business-slug>`, and unpublishing takes
+  it offline without deleting it.
+- Their listing photos are preloaded into the editor's asset manager. Images are
+  added by URL — file uploads are not enabled.
+- Published HTML/CSS is sanitised server-side on save (scripts, inline event
+  handlers, `javascript:`/`data:` URLs, iframes, forms, `@import`,
+  `expression()` and `behavior:` are stripped), because the page renders on the
+  platform's own origin. See `backend/tests/sanitize.test.ts`.
+- The editor bundle is loaded on demand, so it does not affect the main app's
+  bundle size.

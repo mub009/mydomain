@@ -23,6 +23,7 @@ import { usersRouter } from "@/modules/users/users.routes";
 import { pointsRouter } from "@/modules/points/points.routes";
 import { visitorsRouter } from "@/modules/visitors/visitors.routes";
 import { qrCodesRouter, reviewLinksRouter, reviewScanRouter } from "@/modules/reviewqr/reviewqr.routes";
+import { publicSiteRouter, siteBuilderRouter } from "@/modules/sites/sites.routes";
 
 export function createApp(): Express {
   const app = express();
@@ -59,6 +60,8 @@ export function createApp(): Express {
   app.use("/api/v1/visitors", visitorsRouter);
   app.use("/api/v1/businesses", reviewLinksRouter);
   app.use("/api/v1/qr-codes", qrCodesRouter);
+  app.use("/api/v1/businesses", siteBuilderRouter);
+  app.use("/api/v1/sites", publicSiteRouter);
   // Short public path for the printed QR board: https://host/r/<slug>
   app.use("/r", reviewScanRouter);
 

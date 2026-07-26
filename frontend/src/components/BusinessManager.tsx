@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowLeft,
@@ -14,10 +14,13 @@ import {
 import { businessesApi } from "@/api/endpoints";
 import { apiErrorMessage } from "@/api/client";
 import { Business, Category } from "@/types";
+import { Spinner } from "@/components/Loading";
 import ReviewQrBoard from "@/components/ReviewQrBoard";
+// The builder pulls in GrapesJS, so keep it out of the main bundle.
+const SiteBuilder = lazy(() => import("@/components/SiteBuilder"));
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-const SECTIONS = ["Details", "Hours", "Services", "Photos", "Reviews & QR"] as const;
+const SECTIONS = ["Details", "Hours", "Services", "Photos", "Reviews & QR", "Website"] as const;
 type Section = (typeof SECTIONS)[number];
 
 interface HourRow {
@@ -490,6 +493,12 @@ export default function BusinessManager({
       )}
 
       {section === "Reviews & QR" && <ReviewQrBoard business={biz} />}
+
+      {section === "Website" && (
+        <Suspense fallback={<Spinner label="Loading the website builder…" />}>
+          <SiteBuilder business={biz} />
+        </Suspense>
+      )}
     </div>
   );
 }
