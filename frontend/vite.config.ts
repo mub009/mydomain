@@ -16,6 +16,12 @@ export default defineConfig({
         target: "http://localhost:4000",
         changeOrigin: true,
       },
+      // QR boards encode this origin, so the scan redirect must reach the
+      // backend in development too — otherwise /r/q/<code> hits the SPA.
+      "/r": {
+        target: "http://localhost:4000",
+        changeOrigin: true,
+      },
     },
   },
 });

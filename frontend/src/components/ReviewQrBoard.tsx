@@ -1,11 +1,24 @@
 import { useEffect, useMemo, useState } from "react";
 import QRCode from "qrcode";
-import { Download, Facebook, Globe, Instagram, Link2, Printer, QrCode, Star, Youtube } from "lucide-react";
+import {
+  Download,
+  ExternalLink,
+  Facebook,
+  Globe,
+  Instagram,
+  Link2,
+  Printer,
+  QrCode,
+  Star,
+  Youtube,
+} from "lucide-react";
 import { Link } from "react-router-dom";
 import { businessesApi, qrCodesApi } from "@/api/endpoints";
 import { apiErrorMessage } from "@/api/client";
 import { CHANNEL_LABELS, REVIEW_CHANNELS, Business, ReviewChannel, ReviewLinks, ReviewQrCode } from "@/types";
 import { Spinner } from "@/components/Loading";
+import BoardPreviewModal from "@/components/BoardPreviewModal";
+import { boardUrl, downloadDataUrl, renderQrDataUrl } from "@/lib/qrBoard";
 
 const CHANNELS: { value: ReviewChannel; label: string; icon: typeof Star; tint: string }[] = [
   { value: "GOOGLE", label: "Google", icon: Star, tint: "text-amber-600" },
@@ -22,9 +35,24 @@ function scanUrl(slug: string, channel?: ReviewChannel): string {
   return channel ? `${base}?c=${channel.toLowerCase()}` : base;
 }
 
+// Small scannable preview of an issued board, shown in the list.
+function BoardThumb({ code }: { code: string }) {
+  const [dataUrl, setDataUrl] = useState("");
+
+  useEffect(() => {
+    renderQrDataUrl(boardUrl(code), 160)
+      .then(setDataUrl)
+      .catch(() => setDataUrl(""));
+  }, [code]);
+
+  if (!dataUrl) return <div className="h-14 w-14 animate-pulse rounded bg-gray-100" />;
+  return <img src={dataUrl} alt={`QR code ${code}`} className="h-14 w-14" />;
+}
+
 export default function ReviewQrBoard({ business }: { business: Business }) {
   const [links, setLinks] = useState<ReviewLinks | null>(null);
   const [attachedBoards, setAttachedBoards] = useState<ReviewQrCode[]>([]);
+  const [previewBoard, setPreviewBoard] = useState<ReviewQrCode | null>(null);
   const [form, setForm] = useState({
     googlePlaceId: "",
     googleReviewUrl: "",
@@ -118,10 +146,16 @@ export default function ReviewQrBoard({ business }: { business: Business }) {
   }
 
   function downloadQr() {
-    const link = document.createElement("a");
-    link.href = qrDataUrl;
-    link.download = `${business.slug}-review-qr.png`;
-    link.click();
+    downloadDataUrl(qrDataUrl, `${business.slug}-review-qr.png`);
+  }
+
+  // Download an issued board's QR straight from the list.
+  async function downloadBoard(board: ReviewQrCode) {
+    try {
+      downloadDataUrl(await renderQrDataUrl(boardUrl(board.code)), `${board.code}-qr.png`);
+    } catch {
+      setError("Could not generate that QR image. Try the View option instead.");
+    }
   }
 
   if (loading) return <Spinner label="Loading review settings…" />;
@@ -319,28 +353,68 @@ export default function ReviewQrBoard({ business }: { business: Business }) {
             {attachedBoards.length > 0 ? (
               <div className="mt-3 space-y-2">
                 {attachedBoards.map((board) => (
-                  <div key={board.id} className="rounded-lg bg-gray-50 px-3 py-2.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-mono text-sm font-bold text-ink-900">{board.code}</span>
-                      <span className="text-xs text-ink-500">
-                        {board.scanCount} {board.scanCount === 1 ? "scan" : "scans"}
-                      </span>
-                    </div>
-                    <div className="mt-2 flex items-center gap-2">
-                      <label className="shrink-0 text-[11px] font-medium text-ink-600">Sends people to</label>
-                      <select
-                        value={board.channel ?? ""}
-                        onChange={(e) => changeBoardChannel(board, e.target.value as ReviewChannel | "")}
-                        className="flex-1 rounded-md border border-gray-300 bg-white px-2 py-1 text-xs focus:border-brand-500 focus:outline-none"
+                  <div key={board.id} className="rounded-lg bg-gray-50 p-3">
+                    <div className="flex items-start gap-3">
+                      {/* Scannable thumbnail — click to open the full board */}
+                      <button
+                        type="button"
+                        onClick={() => setPreviewBoard(board)}
+                        title="View, download or print this board"
+                        className="shrink-0 rounded-md border border-gray-200 bg-white p-1 transition-colors hover:border-brand-400"
                       >
-                        <option value="">My default channel</option>
-                        {REVIEW_CHANNELS.map((c) => (
-                          <option key={c.value} value={c.value} disabled={!links?.resolved[c.value]}>
-                            {c.label}
-                            {links?.resolved[c.value] ? "" : " — add link first"}
-                          </option>
-                        ))}
-                      </select>
+                        <BoardThumb code={board.code} />
+                      </button>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-mono text-sm font-bold text-ink-900">{board.code}</span>
+                          <span className="shrink-0 text-xs text-ink-500">
+                            {board.scanCount} {board.scanCount === 1 ? "scan" : "scans"}
+                          </span>
+                        </div>
+
+                        <div className="mt-1.5 flex items-center gap-2">
+                          <label className="shrink-0 text-[11px] font-medium text-ink-600">Sends to</label>
+                          <select
+                            value={board.channel ?? ""}
+                            onChange={(e) => changeBoardChannel(board, e.target.value as ReviewChannel | "")}
+                            className="min-w-0 flex-1 rounded-md border border-gray-300 bg-white px-2 py-1 text-xs focus:border-brand-500 focus:outline-none"
+                          >
+                            <option value="">My default channel</option>
+                            {REVIEW_CHANNELS.map((c) => (
+                              <option key={c.value} value={c.value} disabled={!links?.resolved[c.value]}>
+                                {c.label}
+                                {links?.resolved[c.value] ? "" : " — add link first"}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setPreviewBoard(board)}
+                            className="btn-secondary px-2.5 py-1 text-xs"
+                          >
+                            <QrCode size={12} /> View
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => downloadBoard(board)}
+                            className="btn-secondary px-2.5 py-1 text-xs"
+                          >
+                            <Download size={12} /> Download
+                          </button>
+                          <a
+                            href={boardUrl(board.code)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="btn-secondary px-2.5 py-1 text-xs"
+                          >
+                            <ExternalLink size={12} /> Test scan
+                          </a>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -359,6 +433,15 @@ export default function ReviewQrBoard({ business }: { business: Business }) {
           )}
         </div>
       </div>
+
+      {previewBoard && (
+        <BoardPreviewModal
+          code={previewBoard.code}
+          businessName={business.name}
+          channel={previewBoard.channel ?? links?.preferredReviewChannel ?? null}
+          onClose={() => setPreviewBoard(null)}
+        />
+      )}
     </div>
   );
 }

@@ -1,24 +1,18 @@
 import { useEffect, useState } from "react";
-import QRCode from "qrcode";
-import { Plus, Printer, QrCode as QrIcon, Search, Unlink } from "lucide-react";
+import { Download, Plus, Printer, QrCode as QrIcon, Search, Unlink } from "lucide-react";
 import { adminApi } from "@/api/endpoints";
 import { apiErrorMessage } from "@/api/client";
 import { CHANNEL_LABELS, REVIEW_CHANNELS, ReviewChannel, ReviewQrCode, ReviewQrStatus } from "@/types";
 import { ListSkeleton } from "@/components/Loading";
 import Modal from "@/components/Modal";
 import Pagination from "@/components/Pagination";
+import { boardHeadline, boardUrl, downloadDataUrl, renderQrDataUrl } from "@/lib/qrBoard";
 
 const STATUS_TINT: Record<ReviewQrStatus, string> = {
   UNASSIGNED: "bg-gray-100 text-gray-600",
   ASSIGNED: "bg-emerald-50 text-emerald-700",
   DISABLED: "bg-red-50 text-red-700",
 };
-
-// The board encodes this; the server resolves it to the shop's review page
-// once the board has been claimed.
-function boardUrl(code: string): string {
-  return `${window.location.origin}/r/q/${code}`;
-}
 
 // A printable sheet of boards, each showing its QR and the code beneath it so
 // a shop can still type it in if the camera struggles.
@@ -35,12 +29,7 @@ function PrintSheet({
 
   useEffect(() => {
     Promise.all(
-      codes.map((code) =>
-        QRCode.toDataURL(boardUrl(code), { errorCorrectionLevel: "H", margin: 1, width: 320 }).then((dataUrl) => ({
-          code,
-          dataUrl,
-        })),
-      ),
+      codes.map((code) => renderQrDataUrl(boardUrl(code), 320).then((dataUrl) => ({ code, dataUrl }))),
     )
       .then(setImages)
       .catch(() => setImages([]));
@@ -55,13 +44,7 @@ function PrintSheet({
         {images.map((item) => (
           <div key={item.code} className="rounded-xl border-2 border-dashed border-gray-200 p-3 text-center">
             <p className="text-[9px] font-bold uppercase tracking-widest text-brand-600">Loved your visit?</p>
-            <p className="text-[11px] font-semibold text-ink-700">
-              {purpose === "GOOGLE" || !purpose
-                ? "Scan to review us"
-                : purpose === "WEBSITE"
-                  ? "Scan to visit our website"
-                  : `Scan to find us on ${CHANNEL_LABELS[purpose]}`}
-            </p>
+            <p className="text-[11px] font-semibold text-ink-700">{boardHeadline(purpose)}</p>
             <img src={item.dataUrl} alt={item.code} className="mx-auto my-1.5 h-28 w-28" />
             <p className="font-mono text-xs font-bold text-ink-900">{item.code}</p>
             <p className="text-[8px] uppercase tracking-wider text-ink-400">Powered by Markkito</p>
@@ -227,6 +210,16 @@ export default function QrCodesPanel() {
               <div className="flex shrink-0 items-center gap-2">
                 <button onClick={() => setPrintJob({ codes: [qr.code], purpose: qr.channel })} className="btn-secondary px-3 py-1.5 text-sm">
                   <QrIcon size={14} /> View
+                </button>
+                <button
+                  onClick={() =>
+                    renderQrDataUrl(boardUrl(qr.code))
+                      .then((d) => downloadDataUrl(d, `${qr.code}-qr.png`))
+                      .catch(() => setError("Could not generate that QR image."))
+                  }
+                  className="btn-secondary px-3 py-1.5 text-sm"
+                >
+                  <Download size={14} /> PNG
                 </button>
                 {qr.status === "ASSIGNED" && (
                   <button onClick={() => detach(qr)} className="btn-secondary px-3 py-1.5 text-sm">
