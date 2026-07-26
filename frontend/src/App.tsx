@@ -1,4 +1,7 @@
+import { useEffect } from "react";
 import { Routes, Route } from "react-router-dom";
+import { authApi } from "@/api/endpoints";
+import { useAuthStore } from "@/store/authStore";
 import Layout from "@/components/Layout";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Home from "@/pages/Home";
@@ -11,6 +14,16 @@ import RfqDetail from "@/pages/RfqDetail";
 import AdminDashboard from "@/pages/AdminDashboard";
 
 export default function App() {
+  const accessToken = useAuthStore((s) => s.accessToken);
+  const updateUser = useAuthStore((s) => s.updateUser);
+
+  // Re-sync the signed-in user's profile on load so sessions persisted
+  // before a backend change pick up new fields like dealer privileges.
+  useEffect(() => {
+    if (!accessToken) return;
+    authApi.me().then(updateUser).catch(() => undefined);
+  }, [accessToken, updateUser]);
+
   return (
     <Layout>
       <Routes>
