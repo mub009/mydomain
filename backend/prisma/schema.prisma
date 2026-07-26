@@ -166,6 +166,14 @@ model Business {
   latitude     Float
   longitude    Float
 
+  // External review profiles — used by the shop's QR board to send customers
+  // straight to the right "write a review" page.
+  googlePlaceId          String?        @db.VarChar(255)
+  googleReviewUrl        String?        @db.Text // explicit override, else built from the place id
+  instagramUsername      String?        @db.VarChar(100)
+  facebookPageUrl        String?        @db.Text
+  preferredReviewChannel ReviewChannel? // where an un-suffixed QR scan lands
+
   // Marketplace metadata
   logoUrl       String?
   coverImageUrl String?
@@ -178,14 +186,15 @@ model Business {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  photos     BusinessPhoto[]
-  hours      BusinessHours[]
-  services   Service[]
-  reviews    Review[]
-  leads      Lead[]
-  bookings   Booking[]
-  quotes     Quote[]         @relation("QuoteBusiness")
-  rfqInvites RfqInvite[]
+  photos      BusinessPhoto[]
+  hours       BusinessHours[]
+  services    Service[]
+  reviews     Review[]
+  leads       Lead[]
+  bookings    Booking[]
+  quotes      Quote[]         @relation("QuoteBusiness")
+  rfqInvites  RfqInvite[]
+  reviewScans ReviewScan[]
 
   @@index([categoryId])
   @@index([city, state])
@@ -370,6 +379,29 @@ model Payment {
 
   @@index([userId])
   @@map("payments")
+}
+
+// ---------------------------------------------------------------------------
+// QR review boards (send in-store customers to external review pages)
+// ---------------------------------------------------------------------------
+
+enum ReviewChannel {
+  GOOGLE
+  INSTAGRAM
+  FACEBOOK
+}
+
+// One row per QR scan, so a shop can see which board and platform is working.
+model ReviewScan {
+  id         String        @id @default(uuid()) @db.VarChar(36)
+  businessId String        @db.VarChar(36)
+  business   Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  channel    ReviewChannel
+  userAgent  String?       @db.Text
+  scannedAt  DateTime      @default(now())
+
+  @@index([businessId, scannedAt])
+  @@map("review_scans")
 }
 
 // ---------------------------------------------------------------------------

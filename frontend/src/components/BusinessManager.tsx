@@ -14,9 +14,10 @@ import {
 import { businessesApi } from "@/api/endpoints";
 import { apiErrorMessage } from "@/api/client";
 import { Business, Category } from "@/types";
+import ReviewQrBoard from "@/components/ReviewQrBoard";
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-const SECTIONS = ["Details", "Hours", "Services", "Photos"] as const;
+const SECTIONS = ["Details", "Hours", "Services", "Photos", "Reviews & QR"] as const;
 type Section = (typeof SECTIONS)[number];
 
 interface HourRow {
@@ -487,6 +488,8 @@ export default function BusinessManager({
           </form>
         </div>
       )}
+
+      {section === "Reviews & QR" && <ReviewQrBoard business={biz} />}
     </div>
   );
 }

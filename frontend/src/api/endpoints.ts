@@ -12,6 +12,7 @@ import {
   PointTransaction,
   PopularCity,
   Review,
+  ReviewLinks,
   Rfq,
   UserRole,
   Visitor,
@@ -54,6 +55,11 @@ export const businessesApi = {
   updateService: (id: string, serviceId: string, payload: Record<string, unknown>) =>
     api.patch(`/businesses/${id}/services/${serviceId}`, payload).then((r) => r.data.data),
   deleteService: (id: string, serviceId: string) => api.delete(`/businesses/${id}/services/${serviceId}`),
+
+  // QR review board
+  reviewLinks: (id: string) => api.get<ApiResponse<ReviewLinks>>(`/businesses/${id}/review-links`).then((r) => r.data.data),
+  updateReviewLinks: (id: string, payload: Record<string, unknown>) =>
+    api.patch<ApiResponse<ReviewLinks>>(`/businesses/${id}/review-links`, payload).then((r) => r.data.data),
 };
 
 export const reviewsApi = {

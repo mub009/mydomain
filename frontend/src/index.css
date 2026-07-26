@@ -88,3 +88,24 @@ body {
     animation: none;
   }
 }
+
+/* Printing from the QR board screen should produce just the board itself,
+   centred on the page — not the whole dashboard around it. */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #qr-board,
+  #qr-board * {
+    visibility: visible;
+  }
+  #qr-board {
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    width: 90mm;
+    height: fit-content;
+    border: none !important;
+    padding: 0 !important;
+  }
+}

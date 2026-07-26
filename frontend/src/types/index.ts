@@ -182,6 +182,20 @@ export interface Quote {
   business?: { id: string; name: string; slug: string; avgRating: number };
 }
 
+export type ReviewChannel = "GOOGLE" | "INSTAGRAM" | "FACEBOOK";
+
+export interface ReviewLinks {
+  slug: string;
+  googlePlaceId?: string | null;
+  googleReviewUrl?: string | null;
+  instagramUsername?: string | null;
+  facebookPageUrl?: string | null;
+  preferredReviewChannel?: ReviewChannel | null;
+  resolved: Record<ReviewChannel, string | null>;
+  scanCounts: Record<string, number>;
+  totalScans: number;
+}
+
 export interface Visitor {
   id: string;
   phone: string;
