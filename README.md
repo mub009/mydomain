@@ -41,7 +41,8 @@ cd backend
 cp .env.example .env       # fill in secrets (JWT, Stripe keys)
 npm install
 npm run prisma:migrate     # creates schema in MySQL
-npm run prisma:seed        # sample categories/businesses/users
+npm run prisma:seed        # core categories/users + one showcase business
+npm run seed:businesses    # optional: 100 demo businesses (see below)
 npm run dev                # http://localhost:4000
 ```
 
@@ -50,6 +51,22 @@ Seeded accounts (password `Password123!`):
 - `owner@mydomain.dev` — BUSINESS_OWNER
 - `dealer@mydomain.dev` — DEALER (admin-managed; can add/manage stores)
 - `customer@mydomain.dev` — CUSTOMER
+
+#### Demo catalogue (`npm run seed:businesses`)
+
+Populates 100 published businesses across 10 categories (Restaurants, Home
+Services, Beauty & Spa, Health & Medical, Education, Automotive, Event
+Services, Fitness, Electronics Repair, Real Estate) and 10 Indian cities.
+Every listing gets a full profile: description, contact details, address with
+coordinates, 5 photos, 7-day opening hours (one closed day), 2–4 priced
+services, and 2–8 reviews with the rating summary recomputed from them.
+
+Listings are owned by `owner1@demo.markkito.dev` … `owner100@demo.markkito.dev`
+(same password). The script is idempotent — it upserts by slug, so re-running
+it will not create duplicates.
+
+Photos come from `picsum.photos`, so image thumbnails need outbound internet
+access; the UI falls back to a category icon when an image cannot be loaded.
 
 ### 3. Frontend
 
