@@ -5,6 +5,7 @@ import { b2bApi, categoriesApi } from "@/api/endpoints";
 import { apiErrorMessage } from "@/api/client";
 import { Category, Rfq } from "@/types";
 import { useAuthStore } from "@/store/authStore";
+import { ListSkeleton } from "@/components/Loading";
 import Pagination from "@/components/Pagination";
 
 const RFQ_STATUS_CLASS: Record<string, string> = {
@@ -20,6 +21,7 @@ export default function B2BMarketplace() {
   const [rfqs, setRfqs] = useState<Rfq[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading] = useState(true);
   const [categories, setCategories] = useState<Category[]>([]);
   const [notice, setNotice] = useState("");
   const [form, setForm] = useState({
@@ -32,10 +34,14 @@ export default function B2BMarketplace() {
   });
 
   function load() {
-    b2bApi.list({ page }).then((r) => {
-      setRfqs(r.data);
-      setTotalPages(r.meta.totalPages);
-    });
+    setLoading(true);
+    b2bApi
+      .list({ page })
+      .then((r) => {
+        setRfqs(r.data);
+        setTotalPages(r.meta.totalPages);
+      })
+      .finally(() => setLoading(false));
   }
 
   useEffect(() => {
@@ -72,6 +78,8 @@ export default function B2BMarketplace() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
         <div className="lg:col-span-2">
           <h2 className="text-lg font-bold text-ink-900 mb-3">Open requests</h2>
+          {loading && <ListSkeleton rows={4} />}
+          {!loading && (
           <div className="space-y-3">
             {rfqs.map((r) => (
               <Link key={r.id} to={`/b2b/${r.id}`} className="card block p-4 hover:shadow-card-hover transition-shadow">
@@ -96,6 +104,7 @@ export default function B2BMarketplace() {
             )}
             <Pagination page={page} totalPages={totalPages} onChange={setPage} />
           </div>
+          )}
         </div>
 
         <div>

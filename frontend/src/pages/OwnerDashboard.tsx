@@ -21,6 +21,7 @@ import { apiErrorMessage } from "@/api/client";
 import { AdminUser, Business, Category, Lead, Booking, PointsBalance, Privilege } from "@/types";
 import { useAuthStore } from "@/store/authStore";
 import BusinessManager from "@/components/BusinessManager";
+import { CardSkeleton, ListSkeleton } from "@/components/Loading";
 import Pagination from "@/components/Pagination";
 import ResetPasswordModal, { CopyField, generatePassword } from "@/components/ResetPasswordModal";
 
@@ -126,10 +127,15 @@ export default function OwnerDashboard() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [bizPage, setBizPage] = useState(1);
+  const [bizTotalPages, setBizTotalPages] = useState(1);
+  const [bizLoading, setBizLoading] = useState(true);
   const [leadsPage, setLeadsPage] = useState(1);
   const [leadsTotalPages, setLeadsTotalPages] = useState(1);
+  const [leadsLoading, setLeadsLoading] = useState(false);
   const [bookingsPage, setBookingsPage] = useState(1);
   const [bookingsTotalPages, setBookingsTotalPages] = useState(1);
+  const [bookingsLoading, setBookingsLoading] = useState(false);
+  const [accountsLoading, setAccountsLoading] = useState(false);
   const [notice, setNotice] = useState("");
   const [createError, setCreateError] = useState("");
   const [manageId, setManageId] = useState<string | null>(null);
@@ -174,20 +180,27 @@ export default function OwnerDashboard() {
 
   function loadCreatedAccounts(page = accountsPage) {
     if (!isDealer) return;
+    setAccountsLoading(true);
     usersApi
       .created({ page })
       .then((r) => {
         setCreatedAccounts(r.data);
         setAccountsTotalPages(r.meta.totalPages);
       })
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .finally(() => setAccountsLoading(false));
   }
 
-  function loadBusinesses() {
-    businessesApi.mine().then((list) => {
-      setBusinesses(list);
-      if (list.length && !selectedBusinessId) setSelectedBusinessId(list[0].id);
-    });
+  function loadBusinesses(page = bizPage) {
+    setBizLoading(true);
+    businessesApi
+      .mine({ page })
+      .then((r) => {
+        setBusinesses(r.data);
+        setBizTotalPages(r.meta.totalPages);
+        if (r.data.length && !selectedBusinessId) setSelectedBusinessId(r.data[0].id);
+      })
+      .finally(() => setBizLoading(false));
   }
 
   const stats = useMemo(() => {
@@ -209,17 +222,33 @@ export default function OwnerDashboard() {
 
   useEffect(() => {
     if (!selectedBusinessId) return;
-    if (tab === "leads")
-      leadsApi.listForBusiness(selectedBusinessId, { page: leadsPage }).then((r) => {
-        setLeads(r.data);
-        setLeadsTotalPages(r.meta.totalPages);
-      });
-    if (tab === "bookings")
-      bookingsApi.forBusiness(selectedBusinessId, { page: bookingsPage }).then((r) => {
-        setBookings(r.data);
-        setBookingsTotalPages(r.meta.totalPages);
-      });
+    if (tab === "leads") {
+      setLeadsLoading(true);
+      leadsApi
+        .listForBusiness(selectedBusinessId, { page: leadsPage })
+        .then((r) => {
+          setLeads(r.data);
+          setLeadsTotalPages(r.meta.totalPages);
+        })
+        .finally(() => setLeadsLoading(false));
+    }
+    if (tab === "bookings") {
+      setBookingsLoading(true);
+      bookingsApi
+        .forBusiness(selectedBusinessId, { page: bookingsPage })
+        .then((r) => {
+          setBookings(r.data);
+          setBookingsTotalPages(r.meta.totalPages);
+        })
+        .finally(() => setBookingsLoading(false));
+    }
   }, [tab, selectedBusinessId, leadsPage, bookingsPage]);
+
+  // Listings reload when the page changes.
+  useEffect(() => {
+    loadBusinesses(bizPage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bizPage]);
 
   // Switching business starts both lists from their first page.
   useEffect(() => {
@@ -486,8 +515,11 @@ export default function OwnerDashboard() {
             </form>
           )}
 
+          {bizLoading && <CardSkeleton count={4} className="grid grid-cols-1 sm:grid-cols-2 gap-3" />}
+
+          {!bizLoading && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {businesses.slice((bizPage - 1) * 8, bizPage * 8).map((b) => (
+            {businesses.map((b) => (
               <div key={b.id} className="card p-4 flex flex-col">
                 <div className="flex items-start justify-between gap-2">
                   <p className="font-semibold text-ink-900">{b.name}</p>
@@ -507,7 +539,8 @@ export default function OwnerDashboard() {
               </div>
             )}
           </div>
-          <Pagination page={bizPage} totalPages={Math.ceil(businesses.length / 8) || 1} onChange={setBizPage} />
+          )}
+          <Pagination page={bizPage} totalPages={bizTotalPages} onChange={setBizPage} />
 
           {isDealer && createdAccounts.length > 0 && (
             <div className="mt-8">
@@ -518,6 +551,8 @@ export default function OwnerDashboard() {
                 Logins you handed out with a listing. If an owner forgets their password, reset it here and share the
                 new one.
               </p>
+              {accountsLoading && <ListSkeleton rows={3} />}
+              {!accountsLoading && (
               <div className="card divide-y divide-gray-100">
                 {createdAccounts.map((a) => (
                   <div key={a.id} className="p-4 flex items-center justify-between gap-3">
@@ -538,6 +573,7 @@ export default function OwnerDashboard() {
                   </div>
                 ))}
               </div>
+              )}
               <Pagination page={accountsPage} totalPages={accountsTotalPages} onChange={setAccountsPage} />
             </div>
           )}
@@ -560,7 +596,9 @@ export default function OwnerDashboard() {
             ))}
           </select>
 
-          {tab === "leads" && (
+          {tab === "leads" && leadsLoading && <ListSkeleton rows={4} />}
+
+          {tab === "leads" && !leadsLoading && (
             <div className="space-y-2">
               {leads.map((l) => (
                 <div key={l.id} className="card p-3.5 flex justify-between items-center gap-3">
@@ -588,7 +626,9 @@ export default function OwnerDashboard() {
             </div>
           )}
 
-          {tab === "bookings" && (
+          {tab === "bookings" && bookingsLoading && <ListSkeleton rows={4} />}
+
+          {tab === "bookings" && !bookingsLoading && (
             <div className="space-y-2">
               {bookings.map((b) => (
                 <div key={b.id} className="card p-3.5 flex justify-between items-center gap-3">

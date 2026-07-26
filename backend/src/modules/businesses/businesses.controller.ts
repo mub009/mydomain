@@ -18,7 +18,8 @@ export async function listBusinessesHandler(req: Request, res: Response): Promis
 }
 
 export async function listMyBusinessesHandler(req: Request, res: Response): Promise<void> {
-  ok(res, await businessesService.listMyBusinesses(actor(req).sub));
+  const { items, meta } = await businessesService.listMyBusinesses(actor(req).sub, req.query as any);
+  paginated(res, items, meta);
 }
 
 export async function getBusinessHandler(req: Request, res: Response): Promise<void> {

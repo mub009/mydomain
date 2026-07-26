@@ -27,6 +27,7 @@ import {
   UserRole,
   UserStatus,
 } from "@/types";
+import { ListSkeleton, Spinner } from "@/components/Loading";
 import Modal from "@/components/Modal";
 import Pagination from "@/components/Pagination";
 import PointsModal from "@/components/PointsModal";
@@ -168,16 +169,19 @@ function UsersPanel({ onChanged }: { onChanged: () => void }) {
   const [resetting, setResetting] = useState<AdminUser | null>(null);
   const [pointsFor, setPointsFor] = useState<AdminUser | null>(null);
   const [creating, setCreating] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   function load() {
+    setLoading(true);
     adminApi
       .users({ search: search || undefined, role: roleFilter || undefined, page })
       .then((r) => {
         setUsers(r.data);
         setTotalPages(r.meta.totalPages);
       })
-      .catch((e) => setError(apiErrorMessage(e)));
+      .catch((e) => setError(apiErrorMessage(e)))
+      .finally(() => setLoading(false));
   }
 
   useEffect(() => {
@@ -213,6 +217,9 @@ function UsersPanel({ onChanged }: { onChanged: () => void }) {
 
       {error && <p className="text-sm text-red-700 bg-red-50 rounded-md px-3 py-2 mb-4">{error}</p>}
 
+      {loading && <ListSkeleton rows={5} />}
+
+      {!loading && (
       <div className="card divide-y divide-gray-100">
         {users.map((u) => (
           <div key={u.id} className="p-4 flex items-center justify-between gap-3">
@@ -260,6 +267,7 @@ function UsersPanel({ onChanged }: { onChanged: () => void }) {
         ))}
         {users.length === 0 && <div className="p-8 text-center text-sm text-ink-500">No users found.</div>}
       </div>
+      )}
       <Pagination page={page} totalPages={totalPages} onChange={setPage} />
 
       {editing && (
@@ -427,16 +435,19 @@ function BusinessesPanel({ categories, onChanged }: { categories: Category[]; on
   const [totalPages, setTotalPages] = useState(1);
   const [editing, setEditing] = useState<Business | null>(null);
   const [reassigning, setReassigning] = useState<Business | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   function load() {
+    setLoading(true);
     adminApi
       .businesses({ search: search || undefined, status: statusFilter || undefined, page })
       .then((r) => {
         setBusinesses(r.data);
         setTotalPages(r.meta.totalPages);
       })
-      .catch((e) => setError(apiErrorMessage(e)));
+      .catch((e) => setError(apiErrorMessage(e)))
+      .finally(() => setLoading(false));
   }
 
   useEffect(() => {
@@ -474,6 +485,9 @@ function BusinessesPanel({ categories, onChanged }: { categories: Category[]; on
 
       {error && <p className="text-sm text-red-700 bg-red-50 rounded-md px-3 py-2 mb-4">{error}</p>}
 
+      {loading && <ListSkeleton rows={5} />}
+
+      {!loading && (
       <div className="space-y-2">
         {businesses.map((b) => (
           <div key={b.id} className="card p-4">
@@ -521,6 +535,7 @@ function BusinessesPanel({ categories, onChanged }: { categories: Category[]; on
         ))}
         {businesses.length === 0 && <div className="card p-8 text-center text-sm text-ink-500">No businesses found.</div>}
       </div>
+      )}
       <Pagination page={page} totalPages={totalPages} onChange={setPage} />
 
       {editing && (
@@ -633,12 +648,17 @@ function ReassignModal({ business, onClose, onSaved }: { business: Business; onC
   const [search, setSearch] = useState("");
   const [error, setError] = useState("");
   const [savingId, setSavingId] = useState("");
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    setLoading(true);
     const id = setTimeout(() => {
-      adminApi.users({ search: search || undefined }).then((r) =>
-        setCandidates(r.data.filter((u) => u.role === "BUSINESS_OWNER" || u.role === "DEALER" || u.role === "ADMIN")),
-      );
+      adminApi
+        .users({ search: search || undefined })
+        .then((r) =>
+          setCandidates(r.data.filter((u) => u.role === "BUSINESS_OWNER" || u.role === "DEALER" || u.role === "ADMIN")),
+        )
+        .finally(() => setLoading(false));
     }, 250);
     return () => clearTimeout(id);
   }, [search]);
@@ -673,7 +693,8 @@ function ReassignModal({ business, onClose, onSaved }: { business: Business; onC
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search owners/dealers…" className="w-full py-2.5 text-sm focus:outline-none" />
       </div>
       <div className="max-h-72 overflow-y-auto divide-y divide-gray-100 border border-gray-100 rounded-lg">
-        {list.map((u) => (
+        {loading && <Spinner label="Searching…" />}
+        {!loading && list.map((u) => (
           <div key={u.id} className="p-3 flex items-center justify-between gap-2">
             <div className="min-w-0">
               <p className="text-sm font-medium text-ink-900 truncate">
@@ -686,7 +707,7 @@ function ReassignModal({ business, onClose, onSaved }: { business: Business; onC
             </button>
           </div>
         ))}
-        {list.length === 0 && <div className="p-6 text-center text-sm text-ink-500">No eligible owners found.</div>}
+        {!loading && list.length === 0 && <div className="p-6 text-center text-sm text-ink-500">No eligible owners found.</div>}
       </div>
     </Modal>
   );
@@ -711,7 +732,12 @@ function ReportsPanel() {
   }, []);
 
   if (error) return <p className="text-sm text-red-700 bg-red-50 rounded-md px-3 py-2">{error}</p>;
-  if (!report) return <div className="card p-8 text-center text-sm text-ink-500">Loading report…</div>;
+  if (!report)
+    return (
+      <div className="card">
+        <Spinner label="Loading report…" />
+      </div>
+    );
 
   const totalPages = Math.ceil(report.items.length / REPORT_PAGE_SIZE) || 1;
   const pageItems = report.items.slice((page - 1) * REPORT_PAGE_SIZE, page * REPORT_PAGE_SIZE);
@@ -797,12 +823,17 @@ function ApprovalsPanel({ onChanged }: { onChanged: () => void }) {
   const [pending, setPending] = useState<Business[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading] = useState(true);
 
   function load() {
-    adminApi.pendingBusinesses({ page }).then((r) => {
-      setPending(r.data);
-      setTotalPages(r.meta.totalPages);
-    });
+    setLoading(true);
+    adminApi
+      .pendingBusinesses({ page })
+      .then((r) => {
+        setPending(r.data);
+        setTotalPages(r.meta.totalPages);
+      })
+      .finally(() => setLoading(false));
   }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(load, [page]);
@@ -812,6 +843,8 @@ function ApprovalsPanel({ onChanged }: { onChanged: () => void }) {
     load();
     onChanged();
   }
+
+  if (loading) return <ListSkeleton rows={3} />;
 
   return (
     <div className="space-y-2">

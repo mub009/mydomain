@@ -24,6 +24,8 @@ import { apiErrorMessage } from "@/api/client";
 import { Business, Review } from "@/types";
 import { useAuthStore } from "@/store/authStore";
 import StarRating, { StarRow } from "@/components/StarRating";
+import { Spinner } from "@/components/Loading";
+import Pagination from "@/components/Pagination";
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const TABS = ["Overview", "Photos", "Services", "Reviews"] as const;
@@ -140,6 +142,11 @@ export default function BusinessDetail() {
   const [bookmarked, setBookmarked] = useState(false);
   const [copied, setCopied] = useState(false);
   const [reviewSort, setReviewSort] = useState<ReviewSort>("relevant");
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [reviewPage, setReviewPage] = useState(1);
+  const [reviewTotalPages, setReviewTotalPages] = useState(1);
+  const [reviewTotal, setReviewTotal] = useState(0);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
 
   const [leadForm, setLeadForm] = useState({ name: "", phone: "", email: "", message: "" });
   const [reviewForm, setReviewForm] = useState({ rating: 5, title: "", comment: "" });
@@ -154,12 +161,28 @@ export default function BusinessDetail() {
       .catch((err) => setError(apiErrorMessage(err)));
   }, [slug]);
 
+  // Reviews are paginated separately — the business payload only embeds the
+  // first few for the summary strip.
+  useEffect(() => {
+    if (!business || tab !== "Reviews") return;
+    setReviewsLoading(true);
+    reviewsApi
+      .list(business.id, { page: reviewPage })
+      .then((r) => {
+        setReviews(r.data);
+        setReviewTotalPages(r.meta.totalPages);
+        setReviewTotal(r.meta.total);
+      })
+      .catch(() => undefined)
+      .finally(() => setReviewsLoading(false));
+  }, [business, tab, reviewPage]);
+
   const sortedReviews = useMemo<Review[]>(() => {
-    const list = [...(business?.reviews ?? [])];
+    const list = [...(reviews.length > 0 ? reviews : business?.reviews ?? [])];
     if (reviewSort === "latest") return list.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
     if (reviewSort === "high") return list.sort((a, b) => b.rating - a.rating);
     return list;
-  }, [business?.reviews, reviewSort]);
+  }, [reviews, business?.reviews, reviewSort]);
 
   if (error) return <p className="text-red-600">{error}</p>;
   if (!business) {
@@ -199,6 +222,7 @@ export default function BusinessDetail() {
       setReviewForm({ rating: 5, title: "", comment: "" });
       const refreshed = await businessesApi.get(slug!);
       setBusiness(refreshed);
+      setReviewPage(1); // jump back to the first page so the new review is visible
     } catch (err) {
       setNotice(apiErrorMessage(err));
     }
@@ -557,6 +581,9 @@ export default function BusinessDetail() {
                 </div>
               )}
 
+              {reviewsLoading && <Spinner label="Loading reviews…" />}
+
+              {!reviewsLoading && (
               <div className="space-y-3">
                 {sortedReviews.map((r) => (
                   <div key={r.id} className="border-b border-gray-100 pb-3 last:border-0">
@@ -596,6 +623,10 @@ export default function BusinessDetail() {
                   <p className="text-sm text-ink-500">No reviews yet — be the first to leave one.</p>
                 )}
               </div>
+              )}
+              {!reviewsLoading && reviewTotal > 0 && (
+                <Pagination page={reviewPage} totalPages={reviewTotalPages} onChange={setReviewPage} />
+              )}
             </div>
           )}
         </div>

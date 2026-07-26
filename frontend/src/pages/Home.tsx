@@ -29,7 +29,9 @@ export default function Home() {
   const [results, setResults] = useState<Business[]>([]);
   const [page, setPage] = useState(1);
   const [resultMeta, setResultMeta] = useState({ total: 0, totalPages: 1 });
-  const [loading, setLoading] = useState(false);
+  // Starts true: the first search fires on mount, so the skeleton shows
+  // immediately instead of flashing "No businesses found".
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
 

@@ -36,7 +36,7 @@ export default function RfqDetail() {
 
   useEffect(() => {
     load();
-    if (user?.role === "BUSINESS_OWNER") businessesApi.mine().then(setMyBusinesses);
+    if (user?.role === "BUSINESS_OWNER") businessesApi.mine({ pageSize: 50 }).then((r) => setMyBusinesses(r.data));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 

@@ -37,7 +37,8 @@ export const searchApi = {
 export const businessesApi = {
   get: (slug: string) => api.get<ApiResponse<Business>>(`/businesses/${slug}`).then((r) => r.data.data),
   manage: (id: string) => api.get<ApiResponse<Business>>(`/businesses/${id}/manage`).then((r) => r.data.data),
-  mine: () => api.get<ApiResponse<Business[]>>("/businesses/mine").then((r) => r.data.data),
+  mine: (params: Record<string, unknown> = {}) =>
+    api.get<PaginatedResponse<Business>>("/businesses/mine", { params }).then((r) => r.data),
   create: (payload: Record<string, unknown>) =>
     api.post<ApiResponse<Business>>("/businesses", payload).then((r) => r.data.data),
   update: (id: string, payload: Record<string, unknown>) =>
@@ -55,7 +56,8 @@ export const businessesApi = {
 };
 
 export const reviewsApi = {
-  list: (businessId: string) => api.get<PaginatedResponse<Review>>(`/businesses/${businessId}/reviews`).then((r) => r.data),
+  list: (businessId: string, params: Record<string, unknown> = {}) =>
+    api.get<PaginatedResponse<Review>>(`/businesses/${businessId}/reviews`, { params }).then((r) => r.data),
   create: (businessId: string, payload: { rating: number; title?: string; comment?: string }) =>
     api.post<ApiResponse<Review>>(`/businesses/${businessId}/reviews`, payload).then((r) => r.data.data),
 };

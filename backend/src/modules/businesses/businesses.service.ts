@@ -148,8 +148,14 @@ export async function listBusinesses(query: { page?: number; pageSize?: number; 
   return { items, meta: { page, pageSize, total } };
 }
 
-export async function listMyBusinesses(ownerId: string) {
-  return prisma.business.findMany({ where: { ownerId }, orderBy: { createdAt: "desc" }, include: { category: true } });
+export async function listMyBusinesses(ownerId: string, query: { page?: number; pageSize?: number } = {}) {
+  const { page, pageSize, skip, take } = parsePagination(query);
+  const where = { ownerId };
+  const [items, total] = await Promise.all([
+    prisma.business.findMany({ where, skip, take, orderBy: { createdAt: "desc" }, include: { category: true } }),
+    prisma.business.count({ where }),
+  ]);
+  return { items, meta: { page, pageSize, total } };
 }
 
 export async function getBusinessBySlug(slug: string) {
