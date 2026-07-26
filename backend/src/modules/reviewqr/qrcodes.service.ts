@@ -1,4 +1,4 @@
-import { Prisma, ReviewQrStatus, UserRole } from "@prisma/client";
+import { Prisma, ReviewChannel, ReviewQrStatus, UserRole } from "@prisma/client";
 import { prisma } from "@/config/database";
 import { AppError } from "@/common/errors";
 import { parsePagination } from "@/common/pagination";
@@ -29,8 +29,9 @@ export function normalizeCode(raw: string): string {
   return `MK-${body}`;
 }
 
-// Admin issues a batch of boards. Codes are unique; collisions are retried.
-export async function generateBatch(count: number, batchLabel?: string) {
+// Admin issues a batch of boards, optionally all pointing at one platform
+// (picked from the list). Codes are unique; collisions are retried.
+export async function generateBatch(count: number, batchLabel?: string, channel?: ReviewChannel) {
   const created: string[] = [];
 
   for (let i = 0; i < count; i++) {
@@ -38,7 +39,7 @@ export async function generateBatch(count: number, batchLabel?: string) {
     for (;;) {
       const code = generateCode();
       try {
-        await prisma.reviewQrCode.create({ data: { code, batchLabel } });
+        await prisma.reviewQrCode.create({ data: { code, batchLabel, channel } });
         created.push(code);
         break;
       } catch (err) {
@@ -97,6 +98,7 @@ export async function lookupCode(rawCode: string) {
   return {
     code: qr.code,
     status: qr.status,
+    channel: qr.channel,
     batchLabel: qr.batchLabel,
     scanCount: qr.scanCount,
     assignedAt: qr.assignedAt,
@@ -106,7 +108,7 @@ export async function lookupCode(rawCode: string) {
 
 // A shop owner (or dealer/admin) confirms the scanned board and attaches it to
 // one of their businesses.
-export async function claimCode(actor: Actor, rawCode: string, businessId: string) {
+export async function claimCode(actor: Actor, rawCode: string, businessId: string, channel?: ReviewChannel) {
   const code = normalizeCode(rawCode);
 
   const [qr, business] = await Promise.all([
@@ -137,20 +139,49 @@ export async function claimCode(actor: Actor, rawCode: string, businessId: strin
       status: ReviewQrStatus.ASSIGNED,
       assignedAt: new Date(),
       assignedById: actor.sub,
+      // Purpose picked at claim time overrides whatever the batch was issued with.
+      ...(channel ? { channel } : {}),
     },
     include: QR_INCLUDE,
   });
 
   // Warn the owner if the board will not lead anywhere useful yet.
   const channels = availableChannels(business);
+  const effective = updated.channel ?? business.preferredReviewChannel ?? channels[0] ?? null;
   return {
     code: updated.code,
     status: updated.status,
+    channel: updated.channel,
     business: updated.business,
     assignedAt: updated.assignedAt,
     reviewChannelsConfigured: channels,
     needsReviewLinks: channels.length === 0,
+    // Where a scan will actually land right now, and whether that link exists.
+    effectiveChannel: effective,
+    effectiveUrl: effective ? resolveChannelUrl(business, effective) : null,
   };
+}
+
+// The owner re-points one of their boards at a different platform.
+export async function setBoardChannel(actor: Actor, qrId: string, channel: ReviewChannel | null) {
+  const qr = await prisma.reviewQrCode.findUnique({ where: { id: qrId }, include: { business: true } });
+  if (!qr) throw AppError.notFound("QR board not found");
+  if (!qr.business) throw AppError.badRequest("Attach this board to a business first");
+  if (actor.role !== UserRole.ADMIN && qr.business.ownerId !== actor.sub) {
+    throw AppError.forbidden("You do not own this business");
+  }
+  if (channel && !resolveChannelUrl(qr.business, channel)) {
+    throw AppError.badRequest(
+      `Add your ${channel.toLowerCase()} link in "Connect your review pages" before pointing a board at it`,
+    );
+  }
+
+  const updated = await prisma.reviewQrCode.update({
+    where: { id: qrId },
+    data: { channel },
+    select: { id: true, code: true, channel: true, status: true, scanCount: true, assignedAt: true },
+  });
+  return updated;
 }
 
 // The boards attached to a business, for its dashboard.
@@ -164,20 +195,24 @@ export async function listBusinessQrCodes(actor: Actor, businessId: string) {
   return prisma.reviewQrCode.findMany({
     where: { businessId },
     orderBy: { assignedAt: "desc" },
-    select: { id: true, code: true, status: true, scanCount: true, assignedAt: true },
+    select: { id: true, code: true, channel: true, status: true, scanCount: true, assignedAt: true },
   });
 }
 
 // Admin actions: detach a board (back to the pool) or disable a lost one.
-export async function updateQrCodeAsAdmin(id: string, data: { status?: ReviewQrStatus; businessId?: string | null }) {
-  if (data.status === undefined && data.businessId === undefined) {
-    throw AppError.badRequest("Provide a status or a business to attach");
+export async function updateQrCodeAsAdmin(
+  id: string,
+  data: { status?: ReviewQrStatus; businessId?: string | null; channel?: ReviewChannel | null },
+) {
+  if (data.status === undefined && data.businessId === undefined && data.channel === undefined) {
+    throw AppError.badRequest("Provide a status, business, or channel to change");
   }
 
   const qr = await prisma.reviewQrCode.findUnique({ where: { id } });
   if (!qr) throw AppError.notFound("QR code not found");
 
   const patch: Prisma.ReviewQrCodeUpdateInput = {};
+  if (data.channel !== undefined) patch.channel = data.channel;
 
   if (data.businessId !== undefined) {
     if (data.businessId === null) {
@@ -232,10 +267,16 @@ export async function resolveQrScan(
   const channels = availableChannels(business);
   if (channels.length === 0) return { kind: "listing", slug: business.slug };
 
+  // The board's own purpose wins — that's what was picked from the list when
+  // it was issued or claimed. Fall back to the shop's default, then to
+  // whatever it has configured, so a scan always lands somewhere.
   const channel =
-    business.preferredReviewChannel && resolveChannelUrl(business, business.preferredReviewChannel)
+    (qr.channel && resolveChannelUrl(business, qr.channel) ? qr.channel : undefined) ??
+    (business.preferredReviewChannel && resolveChannelUrl(business, business.preferredReviewChannel)
       ? business.preferredReviewChannel
-      : channels[0];
+      : undefined) ??
+    channels[0];
+
   const url = resolveChannelUrl(business, channel);
   if (!url) return { kind: "listing", slug: business.slug };
 

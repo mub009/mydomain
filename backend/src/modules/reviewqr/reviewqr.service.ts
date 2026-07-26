@@ -12,13 +12,14 @@ export interface ReviewLinksInput {
   googleReviewUrl?: string | null;
   instagramUsername?: string | null;
   facebookPageUrl?: string | null;
+  youtubeUrl?: string | null;
   preferredReviewChannel?: ReviewChannel | null;
 }
 
 type LinkSource = Pick<
   ReviewLinksInput,
-  "googlePlaceId" | "googleReviewUrl" | "instagramUsername" | "facebookPageUrl"
->;
+  "googlePlaceId" | "googleReviewUrl" | "instagramUsername" | "facebookPageUrl" | "youtubeUrl"
+> & { website?: string | null };
 
 // Google's canonical "write a review" deep link. Scanning it on a phone opens
 // the Maps app straight on the review composer for that place.
@@ -43,19 +44,47 @@ export function facebookLink(source: LinkSource): string | null {
   return base.includes("/reviews") ? base : `${base}/reviews`;
 }
 
+export function youtubeLink(source: LinkSource): string | null {
+  if (!source.youtubeUrl) return null;
+  const raw = source.youtubeUrl.trim();
+  if (/^https?:\/\//i.test(raw)) return raw;
+  // Accept a bare handle ("@myshop") or channel name.
+  return `https://www.youtube.com/${raw.startsWith("@") ? raw : `@${raw}`}`;
+}
+
+export function websiteLink(source: LinkSource): string | null {
+  if (!source.website) return null;
+  const raw = source.website.trim();
+  return /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+}
+
 export function resolveChannelUrl(source: LinkSource, channel: ReviewChannel): string | null {
-  if (channel === ReviewChannel.GOOGLE) return googleReviewLink(source);
-  if (channel === ReviewChannel.INSTAGRAM) return instagramLink(source);
-  return facebookLink(source);
+  switch (channel) {
+    case ReviewChannel.GOOGLE:
+      return googleReviewLink(source);
+    case ReviewChannel.INSTAGRAM:
+      return instagramLink(source);
+    case ReviewChannel.FACEBOOK:
+      return facebookLink(source);
+    case ReviewChannel.YOUTUBE:
+      return youtubeLink(source);
+    case ReviewChannel.WEBSITE:
+      return websiteLink(source);
+    default:
+      return null;
+  }
 }
 
 // Which channels this business has actually configured, in display order.
 export function availableChannels(source: LinkSource): ReviewChannel[] {
-  const channels: ReviewChannel[] = [];
-  if (googleReviewLink(source)) channels.push(ReviewChannel.GOOGLE);
-  if (instagramLink(source)) channels.push(ReviewChannel.INSTAGRAM);
-  if (facebookLink(source)) channels.push(ReviewChannel.FACEBOOK);
-  return channels;
+  const order: ReviewChannel[] = [
+    ReviewChannel.GOOGLE,
+    ReviewChannel.INSTAGRAM,
+    ReviewChannel.FACEBOOK,
+    ReviewChannel.YOUTUBE,
+    ReviewChannel.WEBSITE,
+  ];
+  return order.filter((channel) => resolveChannelUrl(source, channel));
 }
 
 function assertOwnerOrAdmin(actor: Actor, ownerId: string): void {
@@ -80,11 +109,15 @@ export async function getReviewLinks(actor: Actor, businessId: string) {
     googleReviewUrl: business.googleReviewUrl,
     instagramUsername: business.instagramUsername,
     facebookPageUrl: business.facebookPageUrl,
+    youtubeUrl: business.youtubeUrl,
+    website: business.website,
     preferredReviewChannel: business.preferredReviewChannel,
     resolved: {
       GOOGLE: googleReviewLink(business),
       INSTAGRAM: instagramLink(business),
       FACEBOOK: facebookLink(business),
+      YOUTUBE: youtubeLink(business),
+      WEBSITE: websiteLink(business),
     },
     scanCounts: Object.fromEntries(scans.map((s) => [s.channel, s._count._all])) as Record<string, number>,
     totalScans: scans.reduce((sum, s) => sum + s._count._all, 0),

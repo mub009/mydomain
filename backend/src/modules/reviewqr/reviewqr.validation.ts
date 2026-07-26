@@ -25,10 +25,11 @@ export const updateReviewLinksSchema = z.object({
     .optional(),
   instagramUsername: optionalText(100),
   facebookPageUrl: optionalText(500),
+  youtubeUrl: optionalText(500),
   preferredReviewChannel: z.nativeEnum(ReviewChannel).nullable().optional(),
 });
 
 export const scanQuerySchema = z.object({
-  // ?c=google|instagram|facebook — optional; falls back to the shop's default.
-  c: z.enum(["google", "instagram", "facebook"]).optional(),
+  // Optional destination override; falls back to the shop's default.
+  c: z.enum(["google", "instagram", "facebook", "youtube", "website"]).optional(),
 });

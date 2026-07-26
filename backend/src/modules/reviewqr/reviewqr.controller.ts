@@ -14,6 +14,8 @@ const CHANNEL_BY_PARAM: Record<string, ReviewChannel> = {
   google: ReviewChannel.GOOGLE,
   instagram: ReviewChannel.INSTAGRAM,
   facebook: ReviewChannel.FACEBOOK,
+  youtube: ReviewChannel.YOUTUBE,
+  website: ReviewChannel.WEBSITE,
 };
 
 export async function getReviewLinksHandler(req: Request, res: Response): Promise<void> {

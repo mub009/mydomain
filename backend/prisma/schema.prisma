@@ -172,7 +172,8 @@ model Business {
   googleReviewUrl        String?        @db.Text // explicit override, else built from the place id
   instagramUsername      String?        @db.VarChar(100)
   facebookPageUrl        String?        @db.Text
-  preferredReviewChannel ReviewChannel? // where an un-suffixed QR scan lands
+  youtubeUrl             String?        @db.Text // channel or video link
+  preferredReviewChannel ReviewChannel? // fallback when a board has no purpose set
 
   // Marketplace metadata
   logoUrl       String?
@@ -386,10 +387,14 @@ model Payment {
 // QR review boards (send in-store customers to external review pages)
 // ---------------------------------------------------------------------------
 
+// Destinations a QR board can point at. Each business supplies its own link
+// or handle per platform; a board is bound to one of these.
 enum ReviewChannel {
   GOOGLE
   INSTAGRAM
   FACEBOOK
+  YOUTUBE
+  WEBSITE
 }
 
 enum ReviewQrStatus {
@@ -404,6 +409,9 @@ model ReviewQrCode {
   id           String         @id @default(uuid()) @db.VarChar(36)
   code         String         @unique @db.VarChar(20) // e.g. MK-7F3K2A
   status       ReviewQrStatus @default(UNASSIGNED)
+  // What this board is for, chosen from a list when it's issued or claimed.
+  // Null falls back to the business's preferred channel.
+  channel      ReviewChannel?
   batchLabel   String?        @db.VarChar(100) // grouping for a printed run
   businessId   String?        @db.VarChar(36)
   business     Business?      @relation(fields: [businessId], references: [id], onDelete: SetNull)

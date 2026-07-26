@@ -3,7 +3,7 @@ import QRCode from "qrcode";
 import { Plus, Printer, QrCode as QrIcon, Search, Unlink } from "lucide-react";
 import { adminApi } from "@/api/endpoints";
 import { apiErrorMessage } from "@/api/client";
-import { ReviewQrCode, ReviewQrStatus } from "@/types";
+import { CHANNEL_LABELS, REVIEW_CHANNELS, ReviewChannel, ReviewQrCode, ReviewQrStatus } from "@/types";
 import { ListSkeleton } from "@/components/Loading";
 import Modal from "@/components/Modal";
 import Pagination from "@/components/Pagination";
@@ -22,7 +22,15 @@ function boardUrl(code: string): string {
 
 // A printable sheet of boards, each showing its QR and the code beneath it so
 // a shop can still type it in if the camera struggles.
-function PrintSheet({ codes, onClose }: { codes: string[]; onClose: () => void }) {
+function PrintSheet({
+  codes,
+  purpose,
+  onClose,
+}: {
+  codes: string[];
+  purpose?: ReviewChannel | null;
+  onClose: () => void;
+}) {
   const [images, setImages] = useState<{ code: string; dataUrl: string }[]>([]);
 
   useEffect(() => {
@@ -47,7 +55,13 @@ function PrintSheet({ codes, onClose }: { codes: string[]; onClose: () => void }
         {images.map((item) => (
           <div key={item.code} className="rounded-xl border-2 border-dashed border-gray-200 p-3 text-center">
             <p className="text-[9px] font-bold uppercase tracking-widest text-brand-600">Loved your visit?</p>
-            <p className="text-[11px] font-semibold text-ink-700">Scan to review us</p>
+            <p className="text-[11px] font-semibold text-ink-700">
+              {purpose === "GOOGLE" || !purpose
+                ? "Scan to review us"
+                : purpose === "WEBSITE"
+                  ? "Scan to visit our website"
+                  : `Scan to find us on ${CHANNEL_LABELS[purpose]}`}
+            </p>
             <img src={item.dataUrl} alt={item.code} className="mx-auto my-1.5 h-28 w-28" />
             <p className="font-mono text-xs font-bold text-ink-900">{item.code}</p>
             <p className="text-[8px] uppercase tracking-wider text-ink-400">Powered by Markkito</p>
@@ -75,9 +89,9 @@ export default function QrCodesPanel() {
   const [notice, setNotice] = useState("");
 
   const [generating, setGenerating] = useState(false);
-  const [batchForm, setBatchForm] = useState({ count: "20", batchLabel: "" });
+  const [batchForm, setBatchForm] = useState({ count: "20", batchLabel: "", channel: "GOOGLE" as ReviewChannel | "" });
   const [showGenerate, setShowGenerate] = useState(false);
-  const [printCodes, setPrintCodes] = useState<string[] | null>(null);
+  const [printJob, setPrintJob] = useState<{ codes: string[]; purpose?: ReviewChannel | null } | null>(null);
 
   function load() {
     setLoading(true);
@@ -109,10 +123,14 @@ export default function QrCodesPanel() {
     setError("");
     setNotice("");
     try {
-      const result = await adminApi.generateQrBatch(Number(batchForm.count), batchForm.batchLabel || undefined);
+      const result = await adminApi.generateQrBatch(
+        Number(batchForm.count),
+        batchForm.batchLabel || undefined,
+        batchForm.channel || undefined,
+      );
       setNotice(`Generated ${result.created} new QR boards.`);
       setShowGenerate(false);
-      setPrintCodes(result.codes);
+      setPrintJob({ codes: result.codes, purpose: batchForm.channel || null });
       load();
     } catch (err) {
       setError(apiErrorMessage(err));
@@ -192,6 +210,9 @@ export default function QrCodesPanel() {
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="font-mono font-bold text-ink-900">{qr.code}</p>
                   <span className={`badge ${STATUS_TINT[qr.status]}`}>{qr.status.toLowerCase()}</span>
+                  <span className="badge bg-brand-50 text-brand-700">
+                    {qr.channel ? CHANNEL_LABELS[qr.channel] : "Shop default"}
+                  </span>
                   {qr.scanCount > 0 && <span className="text-xs text-ink-400">{qr.scanCount} scans</span>}
                 </div>
                 {qr.business ? (
@@ -204,7 +225,7 @@ export default function QrCodesPanel() {
                 {qr.batchLabel && <p className="mt-0.5 text-[11px] text-ink-400">Batch: {qr.batchLabel}</p>}
               </div>
               <div className="flex shrink-0 items-center gap-2">
-                <button onClick={() => setPrintCodes([qr.code])} className="btn-secondary px-3 py-1.5 text-sm">
+                <button onClick={() => setPrintJob({ codes: [qr.code], purpose: qr.channel })} className="btn-secondary px-3 py-1.5 text-sm">
                   <QrIcon size={14} /> View
                 </button>
                 {qr.status === "ASSIGNED" && (
@@ -253,6 +274,24 @@ export default function QrCodesPanel() {
               />
             </div>
             <div>
+              <label className="mb-1 block text-xs font-semibold text-ink-700">What are these boards for?</label>
+              <select
+                className="input"
+                value={batchForm.channel}
+                onChange={(e) => setBatchForm({ ...batchForm, channel: e.target.value as ReviewChannel | "" })}
+              >
+                {REVIEW_CHANNELS.map((c) => (
+                  <option key={c.value} value={c.value}>
+                    {c.label}
+                  </option>
+                ))}
+                <option value="">Shop's own default</option>
+              </select>
+              <p className="mt-1 text-[11px] text-ink-400">
+                A scan opens this platform using the shop's own link. Shops can re-point their board later.
+              </p>
+            </div>
+            <div>
               <label className="mb-1 block text-xs font-semibold text-ink-700">Batch label (optional)</label>
               <input
                 className="input"
@@ -268,7 +307,7 @@ export default function QrCodesPanel() {
         </Modal>
       )}
 
-      {printCodes && <PrintSheet codes={printCodes} onClose={() => setPrintCodes(null)} />}
+      {printJob && <PrintSheet codes={printJob.codes} purpose={printJob.purpose} onClose={() => setPrintJob(null)} />}
     </div>
   );
 }

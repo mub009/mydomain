@@ -120,10 +120,13 @@ export interface QrCodeListResponse {
 export const qrCodesApi = {
   // Public: confirm what a scanned board is before claiming it.
   lookup: (code: string) => api.get<ApiResponse<QrLookup>>(`/qr-codes/lookup/${encodeURIComponent(code)}`).then((r) => r.data.data),
-  claim: (code: string, businessId: string) =>
-    api.post<ApiResponse<QrClaimResult>>("/qr-codes/claim", { code, businessId }).then((r) => r.data.data),
+  claim: (code: string, businessId: string, channel?: string) =>
+    api.post<ApiResponse<QrClaimResult>>("/qr-codes/claim", { code, businessId, channel }).then((r) => r.data.data),
   forBusiness: (businessId: string) =>
     api.get<ApiResponse<ReviewQrCode[]>>(`/businesses/${businessId}/qr-codes`).then((r) => r.data.data),
+  // Re-point one of the shop's boards at a different platform.
+  setChannel: (businessId: string, qrId: string, channel: string | null) =>
+    api.patch<ApiResponse<ReviewQrCode>>(`/businesses/${businessId}/qr-codes/${qrId}`, { channel }).then((r) => r.data.data),
 };
 
 export const visitorsApi = {
@@ -173,11 +176,12 @@ export const adminApi = {
   // Pre-printed review QR boards
   qrCodes: (params: Record<string, unknown> = {}) =>
     api.get<QrCodeListResponse>("/admin/qr-codes", { params }).then((r) => r.data),
-  generateQrBatch: (count: number, batchLabel?: string) =>
+  generateQrBatch: (count: number, batchLabel?: string, channel?: string) =>
     api
       .post<ApiResponse<{ created: number; codes: string[]; batchLabel: string | null }>>("/admin/qr-codes/batch", {
         count,
         batchLabel,
+        channel,
       })
       .then((r) => r.data.data),
   updateQrCode: (id: string, payload: { status?: string; businessId?: string | null }) =>

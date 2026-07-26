@@ -4,14 +4,20 @@ import { asyncHandler } from "@/common/asyncHandler";
 import { validate } from "@/middleware/validate";
 import { requireAuth, requirePrivilege, requireRole } from "@/middleware/auth";
 import { scanQuerySchema, updateReviewLinksSchema } from "./reviewqr.validation";
-import { claimCodeSchema } from "./qrcodes.validation";
+import { claimCodeSchema, setBoardChannelSchema } from "./qrcodes.validation";
 import {
   getReviewLinksHandler,
   scanRedirectHandler,
   scanStatsHandler,
   updateReviewLinksHandler,
 } from "./reviewqr.controller";
-import { businessQrCodesHandler, claimCodeHandler, lookupCodeHandler, qrScanHandler } from "./qrcodes.controller";
+import {
+  businessQrCodesHandler,
+  claimCodeHandler,
+  lookupCodeHandler,
+  qrScanHandler,
+  setBoardChannelHandler,
+} from "./qrcodes.controller";
 
 // Public redirect targets for printed boards. Mounted at short paths so the
 // encoded URL stays small and scans reliably:
@@ -47,3 +53,11 @@ reviewLinksRouter.patch(
 );
 reviewLinksRouter.get("/:id/review-scans", requireAuth, asyncHandler(scanStatsHandler));
 reviewLinksRouter.get("/:id/qr-codes", requireAuth, asyncHandler(businessQrCodesHandler));
+// Re-point one of the shop's boards at a different platform.
+reviewLinksRouter.patch(
+  "/:id/qr-codes/:qrId",
+  requireAuth,
+  listingPriv,
+  validate({ body: setBoardChannelSchema }),
+  asyncHandler(setBoardChannelHandler),
+);

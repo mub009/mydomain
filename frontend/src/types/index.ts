@@ -182,7 +182,24 @@ export interface Quote {
   business?: { id: string; name: string; slug: string; avgRating: number };
 }
 
-export type ReviewChannel = "GOOGLE" | "INSTAGRAM" | "FACEBOOK";
+export type ReviewChannel = "GOOGLE" | "INSTAGRAM" | "FACEBOOK" | "YOUTUBE" | "WEBSITE";
+
+// Destination options offered in the QR "purpose" dropdowns.
+export const REVIEW_CHANNELS: { value: ReviewChannel; label: string }[] = [
+  { value: "GOOGLE", label: "Google review" },
+  { value: "INSTAGRAM", label: "Instagram" },
+  { value: "FACEBOOK", label: "Facebook" },
+  { value: "YOUTUBE", label: "YouTube" },
+  { value: "WEBSITE", label: "Website" },
+];
+
+export const CHANNEL_LABELS: Record<ReviewChannel, string> = {
+  GOOGLE: "Google review",
+  INSTAGRAM: "Instagram",
+  FACEBOOK: "Facebook",
+  YOUTUBE: "YouTube",
+  WEBSITE: "Website",
+};
 
 export interface ReviewLinks {
   slug: string;
@@ -190,6 +207,8 @@ export interface ReviewLinks {
   googleReviewUrl?: string | null;
   instagramUsername?: string | null;
   facebookPageUrl?: string | null;
+  youtubeUrl?: string | null;
+  website?: string | null;
   preferredReviewChannel?: ReviewChannel | null;
   resolved: Record<ReviewChannel, string | null>;
   scanCounts: Record<string, number>;
@@ -202,6 +221,7 @@ export interface ReviewQrCode {
   id: string;
   code: string;
   status: ReviewQrStatus;
+  channel?: ReviewChannel | null;
   batchLabel?: string | null;
   scanCount: number;
   assignedAt?: string | null;
@@ -212,6 +232,7 @@ export interface ReviewQrCode {
 export interface QrLookup {
   code: string;
   status: ReviewQrStatus;
+  channel?: ReviewChannel | null;
   batchLabel?: string | null;
   scanCount: number;
   assignedAt?: string | null;
@@ -221,10 +242,13 @@ export interface QrLookup {
 export interface QrClaimResult {
   code: string;
   status: ReviewQrStatus;
+  channel?: ReviewChannel | null;
   business?: { id: string; name: string; slug: string; city: string } | null;
   assignedAt?: string | null;
   reviewChannelsConfigured: ReviewChannel[];
   needsReviewLinks: boolean;
+  effectiveChannel?: ReviewChannel | null;
+  effectiveUrl?: string | null;
 }
 
 export interface Visitor {

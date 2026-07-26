@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { AlertTriangle, CheckCircle2, QrCode, Store } from "lucide-react";
 import { businessesApi, qrCodesApi } from "@/api/endpoints";
 import { apiErrorMessage } from "@/api/client";
-import { Business, QrClaimResult, QrLookup } from "@/types";
+import { CHANNEL_LABELS, REVIEW_CHANNELS, Business, QrClaimResult, QrLookup, ReviewChannel } from "@/types";
 import { useAuthStore } from "@/store/authStore";
 import { Spinner } from "@/components/Loading";
 
@@ -19,6 +19,7 @@ export default function QrClaim() {
   const [lookup, setLookup] = useState<QrLookup | null>(null);
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [businessId, setBusinessId] = useState("");
+  const [channel, setChannel] = useState<ReviewChannel | "">("");
   const [claimed, setClaimed] = useState<QrClaimResult | null>(null);
   const [loading, setLoading] = useState(!!codeParam);
   const [saving, setSaving] = useState(false);
@@ -33,7 +34,10 @@ export default function QrClaim() {
     setLookup(null);
     qrCodesApi
       .lookup(raw)
-      .then(setLookup)
+      .then((found) => {
+        setLookup(found);
+        setChannel(found.channel ?? "");
+      })
       .catch((err) => setError(apiErrorMessage(err)))
       .finally(() => setLoading(false));
   }
@@ -63,7 +67,7 @@ export default function QrClaim() {
     setSaving(true);
     setError("");
     try {
-      setClaimed(await qrCodesApi.claim(lookup?.code ?? code, businessId));
+      setClaimed(await qrCodesApi.claim(lookup?.code ?? code, businessId, channel || undefined));
     } catch (err) {
       setError(apiErrorMessage(err));
     } finally {
@@ -96,9 +100,15 @@ export default function QrClaim() {
               </p>
             </div>
           ) : (
-            <p className="mt-4 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
-              Customers scanning this board will now be taken straight to your review page.
-            </p>
+            <div className="mt-4 rounded-lg bg-emerald-50 px-3 py-2.5 text-left">
+              <p className="text-xs font-semibold text-emerald-800">
+                Scans now open{" "}
+                {claimed.effectiveChannel ? CHANNEL_LABELS[claimed.effectiveChannel] : "your default channel"}
+              </p>
+              {claimed.effectiveUrl && (
+                <p className="mt-0.5 break-all text-[11px] text-emerald-700/80">{claimed.effectiveUrl}</p>
+              )}
+            </div>
           )}
 
           <div className="mt-5 flex gap-2">
@@ -164,6 +174,12 @@ export default function QrClaim() {
             <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
               <p className="text-xs text-ink-500">Board code</p>
               <p className="font-mono text-lg font-bold text-ink-900">{lookup.code}</p>
+              <p className="mt-1 text-xs text-ink-600">
+                Purpose:{" "}
+                <span className="font-semibold text-ink-900">
+                  {lookup.channel ? CHANNEL_LABELS[lookup.channel] : "Your default channel"}
+                </span>
+              </p>
               {lookup.batchLabel && <p className="mt-0.5 text-xs text-ink-400">Batch: {lookup.batchLabel}</p>}
             </div>
 
@@ -208,6 +224,27 @@ export default function QrClaim() {
                           </option>
                         ))}
                       </select>
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-xs font-semibold text-ink-700">
+                        Where should a scan send customers?
+                      </label>
+                      <select
+                        className="input"
+                        value={channel}
+                        onChange={(e) => setChannel(e.target.value as ReviewChannel | "")}
+                      >
+                        <option value="">My default channel</option>
+                        {REVIEW_CHANNELS.map((c) => (
+                          <option key={c.value} value={c.value}>
+                            {c.label}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="mt-1 text-[11px] text-ink-400">
+                        Uses your own link for that platform. You can change this later from your dashboard.
+                      </p>
                     </div>
                     <button disabled={saving || !businessId} onClick={claim} className="btn-primary w-full py-2.5 disabled:opacity-50">
                       {saving ? "Activating…" : "Confirm & activate board"}

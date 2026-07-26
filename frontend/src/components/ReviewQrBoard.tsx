@@ -1,16 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import QRCode from "qrcode";
-import { Download, Facebook, Instagram, Link2, Printer, QrCode, Star } from "lucide-react";
+import { Download, Facebook, Globe, Instagram, Link2, Printer, QrCode, Star, Youtube } from "lucide-react";
 import { Link } from "react-router-dom";
 import { businessesApi, qrCodesApi } from "@/api/endpoints";
 import { apiErrorMessage } from "@/api/client";
-import { Business, ReviewChannel, ReviewLinks, ReviewQrCode } from "@/types";
+import { CHANNEL_LABELS, REVIEW_CHANNELS, Business, ReviewChannel, ReviewLinks, ReviewQrCode } from "@/types";
 import { Spinner } from "@/components/Loading";
 
 const CHANNELS: { value: ReviewChannel; label: string; icon: typeof Star; tint: string }[] = [
   { value: "GOOGLE", label: "Google", icon: Star, tint: "text-amber-600" },
   { value: "INSTAGRAM", label: "Instagram", icon: Instagram, tint: "text-pink-600" },
   { value: "FACEBOOK", label: "Facebook", icon: Facebook, tint: "text-blue-600" },
+  { value: "YOUTUBE", label: "YouTube", icon: Youtube, tint: "text-red-600" },
+  { value: "WEBSITE", label: "Website", icon: Globe, tint: "text-brand-600" },
 ];
 
 // The printed board points here; the server resolves the right platform and
@@ -28,6 +30,7 @@ export default function ReviewQrBoard({ business }: { business: Business }) {
     googleReviewUrl: "",
     instagramUsername: "",
     facebookPageUrl: "",
+    youtubeUrl: "",
     preferredReviewChannel: "" as ReviewChannel | "",
   });
   const [qrDataUrl, setQrDataUrl] = useState("");
@@ -44,6 +47,7 @@ export default function ReviewQrBoard({ business }: { business: Business }) {
       googleReviewUrl: data.googleReviewUrl ?? "",
       instagramUsername: data.instagramUsername ?? "",
       facebookPageUrl: data.facebookPageUrl ?? "",
+      youtubeUrl: data.youtubeUrl ?? "",
       preferredReviewChannel: data.preferredReviewChannel ?? "",
     });
   }
@@ -86,6 +90,7 @@ export default function ReviewQrBoard({ business }: { business: Business }) {
         googleReviewUrl: form.googleReviewUrl,
         instagramUsername: form.instagramUsername,
         facebookPageUrl: form.facebookPageUrl,
+        youtubeUrl: form.youtubeUrl,
         preferredReviewChannel: form.preferredReviewChannel || null,
       });
       hydrate(updated);
@@ -94,6 +99,21 @@ export default function ReviewQrBoard({ business }: { business: Business }) {
       setError(apiErrorMessage(err));
     } finally {
       setSaving(false);
+    }
+  }
+
+  // Re-point an issued board at a different platform.
+  async function changeBoardChannel(board: ReviewQrCode, channel: ReviewChannel | "") {
+    setError("");
+    setNotice("");
+    try {
+      const updated = await qrCodesApi.setChannel(business.id, board.id, channel || null);
+      setAttachedBoards((list) => list.map((b) => (b.id === board.id ? { ...b, channel: updated.channel } : b)));
+      setNotice(
+        `${board.code} now sends people to ${updated.channel ? CHANNEL_LABELS[updated.channel] : "your default channel"}.`,
+      );
+    } catch (err) {
+      setError(apiErrorMessage(err));
     }
   }
 
@@ -174,6 +194,16 @@ export default function ReviewQrBoard({ business }: { business: Business }) {
               placeholder="yourshop or https://facebook.com/yourshop"
               value={form.facebookPageUrl}
               onChange={(e) => setForm({ ...form, facebookPageUrl: e.target.value })}
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-ink-700">YouTube channel</label>
+            <input
+              className="input"
+              placeholder="@yourshop or a full YouTube link"
+              value={form.youtubeUrl}
+              onChange={(e) => setForm({ ...form, youtubeUrl: e.target.value })}
             />
           </div>
 
@@ -289,11 +319,29 @@ export default function ReviewQrBoard({ business }: { business: Business }) {
             {attachedBoards.length > 0 ? (
               <div className="mt-3 space-y-2">
                 {attachedBoards.map((board) => (
-                  <div key={board.id} className="flex items-center justify-between gap-2 rounded-lg bg-gray-50 px-3 py-2">
-                    <span className="font-mono text-sm font-bold text-ink-900">{board.code}</span>
-                    <span className="text-xs text-ink-500">
-                      {board.scanCount} {board.scanCount === 1 ? "scan" : "scans"}
-                    </span>
+                  <div key={board.id} className="rounded-lg bg-gray-50 px-3 py-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-mono text-sm font-bold text-ink-900">{board.code}</span>
+                      <span className="text-xs text-ink-500">
+                        {board.scanCount} {board.scanCount === 1 ? "scan" : "scans"}
+                      </span>
+                    </div>
+                    <div className="mt-2 flex items-center gap-2">
+                      <label className="shrink-0 text-[11px] font-medium text-ink-600">Sends people to</label>
+                      <select
+                        value={board.channel ?? ""}
+                        onChange={(e) => changeBoardChannel(board, e.target.value as ReviewChannel | "")}
+                        className="flex-1 rounded-md border border-gray-300 bg-white px-2 py-1 text-xs focus:border-brand-500 focus:outline-none"
+                      >
+                        <option value="">My default channel</option>
+                        {REVIEW_CHANNELS.map((c) => (
+                          <option key={c.value} value={c.value} disabled={!links?.resolved[c.value]}>
+                            {c.label}
+                            {links?.resolved[c.value] ? "" : " — add link first"}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                 ))}
               </div>

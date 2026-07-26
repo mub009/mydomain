@@ -11,7 +11,7 @@ function actor(req: Request) {
 
 // Admin -----------------------------------------------------------------
 export async function generateBatchHandler(req: Request, res: Response): Promise<void> {
-  created(res, await qrcodesService.generateBatch(req.body.count, req.body.batchLabel));
+  created(res, await qrcodesService.generateBatch(req.body.count, req.body.batchLabel, req.body.channel));
 }
 
 export async function listQrCodesHandler(req: Request, res: Response): Promise<void> {
@@ -34,7 +34,11 @@ export async function lookupCodeHandler(req: Request, res: Response): Promise<vo
 }
 
 export async function claimCodeHandler(req: Request, res: Response): Promise<void> {
-  ok(res, await qrcodesService.claimCode(actor(req), req.body.code, req.body.businessId));
+  ok(res, await qrcodesService.claimCode(actor(req), req.body.code, req.body.businessId, req.body.channel));
+}
+
+export async function setBoardChannelHandler(req: Request, res: Response): Promise<void> {
+  ok(res, await qrcodesService.setBoardChannel(actor(req), req.params.qrId, req.body.channel));
 }
 
 export async function businessQrCodesHandler(req: Request, res: Response): Promise<void> {
