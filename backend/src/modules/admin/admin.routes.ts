@@ -29,6 +29,16 @@ import { adjustPointsSchema, listTransactionsQuerySchema } from "@/modules/point
 import { adjustPointsHandler, userTransactionsHandler } from "@/modules/points/points.controller";
 import { listVisitorsQuerySchema } from "@/modules/visitors/visitors.validation";
 import { listVisitorsHandler } from "@/modules/visitors/visitors.controller";
+import {
+  generateBatchSchema,
+  listQrCodesQuerySchema,
+  updateQrCodeSchema,
+} from "@/modules/reviewqr/qrcodes.validation";
+import {
+  generateBatchHandler,
+  listQrCodesHandler,
+  updateQrCodeHandler,
+} from "@/modules/reviewqr/qrcodes.controller";
 
 export const adminRouter = Router();
 
@@ -45,6 +55,11 @@ adminRouter.get(
 adminRouter.get("/stats", asyncHandler(platformStatsHandler));
 adminRouter.get("/reports/business-creators", asyncHandler(businessCreatorsReportHandler));
 adminRouter.get("/visitors", validate({ query: listVisitorsQuerySchema }), asyncHandler(listVisitorsHandler));
+
+// Pre-printed review QR boards
+adminRouter.get("/qr-codes", validate({ query: listQrCodesQuerySchema }), asyncHandler(listQrCodesHandler));
+adminRouter.post("/qr-codes/batch", validate({ body: generateBatchSchema }), asyncHandler(generateBatchHandler));
+adminRouter.patch("/qr-codes/:id", validate({ body: updateQrCodeSchema }), asyncHandler(updateQrCodeHandler));
 
 // Users
 adminRouter.get("/users", validate({ query: listUsersQuerySchema }), asyncHandler(listUsersHandler));

@@ -195,6 +195,7 @@ model Business {
   quotes      Quote[]         @relation("QuoteBusiness")
   rfqInvites  RfqInvite[]
   reviewScans ReviewScan[]
+  reviewQrCodes ReviewQrCode[]
 
   @@index([categoryId])
   @@index([city, state])
@@ -391,16 +392,47 @@ enum ReviewChannel {
   FACEBOOK
 }
 
+enum ReviewQrStatus {
+  UNASSIGNED // printed and issued, not yet claimed by a shop
+  ASSIGNED
+  DISABLED // retired or lost board
+}
+
+// A pre-printed QR board issued by admin. Each carries a short code printed
+// on the board itself; a shop scans it, confirms, and it becomes theirs.
+model ReviewQrCode {
+  id           String         @id @default(uuid()) @db.VarChar(36)
+  code         String         @unique @db.VarChar(20) // e.g. MK-7F3K2A
+  status       ReviewQrStatus @default(UNASSIGNED)
+  batchLabel   String?        @db.VarChar(100) // grouping for a printed run
+  businessId   String?        @db.VarChar(36)
+  business     Business?      @relation(fields: [businessId], references: [id], onDelete: SetNull)
+  assignedAt   DateTime?
+  assignedById String?        @db.VarChar(36) // who claimed it
+  scanCount    Int            @default(0)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  scans ReviewScan[]
+
+  @@index([status])
+  @@index([businessId])
+  @@map("review_qr_codes")
+}
+
 // One row per QR scan, so a shop can see which board and platform is working.
 model ReviewScan {
   id         String        @id @default(uuid()) @db.VarChar(36)
   businessId String        @db.VarChar(36)
   business   Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  qrCodeId   String?       @db.VarChar(36)
+  qrCode     ReviewQrCode? @relation(fields: [qrCodeId], references: [id], onDelete: SetNull)
   channel    ReviewChannel
   userAgent  String?       @db.Text
   scannedAt  DateTime      @default(now())
 
   @@index([businessId, scannedAt])
+  @@index([qrCodeId])
   @@map("review_scans")
 }
 

@@ -1,19 +1,36 @@
 import { Router } from "express";
+import { UserRole } from "@prisma/client";
 import { asyncHandler } from "@/common/asyncHandler";
 import { validate } from "@/middleware/validate";
-import { requireAuth, requirePrivilege } from "@/middleware/auth";
+import { requireAuth, requirePrivilege, requireRole } from "@/middleware/auth";
 import { scanQuerySchema, updateReviewLinksSchema } from "./reviewqr.validation";
+import { claimCodeSchema } from "./qrcodes.validation";
 import {
   getReviewLinksHandler,
   scanRedirectHandler,
   scanStatsHandler,
   updateReviewLinksHandler,
 } from "./reviewqr.controller";
+import { businessQrCodesHandler, claimCodeHandler, lookupCodeHandler, qrScanHandler } from "./qrcodes.controller";
 
-// Public redirect target for the printed QR board. Deliberately mounted at a
-// short path ("/r/:slug") so the encoded URL stays small and scans reliably.
+// Public redirect targets for printed boards. Mounted at short paths so the
+// encoded URL stays small and scans reliably:
+//   /r/q/<code>  pre-printed board issued by admin
+//   /r/<slug>    per-business board generated from the dashboard
 export const reviewScanRouter = Router();
+reviewScanRouter.get("/q/:code", asyncHandler(qrScanHandler));
 reviewScanRouter.get("/:slug", validate({ query: scanQuerySchema }), asyncHandler(scanRedirectHandler));
+
+// Shop-facing code lookup and claim.
+export const qrCodesRouter = Router();
+qrCodesRouter.get("/lookup/:code", asyncHandler(lookupCodeHandler));
+qrCodesRouter.post(
+  "/claim",
+  requireAuth,
+  requireRole(UserRole.BUSINESS_OWNER, UserRole.DEALER, UserRole.ADMIN),
+  validate({ body: claimCodeSchema }),
+  asyncHandler(claimCodeHandler),
+);
 
 // Owner-facing management, nested under the business it belongs to.
 export const reviewLinksRouter = Router({ mergeParams: true });
@@ -29,3 +46,4 @@ reviewLinksRouter.patch(
   asyncHandler(updateReviewLinksHandler),
 );
 reviewLinksRouter.get("/:id/review-scans", requireAuth, asyncHandler(scanStatsHandler));
+reviewLinksRouter.get("/:id/qr-codes", requireAuth, asyncHandler(businessQrCodesHandler));

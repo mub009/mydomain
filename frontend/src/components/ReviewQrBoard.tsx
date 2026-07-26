@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import QRCode from "qrcode";
 import { Download, Facebook, Instagram, Link2, Printer, QrCode, Star } from "lucide-react";
-import { businessesApi } from "@/api/endpoints";
+import { Link } from "react-router-dom";
+import { businessesApi, qrCodesApi } from "@/api/endpoints";
 import { apiErrorMessage } from "@/api/client";
-import { Business, ReviewChannel, ReviewLinks } from "@/types";
+import { Business, ReviewChannel, ReviewLinks, ReviewQrCode } from "@/types";
 import { Spinner } from "@/components/Loading";
 
 const CHANNELS: { value: ReviewChannel; label: string; icon: typeof Star; tint: string }[] = [
@@ -21,6 +22,7 @@ function scanUrl(slug: string, channel?: ReviewChannel): string {
 
 export default function ReviewQrBoard({ business }: { business: Business }) {
   const [links, setLinks] = useState<ReviewLinks | null>(null);
+  const [attachedBoards, setAttachedBoards] = useState<ReviewQrCode[]>([]);
   const [form, setForm] = useState({
     googlePlaceId: "",
     googleReviewUrl: "",
@@ -53,6 +55,11 @@ export default function ReviewQrBoard({ business }: { business: Business }) {
       .then(hydrate)
       .catch((err) => setError(apiErrorMessage(err)))
       .finally(() => setLoading(false));
+    // Pre-printed boards the shop has already activated.
+    qrCodesApi
+      .forBusiness(business.id)
+      .then(setAttachedBoards)
+      .catch(() => undefined);
   }, [business.id]);
 
   const target = useMemo(
@@ -265,6 +272,37 @@ export default function ReviewQrBoard({ business }: { business: Business }) {
               </div>
             </div>
           )}
+
+          {/* Pre-printed boards issued by admin and activated by this shop */}
+          <div className="card p-4">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-ink-500">Issued QR boards</p>
+                <p className="mt-0.5 text-xs text-ink-500">
+                  Boards you received from Markkito and activated by scanning.
+                </p>
+              </div>
+              <Link to="/qr" className="btn-secondary shrink-0 px-3 py-1.5 text-sm">
+                <QrCode size={14} /> Activate a board
+              </Link>
+            </div>
+            {attachedBoards.length > 0 ? (
+              <div className="mt-3 space-y-2">
+                {attachedBoards.map((board) => (
+                  <div key={board.id} className="flex items-center justify-between gap-2 rounded-lg bg-gray-50 px-3 py-2">
+                    <span className="font-mono text-sm font-bold text-ink-900">{board.code}</span>
+                    <span className="text-xs text-ink-500">
+                      {board.scanCount} {board.scanCount === 1 ? "scan" : "scans"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-3 text-xs text-ink-400">
+                None yet. If you have a printed board from us, scan it or enter its code to activate.
+              </p>
+            )}
+          </div>
 
           {links && configured.length === 0 && (
             <p className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">

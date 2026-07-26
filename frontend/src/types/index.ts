@@ -196,6 +196,37 @@ export interface ReviewLinks {
   totalScans: number;
 }
 
+export type ReviewQrStatus = "UNASSIGNED" | "ASSIGNED" | "DISABLED";
+
+export interface ReviewQrCode {
+  id: string;
+  code: string;
+  status: ReviewQrStatus;
+  batchLabel?: string | null;
+  scanCount: number;
+  assignedAt?: string | null;
+  business?: { id: string; name: string; slug: string; city: string } | null;
+  createdAt?: string;
+}
+
+export interface QrLookup {
+  code: string;
+  status: ReviewQrStatus;
+  batchLabel?: string | null;
+  scanCount: number;
+  assignedAt?: string | null;
+  business?: { id: string; name: string; slug: string; city: string } | null;
+}
+
+export interface QrClaimResult {
+  code: string;
+  status: ReviewQrStatus;
+  business?: { id: string; name: string; slug: string; city: string } | null;
+  assignedAt?: string | null;
+  reviewChannelsConfigured: ReviewChannel[];
+  needsReviewLinks: boolean;
+}
+
 export interface Visitor {
   id: string;
   phone: string;

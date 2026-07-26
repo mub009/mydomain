@@ -7,6 +7,7 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import WelcomeModal from "@/components/WelcomeModal";
 import Home from "@/pages/Home";
 import SearchResults from "@/pages/SearchResults";
+import QrClaim from "@/pages/QrClaim";
 import BusinessDetail from "@/pages/BusinessDetail";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
@@ -31,6 +32,9 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/search" element={<SearchResults />} />
+        {/* Landing point for a scanned (or hand-typed) pre-printed QR board */}
+        <Route path="/qr" element={<QrClaim />} />
+        <Route path="/qr/:code" element={<QrClaim />} />
         <Route path="/business/:slug" element={<BusinessDetail />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />

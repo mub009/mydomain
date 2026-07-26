@@ -33,9 +33,10 @@ import { ListSkeleton, Spinner } from "@/components/Loading";
 import Modal from "@/components/Modal";
 import Pagination from "@/components/Pagination";
 import PointsModal from "@/components/PointsModal";
+import QrCodesPanel from "@/components/QrCodesPanel";
 import ResetPasswordModal from "@/components/ResetPasswordModal";
 
-const TABS = ["Overview", "Users", "Businesses", "Approvals", "Visitors", "Reports"] as const;
+const TABS = ["Overview", "Users", "Businesses", "Approvals", "QR Boards", "Visitors", "Reports"] as const;
 type Tab = (typeof TABS)[number];
 
 const ROLES: UserRole[] = ["CUSTOMER", "BUSINESS_OWNER", "DEALER", "ADMIN"];
@@ -152,6 +153,7 @@ export default function AdminDashboard() {
       {tab === "Users" && <UsersPanel onChanged={() => adminApi.stats().then(setStats)} />}
       {tab === "Businesses" && <BusinessesPanel categories={categories} onChanged={() => adminApi.stats().then(setStats)} />}
       {tab === "Approvals" && <ApprovalsPanel onChanged={() => adminApi.stats().then(setStats)} />}
+      {tab === "QR Boards" && <QrCodesPanel />}
       {tab === "Visitors" && <VisitorsPanel />}
       {tab === "Reports" && <ReportsPanel />}
     </div>

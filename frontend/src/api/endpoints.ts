@@ -11,8 +11,11 @@ import {
   PointsBalance,
   PointTransaction,
   PopularCity,
+  QrClaimResult,
+  QrLookup,
   Review,
   ReviewLinks,
+  ReviewQrCode,
   Rfq,
   UserRole,
   Visitor,
@@ -107,6 +110,22 @@ export const usersApi = {
     api.get<PaginatedResponse<AdminUser>>("/users/created", { params }).then((r) => r.data),
 };
 
+export interface QrCodeListResponse {
+  success: boolean;
+  data: ReviewQrCode[];
+  meta: { page: number; pageSize: number; total: number; totalPages: number };
+  summary: { unassigned: number; assigned: number };
+}
+
+export const qrCodesApi = {
+  // Public: confirm what a scanned board is before claiming it.
+  lookup: (code: string) => api.get<ApiResponse<QrLookup>>(`/qr-codes/lookup/${encodeURIComponent(code)}`).then((r) => r.data.data),
+  claim: (code: string, businessId: string) =>
+    api.post<ApiResponse<QrClaimResult>>("/qr-codes/claim", { code, businessId }).then((r) => r.data.data),
+  forBusiness: (businessId: string) =>
+    api.get<ApiResponse<ReviewQrCode[]>>(`/businesses/${businessId}/qr-codes`).then((r) => r.data.data),
+};
+
 export const visitorsApi = {
   capture: (payload: { phone: string; consent: true; latitude?: number; longitude?: number; city?: string }) =>
     api.post<ApiResponse<{ id: string; phone: string }>>("/visitors", payload).then((r) => r.data.data),
@@ -150,6 +169,19 @@ export const adminApi = {
   // Visitors captured by the welcome popup
   visitors: (params: Record<string, unknown> = {}) =>
     api.get<VisitorListResponse>("/admin/visitors", { params }).then((r) => r.data),
+
+  // Pre-printed review QR boards
+  qrCodes: (params: Record<string, unknown> = {}) =>
+    api.get<QrCodeListResponse>("/admin/qr-codes", { params }).then((r) => r.data),
+  generateQrBatch: (count: number, batchLabel?: string) =>
+    api
+      .post<ApiResponse<{ created: number; codes: string[]; batchLabel: string | null }>>("/admin/qr-codes/batch", {
+        count,
+        batchLabel,
+      })
+      .then((r) => r.data.data),
+  updateQrCode: (id: string, payload: { status?: string; businessId?: string | null }) =>
+    api.patch<ApiResponse<ReviewQrCode>>(`/admin/qr-codes/${id}`, payload).then((r) => r.data.data),
 
   // Approvals
   pendingBusinesses: (params: Record<string, unknown> = {}) =>
