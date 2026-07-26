@@ -28,8 +28,3 @@ export const updateReviewLinksSchema = z.object({
   youtubeUrl: optionalText(500),
   preferredReviewChannel: z.nativeEnum(ReviewChannel).nullable().optional(),
 });
-
-export const scanQuerySchema = z.object({
-  // Optional destination override; falls back to the shop's default.
-  c: z.enum(["google", "instagram", "facebook", "youtube", "website"]).optional(),
-});

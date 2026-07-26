@@ -1,17 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import QRCode from "qrcode";
-import {
-  Download,
-  ExternalLink,
-  Facebook,
-  Globe,
-  Instagram,
-  Link2,
-  Printer,
-  QrCode,
-  Star,
-  Youtube,
-} from "lucide-react";
+import { useEffect, useState } from "react";
+import { Download, ExternalLink, Facebook, Globe, Instagram, Link2, QrCode, Star, Youtube } from "lucide-react";
 import { Link } from "react-router-dom";
 import { businessesApi, qrCodesApi } from "@/api/endpoints";
 import { apiErrorMessage } from "@/api/client";
@@ -27,13 +15,6 @@ const CHANNELS: { value: ReviewChannel; label: string; icon: typeof Star; tint: 
   { value: "YOUTUBE", label: "YouTube", icon: Youtube, tint: "text-red-600" },
   { value: "WEBSITE", label: "Website", icon: Globe, tint: "text-brand-600" },
 ];
-
-// The printed board points here; the server resolves the right platform and
-// records the scan before redirecting the customer's phone.
-function scanUrl(slug: string, channel?: ReviewChannel): string {
-  const base = `${window.location.origin}/r/${slug}`;
-  return channel ? `${base}?c=${channel.toLowerCase()}` : base;
-}
 
 // Small scannable preview of an issued board, shown in the list.
 function BoardThumb({ code }: { code: string }) {
@@ -61,8 +42,6 @@ export default function ReviewQrBoard({ business }: { business: Business }) {
     youtubeUrl: "",
     preferredReviewChannel: "" as ReviewChannel | "",
   });
-  const [qrDataUrl, setQrDataUrl] = useState("");
-  const [qrChannel, setQrChannel] = useState<ReviewChannel | "">("");
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -93,19 +72,6 @@ export default function ReviewQrBoard({ business }: { business: Business }) {
       .then(setAttachedBoards)
       .catch(() => undefined);
   }, [business.id]);
-
-  const target = useMemo(
-    () => scanUrl(business.slug, qrChannel || undefined),
-    [business.slug, qrChannel],
-  );
-
-  // Regenerate the QR whenever the target changes. High error correction so
-  // the code still scans if the printed board gets scuffed.
-  useEffect(() => {
-    QRCode.toDataURL(target, { errorCorrectionLevel: "H", margin: 1, width: 512, color: { dark: "#0f172a", light: "#ffffff" } })
-      .then(setQrDataUrl)
-      .catch(() => setQrDataUrl(""));
-  }, [target]);
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
@@ -143,10 +109,6 @@ export default function ReviewQrBoard({ business }: { business: Business }) {
     } catch (err) {
       setError(apiErrorMessage(err));
     }
-  }
-
-  function downloadQr() {
-    downloadDataUrl(qrDataUrl, `${business.slug}-review-qr.png`);
   }
 
   // Download an issued board's QR straight from the list.
@@ -262,64 +224,8 @@ export default function ReviewQrBoard({ business }: { business: Business }) {
           </button>
         </form>
 
-        {/* QR board preview */}
+        {/* Boards, scans and warnings */}
         <div className="space-y-3">
-          <div className="card p-5">
-            <h3 className="flex items-center gap-1.5 font-bold text-ink-900">
-              <QrCode size={16} className="text-brand-600" /> Your QR board
-            </h3>
-            <p className="mt-0.5 text-xs text-ink-500">
-              Print this and place it at your counter. Scanning opens the review page automatically.
-            </p>
-
-            <div className="mt-3 flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => setQrChannel("")}
-                className={`badge ${qrChannel === "" ? "bg-brand-600 text-white" : "bg-gray-100 text-gray-600"}`}
-              >
-                Default
-              </button>
-              {configured.map((c) => (
-                <button
-                  key={c.value}
-                  type="button"
-                  onClick={() => setQrChannel(c.value)}
-                  className={`badge ${qrChannel === c.value ? "bg-brand-600 text-white" : "bg-gray-100 text-gray-600"}`}
-                >
-                  {c.label}
-                </button>
-              ))}
-            </div>
-
-            {/* The printable board */}
-            <div id="qr-board" className="mt-4 rounded-xl border-2 border-dashed border-gray-200 bg-white p-6 text-center">
-              <p className="text-xs font-bold uppercase tracking-widest text-brand-600">Loved your visit?</p>
-              <h4 className="mt-1 text-xl font-extrabold text-ink-900">{business.name}</h4>
-              <p className="mt-0.5 text-sm text-ink-500">Scan to leave us a review</p>
-              {qrDataUrl ? (
-                <img src={qrDataUrl} alt="Review QR code" className="mx-auto mt-3 h-48 w-48" />
-              ) : (
-                <div className="mx-auto mt-3 flex h-48 w-48 items-center justify-center rounded bg-gray-100 text-gray-400">
-                  <QrCode size={40} />
-                </div>
-              )}
-              <p className="mt-2 text-xs text-ink-400">Point your camera at the code</p>
-              <p className="mt-3 text-[10px] font-semibold uppercase tracking-wider text-ink-400">Powered by Markkito</p>
-            </div>
-
-            <p className="mt-2 break-all text-[11px] text-ink-400">{target}</p>
-
-            <div className="mt-3 flex gap-2">
-              <button type="button" onClick={downloadQr} disabled={!qrDataUrl} className="btn-primary flex-1 py-2.5 disabled:opacity-50">
-                <Download size={15} /> Download PNG
-              </button>
-              <button type="button" onClick={() => window.print()} className="btn-secondary flex-1 py-2.5">
-                <Printer size={15} /> Print
-              </button>
-            </div>
-          </div>
-
           {/* Scan analytics */}
           {links && links.totalScans > 0 && (
             <div className="card p-4">
