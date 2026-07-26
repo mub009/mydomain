@@ -26,12 +26,28 @@ describe("sanitizeSiteHtml", () => {
     expect(out).not.toMatch(/data:text\/html/i);
   });
 
-  it("removes framing and credential-harvesting elements", () => {
-    const out = sanitizeSiteHtml(
-      '<iframe src="https://evil.test"></iframe><form action="https://evil.test"><input name="pw"></form><p>ok</p>',
-    );
-    expect(out).not.toMatch(/<(iframe|form)/i);
+  it("removes iframes that are not map embeds", () => {
+    const out = sanitizeSiteHtml('<iframe src="https://evil.test"></iframe><p>ok</p>');
+    expect(out).not.toMatch(/<iframe/i);
     expect(out).toContain("<p>ok</p>");
+  });
+
+  it("keeps a Google Maps embed", () => {
+    const out = sanitizeSiteHtml(
+      '<iframe src="https://maps.google.com/maps?q=12.97,77.59&amp;z=16&amp;output=embed"></iframe>',
+    );
+    expect(out).toMatch(/<iframe/i);
+    expect(out).toContain("maps.google.com");
+  });
+
+  // The contact form must keep working, but must not be able to post offsite.
+  it("keeps forms while removing anything that could submit them elsewhere", () => {
+    const out = sanitizeSiteHtml(
+      '<form action="https://evil.test" method="post" target="_blank"><input name="pw"></form>',
+    );
+    expect(out).toMatch(/<form/i);
+    expect(out).toContain('<input name="pw">');
+    expect(out).not.toMatch(/action\s*=|method\s*=|target\s*=/i);
   });
 
   it("leaves ordinary markup untouched", () => {

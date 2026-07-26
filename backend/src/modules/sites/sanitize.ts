@@ -12,7 +12,11 @@
  */
 
 // Elements that can execute code or load an unrelated document.
-const FORBIDDEN_TAGS = ["script", "iframe", "object", "embed", "base", "link", "meta", "form"];
+const FORBIDDEN_TAGS = ["script", "object", "embed", "base", "link", "meta"];
+
+// Maps are part of the standard business page, so an iframe is allowed when it
+// points at Google's embed endpoint and nothing else.
+const ALLOWED_IFRAME_SRC = /^https:\/\/(?:www\.|maps\.)?google\.com\/maps[?/][^"']*$/i;
 
 function stripTag(html: string, tag: string): string {
   // Paired form, including anything nested inside.
@@ -22,10 +26,33 @@ function stripTag(html: string, tag: string): string {
   return html.replace(paired, "").replace(single, "");
 }
 
+// Drop every iframe whose src is not an allowed map embed.
+function filterIframes(html: string): string {
+  return html.replace(/<iframe\b[^>]*>(?:[\s\S]*?<\/iframe\s*>)?/gi, (tag) => {
+    const src = /\bsrc\s*=\s*["']([^"']*)["']/i.exec(tag)?.[1] ?? "";
+    // &amp; survives HTML-escaping of the query string; compare the decoded form.
+    return ALLOWED_IFRAME_SRC.test(src.replace(/&amp;/g, "&")) ? tag : "";
+  });
+}
+
+// Forms stay — the contact form is core to the page — but they must not be
+// able to post anywhere. With no action/method they can only be handled by
+// our own submit handler on the published page.
+function neutraliseForms(html: string): string {
+  return html.replace(/<form\b[^>]*>/gi, (tag) =>
+    tag
+      .replace(/\s(action|method|target|enctype)\s*=\s*"[^"]*"/gi, "")
+      .replace(/\s(action|method|target|enctype)\s*=\s*'[^']*'/gi, "")
+      .replace(/\s(action|method|target|enctype)\s*=\s*[^\s>]+/gi, ""),
+  );
+}
+
 export function sanitizeSiteHtml(html: string): string {
   let clean = html;
 
   for (const tag of FORBIDDEN_TAGS) clean = stripTag(clean, tag);
+  clean = filterIframes(clean);
+  clean = neutraliseForms(clean);
 
   // Inline handlers: onclick="…", onerror='…', onload=… (unquoted).
   clean = clean
