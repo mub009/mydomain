@@ -62,7 +62,12 @@ function humanizeFieldPath(path: string): string {
 
 export function apiErrorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {
-    const apiError = (error.response?.data as any)?.error;
+    // The request never reached the server (backend down, wrong port, offline).
+    if (!error.response) {
+      return "Could not reach the server. Check that the backend is running.";
+    }
+
+    const apiError = (error.response.data as any)?.error;
     // Validation errors carry per-field issues — surface which field failed
     // instead of the generic "Request validation failed".
     const issues = apiError?.details?.issues;
@@ -73,7 +78,19 @@ export function apiErrorMessage(error: unknown): string {
         )
         .join(" · ");
     }
-    return apiError?.message ?? error.message;
+
+    if (apiError?.message) {
+      // In development the server attaches the underlying reason; showing it
+      // saves a trip to the logs when something unexpected breaks.
+      const reason = apiError.details?.reason ?? apiError.details?.hint;
+      return reason && reason !== apiError.message ? `${apiError.message} (${reason})` : apiError.message;
+    }
+    return `Request failed (${error.response.status}). Check the backend logs.`;
   }
-  return "Something went wrong";
+
+  // Not an HTTP failure — a bug in our own code. Log it so it is findable
+  // instead of vanishing behind a generic message.
+  // eslint-disable-next-line no-console
+  console.error("Unexpected client error:", error);
+  return error instanceof Error ? `Unexpected error: ${error.message}` : "An unexpected error occurred";
 }
