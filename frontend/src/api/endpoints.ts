@@ -11,6 +11,7 @@ import {
   PopularCity,
   Review,
   Rfq,
+  UserRole,
 } from "@/types";
 
 export const authApi = {
@@ -95,8 +96,22 @@ export const usersApi = {
     api.get<PaginatedResponse<AdminUser>>("/users/created", { params }).then((r) => r.data),
 };
 
+export interface CreatorReportRow {
+  creator: { id: string; firstName: string; lastName: string; email: string; role: UserRole } | null;
+  businessCount: number;
+  publishedCount: number;
+}
+
+export interface CreatorReport {
+  items: CreatorReportRow[];
+  totalBusinesses: number;
+  dealerBusinessCount: number;
+}
+
 export const adminApi = {
   stats: () => api.get<ApiResponse<Record<string, number>>>("/admin/stats").then((r) => r.data.data),
+  businessCreatorsReport: () =>
+    api.get<ApiResponse<CreatorReport>>("/admin/reports/business-creators").then((r) => r.data.data),
 
   // Approvals
   pendingBusinesses: () => api.get<PaginatedResponse<Business>>("/admin/businesses/pending").then((r) => r.data),

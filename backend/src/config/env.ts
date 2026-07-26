@@ -13,6 +13,12 @@ const envSchema = z.object({
   JWT_REFRESH_TTL: z.string().default("30d"),
   STRIPE_SECRET_KEY: z.string().optional().default(""),
   STRIPE_WEBHOOK_SECRET: z.string().optional().default(""),
+  // Outgoing email. Without SMTP_HOST, emails are logged instead of sent.
+  SMTP_HOST: z.string().optional().default(""),
+  SMTP_PORT: z.coerce.number().default(587),
+  SMTP_USER: z.string().optional().default(""),
+  SMTP_PASS: z.string().optional().default(""),
+  MAIL_FROM: z.string().default("Markkito <no-reply@markkito.com>"),
 });
 
 const parsed = envSchema.safeParse(process.env);

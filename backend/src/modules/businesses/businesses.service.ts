@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import { BusinessStatus, UserRole, UserStatus } from "@prisma/client";
 import { prisma } from "@/config/database";
 import { AppError } from "@/common/errors";
+import { sendBusinessWelcomeEmail } from "@/common/mailer";
 import { parsePagination } from "@/common/pagination";
 
 interface Actor {
@@ -28,16 +29,23 @@ export async function createBusiness(actor: Actor, data: Record<string, unknown>
   const category = await prisma.category.findUnique({ where: { id: businessData.categoryId as string } });
   if (!category) throw AppError.badRequest("Invalid categoryId");
 
+  // Listings registered by staff (dealer/admin) go live immediately —
+  // dealers vouch for the businesses they onboard. Self-registered owners
+  // still go through admin approval.
+  const isStaff = actor.role === UserRole.DEALER || actor.role === UserRole.ADMIN;
+  const initialStatus = isStaff ? BusinessStatus.PUBLISHED : BusinessStatus.PENDING_APPROVAL;
+
   // Plain owners always own their listings. Dealers and admins may instead
   // supply a login for the business's own team; the listing is then assigned
   // to that account so the business can sign in and manage it themselves.
-  const canAssignOwner = actor.role === UserRole.DEALER || actor.role === UserRole.ADMIN;
-  if (!owner || !canAssignOwner) {
+  if (!owner || !isStaff) {
     return prisma.business.create({
       data: {
         ...(businessData as any),
         ownerId: actor.sub,
-        status: BusinessStatus.PENDING_APPROVAL,
+        createdById: actor.sub,
+        status: initialStatus,
+        isVerified: isStaff,
       },
     });
   }
@@ -53,7 +61,7 @@ export async function createBusiness(actor: Actor, data: Record<string, unknown>
     }
   }
 
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     let ownerRecord = existing;
 
     if (ownerRecord) {
@@ -83,7 +91,9 @@ export async function createBusiness(actor: Actor, data: Record<string, unknown>
       data: {
         ...(businessData as any),
         ownerId: ownerRecord.id,
-        status: BusinessStatus.PENDING_APPROVAL,
+        createdById: actor.sub,
+        status: initialStatus,
+        isVerified: isStaff,
       },
     });
 
@@ -91,6 +101,18 @@ export async function createBusiness(actor: Actor, data: Record<string, unknown>
     // can show the credentials) or an existing account was linked.
     return { ...business, ownerAccount: { email: ownerRecord.email, created: !existing } };
   });
+
+  // Welcome the business team by email (with their login when a fresh
+  // account was created). Fire-and-forget — never blocks the request.
+  sendBusinessWelcomeEmail({
+    userId: result.ownerId,
+    to: result.ownerAccount.email,
+    firstName: owner.firstName,
+    businessName: result.name,
+    password: result.ownerAccount.created ? owner.password : undefined,
+  });
+
+  return result;
 }
 
 export async function listBusinesses(query: { page?: number; pageSize?: number; categoryId?: string; city?: string; status?: string }) {

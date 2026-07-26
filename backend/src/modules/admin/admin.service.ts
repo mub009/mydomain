@@ -204,6 +204,39 @@ export async function reassignBusiness(businessId: string, newOwnerId: string) {
   });
 }
 
+// Who registered listings on the platform (dealers, admins, self-registered
+// owners) and how many, most active first.
+export async function getBusinessCreatorsReport() {
+  const [groups, publishedGroups] = await Promise.all([
+    prisma.business.groupBy({ by: ["createdById"], _count: { _all: true } }),
+    prisma.business.groupBy({ by: ["createdById"], where: { status: BusinessStatus.PUBLISHED }, _count: { _all: true } }),
+  ]);
+
+  const creatorIds = groups.map((g) => g.createdById).filter((id): id is string => !!id);
+  const creators = await prisma.user.findMany({
+    where: { id: { in: creatorIds } },
+    select: { id: true, firstName: true, lastName: true, email: true, role: true },
+  });
+  const creatorById = new Map(creators.map((c) => [c.id, c]));
+  const publishedById = new Map(publishedGroups.map((g) => [g.createdById, g._count._all]));
+
+  const items = groups
+    .map((g) => ({
+      creator: g.createdById ? (creatorById.get(g.createdById) ?? null) : null,
+      businessCount: g._count._all,
+      publishedCount: publishedById.get(g.createdById) ?? 0,
+    }))
+    .sort((a, b) => b.businessCount - a.businessCount);
+
+  return {
+    items,
+    totalBusinesses: items.reduce((sum, i) => sum + i.businessCount, 0),
+    dealerBusinessCount: items
+      .filter((i) => i.creator?.role === UserRole.DEALER)
+      .reduce((sum, i) => sum + i.businessCount, 0),
+  };
+}
+
 export async function getPlatformStats() {
   const [userCount, dealerCount, businessCount, publishedBusinessCount, pendingBusinessCount, reviewCount, leadCount, bookingCount, openRfqCount] =
     await Promise.all([

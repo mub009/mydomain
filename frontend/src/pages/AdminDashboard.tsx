@@ -14,7 +14,7 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { adminApi, categoriesApi } from "@/api/endpoints";
+import { adminApi, categoriesApi, CreatorReport } from "@/api/endpoints";
 import { apiErrorMessage } from "@/api/client";
 import {
   AdminUser,
@@ -29,7 +29,7 @@ import {
 import Modal from "@/components/Modal";
 import ResetPasswordModal from "@/components/ResetPasswordModal";
 
-const TABS = ["Overview", "Users", "Businesses", "Approvals"] as const;
+const TABS = ["Overview", "Users", "Businesses", "Approvals", "Reports"] as const;
 type Tab = (typeof TABS)[number];
 
 const ROLES: UserRole[] = ["CUSTOMER", "BUSINESS_OWNER", "DEALER", "ADMIN"];
@@ -146,6 +146,7 @@ export default function AdminDashboard() {
       {tab === "Users" && <UsersPanel onChanged={() => adminApi.stats().then(setStats)} />}
       {tab === "Businesses" && <BusinessesPanel categories={categories} onChanged={() => adminApi.stats().then(setStats)} />}
       {tab === "Approvals" && <ApprovalsPanel onChanged={() => adminApi.stats().then(setStats)} />}
+      {tab === "Reports" && <ReportsPanel />}
     </div>
   );
 }
@@ -641,6 +642,88 @@ function ReassignModal({ business, onClose, onSaved }: { business: Business; onC
         {list.length === 0 && <div className="p-6 text-center text-sm text-ink-500">No eligible owners found.</div>}
       </div>
     </Modal>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Reports panel — who registered listings, and how many
+// ---------------------------------------------------------------------------
+
+function ReportsPanel() {
+  const [report, setReport] = useState<CreatorReport | null>(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    adminApi
+      .businessCreatorsReport()
+      .then(setReport)
+      .catch((e) => setError(apiErrorMessage(e)));
+  }, []);
+
+  if (error) return <p className="text-sm text-red-700 bg-red-50 rounded-md px-3 py-2">{error}</p>;
+  if (!report) return <div className="card p-8 text-center text-sm text-ink-500">Loading report…</div>;
+
+  return (
+    <div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-5">
+        <div className="card p-4">
+          <p className="text-2xl font-extrabold text-ink-900 leading-none">{report.totalBusinesses}</p>
+          <p className="text-xs text-ink-500 mt-1">Total businesses</p>
+        </div>
+        <div className="card p-4">
+          <p className="text-2xl font-extrabold text-violet-700 leading-none">{report.dealerBusinessCount}</p>
+          <p className="text-xs text-ink-500 mt-1">Registered by dealers</p>
+        </div>
+        <div className="card p-4">
+          <p className="text-2xl font-extrabold text-ink-900 leading-none">{report.items.length}</p>
+          <p className="text-xs text-ink-500 mt-1">Active registrars</p>
+        </div>
+      </div>
+
+      <h3 className="font-bold text-ink-900 mb-3">Businesses registered, by creator</h3>
+      <div className="card overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-xs uppercase tracking-wide text-ink-400 border-b border-gray-100">
+              <th className="px-4 py-3 font-semibold">Created by</th>
+              <th className="px-4 py-3 font-semibold hidden sm:table-cell">Role</th>
+              <th className="px-4 py-3 font-semibold text-right">Businesses</th>
+              <th className="px-4 py-3 font-semibold text-right hidden sm:table-cell">Published</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {report.items.map((row, i) => (
+              <tr key={row.creator?.id ?? `unknown-${i}`}>
+                <td className="px-4 py-3">
+                  {row.creator ? (
+                    <div className="min-w-0">
+                      <p className="font-semibold text-ink-900 truncate">
+                        {row.creator.firstName} {row.creator.lastName}
+                      </p>
+                      <p className="text-xs text-ink-500 truncate">{row.creator.email}</p>
+                    </div>
+                  ) : (
+                    <span className="text-ink-400">Unknown / removed user</span>
+                  )}
+                </td>
+                <td className="px-4 py-3 hidden sm:table-cell">
+                  {row.creator && <span className={`badge ${roleBadge(row.creator.role)}`}>{row.creator.role.replace("_", " ")}</span>}
+                </td>
+                <td className="px-4 py-3 text-right font-bold text-ink-900">{row.businessCount}</td>
+                <td className="px-4 py-3 text-right text-emerald-700 hidden sm:table-cell">{row.publishedCount}</td>
+              </tr>
+            ))}
+            {report.items.length === 0 && (
+              <tr>
+                <td colSpan={4} className="px-4 py-8 text-center text-ink-500">
+                  No businesses registered yet.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 }
 

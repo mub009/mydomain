@@ -17,6 +17,10 @@ export async function createUserHandler(req: Request, res: Response): Promise<vo
   created(res, await adminService.createUser(req.body, req.user?.sub));
 }
 
+export async function businessCreatorsReportHandler(_req: Request, res: Response): Promise<void> {
+  ok(res, await adminService.getBusinessCreatorsReport());
+}
+
 export async function updateUserHandler(req: Request, res: Response): Promise<void> {
   ok(res, await adminService.updateUser(req.params.id, req.body));
 }

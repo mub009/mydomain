@@ -76,8 +76,8 @@ function OwnerCredsCard({ creds, onDismiss }: { creds: OwnerCreds; onDismiss: ()
       </div>
       <p className="text-xs text-emerald-700/90 mt-1 mb-3">
         {creds.created
-          ? "Share these with the business team so they can sign in and manage their listing. The password won't be shown again."
-          : "This listing was linked to an existing account — the business team signs in with the email below and their existing password."}
+          ? "A welcome email with these login details has been sent to the owner. You can also share them directly — the password won't be shown here again."
+          : "This listing was linked to an existing account — the business team signs in with the email below and their existing password. A welcome email has been sent."}
       </p>
       <div className="space-y-2.5">
         <CopyField label="Username (email)" value={creds.username} />
@@ -221,7 +221,7 @@ export default function OwnerDashboard() {
       if (assignOwner) {
         // The listing belongs to the business team's account now — surface
         // the login so the dealer can hand it over.
-        setNotice("Business created and assigned to the business team's account. It's pending admin approval.");
+        setNotice("Business created, published, and assigned to the business team's account. Their login has also been emailed to them.");
         setOwnerCreds({
           businessName: created.name,
           username: created.ownerAccount?.email ?? ownerAccount.email,

@@ -43,6 +43,7 @@ model User {
   createdById     String?    @db.VarChar(36) // staff member (dealer/admin) who created this account
   createdBy       User?      @relation("UserCreator", fields: [createdById], references: [id])
   createdUsers    User[]     @relation("UserCreator")
+  createdBusinesses Business[] @relation("BusinessCreator")
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
 
@@ -57,6 +58,7 @@ model User {
   notifications Notification[]
 
   @@index([role])
+  @@index([createdById])
   @@map("users")
 }
 
@@ -112,6 +114,8 @@ model Business {
   id               String           @id @default(uuid()) @db.VarChar(36)
   ownerId          String           @db.VarChar(36)
   owner            User             @relation("BusinessOwner", fields: [ownerId], references: [id])
+  createdById      String?          @db.VarChar(36) // who registered this listing (dealer/admin/owner)
+  createdBy        User?            @relation("BusinessCreator", fields: [createdById], references: [id])
   name             String
   slug             String           @unique
   description      String?          @db.Text
@@ -157,6 +161,7 @@ model Business {
   @@index([categoryId])
   @@index([city, state])
   @@index([status])
+  @@index([createdById])
   @@map("businesses")
 }
 

@@ -5,6 +5,7 @@ import { validate } from "@/middleware/validate";
 import { requireAuth, requireRole } from "@/middleware/auth";
 import {
   approveBusinessHandler,
+  businessCreatorsReportHandler,
   createUserHandler,
   listAllBusinessesHandler,
   listPendingBusinessesHandler,
@@ -30,6 +31,7 @@ export const adminRouter = Router();
 adminRouter.use(requireAuth, requireRole(UserRole.ADMIN));
 
 adminRouter.get("/stats", asyncHandler(platformStatsHandler));
+adminRouter.get("/reports/business-creators", asyncHandler(businessCreatorsReportHandler));
 
 // Users
 adminRouter.get("/users", validate({ query: listUsersQuerySchema }), asyncHandler(listUsersHandler));
