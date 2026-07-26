@@ -20,6 +20,7 @@ import { apiErrorMessage } from "@/api/client";
 import { AdminUser, Business, Category, Lead, Booking, Privilege } from "@/types";
 import { useAuthStore } from "@/store/authStore";
 import BusinessManager from "@/components/BusinessManager";
+import Pagination from "@/components/Pagination";
 import ResetPasswordModal, { CopyField, generatePassword } from "@/components/ResetPasswordModal";
 
 function StatCard({
@@ -123,6 +124,11 @@ export default function OwnerDashboard() {
   const [selectedBusinessId, setSelectedBusinessId] = useState<string>("");
   const [leads, setLeads] = useState<Lead[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [bizPage, setBizPage] = useState(1);
+  const [leadsPage, setLeadsPage] = useState(1);
+  const [leadsTotalPages, setLeadsTotalPages] = useState(1);
+  const [bookingsPage, setBookingsPage] = useState(1);
+  const [bookingsTotalPages, setBookingsTotalPages] = useState(1);
   const [notice, setNotice] = useState("");
   const [createError, setCreateError] = useState("");
   const [manageId, setManageId] = useState<string | null>(null);
@@ -152,13 +158,18 @@ export default function OwnerDashboard() {
   // The business logins this dealer has handed out; they can reset those
   // passwords on the owner's behalf.
   const [createdAccounts, setCreatedAccounts] = useState<AdminUser[]>([]);
+  const [accountsPage, setAccountsPage] = useState(1);
+  const [accountsTotalPages, setAccountsTotalPages] = useState(1);
   const [resettingUser, setResettingUser] = useState<AdminUser | null>(null);
 
-  function loadCreatedAccounts() {
+  function loadCreatedAccounts(page = accountsPage) {
     if (!isDealer) return;
     usersApi
-      .created()
-      .then((r) => setCreatedAccounts(r.data))
+      .created({ page })
+      .then((r) => {
+        setCreatedAccounts(r.data);
+        setAccountsTotalPages(r.meta.totalPages);
+      })
       .catch(() => undefined);
   }
 
@@ -187,9 +198,28 @@ export default function OwnerDashboard() {
 
   useEffect(() => {
     if (!selectedBusinessId) return;
-    if (tab === "leads") leadsApi.listForBusiness(selectedBusinessId).then((r) => setLeads(r.data));
-    if (tab === "bookings") bookingsApi.forBusiness(selectedBusinessId).then((r) => setBookings(r.data));
-  }, [tab, selectedBusinessId]);
+    if (tab === "leads")
+      leadsApi.listForBusiness(selectedBusinessId, { page: leadsPage }).then((r) => {
+        setLeads(r.data);
+        setLeadsTotalPages(r.meta.totalPages);
+      });
+    if (tab === "bookings")
+      bookingsApi.forBusiness(selectedBusinessId, { page: bookingsPage }).then((r) => {
+        setBookings(r.data);
+        setBookingsTotalPages(r.meta.totalPages);
+      });
+  }, [tab, selectedBusinessId, leadsPage, bookingsPage]);
+
+  // Switching business starts both lists from their first page.
+  useEffect(() => {
+    setLeadsPage(1);
+    setBookingsPage(1);
+  }, [selectedBusinessId]);
+
+  useEffect(() => {
+    loadCreatedAccounts(accountsPage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accountsPage]);
 
   async function createBusiness(e: React.FormEvent) {
     e.preventDefault();
@@ -242,12 +272,12 @@ export default function OwnerDashboard() {
 
   async function updateLead(leadId: string, status: string) {
     await leadsApi.updateStatus(leadId, status);
-    if (selectedBusinessId) leadsApi.listForBusiness(selectedBusinessId).then((r) => setLeads(r.data));
+    if (selectedBusinessId) leadsApi.listForBusiness(selectedBusinessId, { page: leadsPage }).then((r) => setLeads(r.data));
   }
 
   async function updateBooking(bookingId: string, status: string) {
     await bookingsApi.updateStatus(bookingId, status);
-    if (selectedBusinessId) bookingsApi.forBusiness(selectedBusinessId).then((r) => setBookings(r.data));
+    if (selectedBusinessId) bookingsApi.forBusiness(selectedBusinessId, { page: bookingsPage }).then((r) => setBookings(r.data));
   }
 
   return (
@@ -406,7 +436,7 @@ export default function OwnerDashboard() {
           )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {businesses.map((b) => (
+            {businesses.slice((bizPage - 1) * 8, bizPage * 8).map((b) => (
               <div key={b.id} className="card p-4 flex flex-col">
                 <div className="flex items-start justify-between gap-2">
                   <p className="font-semibold text-ink-900">{b.name}</p>
@@ -426,6 +456,7 @@ export default function OwnerDashboard() {
               </div>
             )}
           </div>
+          <Pagination page={bizPage} totalPages={Math.ceil(businesses.length / 8) || 1} onChange={setBizPage} />
 
           {isDealer && createdAccounts.length > 0 && (
             <div className="mt-8">
@@ -456,6 +487,7 @@ export default function OwnerDashboard() {
                   </div>
                 ))}
               </div>
+              <Pagination page={accountsPage} totalPages={accountsTotalPages} onChange={setAccountsPage} />
             </div>
           )}
 
@@ -501,6 +533,7 @@ export default function OwnerDashboard() {
                 </div>
               ))}
               {leads.length === 0 && <div className="card p-6 text-center text-sm text-ink-500">No leads yet.</div>}
+              <Pagination page={leadsPage} totalPages={leadsTotalPages} onChange={setLeadsPage} />
             </div>
           )}
 
@@ -526,6 +559,7 @@ export default function OwnerDashboard() {
                 </div>
               ))}
               {bookings.length === 0 && <div className="card p-6 text-center text-sm text-ink-500">No bookings yet.</div>}
+              <Pagination page={bookingsPage} totalPages={bookingsTotalPages} onChange={setBookingsPage} />
             </div>
           )}
         </div>

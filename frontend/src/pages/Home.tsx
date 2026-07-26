@@ -8,6 +8,7 @@ import StarRating from "@/components/StarRating";
 import PromoCarousel from "@/components/PromoCarousel";
 import CategoryShowcase from "@/components/CategoryShowcase";
 import LocationInput from "@/components/LocationInput";
+import Pagination from "@/components/Pagination";
 import { getCategoryIcon } from "@/lib/categoryIcons";
 import { CATEGORY_SHOWCASE } from "@/data/categoryShowcase";
 
@@ -26,6 +27,8 @@ export default function Home() {
   const [categorySlug, setCategorySlug] = useState("");
   const [categories, setCategories] = useState<Category[]>([]);
   const [results, setResults] = useState<Business[]>([]);
+  const [page, setPage] = useState(1);
+  const [resultMeta, setResultMeta] = useState({ total: 0, totalPages: 1 });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
@@ -54,10 +57,17 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function runSearch(e?: React.FormEvent, overrideCategory?: string, overrideQuery?: string, overrideGeo?: GeoPoint | null) {
+  async function runSearch(
+    e?: React.FormEvent,
+    overrideCategory?: string,
+    overrideQuery?: string,
+    overrideGeo?: GeoPoint | null,
+    pageArg = 1,
+  ) {
     e?.preventDefault();
     setLoading(true);
     setError("");
+    setPage(pageArg);
     const activeGeo = overrideGeo !== undefined ? overrideGeo : geo;
     try {
       const res = await searchApi.search({
@@ -67,13 +77,20 @@ export default function Home() {
         lng: activeGeo?.lng,
         sort: activeGeo ? "distance" : "rating",
         categorySlug: overrideCategory ?? categorySlug ?? undefined,
+        page: pageArg,
       });
       setResults(res.data);
+      setResultMeta({ total: res.meta.total, totalPages: res.meta.totalPages });
     } catch (err) {
       setError(apiErrorMessage(err));
     } finally {
       setLoading(false);
     }
+  }
+
+  function goToPage(nextPage: number) {
+    runSearch(undefined, undefined, undefined, undefined, nextPage);
+    document.getElementById("results")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   function handleCityChange(next: string) {
@@ -168,7 +185,7 @@ export default function Home() {
             <TrendingUp size={18} className="text-brand-600" />
             {geo ? "Businesses near you" : "Top rated businesses"}
           </h2>
-          {results.length > 0 && <span className="text-sm text-ink-500">{results.length} results</span>}
+          {resultMeta.total > 0 && <span className="text-sm text-ink-500">{resultMeta.total} results</span>}
         </div>
 
         {error && <p className="text-red-600 mb-4">{error}</p>}
@@ -218,6 +235,7 @@ export default function Home() {
             )}
           </div>
         )}
+        {!loading && <Pagination page={page} totalPages={resultMeta.totalPages} onChange={goToPage} />}
       </section>
     </div>
   );

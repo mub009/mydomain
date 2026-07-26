@@ -208,9 +208,13 @@ export async function reassignBusiness(businessId: string, newOwnerId: string) {
 // and how many, most active first. Owners registering their own business are
 // not part of this report.
 export async function getBusinessCreatorsReport() {
-  const [groups, publishedGroups] = await Promise.all([
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+
+  const [groups, publishedGroups, todayGroups] = await Promise.all([
     prisma.business.groupBy({ by: ["createdById"], _count: { _all: true } }),
     prisma.business.groupBy({ by: ["createdById"], where: { status: BusinessStatus.PUBLISHED }, _count: { _all: true } }),
+    prisma.business.groupBy({ by: ["createdById"], where: { createdAt: { gte: startOfToday } }, _count: { _all: true } }),
   ]);
 
   const creatorIds = groups.map((g) => g.createdById).filter((id): id is string => !!id);
@@ -220,6 +224,7 @@ export async function getBusinessCreatorsReport() {
   });
   const creatorById = new Map(creators.map((c) => [c.id, c]));
   const publishedById = new Map(publishedGroups.map((g) => [g.createdById, g._count._all]));
+  const todayById = new Map(todayGroups.map((g) => [g.createdById, g._count._all]));
 
   const items = groups
     .filter((g) => g.createdById && creatorById.has(g.createdById))
@@ -227,6 +232,7 @@ export async function getBusinessCreatorsReport() {
       creator: creatorById.get(g.createdById as string)!,
       businessCount: g._count._all,
       publishedCount: publishedById.get(g.createdById) ?? 0,
+      todayCount: todayById.get(g.createdById) ?? 0,
     }))
     .sort((a, b) => b.businessCount - a.businessCount);
 
@@ -236,6 +242,8 @@ export async function getBusinessCreatorsReport() {
     dealerBusinessCount: items
       .filter((i) => i.creator.role === UserRole.DEALER)
       .reduce((sum, i) => sum + i.businessCount, 0),
+    registeredToday: todayGroups.reduce((sum, g) => sum + g._count._all, 0),
+    dealerRegisteredToday: items.reduce((sum, i) => sum + (i.creator.role === UserRole.DEALER ? i.todayCount : 0), 0),
   };
 }
 

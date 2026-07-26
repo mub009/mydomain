@@ -5,6 +5,7 @@ import { b2bApi, categoriesApi } from "@/api/endpoints";
 import { apiErrorMessage } from "@/api/client";
 import { Category, Rfq } from "@/types";
 import { useAuthStore } from "@/store/authStore";
+import Pagination from "@/components/Pagination";
 
 const RFQ_STATUS_CLASS: Record<string, string> = {
   OPEN: "bg-emerald-50 text-emerald-700",
@@ -17,6 +18,8 @@ const RFQ_STATUS_CLASS: Record<string, string> = {
 export default function B2BMarketplace() {
   const user = useAuthStore((s) => s.user);
   const [rfqs, setRfqs] = useState<Rfq[]>([]);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [categories, setCategories] = useState<Category[]>([]);
   const [notice, setNotice] = useState("");
   const [form, setForm] = useState({
@@ -29,11 +32,18 @@ export default function B2BMarketplace() {
   });
 
   function load() {
-    b2bApi.list().then((r) => setRfqs(r.data));
+    b2bApi.list({ page }).then((r) => {
+      setRfqs(r.data);
+      setTotalPages(r.meta.totalPages);
+    });
   }
 
   useEffect(() => {
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page]);
+
+  useEffect(() => {
     categoriesApi.list().then(setCategories);
   }, []);
 
@@ -84,6 +94,7 @@ export default function B2BMarketplace() {
                 No open RFQs right now.
               </div>
             )}
+            <Pagination page={page} totalPages={totalPages} onChange={setPage} />
           </div>
         </div>
 

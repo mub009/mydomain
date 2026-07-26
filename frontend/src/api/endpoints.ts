@@ -61,8 +61,8 @@ export const reviewsApi = {
 export const leadsApi = {
   create: (businessId: string, payload: { name: string; phone: string; email?: string; message?: string; source?: string }) =>
     api.post<ApiResponse<Lead>>(`/businesses/${businessId}/leads`, payload).then((r) => r.data.data),
-  listForBusiness: (businessId: string) =>
-    api.get<PaginatedResponse<Lead>>(`/businesses/${businessId}/leads`).then((r) => r.data),
+  listForBusiness: (businessId: string, params: Record<string, unknown> = {}) =>
+    api.get<PaginatedResponse<Lead>>(`/businesses/${businessId}/leads`, { params }).then((r) => r.data),
   updateStatus: (leadId: string, status: string) =>
     api.patch<ApiResponse<Lead>>(`/leads/${leadId}/status`, { status }).then((r) => r.data.data),
 };
@@ -71,8 +71,8 @@ export const bookingsApi = {
   create: (businessId: string, payload: { serviceId: string; scheduledAt: string; notes?: string }) =>
     api.post<ApiResponse<Booking>>(`/businesses/${businessId}/bookings`, payload).then((r) => r.data.data),
   mine: () => api.get<PaginatedResponse<Booking>>("/bookings/mine").then((r) => r.data),
-  forBusiness: (businessId: string) =>
-    api.get<PaginatedResponse<Booking>>(`/businesses/${businessId}/bookings`).then((r) => r.data),
+  forBusiness: (businessId: string, params: Record<string, unknown> = {}) =>
+    api.get<PaginatedResponse<Booking>>(`/businesses/${businessId}/bookings`, { params }).then((r) => r.data),
   updateStatus: (bookingId: string, status: string) =>
     api.patch<ApiResponse<Booking>>(`/bookings/${bookingId}/status`, { status }).then((r) => r.data.data),
 };
@@ -100,12 +100,15 @@ export interface CreatorReportRow {
   creator: { id: string; firstName: string; lastName: string; email: string; role: UserRole } | null;
   businessCount: number;
   publishedCount: number;
+  todayCount: number;
 }
 
 export interface CreatorReport {
   items: CreatorReportRow[];
   totalBusinesses: number;
   dealerBusinessCount: number;
+  registeredToday: number;
+  dealerRegisteredToday: number;
 }
 
 export const adminApi = {
@@ -114,7 +117,8 @@ export const adminApi = {
     api.get<ApiResponse<CreatorReport>>("/admin/reports/business-creators").then((r) => r.data.data),
 
   // Approvals
-  pendingBusinesses: () => api.get<PaginatedResponse<Business>>("/admin/businesses/pending").then((r) => r.data),
+  pendingBusinesses: (params: Record<string, unknown> = {}) =>
+    api.get<PaginatedResponse<Business>>("/admin/businesses/pending", { params }).then((r) => r.data),
   approve: (id: string) => api.post(`/admin/businesses/${id}/approve`).then((r) => r.data.data),
   reject: (id: string) => api.post(`/admin/businesses/${id}/reject`).then((r) => r.data.data),
   suspend: (id: string) => api.post(`/admin/businesses/${id}/suspend`).then((r) => r.data.data),

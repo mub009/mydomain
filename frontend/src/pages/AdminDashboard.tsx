@@ -27,6 +27,7 @@ import {
   UserStatus,
 } from "@/types";
 import Modal from "@/components/Modal";
+import Pagination from "@/components/Pagination";
 import ResetPasswordModal from "@/components/ResetPasswordModal";
 
 const TABS = ["Overview", "Users", "Businesses", "Approvals", "Reports"] as const;
@@ -159,6 +160,8 @@ function UsersPanel({ onChanged }: { onChanged: () => void }) {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [editing, setEditing] = useState<AdminUser | null>(null);
   const [resetting, setResetting] = useState<AdminUser | null>(null);
   const [creating, setCreating] = useState(false);
@@ -166,8 +169,11 @@ function UsersPanel({ onChanged }: { onChanged: () => void }) {
 
   function load() {
     adminApi
-      .users({ search: search || undefined, role: roleFilter || undefined })
-      .then((r) => setUsers(r.data))
+      .users({ search: search || undefined, role: roleFilter || undefined, page })
+      .then((r) => {
+        setUsers(r.data);
+        setTotalPages(r.meta.totalPages);
+      })
       .catch((e) => setError(apiErrorMessage(e)));
   }
 
@@ -175,6 +181,11 @@ function UsersPanel({ onChanged }: { onChanged: () => void }) {
     const id = setTimeout(load, 250);
     return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search, roleFilter, page]);
+
+  // New search/filter always starts from the first page.
+  useEffect(() => {
+    setPage(1);
   }, [search, roleFilter]);
 
   return (
@@ -235,6 +246,7 @@ function UsersPanel({ onChanged }: { onChanged: () => void }) {
         ))}
         {users.length === 0 && <div className="p-8 text-center text-sm text-ink-500">No users found.</div>}
       </div>
+      <Pagination page={page} totalPages={totalPages} onChange={setPage} />
 
       {editing && (
         <UserEditModal
@@ -386,14 +398,19 @@ function BusinessesPanel({ categories, onChanged }: { categories: Category[]; on
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [editing, setEditing] = useState<Business | null>(null);
   const [reassigning, setReassigning] = useState<Business | null>(null);
   const [error, setError] = useState("");
 
   function load() {
     adminApi
-      .businesses({ search: search || undefined, status: statusFilter || undefined })
-      .then((r) => setBusinesses(r.data))
+      .businesses({ search: search || undefined, status: statusFilter || undefined, page })
+      .then((r) => {
+        setBusinesses(r.data);
+        setTotalPages(r.meta.totalPages);
+      })
       .catch((e) => setError(apiErrorMessage(e)));
   }
 
@@ -401,6 +418,10 @@ function BusinessesPanel({ categories, onChanged }: { categories: Category[]; on
     const id = setTimeout(load, 250);
     return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search, statusFilter, page]);
+
+  useEffect(() => {
+    setPage(1);
   }, [search, statusFilter]);
 
   async function quickAction(id: string, action: "approve" | "reject" | "suspend") {
@@ -475,6 +496,7 @@ function BusinessesPanel({ categories, onChanged }: { categories: Category[]; on
         ))}
         {businesses.length === 0 && <div className="card p-8 text-center text-sm text-ink-500">No businesses found.</div>}
       </div>
+      <Pagination page={page} totalPages={totalPages} onChange={setPage} />
 
       {editing && (
         <BusinessEditModal
@@ -649,8 +671,11 @@ function ReassignModal({ business, onClose, onSaved }: { business: Business; onC
 // Reports panel — who registered listings, and how many
 // ---------------------------------------------------------------------------
 
+const REPORT_PAGE_SIZE = 10;
+
 function ReportsPanel() {
   const [report, setReport] = useState<CreatorReport | null>(null);
+  const [page, setPage] = useState(1);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -663,9 +688,12 @@ function ReportsPanel() {
   if (error) return <p className="text-sm text-red-700 bg-red-50 rounded-md px-3 py-2">{error}</p>;
   if (!report) return <div className="card p-8 text-center text-sm text-ink-500">Loading report…</div>;
 
+  const totalPages = Math.ceil(report.items.length / REPORT_PAGE_SIZE) || 1;
+  const pageItems = report.items.slice((page - 1) * REPORT_PAGE_SIZE, page * REPORT_PAGE_SIZE);
+
   return (
     <div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-5">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
         <div className="card p-4">
           <p className="text-2xl font-extrabold text-ink-900 leading-none">{report.totalBusinesses}</p>
           <p className="text-xs text-ink-500 mt-1">Total businesses</p>
@@ -673,6 +701,10 @@ function ReportsPanel() {
         <div className="card p-4">
           <p className="text-2xl font-extrabold text-violet-700 leading-none">{report.dealerBusinessCount}</p>
           <p className="text-xs text-ink-500 mt-1">Registered by dealers</p>
+        </div>
+        <div className="card p-4 border-brand-200 bg-brand-50/40">
+          <p className="text-2xl font-extrabold text-brand-700 leading-none">{report.registeredToday}</p>
+          <p className="text-xs text-ink-500 mt-1">Registered today</p>
         </div>
         <div className="card p-4">
           <p className="text-2xl font-extrabold text-ink-900 leading-none">{report.items.length}</p>
@@ -688,11 +720,12 @@ function ReportsPanel() {
               <th className="px-4 py-3 font-semibold">Created by</th>
               <th className="px-4 py-3 font-semibold hidden sm:table-cell">Role</th>
               <th className="px-4 py-3 font-semibold text-right">Businesses</th>
+              <th className="px-4 py-3 font-semibold text-right">Today</th>
               <th className="px-4 py-3 font-semibold text-right hidden sm:table-cell">Published</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {report.items.map((row, i) => (
+            {pageItems.map((row, i) => (
               <tr key={row.creator?.id ?? `unknown-${i}`}>
                 <td className="px-4 py-3">
                   {row.creator ? (
@@ -710,12 +743,15 @@ function ReportsPanel() {
                   {row.creator && <span className={`badge ${roleBadge(row.creator.role)}`}>{row.creator.role.replace("_", " ")}</span>}
                 </td>
                 <td className="px-4 py-3 text-right font-bold text-ink-900">{row.businessCount}</td>
+                <td className="px-4 py-3 text-right font-semibold text-brand-700">
+                  {row.todayCount > 0 ? `+${row.todayCount}` : "—"}
+                </td>
                 <td className="px-4 py-3 text-right text-emerald-700 hidden sm:table-cell">{row.publishedCount}</td>
               </tr>
             ))}
             {report.items.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-ink-500">
+                <td colSpan={5} className="px-4 py-8 text-center text-ink-500">
                   No dealer-registered businesses yet.
                 </td>
               </tr>
@@ -723,6 +759,7 @@ function ReportsPanel() {
           </tbody>
         </table>
       </div>
+      <Pagination page={page} totalPages={totalPages} onChange={setPage} />
     </div>
   );
 }
@@ -733,11 +770,17 @@ function ReportsPanel() {
 
 function ApprovalsPanel({ onChanged }: { onChanged: () => void }) {
   const [pending, setPending] = useState<Business[]>([]);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
   function load() {
-    adminApi.pendingBusinesses().then((r) => setPending(r.data));
+    adminApi.pendingBusinesses({ page }).then((r) => {
+      setPending(r.data);
+      setTotalPages(r.meta.totalPages);
+    });
   }
-  useEffect(load, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(load, [page]);
 
   async function act(id: string, action: "approve" | "reject") {
     await adminApi[action](id);
@@ -767,6 +810,7 @@ function ApprovalsPanel({ onChanged }: { onChanged: () => void }) {
         </div>
       ))}
       {pending.length === 0 && <div className="card p-8 text-center text-sm text-ink-500">Nothing pending review.</div>}
+      <Pagination page={page} totalPages={totalPages} onChange={setPage} />
     </div>
   );
 }
