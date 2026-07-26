@@ -676,11 +676,11 @@ function ReportsPanel() {
         </div>
         <div className="card p-4">
           <p className="text-2xl font-extrabold text-ink-900 leading-none">{report.items.length}</p>
-          <p className="text-xs text-ink-500 mt-1">Active registrars</p>
+          <p className="text-xs text-ink-500 mt-1">Active dealers/admins</p>
         </div>
       </div>
 
-      <h3 className="font-bold text-ink-900 mb-3">Businesses registered, by creator</h3>
+      <h3 className="font-bold text-ink-900 mb-3">Businesses registered by dealers</h3>
       <div className="card overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
@@ -716,7 +716,7 @@ function ReportsPanel() {
             {report.items.length === 0 && (
               <tr>
                 <td colSpan={4} className="px-4 py-8 text-center text-ink-500">
-                  No businesses registered yet.
+                  No dealer-registered businesses yet.
                 </td>
               </tr>
             )}

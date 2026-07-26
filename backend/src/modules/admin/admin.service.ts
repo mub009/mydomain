@@ -204,8 +204,9 @@ export async function reassignBusiness(businessId: string, newOwnerId: string) {
   });
 }
 
-// Who registered listings on the platform (dealers, admins, self-registered
-// owners) and how many, most active first.
+// Staff registrations report: which dealers (and admins) registered listings
+// and how many, most active first. Owners registering their own business are
+// not part of this report.
 export async function getBusinessCreatorsReport() {
   const [groups, publishedGroups] = await Promise.all([
     prisma.business.groupBy({ by: ["createdById"], _count: { _all: true } }),
@@ -214,15 +215,16 @@ export async function getBusinessCreatorsReport() {
 
   const creatorIds = groups.map((g) => g.createdById).filter((id): id is string => !!id);
   const creators = await prisma.user.findMany({
-    where: { id: { in: creatorIds } },
+    where: { id: { in: creatorIds }, role: { in: [UserRole.DEALER, UserRole.ADMIN] } },
     select: { id: true, firstName: true, lastName: true, email: true, role: true },
   });
   const creatorById = new Map(creators.map((c) => [c.id, c]));
   const publishedById = new Map(publishedGroups.map((g) => [g.createdById, g._count._all]));
 
   const items = groups
+    .filter((g) => g.createdById && creatorById.has(g.createdById))
     .map((g) => ({
-      creator: g.createdById ? (creatorById.get(g.createdById) ?? null) : null,
+      creator: creatorById.get(g.createdById as string)!,
       businessCount: g._count._all,
       publishedCount: publishedById.get(g.createdById) ?? 0,
     }))
@@ -230,9 +232,9 @@ export async function getBusinessCreatorsReport() {
 
   return {
     items,
-    totalBusinesses: items.reduce((sum, i) => sum + i.businessCount, 0),
+    totalBusinesses: groups.reduce((sum, g) => sum + g._count._all, 0),
     dealerBusinessCount: items
-      .filter((i) => i.creator?.role === UserRole.DEALER)
+      .filter((i) => i.creator.role === UserRole.DEALER)
       .reduce((sum, i) => sum + i.businessCount, 0),
   };
 }
