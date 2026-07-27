@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Download, Plus, Printer, QrCode as QrIcon, Search, Unlink } from "lucide-react";
 import { adminApi } from "@/api/endpoints";
 import { apiErrorMessage } from "@/api/client";
-import { CHANNEL_LABELS, REVIEW_CHANNELS, ReviewChannel, ReviewQrCode, ReviewQrStatus } from "@/types";
+import { CHANNEL_LABELS, ReviewChannel, ReviewQrCode, ReviewQrStatus } from "@/types";
 import { ListSkeleton } from "@/components/Loading";
 import Modal from "@/components/Modal";
 import Pagination from "@/components/Pagination";
@@ -72,7 +72,7 @@ export default function QrCodesPanel() {
   const [notice, setNotice] = useState("");
 
   const [generating, setGenerating] = useState(false);
-  const [batchForm, setBatchForm] = useState({ count: "20", batchLabel: "", channel: "GOOGLE" as ReviewChannel | "" });
+  const [batchForm, setBatchForm] = useState({ count: "20", batchLabel: "" });
   const [showGenerate, setShowGenerate] = useState(false);
   const [printJob, setPrintJob] = useState<{ codes: string[]; purpose?: ReviewChannel | null } | null>(null);
 
@@ -106,14 +106,12 @@ export default function QrCodesPanel() {
     setError("");
     setNotice("");
     try {
-      const result = await adminApi.generateQrBatch(
-        Number(batchForm.count),
-        batchForm.batchLabel || undefined,
-        batchForm.channel || undefined,
-      );
+      // No purpose is set here: a blank board works for any shop, and what it
+      // points at is chosen by the dealer or shop when they attach it.
+      const result = await adminApi.generateQrBatch(Number(batchForm.count), batchForm.batchLabel || undefined);
       setNotice(`Generated ${result.created} new QR boards.`);
       setShowGenerate(false);
-      setPrintJob({ codes: result.codes, purpose: batchForm.channel || null });
+      setPrintJob({ codes: result.codes, purpose: null });
       load();
     } catch (err) {
       setError(apiErrorMessage(err));
@@ -251,8 +249,8 @@ export default function QrCodesPanel() {
         <Modal title="Generate QR boards" onClose={() => setShowGenerate(false)}>
           <form onSubmit={generate} className="space-y-3">
             <p className="text-sm text-ink-600">
-              Each board gets a unique code. Print them, hand them to shops, and they activate their own board by
-              scanning it.
+              Each board gets a unique code. Print them and hand them out — the dealer or shop chooses what the board
+              points at when they attach it to a listing.
             </p>
             <div>
               <label className="mb-1 block text-xs font-semibold text-ink-700">How many boards? (max 500)</label>
@@ -265,24 +263,6 @@ export default function QrCodesPanel() {
                 value={batchForm.count}
                 onChange={(e) => setBatchForm({ ...batchForm, count: e.target.value })}
               />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-semibold text-ink-700">What are these boards for?</label>
-              <select
-                className="input"
-                value={batchForm.channel}
-                onChange={(e) => setBatchForm({ ...batchForm, channel: e.target.value as ReviewChannel | "" })}
-              >
-                {REVIEW_CHANNELS.map((c) => (
-                  <option key={c.value} value={c.value}>
-                    {c.label}
-                  </option>
-                ))}
-                <option value="">Shop's own default</option>
-              </select>
-              <p className="mt-1 text-[11px] text-ink-400">
-                A scan opens this platform using the shop's own link. Shops can re-point their board later.
-              </p>
             </div>
             <div>
               <label className="mb-1 block text-xs font-semibold text-ink-700">Batch label (optional)</label>
