@@ -73,6 +73,8 @@ export default function BusinessManager({
     phone: "",
     email: "",
     website: "",
+    logoUrl: "",
+    coverImageUrl: "",
     addressLine1: "",
     addressLine2: "",
     city: "",
@@ -94,6 +96,8 @@ export default function BusinessManager({
       phone: b.phone,
       email: b.email ?? "",
       website: b.website ?? "",
+      logoUrl: b.logoUrl ?? "",
+      coverImageUrl: b.coverImageUrl ?? "",
       addressLine1: b.addressLine1 ?? "",
       addressLine2: b.addressLine2 ?? "",
       city: b.city,
@@ -134,6 +138,8 @@ export default function BusinessManager({
         longitude: Number(details.longitude),
         email: details.email || undefined,
         website: details.website || undefined,
+        logoUrl: details.logoUrl || undefined,
+        coverImageUrl: details.coverImageUrl || undefined,
         addressLine2: details.addressLine2 || undefined,
       });
       flash("Details saved.");
@@ -302,6 +308,53 @@ export default function BusinessManager({
             <div>
               <label className="block text-xs font-semibold text-ink-700 mb-1">Website</label>
               <input value={details.website} onChange={(e) => setDetails({ ...details, website: e.target.value })} className="input" placeholder="https://…" />
+            </div>
+          </div>
+
+          {/* Branding — the logo appears in the header of the business website */}
+          <div className="rounded-lg border border-gray-200 bg-gray-50/60 p-3">
+            <p className="mb-2 text-xs font-bold uppercase tracking-wide text-ink-500">Branding</p>
+            <div className="flex gap-3">
+              <div className="flex-1 space-y-3">
+                <div>
+                  <label className="block text-xs font-semibold text-ink-700 mb-1">Logo image URL</label>
+                  <input
+                    value={details.logoUrl}
+                    onChange={(e) => setDetails({ ...details, logoUrl: e.target.value })}
+                    className="input"
+                    placeholder="https://…/logo.png"
+                  />
+                  <p className="mt-1 text-[11px] text-ink-400">
+                    Shown in your website header and next to your name. Square images work best.
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-ink-700 mb-1">Cover image URL</label>
+                  <input
+                    value={details.coverImageUrl}
+                    onChange={(e) => setDetails({ ...details, coverImageUrl: e.target.value })}
+                    className="input"
+                    placeholder="https://…/cover.jpg"
+                  />
+                </div>
+              </div>
+              <div className="shrink-0 text-center">
+                <p className="mb-1 text-[11px] font-medium text-ink-500">Preview</p>
+                {details.logoUrl ? (
+                  <img
+                    src={details.logoUrl}
+                    alt="Logo preview"
+                    className="h-16 w-16 rounded-full border border-gray-200 object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.visibility = "hidden";
+                    }}
+                  />
+                ) : (
+                  <span className="flex h-16 w-16 items-center justify-center rounded-full bg-brand-600 text-2xl font-extrabold text-white">
+                    {(details.name.trim()[0] ?? "?").toUpperCase()}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
           <div>
