@@ -25,6 +25,102 @@ export function isKnownTemplate(templateId: string): boolean {
   return SITE_TEMPLATES.some((t) => t.id === templateId);
 }
 
+/**
+ * The palette each design contributes to a storefront. An eCommerce site is
+ * rendered by the app rather than authored in the builder — the cart and
+ * checkout have to actually run — so the template choice comes through as a
+ * theme instead of as markup.
+ */
+export interface StorefrontTheme {
+  accent: string;
+  accentAlt: string;
+  onAccent: string;
+  bg: string;
+  surface: string;
+  text: string;
+  muted: string;
+  line: string;
+  headerBg: string;
+  headerText: string;
+  radius: string;
+  font: string;
+  heading: string;
+  uppercase: boolean;
+}
+
+const SANS = 'system-ui,-apple-system,"Segoe UI",Roboto,sans-serif';
+
+const STOREFRONT_THEMES: Record<string, StorefrontTheme> = {
+  classic: {
+    accent: "#e11d2e",
+    accentAlt: "#b91626",
+    onAccent: "#ffffff",
+    bg: "#ffffff",
+    surface: "#f6f8fb",
+    text: "#12161c",
+    muted: "#6b7280",
+    line: "#e8edf3",
+    headerBg: "#ffffff",
+    headerText: "#12161c",
+    radius: "12px",
+    font: SANS,
+    heading: SANS,
+    uppercase: true,
+  },
+  modern: {
+    accent: "#f5b301",
+    accentAlt: "#ffc933",
+    onAccent: "#0d1015",
+    bg: "#0d1015",
+    surface: "#161b22",
+    text: "#e8edf4",
+    muted: "#9aa6b6",
+    line: "#242c37",
+    headerBg: "#0d1015",
+    headerText: "#ffffff",
+    radius: "12px",
+    font: SANS,
+    heading: SANS,
+    uppercase: true,
+  },
+  elegant: {
+    accent: "#b08d5a",
+    accentAlt: "#96754a",
+    onAccent: "#ffffff",
+    bg: "#faf7f2",
+    surface: "#ffffff",
+    text: "#2a251f",
+    muted: "#7a7267",
+    line: "#e6ddce",
+    headerBg: "#faf7f2",
+    headerText: "#2a251f",
+    radius: "2px",
+    font: SANS,
+    heading: 'Georgia,"Times New Roman",serif',
+    uppercase: true,
+  },
+  vibrant: {
+    accent: "#7c3aed",
+    accentAlt: "#ec4899",
+    onAccent: "#ffffff",
+    bg: "#ffffff",
+    surface: "#faf8ff",
+    text: "#1b1236",
+    muted: "#6b6486",
+    line: "#ece7f7",
+    headerBg: "#ffffff",
+    headerText: "#1b1236",
+    radius: "22px",
+    font: SANS,
+    heading: SANS,
+    uppercase: false,
+  },
+};
+
+export function storefrontTheme(templateId?: string | null): StorefrontTheme {
+  return STOREFRONT_THEMES[resolveTemplate(templateId).id] ?? STOREFRONT_THEMES[DEFAULT_TEMPLATE_ID];
+}
+
 /** The catalogue the picker renders — everything but the builder itself. */
 export function templateChoices() {
   return SITE_TEMPLATES.map(({ id, name, description, accent, bestFor }) => ({
@@ -33,6 +129,7 @@ export function templateChoices() {
     description,
     accent,
     bestFor,
+    theme: storefrontTheme(id),
   }));
 }
 

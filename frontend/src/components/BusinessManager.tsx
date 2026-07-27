@@ -16,11 +16,24 @@ import { apiErrorMessage } from "@/api/client";
 import { Business, Category } from "@/types";
 import { Spinner } from "@/components/Loading";
 import ReviewQrBoard from "@/components/ReviewQrBoard";
+import ProductsManager from "@/components/ProductsManager";
+import OrdersManager from "@/components/OrdersManager";
+import CustomersReport from "@/components/CustomersReport";
 // The builder pulls in GrapesJS, so keep it out of the main bundle.
 const SiteBuilder = lazy(() => import("@/components/SiteBuilder"));
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-const SECTIONS = ["Details", "Hours", "Services", "Photos", "Reviews & QR", "Website"] as const;
+const SECTIONS = [
+  "Details",
+  "Hours",
+  "Services",
+  "Photos",
+  "Reviews & QR",
+  "Website",
+  "Products",
+  "Orders",
+  "Customers",
+] as const;
 type Section = (typeof SECTIONS)[number];
 
 interface HourRow {
@@ -252,12 +265,12 @@ export default function BusinessManager({
       {error && <p className="text-sm text-red-700 bg-red-50 rounded-md px-3 py-2">{error}</p>}
 
       {/* Section tabs */}
-      <div className="flex gap-1 border-b border-gray-200">
+      <div className="flex gap-1 overflow-x-auto border-b border-gray-200">
         {SECTIONS.map((s) => (
           <button
             key={s}
             onClick={() => setSection(s)}
-            className={`px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors ${
+            className={`whitespace-nowrap px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors ${
               section === s ? "border-brand-600 text-brand-600" : "border-transparent text-ink-500 hover:text-ink-900"
             }`}
           >
@@ -552,6 +565,12 @@ export default function BusinessManager({
           <SiteBuilder business={biz} />
         </Suspense>
       )}
+
+      {/* Storefront. The catalogue can be built before the shop is switched on,
+          so these are always available — they simply stay empty until then. */}
+      {section === "Products" && <ProductsManager business={biz} />}
+      {section === "Orders" && <OrdersManager business={biz} />}
+      {section === "Customers" && <CustomersReport business={biz} />}
     </div>
   );
 }

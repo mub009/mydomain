@@ -7,16 +7,23 @@ import {
   Business,
   Category,
   Lead,
+  Order,
+  OrderStatus,
+  OrderSummary,
   PaginatedResponse,
   PointsBalance,
   PointTransaction,
   PopularCity,
+  Product,
   QrClaimResult,
   QrLookup,
   Review,
   ReviewLinks,
   ReviewQrCode,
   Rfq,
+  ShopCustomer,
+  SiteType,
+  StorefrontTheme,
   UserRole,
   Visitor,
 } from "@/types";
@@ -135,6 +142,8 @@ export interface SiteTemplateChoice {
   description: string;
   accent: string;
   bestFor: string;
+  /** Palette the design contributes when the site is a storefront. */
+  theme: StorefrontTheme;
 }
 
 export interface SiteEditorPayload {
@@ -145,6 +154,9 @@ export interface SiteEditorPayload {
   publishedAt: string | null;
   updatedAt: string | null;
   hasSavedDraft: boolean;
+  /** Brochure website, or a storefront that takes orders. */
+  siteType: SiteType;
+  storefront: { deliveryFeeCents: number; freeDeliveryAboveCents: number | null; productCount: number };
   /** The design saved against this site. */
   templateId: string;
   /** The design `starterHtml`/`starterCss` below were rendered with. */
@@ -155,8 +167,34 @@ export interface SiteEditorPayload {
   businessData: Record<string, unknown>;
 }
 
+export interface PublishedBusiness {
+  id: string;
+  name: string;
+  slug: string;
+  city: string;
+  description: string | null;
+  phone: string;
+  email: string | null;
+  logoUrl: string | null;
+  addressLine1: string;
+  addressLine2: string | null;
+  state: string;
+  postalCode: string | null;
+  latitude: number;
+  longitude: number;
+  instagramUsername: string | null;
+  avgRating: number;
+  reviewCount: number;
+  photos: { url: string; caption: string | null }[];
+  hours: { dayOfWeek: number; openTime: string; closeTime: string; isClosed: boolean }[];
+}
+
 export interface PublishedSite {
-  business: { id: string; name: string; slug: string; city: string; description: string | null };
+  siteType: SiteType;
+  business: PublishedBusiness;
+  theme: StorefrontTheme;
+  templateId: string;
+  storefront: { deliveryFeeCents: number; freeDeliveryAboveCents: number | null } | null;
   html: string;
   css: string;
   publishedAt: string | null;
@@ -181,6 +219,18 @@ export const sitesApi = {
     api
       .get<ApiResponse<{ templateId: string; html: string; css: string }>>(
         `/businesses/${businessId}/site/templates/${templateId}`,
+      )
+      .then((r) => r.data.data),
+  // Brochure website vs storefront, plus the storefront's delivery settings.
+  // Kept apart from `save` so switching never touches the builder document.
+  setType: (
+    businessId: string,
+    payload: { siteType?: SiteType; deliveryFeeCents?: number; freeDeliveryAboveCents?: number | null },
+  ) =>
+    api
+      .patch<ApiResponse<{ siteType: SiteType; isPublished: boolean; deliveryFeeCents: number; freeDeliveryAboveCents: number | null }>>(
+        `/businesses/${businessId}/site/type`,
+        payload,
       )
       .then((r) => r.data.data),
   publish: (businessId: string, isPublished: boolean) =>
@@ -281,4 +331,70 @@ export const adminApi = {
     api.patch<ApiResponse<Business>>(`/admin/businesses/${id}`, payload).then((r) => r.data.data),
   reassignBusiness: (id: string, ownerId: string) =>
     api.post<ApiResponse<Business>>(`/admin/businesses/${id}/reassign`, { ownerId }).then((r) => r.data.data),
+};
+
+// ---------------------------------------------------------------------------
+// Storefront: catalogue, orders and the shop's customer report
+// ---------------------------------------------------------------------------
+
+export interface OrderListResponse extends PaginatedResponse<Order> {
+  summary: OrderSummary;
+}
+
+export const productsApi = {
+  list: (businessId: string, params: Record<string, unknown> = {}) =>
+    api.get<PaginatedResponse<Product>>(`/businesses/${businessId}/products`, { params }).then((r) => r.data),
+  create: (businessId: string, payload: Record<string, unknown>) =>
+    api.post<ApiResponse<Product>>(`/businesses/${businessId}/products`, payload).then((r) => r.data.data),
+  update: (businessId: string, productId: string, payload: Record<string, unknown>) =>
+    api
+      .patch<ApiResponse<Product>>(`/businesses/${businessId}/products/${productId}`, payload)
+      .then((r) => r.data.data),
+  remove: (businessId: string, productId: string) =>
+    api.delete<ApiResponse<{ id: string }>>(`/businesses/${businessId}/products/${productId}`).then((r) => r.data.data),
+};
+
+export const ordersApi = {
+  list: (businessId: string, params: Record<string, unknown> = {}) =>
+    api.get<OrderListResponse>(`/businesses/${businessId}/orders`, { params }).then((r) => r.data),
+  get: (businessId: string, orderId: string) =>
+    api.get<ApiResponse<Order>>(`/businesses/${businessId}/orders/${orderId}`).then((r) => r.data.data),
+  setStatus: (businessId: string, orderId: string, status: OrderStatus) =>
+    api
+      .patch<ApiResponse<Order>>(`/businesses/${businessId}/orders/${orderId}/status`, { status })
+      .then((r) => r.data.data),
+  customers: (businessId: string, params: Record<string, unknown> = {}) =>
+    api.get<PaginatedResponse<ShopCustomer>>(`/businesses/${businessId}/customers`, { params }).then((r) => r.data),
+};
+
+export interface PlacedOrder {
+  id: string;
+  orderNumber: string;
+  status: OrderStatus;
+  subtotalCents: number;
+  deliveryFeeCents: number;
+  totalCents: number;
+  currency: string;
+  placedAt: string;
+  items: { name: string; quantity: number; lineTotalCents: number }[];
+}
+
+// Public storefront — what a shopper on a published shop page calls.
+export const shopApi = {
+  products: (slug: string, params: Record<string, unknown> = {}) =>
+    api.get<PaginatedResponse<Product>>(`/sites/${slug}/products`, { params }).then((r) => r.data),
+  checkout: (
+    slug: string,
+    payload: {
+      items: { productId: string; quantity: number }[];
+      customerName: string;
+      customerPhone: string;
+      customerEmail?: string;
+      addressLine1: string;
+      addressLine2?: string;
+      city: string;
+      postalCode?: string;
+      notes?: string;
+    },
+  ) => api.post<ApiResponse<PlacedOrder>>(`/sites/${slug}/orders`, payload).then((r) => r.data.data),
 };

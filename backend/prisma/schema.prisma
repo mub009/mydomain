@@ -57,6 +57,7 @@ model User {
   quotes        Quote[]        @relation("QuoteSupplier")
   refreshTokens RefreshToken[]
   notifications Notification[]
+  orders        Order[]
 
   pointTransactions      PointTransaction[] @relation("PointOwner")
   grantedPointTransactions PointTransaction[] @relation("PointGrantedBy")
@@ -198,6 +199,8 @@ model Business {
   reviewScans ReviewScan[]
   reviewQrCodes ReviewQrCode[]
   site        BusinessSite?
+  products    Product[]
+  orders      Order[]
 
   @@index([categoryId])
   @@index([city, state])
@@ -391,10 +394,19 @@ model Payment {
 // A one-page site the owner edits in the builder. projectData is the editor's
 // own document (source of truth); html/css are the rendered output kept for
 // serving the public page without loading the editor.
+// What a business's site is for. A brochure WEBSITE is built in the drag-and-
+// drop editor; an ECOMMERCE site is a storefront where customers add products
+// to a cart and check out, so it is rendered by the app rather than authored.
+enum SiteType {
+  WEBSITE
+  ECOMMERCE
+}
+
 model BusinessSite {
   id          String    @id @default(uuid()) @db.VarChar(36)
   businessId  String    @unique @db.VarChar(36)
   business    Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  siteType    SiteType  @default(WEBSITE)
   // Which of the built-in designs this site started from. Kept so the editor
   // can show the current choice and rebuild from the same design on reset.
   templateId  String    @default("classic") @db.VarChar(40)
@@ -403,10 +415,121 @@ model BusinessSite {
   css         String?   @db.LongText
   isPublished Boolean   @default(false)
   publishedAt DateTime?
+
+  // Storefront settings (ECOMMERCE only).
+  deliveryFeeCents       Int  @default(0)
+  freeDeliveryAboveCents Int?
+  acceptsOnlinePayment   Boolean @default(false)
+
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
   @@map("business_sites")
+}
+
+// ---------------------------------------------------------------------------
+// Storefront catalogue & orders
+// ---------------------------------------------------------------------------
+
+model Product {
+  id          String   @id @default(uuid()) @db.VarChar(36)
+  businessId  String   @db.VarChar(36)
+  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name        String
+  slug        String   @db.VarChar(160)
+  description String?  @db.Text
+  priceCents  Int
+  // Struck-through "was" price. Null when the item is not on offer.
+  compareAtCents Int?
+  currency    String   @default("INR")
+  imageUrl    String?  @db.Text
+  sku         String?  @db.VarChar(60)
+  // Stock is only enforced when the shop opts in; many small shops do not
+  // count units and would otherwise have every item read as sold out.
+  trackStock  Boolean  @default(false)
+  stock       Int      @default(0)
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  orderItems OrderItem[]
+
+  @@unique([businessId, slug])
+  @@index([businessId, isActive])
+  @@map("products")
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PACKED
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum OrderPaymentMethod {
+  COD
+  ONLINE
+}
+
+model Order {
+  id          String   @id @default(uuid()) @db.VarChar(36)
+  businessId  String   @db.VarChar(36)
+  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  // Short human-readable reference the customer quotes on the phone.
+  orderNumber String   @unique @db.VarChar(24)
+  // Set when the buyer happened to be signed in; storefront checkout is open
+  // to guests, so the phone number is the identity that always exists.
+  customerId  String?  @db.VarChar(36)
+  customer    User?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  customerName  String
+  customerPhone String   @db.VarChar(20)
+  customerEmail String?
+  addressLine1  String
+  addressLine2  String?
+  city          String
+  postalCode    String?  @db.VarChar(20)
+  notes         String?  @db.Text
+
+  status        OrderStatus        @default(PENDING)
+  paymentMethod OrderPaymentMethod @default(COD)
+
+  subtotalCents    Int
+  deliveryFeeCents Int    @default(0)
+  totalCents       Int
+  currency         String @default("INR")
+
+  placedAt  DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items OrderItem[]
+
+  @@index([businessId, status])
+  @@index([businessId, placedAt])
+  @@index([businessId, customerPhone])
+  @@map("orders")
+}
+
+model OrderItem {
+  id        String   @id @default(uuid()) @db.VarChar(36)
+  orderId   String   @db.VarChar(36)
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  // Kept nullable so deleting a product never destroys order history.
+  productId String?  @db.VarChar(36)
+  product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  // Snapshot of what was actually bought, at the price charged.
+  name           String
+  imageUrl       String? @db.Text
+  unitPriceCents Int
+  quantity       Int
+  lineTotalCents Int
+
+  @@index([orderId])
+  @@map("order_items")
 }
 
 // ---------------------------------------------------------------------------

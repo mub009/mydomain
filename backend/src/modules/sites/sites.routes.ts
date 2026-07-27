@@ -2,10 +2,11 @@ import { Router } from "express";
 import { asyncHandler } from "@/common/asyncHandler";
 import { validate } from "@/middleware/validate";
 import { requireAuth, requirePrivilege } from "@/middleware/auth";
-import { publishSiteSchema, saveSiteSchema } from "./sites.validation";
+import { publishSiteSchema, saveSiteSchema, siteTypeSchema } from "./sites.validation";
 import {
   getSiteHandler,
   previewTemplateHandler,
+  updateSiteTypeHandler,
   publicSiteHandler,
   publishSiteHandler,
   saveSiteHandler,
@@ -25,6 +26,13 @@ siteBuilderRouter.put(
   listingPriv,
   validate({ body: saveSiteSchema }),
   asyncHandler(saveSiteHandler),
+);
+siteBuilderRouter.patch(
+  "/:id/site/type",
+  requireAuth,
+  listingPriv,
+  validate({ body: siteTypeSchema }),
+  asyncHandler(updateSiteTypeHandler),
 );
 siteBuilderRouter.post(
   "/:id/site/publish",

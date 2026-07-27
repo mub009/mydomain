@@ -267,6 +267,120 @@ export interface Visitor {
   createdAt: string;
 }
 
+// --- Website / storefront ---------------------------------------------------
+
+export type SiteType = "WEBSITE" | "ECOMMERCE";
+
+export const SITE_TYPE_LABELS: Record<SiteType, string> = {
+  WEBSITE: "Website",
+  ECOMMERCE: "eCommerce",
+};
+
+/** Palette a chosen template contributes to a storefront. */
+export interface StorefrontTheme {
+  accent: string;
+  accentAlt: string;
+  onAccent: string;
+  bg: string;
+  surface: string;
+  text: string;
+  muted: string;
+  line: string;
+  headerBg: string;
+  headerText: string;
+  radius: string;
+  font: string;
+  heading: string;
+  uppercase: boolean;
+}
+
+export interface Product {
+  id: string;
+  businessId?: string;
+  name: string;
+  slug: string;
+  description?: string | null;
+  priceCents: number;
+  compareAtCents?: number | null;
+  currency: string;
+  imageUrl?: string | null;
+  sku?: string | null;
+  trackStock: boolean;
+  stock: number;
+  isActive?: boolean;
+  sortOrder?: number;
+  createdAt?: string;
+}
+
+export type OrderStatus = "PENDING" | "CONFIRMED" | "PACKED" | "SHIPPED" | "DELIVERED" | "CANCELLED";
+
+// The order a shop normally moves an order through, used for the "advance to
+// next step" action in the dashboard.
+export const ORDER_FLOW: OrderStatus[] = ["PENDING", "CONFIRMED", "PACKED", "SHIPPED", "DELIVERED"];
+
+export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
+  PENDING: "New",
+  CONFIRMED: "Confirmed",
+  PACKED: "Packed",
+  SHIPPED: "Out for delivery",
+  DELIVERED: "Delivered",
+  CANCELLED: "Cancelled",
+};
+
+export interface OrderItem {
+  id: string;
+  productId?: string | null;
+  name: string;
+  imageUrl?: string | null;
+  unitPriceCents: number;
+  quantity: number;
+  lineTotalCents: number;
+}
+
+export interface Order {
+  id: string;
+  orderNumber: string;
+  customerName: string;
+  customerPhone: string;
+  customerEmail?: string | null;
+  addressLine1: string;
+  addressLine2?: string | null;
+  city: string;
+  postalCode?: string | null;
+  notes?: string | null;
+  status: OrderStatus;
+  paymentMethod: "COD" | "ONLINE";
+  subtotalCents: number;
+  deliveryFeeCents: number;
+  totalCents: number;
+  currency: string;
+  placedAt: string;
+  items: OrderItem[];
+}
+
+export interface OrderSummary {
+  total: number;
+  revenueCents: number;
+  todayCount: number;
+  byStatus: Partial<Record<OrderStatus, number>>;
+}
+
+/** A row of the shop's customer report, grouped by phone number. */
+export interface ShopCustomer {
+  phone: string;
+  name: string;
+  email?: string | null;
+  city: string;
+  address: string;
+  lastOrderNumber: string;
+  lastOrderStatus: OrderStatus | null;
+  currency: string;
+  orderCount: number;
+  totalSpentCents: number;
+  firstOrderAt: string;
+  lastOrderAt: string;
+}
+
 export interface PaginatedResponse<T> {
   success: boolean;
   data: T[];

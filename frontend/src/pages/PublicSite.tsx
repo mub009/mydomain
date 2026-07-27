@@ -1,13 +1,18 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Globe } from "lucide-react";
 import { leadsApi, sitesApi, type PublishedSite } from "@/api/endpoints";
 import { apiErrorMessage } from "@/api/client";
 import { Spinner } from "@/components/Loading";
 
+// Only a fraction of published sites are shops, so the storefront (cart,
+// checkout, catalogue) is fetched on demand rather than in the main bundle.
+const Storefront = lazy(() => import("@/components/Storefront"));
+
 // Renders a business's published website. The markup comes from the builder,
 // so it is injected as-is inside a scoped wrapper; the owner's own CSS is
 // namespaced under that wrapper to keep it from leaking into the app shell.
+// An eCommerce site has no authored markup — it is rendered by <Storefront/>.
 export default function PublicSite() {
   const { slug } = useParams<{ slug: string }>();
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -26,7 +31,7 @@ export default function PublicSite() {
   }, [slug]);
 
   useEffect(() => {
-    if (site) document.title = `${site.business.name} — Website`;
+    if (site && site.siteType !== "ECOMMERCE") document.title = `${site.business.name} — Website`;
   }, [site]);
 
   // The page's contact form is plain markup with no action (the sanitizer
@@ -34,7 +39,9 @@ export default function PublicSite() {
   // business's Leads inbox.
   useEffect(() => {
     const root = rootRef.current;
-    if (!root || !site) return;
+    // Storefronts render their own React forms, so there is no injected markup
+    // to intercept submissions from.
+    if (!root || !site || site.siteType === "ECOMMERCE") return;
 
     async function handleSubmit(event: Event) {
       const form = event.target as HTMLFormElement;
@@ -109,6 +116,20 @@ export default function PublicSite() {
           </Link>
         </div>
       </div>
+    );
+  }
+
+  if (site.siteType === "ECOMMERCE") {
+    return (
+      <Suspense
+        fallback={
+          <div className="flex min-h-screen items-center justify-center">
+            <Spinner label="Opening the shop…" />
+          </div>
+        }
+      >
+        <Storefront site={site} />
+      </Suspense>
     );
   }
 

@@ -21,6 +21,10 @@ export async function saveSiteHandler(req: Request, res: Response): Promise<void
   ok(res, await sitesService.saveSite(actor(req), req.params.id, req.body));
 }
 
+export async function updateSiteTypeHandler(req: Request, res: Response): Promise<void> {
+  ok(res, await sitesService.updateSiteType(actor(req), req.params.id, req.body));
+}
+
 export async function publishSiteHandler(req: Request, res: Response): Promise<void> {
   ok(res, await sitesService.setPublished(actor(req), req.params.id, req.body.isPublished));
 }
