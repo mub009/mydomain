@@ -33,6 +33,11 @@ export async function lookupCodeHandler(req: Request, res: Response): Promise<vo
   ok(res, await qrcodesService.lookupCode(req.params.code));
 }
 
+export async function assignableBusinessesHandler(req: Request, res: Response): Promise<void> {
+  const search = typeof req.query.search === "string" ? req.query.search : undefined;
+  ok(res, await qrcodesService.listAssignableBusinesses(actor(req), search));
+}
+
 export async function claimCodeHandler(req: Request, res: Response): Promise<void> {
   ok(res, await qrcodesService.claimCode(actor(req), req.body.code, req.body.businessId, req.body.channel));
 }

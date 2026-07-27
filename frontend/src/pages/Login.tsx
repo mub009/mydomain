@@ -1,10 +1,20 @@
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { Lock, Mail } from "lucide-react";
 import { authApi } from "@/api/endpoints";
 import { apiErrorMessage } from "@/api/client";
 import { useAuthStore } from "@/store/authStore";
 import AuthLayout from "@/components/AuthLayout";
+
+/**
+ * Only same-site paths are honoured, so a crafted `?next=` cannot bounce a
+ * freshly signed-in user off to another host. Protocol-relative values
+ * ("//evil.test") are rejected along with anything not starting with "/".
+ */
+function safeNext(raw: string | null): string {
+  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return "/";
+  return raw;
+}
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -13,6 +23,10 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const setAuth = useAuthStore((s) => s.setAuth);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  // Where to return to — set by flows that send people here mid-task, such as
+  // a Markkito review QR scanned by someone who is not signed in.
+  const next = safeNext(searchParams.get("next"));
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -21,7 +35,7 @@ export default function Login() {
     try {
       const { user, accessToken, refreshToken } = await authApi.login({ email, password });
       setAuth(user, accessToken, refreshToken);
-      navigate("/");
+      navigate(next, { replace: true });
     } catch (err) {
       setError(apiErrorMessage(err));
     } finally {

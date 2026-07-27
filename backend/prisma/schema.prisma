@@ -545,6 +545,10 @@ enum ReviewChannel {
   YOUTUBE
   WEBSITE
   DIRECTIONS // navigate to the shop, built from its coordinates
+  // Our own listing. Built from the slug, so unlike the platforms above these
+  // two need no setup from the shop and are available the moment it exists.
+  MARKKITO // the business's Markkito details page
+  MARKKITO_REVIEW // the same page with the review composer open
 }
 
 enum ReviewQrStatus {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Download, ExternalLink, Facebook, Globe, Instagram, Link2, Navigation, QrCode, Star, Youtube } from "lucide-react";
+import { Building2, Download, ExternalLink, Facebook, Globe, Instagram, Link2, MessageSquarePlus, Navigation, QrCode, Star, Youtube } from "lucide-react";
 import { Link } from "react-router-dom";
 import { businessesApi, qrCodesApi } from "@/api/endpoints";
 import { apiErrorMessage } from "@/api/client";
@@ -15,6 +15,9 @@ const CHANNELS: { value: ReviewChannel; label: string; icon: typeof Star; tint: 
   { value: "YOUTUBE", label: "YouTube", icon: Youtube, tint: "text-red-600" },
   { value: "WEBSITE", label: "Website", icon: Globe, tint: "text-brand-600" },
   { value: "DIRECTIONS", label: "Directions", icon: Navigation, tint: "text-sky-600" },
+  // Built from the listing itself, so these two are ready with no setup.
+  { value: "MARKKITO_REVIEW", label: "Markkito review", icon: MessageSquarePlus, tint: "text-brand-600" },
+  { value: "MARKKITO", label: "Markkito page", icon: Building2, tint: "text-brand-600" },
 ];
 
 // Small scannable preview of an issued board, shown in the list.
@@ -139,6 +142,21 @@ export default function ReviewQrBoard({ business }: { business: Business }) {
             </h3>
             <p className="mt-0.5 text-xs text-ink-500">
               Customers who scan your QR board land straight on the page you choose.
+            </p>
+          </div>
+
+          {/* These need no setup, so say so rather than leaving the owner
+              wondering why there is no field for them. */}
+          <div className="rounded-lg bg-brand-50/70 px-3 py-2.5">
+            <p className="flex items-center gap-1.5 text-xs font-bold text-brand-800">
+              <Building2 size={13} /> Markkito is ready already
+            </p>
+            <p className="mt-1 text-[11px] leading-relaxed text-brand-800/85">
+              A board can point at your own Markkito page, or straight at its review form — both are built from your
+              listing, so there is nothing to connect here.{" "}
+              <Link to={`/business/${business.slug}?review=1`} target="_blank" className="font-semibold underline">
+                See the review page
+              </Link>
             </p>
           </div>
 

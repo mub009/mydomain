@@ -22,6 +22,60 @@ function generateCode(): string {
   return `MK-${body}`;
 }
 
+/**
+ * Who may attach a board to a business. Admins may attach anywhere; an owner
+ * to their own shops; and a dealer to the shops they registered — the dealer
+ * hands out the printed boards, and the shop's own login belongs to the
+ * business team, not to them.
+ *
+ * Note this governs *attaching only*. Detaching or moving a board between
+ * businesses stays admin-only (see updateQrCodeAsAdmin).
+ */
+export function canAssignBoardTo(
+  actor: Actor,
+  business: { ownerId: string; createdById?: string | null },
+): boolean {
+  if (actor.role === UserRole.ADMIN) return true;
+  if (business.ownerId === actor.sub) return true;
+  return actor.role === UserRole.DEALER && business.createdById === actor.sub;
+}
+
+/**
+ * The businesses this actor may attach a board to, for the picker on the
+ * claim screen. A dealer sees the shops they registered even though the
+ * listings belong to the shops' own accounts.
+ */
+export async function listAssignableBusinesses(actor: Actor, search?: string) {
+  const term = search?.trim();
+  const match: Prisma.BusinessWhereInput | undefined = term
+    ? { OR: [{ name: { contains: term } }, { city: { contains: term } }, { slug: { contains: term } }] }
+    : undefined;
+
+  // An admin can attach anywhere, so their list is search-driven rather than
+  // an attempt to return every listing on the platform.
+  const scope: Prisma.BusinessWhereInput =
+    actor.role === UserRole.ADMIN
+      ? {}
+      : actor.role === UserRole.DEALER
+        ? { OR: [{ ownerId: actor.sub }, { createdById: actor.sub }] }
+        : { ownerId: actor.sub };
+
+  return prisma.business.findMany({
+    where: match ? { AND: [scope, match] } : scope,
+    orderBy: { createdAt: "desc" },
+    take: 50,
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      city: true,
+      ownerId: true,
+      createdById: true,
+      _count: { select: { reviewQrCodes: true } },
+    },
+  });
+}
+
 // Normalise whatever the shop typed or scanned: "mk 7f3k2a" -> "MK-7F3K2A".
 export function normalizeCode(raw: string): string {
   const cleaned = raw.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
@@ -119,8 +173,8 @@ export async function claimCode(actor: Actor, rawCode: string, businessId: strin
   if (!qr) throw AppError.notFound("That QR code was not recognised. Check the code printed on the board.");
   if (!business) throw AppError.notFound("Business not found");
 
-  if (actor.role !== UserRole.ADMIN && business.ownerId !== actor.sub) {
-    throw AppError.forbidden("You can only attach a QR board to your own business");
+  if (!canAssignBoardTo(actor, business)) {
+    throw AppError.forbidden("You can only attach a QR board to a business you own or registered");
   }
   if (qr.status === ReviewQrStatus.DISABLED) {
     throw AppError.badRequest("This QR board has been disabled. Please contact the admin for a replacement.");
@@ -169,8 +223,8 @@ export async function setBoardChannel(actor: Actor, qrId: string, channel: Revie
   const qr = await prisma.reviewQrCode.findUnique({ where: { id: qrId }, include: { business: true } });
   if (!qr) throw AppError.notFound("QR board not found");
   if (!qr.business) throw AppError.badRequest("Attach this board to a business first");
-  if (actor.role !== UserRole.ADMIN && qr.business.ownerId !== actor.sub) {
-    throw AppError.forbidden("You do not own this business");
+  if (!canAssignBoardTo(actor, qr.business)) {
+    throw AppError.forbidden("You do not manage this business");
   }
   if (channel && !resolveChannelUrl(qr.business, channel)) {
     throw AppError.badRequest(
@@ -190,8 +244,8 @@ export async function setBoardChannel(actor: Actor, qrId: string, channel: Revie
 export async function listBusinessQrCodes(actor: Actor, businessId: string) {
   const business = await prisma.business.findUnique({ where: { id: businessId } });
   if (!business) throw AppError.notFound("Business not found");
-  if (actor.role !== UserRole.ADMIN && business.ownerId !== actor.sub) {
-    throw AppError.forbidden("You do not own this business");
+  if (!canAssignBoardTo(actor, business)) {
+    throw AppError.forbidden("You do not manage this business");
   }
 
   return prisma.reviewQrCode.findMany({

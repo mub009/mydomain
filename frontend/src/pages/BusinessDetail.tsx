@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import {
   Bookmark,
   Building2,
@@ -133,11 +133,15 @@ function getOpenStatus(hours: Business["hours"]): OpenStatus | null {
 
 export default function BusinessDetail() {
   const { slug } = useParams<{ slug: string }>();
+  const [searchParams] = useSearchParams();
   const user = useAuthStore((s) => s.user);
+  // A "Markkito review" QR board lands here with ?review=1, so open straight
+  // on the review composer rather than the overview.
+  const wantsReview = searchParams.get("review") === "1";
   const [business, setBusiness] = useState<Business | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [tab, setTab] = useState<Tab>("Overview");
+  const [tab, setTab] = useState<Tab>(wantsReview ? "Reviews" : "Overview");
   const [numberShown, setNumberShown] = useState(false);
   const [bookmarked, setBookmarked] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -151,6 +155,19 @@ export default function BusinessDetail() {
   const [leadForm, setLeadForm] = useState({ name: "", phone: "", email: "", message: "" });
   const [reviewForm, setReviewForm] = useState({ rating: 5, title: "", comment: "" });
   const [bookingForm, setBookingForm] = useState({ serviceId: "", scheduledAt: "" });
+
+  const reviewFormRef = useRef<HTMLDivElement | null>(null);
+
+  // Scroll the composer into view once the listing has rendered, so a customer
+  // who scanned the board sees the star rating without hunting for it.
+  useEffect(() => {
+    if (!wantsReview || !business) return;
+    const timer = window.setTimeout(
+      () => reviewFormRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }),
+      250,
+    );
+    return () => window.clearTimeout(timer);
+  }, [wantsReview, business]);
 
   useEffect(() => {
     if (!slug) return;
@@ -521,6 +538,21 @@ export default function BusinessDetail() {
               )}
 
               {/* Write a review */}
+              <div ref={reviewFormRef}>
+              {!user && wantsReview && (
+                <div className="mb-5 rounded-lg bg-brand-50 px-4 py-3">
+                  <p className="text-sm font-semibold text-brand-800">Sign in to leave your review</p>
+                  <p className="mt-0.5 text-xs text-brand-700/90">
+                    It takes a moment, and {biz.name} will see your rating straight away.
+                  </p>
+                  <Link
+                    to={`/login?next=${encodeURIComponent(`/business/${biz.slug}?review=1`)}`}
+                    className="btn-primary mt-3 inline-flex px-4 py-2 text-sm"
+                  >
+                    Log in to review
+                  </Link>
+                </div>
+              )}
               {user && (
                 <form onSubmit={submitReview} className="bg-gray-50 rounded-lg p-4 space-y-3 mb-5">
                   <h3 className="text-sm font-semibold text-ink-900">Write a review</h3>
@@ -557,6 +589,7 @@ export default function BusinessDetail() {
                   <button className="btn-primary px-5 py-2">Submit review</button>
                 </form>
               )}
+              </div>
 
               {/* Sort tabs */}
               {sortedReviews.length > 0 && (

@@ -1,6 +1,7 @@
 import { ReviewChannel, UserRole } from "@prisma/client";
 import { prisma } from "@/config/database";
 import { AppError } from "@/common/errors";
+import { env } from "@/config/env";
 
 interface Actor {
   sub: string;
@@ -19,7 +20,13 @@ export interface ReviewLinksInput {
 type LinkSource = Pick<
   ReviewLinksInput,
   "googlePlaceId" | "googleReviewUrl" | "instagramUsername" | "facebookPageUrl" | "youtubeUrl"
-> & { website?: string | null; latitude?: number | null; longitude?: number | null };
+> & {
+  website?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  // The listing's own slug, which is what the Markkito channels are built from.
+  slug?: string | null;
+};
 
 // Google's canonical "write a review" deep link. Scanning it on a phone opens
 // the Maps app straight on the review composer for that place.
@@ -65,6 +72,21 @@ export function websiteLink(source: LinkSource): string | null {
   return /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
 }
 
+// The shop's own page on Markkito. Unlike every other channel this needs
+// nothing from the owner — the slug exists as soon as the listing does — so a
+// board pointed here works from the moment it is assigned.
+export function markkitoLink(source: LinkSource): string | null {
+  if (!source.slug) return null;
+  return `${env.CLIENT_ORIGIN}/business/${source.slug}`;
+}
+
+// Same page, opened on the review composer, for boards whose whole purpose is
+// collecting reviews on Markkito.
+export function markkitoReviewLink(source: LinkSource): string | null {
+  const base = markkitoLink(source);
+  return base ? `${base}?review=1` : null;
+}
+
 export function resolveChannelUrl(source: LinkSource, channel: ReviewChannel): string | null {
   switch (channel) {
     case ReviewChannel.GOOGLE:
@@ -79,6 +101,10 @@ export function resolveChannelUrl(source: LinkSource, channel: ReviewChannel): s
       return websiteLink(source);
     case ReviewChannel.DIRECTIONS:
       return directionsLink(source);
+    case ReviewChannel.MARKKITO:
+      return markkitoLink(source);
+    case ReviewChannel.MARKKITO_REVIEW:
+      return markkitoReviewLink(source);
     default:
       return null;
   }
@@ -93,6 +119,10 @@ export function availableChannels(source: LinkSource): ReviewChannel[] {
     ReviewChannel.YOUTUBE,
     ReviewChannel.WEBSITE,
     ReviewChannel.DIRECTIONS,
+    // Last on purpose: these always resolve, so putting them earlier would
+    // silently become the fallback for every board that has no channel set.
+    ReviewChannel.MARKKITO_REVIEW,
+    ReviewChannel.MARKKITO,
   ];
   return order.filter((channel) => resolveChannelUrl(source, channel));
 }
@@ -129,6 +159,8 @@ export async function getReviewLinks(actor: Actor, businessId: string) {
       YOUTUBE: youtubeLink(business),
       WEBSITE: websiteLink(business),
       DIRECTIONS: directionsLink(business),
+      MARKKITO: markkitoLink(business),
+      MARKKITO_REVIEW: markkitoReviewLink(business),
     },
     scanCounts: Object.fromEntries(scans.map((s) => [s.channel, s._count._all])) as Record<string, number>,
     totalScans: scans.reduce((sum, s) => sum + s._count._all, 0),

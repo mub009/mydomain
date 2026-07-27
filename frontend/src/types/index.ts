@@ -182,7 +182,19 @@ export interface Quote {
   business?: { id: string; name: string; slug: string; avgRating: number };
 }
 
-export type ReviewChannel = "GOOGLE" | "INSTAGRAM" | "FACEBOOK" | "YOUTUBE" | "WEBSITE" | "DIRECTIONS";
+export type ReviewChannel =
+  | "GOOGLE"
+  | "INSTAGRAM"
+  | "FACEBOOK"
+  | "YOUTUBE"
+  | "WEBSITE"
+  | "DIRECTIONS"
+  | "MARKKITO"
+  | "MARKKITO_REVIEW";
+
+// The two Markkito destinations are built from the listing's slug, so they
+// work the moment a business exists — nothing for the shop to set up first.
+export const MARKKITO_CHANNELS: ReviewChannel[] = ["MARKKITO_REVIEW", "MARKKITO"];
 
 // Destination options offered in the QR "purpose" dropdowns.
 export const REVIEW_CHANNELS: { value: ReviewChannel; label: string }[] = [
@@ -192,6 +204,8 @@ export const REVIEW_CHANNELS: { value: ReviewChannel; label: string }[] = [
   { value: "YOUTUBE", label: "YouTube" },
   { value: "WEBSITE", label: "Website" },
   { value: "DIRECTIONS", label: "Directions to shop" },
+  { value: "MARKKITO_REVIEW", label: "Markkito review" },
+  { value: "MARKKITO", label: "Markkito business page" },
 ];
 
 export const CHANNEL_LABELS: Record<ReviewChannel, string> = {
@@ -201,6 +215,8 @@ export const CHANNEL_LABELS: Record<ReviewChannel, string> = {
   YOUTUBE: "YouTube",
   WEBSITE: "Website",
   DIRECTIONS: "Directions to shop",
+  MARKKITO_REVIEW: "Markkito review",
+  MARKKITO: "Markkito business page",
 };
 
 export interface ReviewLinks {

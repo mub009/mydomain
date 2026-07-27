@@ -7,6 +7,7 @@ import { updateReviewLinksSchema } from "./reviewqr.validation";
 import { claimCodeSchema, setBoardChannelSchema } from "./qrcodes.validation";
 import { getReviewLinksHandler, updateReviewLinksHandler } from "./reviewqr.controller";
 import {
+  assignableBusinessesHandler,
   businessQrCodesHandler,
   claimCodeHandler,
   lookupCodeHandler,
@@ -22,6 +23,14 @@ reviewScanRouter.get("/q/:code", asyncHandler(qrScanHandler));
 // Shop-facing code lookup and claim.
 export const qrCodesRouter = Router();
 qrCodesRouter.get("/lookup/:code", asyncHandler(lookupCodeHandler));
+// The businesses this user may attach a board to. A dealer gets the shops
+// they registered, which their own "my businesses" list does not include.
+qrCodesRouter.get(
+  "/assignable-businesses",
+  requireAuth,
+  requireRole(UserRole.BUSINESS_OWNER, UserRole.DEALER, UserRole.ADMIN),
+  asyncHandler(assignableBusinessesHandler),
+);
 qrCodesRouter.post(
   "/claim",
   requireAuth,

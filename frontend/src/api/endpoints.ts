@@ -124,11 +124,30 @@ export interface QrCodeListResponse {
   summary: { unassigned: number; assigned: number };
 }
 
+/** A business a QR board may be attached to, as offered on the claim screen. */
+export interface AssignableBusiness {
+  id: string;
+  name: string;
+  slug: string;
+  city: string;
+  ownerId: string;
+  createdById: string | null;
+  _count: { reviewQrCodes: number };
+}
+
 export const qrCodesApi = {
   // Public: confirm what a scanned board is before claiming it.
   lookup: (code: string) => api.get<ApiResponse<QrLookup>>(`/qr-codes/lookup/${encodeURIComponent(code)}`).then((r) => r.data.data),
   claim: (code: string, businessId: string, channel?: string) =>
     api.post<ApiResponse<QrClaimResult>>("/qr-codes/claim", { code, businessId, channel }).then((r) => r.data.data),
+  // Businesses this user may attach a board to. A dealer gets the shops they
+  // registered, which their own "my businesses" list does not include.
+  assignableBusinesses: (search?: string) =>
+    api
+      .get<ApiResponse<AssignableBusiness[]>>("/qr-codes/assignable-businesses", {
+        params: search ? { search } : undefined,
+      })
+      .then((r) => r.data.data),
   forBusiness: (businessId: string) =>
     api.get<ApiResponse<ReviewQrCode[]>>(`/businesses/${businessId}/qr-codes`).then((r) => r.data.data),
   // Re-point one of the shop's boards at a different platform.

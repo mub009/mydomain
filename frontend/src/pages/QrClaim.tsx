@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { AlertTriangle, CheckCircle2, QrCode, Store } from "lucide-react";
-import { businessesApi, qrCodesApi } from "@/api/endpoints";
+import { qrCodesApi, type AssignableBusiness } from "@/api/endpoints";
 import { apiErrorMessage } from "@/api/client";
-import { CHANNEL_LABELS, REVIEW_CHANNELS, Business, QrClaimResult, QrLookup, ReviewChannel } from "@/types";
+import { CHANNEL_LABELS, MARKKITO_CHANNELS, REVIEW_CHANNELS, QrClaimResult, QrLookup, ReviewChannel } from "@/types";
 import { useAuthStore } from "@/store/authStore";
 import { Spinner } from "@/components/Loading";
 
@@ -17,7 +17,7 @@ export default function QrClaim() {
 
   const [code, setCode] = useState(codeParam ?? "");
   const [lookup, setLookup] = useState<QrLookup | null>(null);
-  const [businesses, setBusinesses] = useState<Business[]>([]);
+  const [businesses, setBusinesses] = useState<AssignableBusiness[]>([]);
   const [businessId, setBusinessId] = useState("");
   const [channel, setChannel] = useState<ReviewChannel | "">("");
   const [claimed, setClaimed] = useState<QrClaimResult | null>(null);
@@ -48,13 +48,15 @@ export default function QrClaim() {
   }, [codeParam]);
 
   // Only owners/dealers/admins can attach a board, so only they need the list.
+  // This is deliberately not "my businesses": a dealer must also see the shops
+  // they registered, whose listings belong to the shops' own accounts.
   useEffect(() => {
     if (!canClaim) return;
-    businessesApi
-      .mine({ pageSize: 50 })
-      .then((r) => {
-        setBusinesses(r.data);
-        if (r.data.length === 1) setBusinessId(r.data[0].id);
+    qrCodesApi
+      .assignableBusinesses()
+      .then((list) => {
+        setBusinesses(list);
+        if (list.length === 1) setBusinessId(list[0].id);
       })
       .catch(() => undefined);
   }, [canClaim]);
@@ -207,7 +209,9 @@ export default function QrClaim() {
                   </div>
                 ) : businesses.length === 0 ? (
                   <div className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                    You don't have a business listing yet. Create one first, then attach this board.
+                    {user?.role === "DEALER"
+                      ? "You have not registered any businesses yet. Register one first, then attach this board."
+                      : "You don't have a business listing yet. Create one first, then attach this board."}
                   </div>
                 ) : (
                   <div className="mt-4 space-y-3">
@@ -243,7 +247,9 @@ export default function QrClaim() {
                         ))}
                       </select>
                       <p className="mt-1 text-[11px] text-ink-400">
-                        Uses your own link for that platform. You can change this later from your dashboard.
+                        {channel && MARKKITO_CHANNELS.includes(channel)
+                          ? "Sends customers to this shop's own Markkito page — nothing to set up first."
+                          : "Uses your own link for that platform. You can change this later from your dashboard."}
                       </p>
                     </div>
                     <button disabled={saving || !businessId} onClick={claim} className="btn-primary w-full py-2.5 disabled:opacity-50">
