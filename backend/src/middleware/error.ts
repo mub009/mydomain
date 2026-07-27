@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { ZodError } from "zod";
 import { AppError } from "@/common/errors";
 import { logger } from "@/config/logger";
+import { findStaleClientGaps } from "@/config/prismaClientCheck";
 import { env } from "@/config/env";
 
 export function notFoundHandler(req: Request, res: Response): void {
@@ -64,6 +65,24 @@ export function errorHandler(err: unknown, req: Request, res: Response, _next: N
     res.status(503).json({
       success: false,
       error: { code: "DATABASE_UNAVAILABLE", message: "Cannot reach the database. Check that MySQL is running." },
+    });
+    return;
+  }
+
+  // A generated client that predates the schema throws a plain TypeError the
+  // moment the code touches a model or enum it does not know about. That used
+  // to read as "Something went wrong"; name the real cause and the fix.
+  const gaps = findStaleClientGaps();
+  if (gaps.length > 0) {
+    logger.error({ err, path: req.path, missing: gaps }, "Generated Prisma client is out of date");
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "PRISMA_CLIENT_OUT_OF_DATE",
+        message:
+          "The backend's generated database client is out of date. Run `npm run prisma:generate` in the backend and restart it.",
+        details: env.NODE_ENV === "production" ? undefined : { missing: gaps },
+      },
     });
     return;
   }

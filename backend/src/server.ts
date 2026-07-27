@@ -1,10 +1,15 @@
 import { createApp } from "@/app";
 import { env } from "@/config/env";
 import { connectDatabase, disconnectDatabase } from "@/config/database";
+import { assertPrismaClientIsCurrent } from "@/config/prismaClientCheck";
 import { connectRedis, redis } from "@/config/redis";
 import { logger } from "@/config/logger";
 
 async function main(): Promise<void> {
+  // Fail here rather than halfway through a request: a client generated
+  // before the latest schema is missing models and enums the code uses.
+  assertPrismaClientIsCurrent();
+
   await connectDatabase();
   await connectRedis();
 

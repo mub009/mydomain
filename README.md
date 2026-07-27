@@ -46,6 +46,21 @@ npm run seed:businesses    # optional: 100 demo businesses (see below)
 npm run dev                # http://localhost:4000
 ```
 
+### Pulling changes that touch the database
+
+`prisma migrate deploy` updates MySQL but does **not** regenerate the Prisma
+client, so running it alone leaves the server with a client that has never
+heard of the new tables. Do both, then restart:
+
+```bash
+cd backend
+npm run db:update          # migrate deploy + prisma generate
+npm run dev                # restart — the client is loaded at boot
+```
+
+The server refuses to start against a stale client and names exactly what is
+missing, rather than failing later with an opaque error mid-request.
+
 Seeded accounts (password `Password123!`):
 - `admin@mydomain.dev` — ADMIN
 - `owner@mydomain.dev` — BUSINESS_OWNER
