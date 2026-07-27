@@ -201,6 +201,10 @@ model Business {
   site        BusinessSite?
   products    Product[]
   orders      Order[]
+  whatsapp        WhatsappSession?
+  contacts        Contact[]
+  messageTemplates MessageTemplate[]
+  campaigns       Campaign[]
 
   @@index([categoryId])
   @@index([city, state])
@@ -721,4 +725,148 @@ model Notification {
 
   @@index([userId, readAt])
   @@map("notifications")
+}
+
+// ---------------------------------------------------------------------------
+// WhatsApp broadcasts
+//
+// A shop links its own WhatsApp number, imports the customers who gave it
+// their number, writes a template and sends to them. Messages go out through
+// the shop's own account, one at a time with a pause between them.
+// ---------------------------------------------------------------------------
+
+enum WhatsappStatus {
+  DISCONNECTED
+  // A QR code is waiting to be scanned by the shop's phone.
+  AWAITING_SCAN
+  CONNECTED
+}
+
+model WhatsappSession {
+  id          String         @id @default(uuid()) @db.VarChar(36)
+  businessId  String         @unique @db.VarChar(36)
+  business    Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  status      WhatsappStatus @default(DISCONNECTED)
+  // The linked handset's own number, shown so a shop can tell which account
+  // is connected. No credentials are stored here — the session lives on disk
+  // in whatsapp-web.js's own store.
+  phoneNumber String?        @db.VarChar(24)
+  // Current login QR, as a data URL. Cleared the moment it is scanned.
+  qrDataUrl   String?        @db.LongText
+  lastError   String?        @db.Text
+  connectedAt DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@map("whatsapp_sessions")
+}
+
+enum ContactSource {
+  MANUAL
+  IMPORT
+}
+
+model Contact {
+  id         String        @id @default(uuid()) @db.VarChar(36)
+  businessId String        @db.VarChar(36)
+  business   Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name       String
+  // Digits only, with country code — the form WhatsApp addresses need.
+  phone      String        @db.VarChar(20)
+  email      String?
+  // Free-text grouping ("walk-in", "diwali-2026") for picking an audience.
+  tag        String?       @db.VarChar(60)
+  // Someone who asked to stop hearing from this shop. Never messaged again,
+  // and kept rather than deleted so a re-import cannot resurrect them.
+  optedOut   Boolean       @default(false)
+  optedOutAt DateTime?
+  source     ContactSource @default(MANUAL)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  messages CampaignMessage[]
+
+  @@unique([businessId, phone])
+  @@index([businessId, optedOut])
+  @@index([businessId, tag])
+  @@map("contacts")
+}
+
+model MessageTemplate {
+  id         String   @id @default(uuid()) @db.VarChar(36)
+  businessId String   @db.VarChar(36)
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name       String
+  // Supports {{name}} and {{business}} placeholders, filled per recipient.
+  body       String   @db.Text
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  campaigns Campaign[]
+
+  @@index([businessId])
+  @@map("message_templates")
+}
+
+enum CampaignStatus {
+  DRAFT
+  SENDING
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+model Campaign {
+  id         String           @id @default(uuid()) @db.VarChar(36)
+  businessId String           @db.VarChar(36)
+  business   Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name       String
+  templateId String?          @db.VarChar(36)
+  template   MessageTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  // Snapshot of the wording actually used, so editing a template later never
+  // rewrites what was already sent.
+  body       String           @db.Text
+  status     CampaignStatus   @default(DRAFT)
+
+  totalCount   Int @default(0)
+  sentCount    Int @default(0)
+  failedCount  Int @default(0)
+  skippedCount Int @default(0)
+
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  messages CampaignMessage[]
+
+  @@index([businessId, status])
+  @@map("campaigns")
+}
+
+enum CampaignMessageStatus {
+  PENDING
+  SENT
+  FAILED
+  // Recipient opted out between queueing and sending.
+  SKIPPED
+}
+
+model CampaignMessage {
+  id         String                @id @default(uuid()) @db.VarChar(36)
+  campaignId String                @db.VarChar(36)
+  campaign   Campaign              @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  contactId  String?               @db.VarChar(36)
+  contact    Contact?              @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  // Snapshots, so the log stands on its own if a contact is later removed.
+  name       String
+  phone      String                @db.VarChar(20)
+  body       String                @db.Text
+  status     CampaignMessageStatus @default(PENDING)
+  error      String?               @db.Text
+  attempts   Int                   @default(0)
+  sentAt     DateTime?
+
+  @@index([campaignId, status])
+  @@map("campaign_messages")
 }

@@ -3,6 +3,7 @@ import { env } from "@/config/env";
 import { connectDatabase, disconnectDatabase } from "@/config/database";
 import { assertPrismaClientIsCurrent } from "@/config/prismaClientCheck";
 import { connectRedis, redis } from "@/config/redis";
+import { startDispatcher, stopDispatcher } from "@/modules/whatsapp/dispatcher";
 import { logger } from "@/config/logger";
 
 async function main(): Promise<void> {
@@ -13,6 +14,9 @@ async function main(): Promise<void> {
   await connectDatabase();
   await connectRedis();
 
+  // Drains queued WhatsApp campaigns in the background, slowly.
+  startDispatcher();
+
   const app = createApp();
   const server = app.listen(env.PORT, () => {
     logger.info(`API listening on port ${env.PORT} (${env.NODE_ENV})`);
@@ -20,6 +24,7 @@ async function main(): Promise<void> {
 
   const shutdown = async (signal: string): Promise<void> => {
     logger.info(`Received ${signal}, shutting down gracefully`);
+    stopDispatcher();
     server.close(async () => {
       await disconnectDatabase();
       redis.disconnect();

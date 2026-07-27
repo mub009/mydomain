@@ -118,6 +118,43 @@ cd backend && npm test
 - **B2B services** — buyers post RFQs, businesses submit competing quotes,
   buyer awards a quote (auto-rejecting the rest).
 - **Admin** — pending-business approval queue, platform stats.
+- **WhatsApp broadcasts** — a shop links its own WhatsApp number by scanning a
+  QR code, imports customers from an .xlsx file, saves reusable templates with
+  `{{name}}`-style placeholders, and sends a campaign. See below.
+
+## WhatsApp broadcasts
+
+Business dashboard → **WhatsApp**. Four steps: link the account, import
+contacts, write a template, send a campaign.
+
+Contacts are read from a spreadsheet with **exceljs**. Columns are matched by
+heading rather than position, so "Mobile No.", "WhatsApp Number" and "Contact
+no" all find the phone column; a sheet with no header falls back to
+name-then-phone. Numbers are normalised to `country code + digits`, a bare
+10-digit number is treated as Indian, and unusable rows are reported back with
+the row number rather than dropped silently.
+
+Sending goes through **whatsapp-web.js**, which drives a real linked WhatsApp
+account. Two things follow from that:
+
+- **It is not an official WhatsApp API.** Meta does not sanction bulk sending
+  from a normal account, and a number used carelessly can be restricted or
+  banned. For volume, the official WhatsApp Business Cloud API is the
+  supported route; the transport sits behind an interface
+  (`modules/whatsapp/transport.ts`) so a Cloud API implementation can be
+  dropped in without touching anything else.
+- **Sending is deliberately slow.** One message at a time, an 8-second base
+  pause plus random jitter between each, and a hard daily cap per business
+  (250 by default). All three are configurable — raising them raises the risk.
+
+`WHATSAPP_TRANSPORT` defaults to `log`, which records what *would* be sent
+without touching WhatsApp, so the whole flow can be exercised safely. Set it to
+`webjs` to send for real.
+
+Opt-outs are respected at two points: contacts marked opted out are excluded
+when a campaign is built, and re-checked again immediately before each message
+goes out, so someone who asks to stop mid-campaign is skipped. Re-importing a
+spreadsheet never resurrects an opted-out number.
 
 ## API shape
 

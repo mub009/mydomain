@@ -15,6 +15,10 @@ npm-debug.log*
 backend/prisma/dev.db
 backend/prisma/migrations/dev/
 
+## WhatsApp linked sessions — these are live credentials for a shop's account
+backend/.whatsapp-sessions/
+.whatsapp-sessions/
+
 ## OS
 .DS_Store
 Thumbs.db

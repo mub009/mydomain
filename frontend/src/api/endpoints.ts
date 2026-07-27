@@ -20,12 +20,19 @@ import {
   Review,
   ReviewLinks,
   ReviewQrCode,
+  Campaign,
+  CampaignMessage,
+  Contact,
+  ContactSummary,
+  ImportResult,
+  MessageTemplate,
   Rfq,
   ShopCustomer,
   SiteType,
   StorefrontTheme,
   UserRole,
   Visitor,
+  WhatsappSession,
 } from "@/types";
 
 export const authApi = {
@@ -416,4 +423,85 @@ export const shopApi = {
       notes?: string;
     },
   ) => api.post<ApiResponse<PlacedOrder>>(`/sites/${slug}/orders`, payload).then((r) => r.data.data),
+};
+
+// ---------------------------------------------------------------------------
+// WhatsApp broadcasts
+// ---------------------------------------------------------------------------
+
+export interface ContactListResponse extends PaginatedResponse<Contact> {
+  summary: ContactSummary;
+}
+
+export const whatsappApi = {
+  // Session
+  session: (businessId: string) =>
+    api.get<ApiResponse<WhatsappSession>>(`/businesses/${businessId}/whatsapp/session`).then((r) => r.data.data),
+  connect: (businessId: string) =>
+    api.post<ApiResponse<WhatsappSession>>(`/businesses/${businessId}/whatsapp/connect`).then((r) => r.data.data),
+  disconnect: (businessId: string) =>
+    api.post<ApiResponse<WhatsappSession>>(`/businesses/${businessId}/whatsapp/disconnect`).then((r) => r.data.data),
+
+  // Contacts
+  contacts: (businessId: string, params: Record<string, unknown> = {}) =>
+    api.get<ContactListResponse>(`/businesses/${businessId}/contacts`, { params }).then((r) => r.data),
+  addContact: (businessId: string, payload: { name: string; phone: string; email?: string; tag?: string }) =>
+    api.post<ApiResponse<Contact>>(`/businesses/${businessId}/contacts`, payload).then((r) => r.data.data),
+  updateContact: (
+    businessId: string,
+    contactId: string,
+    payload: { name?: string; tag?: string | null; optedOut?: boolean },
+  ) =>
+    api
+      .patch<ApiResponse<Contact>>(`/businesses/${businessId}/contacts/${contactId}`, payload)
+      .then((r) => r.data.data),
+  deleteContact: (businessId: string, contactId: string) =>
+    api.delete<ApiResponse<{ id: string }>>(`/businesses/${businessId}/contacts/${contactId}`).then((r) => r.data.data),
+  importContacts: (businessId: string, file: File, tag?: string) => {
+    const form = new FormData();
+    form.append("file", file);
+    return api
+      .post<ApiResponse<ImportResult>>(`/businesses/${businessId}/contacts/import`, form, {
+        params: tag ? { tag } : undefined,
+      })
+      .then((r) => r.data.data);
+  },
+
+  // Templates
+  templates: (businessId: string) =>
+    api.get<ApiResponse<MessageTemplate[]>>(`/businesses/${businessId}/templates`).then((r) => r.data.data),
+  createTemplate: (businessId: string, payload: { name: string; body: string }) =>
+    api.post<ApiResponse<MessageTemplate>>(`/businesses/${businessId}/templates`, payload).then((r) => r.data.data),
+  updateTemplate: (businessId: string, templateId: string, payload: { name?: string; body?: string }) =>
+    api
+      .patch<ApiResponse<MessageTemplate>>(`/businesses/${businessId}/templates/${templateId}`, payload)
+      .then((r) => r.data.data),
+  deleteTemplate: (businessId: string, templateId: string) =>
+    api
+      .delete<ApiResponse<{ id: string }>>(`/businesses/${businessId}/templates/${templateId}`)
+      .then((r) => r.data.data),
+
+  // Campaigns
+  campaigns: (businessId: string, params: Record<string, unknown> = {}) =>
+    api.get<PaginatedResponse<Campaign>>(`/businesses/${businessId}/campaigns`, { params }).then((r) => r.data),
+  createCampaign: (
+    businessId: string,
+    payload: { name: string; body: string; templateId?: string; tag?: string; contactIds?: string[] },
+  ) => api.post<ApiResponse<Campaign>>(`/businesses/${businessId}/campaigns`, payload).then((r) => r.data.data),
+  campaign: (businessId: string, campaignId: string, params: Record<string, unknown> = {}) =>
+    api
+      .get<{
+        success: boolean;
+        data: { campaign: Campaign; messages: CampaignMessage[] };
+        meta: { page: number; pageSize: number; total: number; totalPages: number };
+      }>(`/businesses/${businessId}/campaigns/${campaignId}`, { params })
+      .then((r) => r.data),
+  startCampaign: (businessId: string, campaignId: string) =>
+    api
+      .post<ApiResponse<Campaign>>(`/businesses/${businessId}/campaigns/${campaignId}/start`)
+      .then((r) => r.data.data),
+  setCampaignStatus: (businessId: string, campaignId: string, status: string) =>
+    api
+      .patch<ApiResponse<Campaign>>(`/businesses/${businessId}/campaigns/${campaignId}/status`, { status })
+      .then((r) => r.data.data),
 };

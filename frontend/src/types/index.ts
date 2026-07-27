@@ -397,6 +397,99 @@ export interface ShopCustomer {
   lastOrderAt: string;
 }
 
+// --- WhatsApp broadcasts ----------------------------------------------------
+
+export type WhatsappStatus = "DISCONNECTED" | "AWAITING_SCAN" | "CONNECTED";
+
+export interface WhatsappSession {
+  status: WhatsappStatus;
+  phoneNumber: string | null;
+  qrDataUrl: string | null;
+  lastError: string | null;
+  connectedAt: string | null;
+  /** True only when a send would work right now. */
+  canSend: boolean;
+  transport: "log" | "webjs";
+  dailyLimit: number;
+  sentToday: number;
+}
+
+export interface Contact {
+  id: string;
+  name: string;
+  phone: string;
+  email?: string | null;
+  tag?: string | null;
+  optedOut: boolean;
+  optedOutAt?: string | null;
+  source: "MANUAL" | "IMPORT";
+  createdAt: string;
+}
+
+export interface ContactSummary {
+  optedOut: number;
+  tags: { tag: string; count: number }[];
+}
+
+export interface ImportResult {
+  imported: number;
+  updated: number;
+  duplicatesInFile: number;
+  skipped: number;
+  totalRows: number;
+  stillOptedOut: number;
+  problems: { row: number; value: string; reason: string }[];
+}
+
+export interface MessageTemplate {
+  id: string;
+  name: string;
+  body: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Placeholders a template body may use. */
+export const TEMPLATE_VARIABLES = ["name", "business", "city", "phone"] as const;
+
+export type CampaignStatus = "DRAFT" | "SENDING" | "PAUSED" | "COMPLETED" | "CANCELLED";
+
+export const CAMPAIGN_STATUS_LABELS: Record<CampaignStatus, string> = {
+  DRAFT: "Ready to send",
+  SENDING: "Sending",
+  PAUSED: "Paused",
+  COMPLETED: "Finished",
+  CANCELLED: "Cancelled",
+};
+
+export interface Campaign {
+  id: string;
+  name: string;
+  body: string;
+  templateId?: string | null;
+  template?: { name: string } | null;
+  status: CampaignStatus;
+  totalCount: number;
+  sentCount: number;
+  failedCount: number;
+  skippedCount: number;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  createdAt: string;
+}
+
+export type CampaignMessageStatus = "PENDING" | "SENT" | "FAILED" | "SKIPPED";
+
+export interface CampaignMessage {
+  id: string;
+  name: string;
+  phone: string;
+  body: string;
+  status: CampaignMessageStatus;
+  error?: string | null;
+  sentAt?: string | null;
+}
+
 export interface PaginatedResponse<T> {
   success: boolean;
   data: T[];

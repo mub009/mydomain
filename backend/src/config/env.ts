@@ -19,6 +19,23 @@ const envSchema = z.object({
   SMTP_USER: z.string().optional().default(""),
   SMTP_PASS: z.string().optional().default(""),
   MAIL_FROM: z.string().default("Markkito <no-reply@markkito.com>"),
+
+  // WhatsApp broadcasts. "log" records what would be sent without touching
+  // WhatsApp — the default, so a dev machine never links a real account by
+  // accident. "webjs" drives a real linked handset via whatsapp-web.js.
+  WHATSAPP_TRANSPORT: z.enum(["log", "webjs"]).default("log"),
+  // Where whatsapp-web.js keeps each linked session. Must survive restarts,
+  // or every shop has to re-scan a QR code after a deploy.
+  WHATSAPP_SESSION_DIR: z.string().default(".whatsapp-sessions"),
+  // Chromium for whatsapp-web.js. Blank lets Puppeteer find its own.
+  WHATSAPP_CHROMIUM_PATH: z.string().optional().default(""),
+  // Pause between two messages in the same campaign. Sending a burst is the
+  // fastest way to get a number flagged, so this is deliberately unhurried.
+  WHATSAPP_SEND_DELAY_MS: z.coerce.number().min(1000).default(8000),
+  // Extra random jitter added to that pause, so the gap is not machine-regular.
+  WHATSAPP_SEND_JITTER_MS: z.coerce.number().min(0).default(4000),
+  // Ceiling per business per calendar day.
+  WHATSAPP_DAILY_LIMIT: z.coerce.number().min(1).default(250),
 });
 
 const parsed = envSchema.safeParse(process.env);
