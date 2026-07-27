@@ -125,7 +125,9 @@ export async function claimCode(actor: Actor, rawCode: string, businessId: strin
   if (qr.status === ReviewQrStatus.DISABLED) {
     throw AppError.badRequest("This QR board has been disabled. Please contact the admin for a replacement.");
   }
-  if (qr.status === ReviewQrStatus.ASSIGNED) {
+  // A board whose business was deleted keeps status ASSIGNED but loses the
+  // link; treat that as free rather than leaving the board unusable forever.
+  if (qr.status === ReviewQrStatus.ASSIGNED && qr.businessId) {
     if (qr.businessId === businessId) {
       throw AppError.conflict("This QR board is already attached to this business.");
     }
@@ -201,9 +203,17 @@ export async function listBusinessQrCodes(actor: Actor, businessId: string) {
 
 // Admin actions: detach a board (back to the pool) or disable a lost one.
 export async function updateQrCodeAsAdmin(
+  actor: Actor,
   id: string,
   data: { status?: ReviewQrStatus; businessId?: string | null; channel?: ReviewChannel | null },
 ) {
+  // Detaching or reassigning a board is an admin decision: a dealer or owner
+  // must not be able to take a board off a shop, or move it to another one.
+  // The route already enforces this; asserting here keeps the guarantee even
+  // if this service is ever called from somewhere less restricted.
+  if (actor.role !== UserRole.ADMIN) {
+    throw AppError.forbidden("Only an admin can detach or reassign a QR board");
+  }
   if (data.status === undefined && data.businessId === undefined && data.channel === undefined) {
     throw AppError.badRequest("Provide a status, business, or channel to change");
   }
@@ -287,4 +297,17 @@ export async function resolveQrScan(
   ]).catch(() => undefined);
 
   return { kind: "redirect", url, channel };
+}
+
+// Called when a business is deleted: its boards return to the unassigned pool
+// so they can be handed to another shop, instead of being stranded as
+// "assigned" with nothing behind them.
+export async function releaseBoardsForBusiness(
+  tx: Prisma.TransactionClient,
+  businessId: string,
+): Promise<void> {
+  await tx.reviewQrCode.updateMany({
+    where: { businessId },
+    data: { businessId: null, status: ReviewQrStatus.UNASSIGNED, assignedAt: null, assignedById: null, channel: null },
+  });
 }

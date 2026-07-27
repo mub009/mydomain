@@ -25,7 +25,7 @@ export async function listQrCodesHandler(req: Request, res: Response): Promise<v
 }
 
 export async function updateQrCodeHandler(req: Request, res: Response): Promise<void> {
-  ok(res, await qrcodesService.updateQrCodeAsAdmin(req.params.id, req.body));
+  ok(res, await qrcodesService.updateQrCodeAsAdmin(actor(req), req.params.id, req.body));
 }
 
 // Shop-facing -----------------------------------------------------------

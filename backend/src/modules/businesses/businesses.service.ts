@@ -5,6 +5,7 @@ import { AppError } from "@/common/errors";
 import { sendBusinessWelcomeEmail } from "@/common/mailer";
 import { parsePagination } from "@/common/pagination";
 import { assertHasPointsForBusiness, spendPointsForBusiness } from "@/modules/points/points.service";
+import { releaseBoardsForBusiness } from "@/modules/reviewqr/qrcodes.service";
 
 interface Actor {
   sub: string;
@@ -210,7 +211,14 @@ export async function updateBusiness(actor: Actor, id: string, data: Record<stri
 export async function deleteBusiness(actor: Actor, id: string) {
   const business = await getBusinessById(id);
   assertOwnerOrAdmin(actor, business.ownerId);
-  await prisma.business.delete({ where: { id } });
+
+  // Return any issued QR boards to the unassigned pool first. Without this the
+  // board keeps its "assigned" status while losing the business behind it,
+  // leaving a printed board that can neither be scanned nor re-claimed.
+  await prisma.$transaction(async (tx) => {
+    await releaseBoardsForBusiness(tx, id);
+    await tx.business.delete({ where: { id } });
+  });
 }
 
 export async function submitForApproval(actor: Actor, id: string) {
