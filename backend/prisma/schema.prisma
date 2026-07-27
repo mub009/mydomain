@@ -418,6 +418,7 @@ enum ReviewChannel {
   FACEBOOK
   YOUTUBE
   WEBSITE
+  DIRECTIONS // navigate to the shop, built from its coordinates
 }
 
 enum ReviewQrStatus {

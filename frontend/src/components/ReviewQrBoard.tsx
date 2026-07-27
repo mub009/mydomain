@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Download, ExternalLink, Facebook, Globe, Instagram, Link2, QrCode, Star, Youtube } from "lucide-react";
+import { Download, ExternalLink, Facebook, Globe, Instagram, Link2, Navigation, QrCode, Star, Youtube } from "lucide-react";
 import { Link } from "react-router-dom";
 import { businessesApi, qrCodesApi } from "@/api/endpoints";
 import { apiErrorMessage } from "@/api/client";
@@ -14,6 +14,7 @@ const CHANNELS: { value: ReviewChannel; label: string; icon: typeof Star; tint: 
   { value: "FACEBOOK", label: "Facebook", icon: Facebook, tint: "text-blue-600" },
   { value: "YOUTUBE", label: "YouTube", icon: Youtube, tint: "text-red-600" },
   { value: "WEBSITE", label: "Website", icon: Globe, tint: "text-brand-600" },
+  { value: "DIRECTIONS", label: "Directions", icon: Navigation, tint: "text-sky-600" },
 ];
 
 // Small scannable preview of an issued board, shown in the list.

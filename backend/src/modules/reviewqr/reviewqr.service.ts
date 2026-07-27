@@ -19,7 +19,7 @@ export interface ReviewLinksInput {
 type LinkSource = Pick<
   ReviewLinksInput,
   "googlePlaceId" | "googleReviewUrl" | "instagramUsername" | "facebookPageUrl" | "youtubeUrl"
-> & { website?: string | null };
+> & { website?: string | null; latitude?: number | null; longitude?: number | null };
 
 // Google's canonical "write a review" deep link. Scanning it on a phone opens
 // the Maps app straight on the review composer for that place.
@@ -52,6 +52,13 @@ export function youtubeLink(source: LinkSource): string | null {
   return `https://www.youtube.com/${raw.startsWith("@") ? raw : `@${raw}`}`;
 }
 
+// Turn-by-turn navigation to the shop. Built from the coordinates already on
+// the listing, so it needs no setup from the owner and is always available.
+export function directionsLink(source: LinkSource): string | null {
+  if (source.latitude == null || source.longitude == null) return null;
+  return `https://www.google.com/maps/dir/?api=1&destination=${source.latitude},${source.longitude}`;
+}
+
 export function websiteLink(source: LinkSource): string | null {
   if (!source.website) return null;
   const raw = source.website.trim();
@@ -70,6 +77,8 @@ export function resolveChannelUrl(source: LinkSource, channel: ReviewChannel): s
       return youtubeLink(source);
     case ReviewChannel.WEBSITE:
       return websiteLink(source);
+    case ReviewChannel.DIRECTIONS:
+      return directionsLink(source);
     default:
       return null;
   }
@@ -83,6 +92,7 @@ export function availableChannels(source: LinkSource): ReviewChannel[] {
     ReviewChannel.FACEBOOK,
     ReviewChannel.YOUTUBE,
     ReviewChannel.WEBSITE,
+    ReviewChannel.DIRECTIONS,
   ];
   return order.filter((channel) => resolveChannelUrl(source, channel));
 }
@@ -118,6 +128,7 @@ export async function getReviewLinks(actor: Actor, businessId: string) {
       FACEBOOK: facebookLink(business),
       YOUTUBE: youtubeLink(business),
       WEBSITE: websiteLink(business),
+      DIRECTIONS: directionsLink(business),
     },
     scanCounts: Object.fromEntries(scans.map((s) => [s.channel, s._count._all])) as Record<string, number>,
     totalScans: scans.reduce((sum, s) => sum + s._count._all, 0),

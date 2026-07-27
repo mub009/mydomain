@@ -182,7 +182,7 @@ export interface Quote {
   business?: { id: string; name: string; slug: string; avgRating: number };
 }
 
-export type ReviewChannel = "GOOGLE" | "INSTAGRAM" | "FACEBOOK" | "YOUTUBE" | "WEBSITE";
+export type ReviewChannel = "GOOGLE" | "INSTAGRAM" | "FACEBOOK" | "YOUTUBE" | "WEBSITE" | "DIRECTIONS";
 
 // Destination options offered in the QR "purpose" dropdowns.
 export const REVIEW_CHANNELS: { value: ReviewChannel; label: string }[] = [
@@ -191,6 +191,7 @@ export const REVIEW_CHANNELS: { value: ReviewChannel; label: string }[] = [
   { value: "FACEBOOK", label: "Facebook" },
   { value: "YOUTUBE", label: "YouTube" },
   { value: "WEBSITE", label: "Website" },
+  { value: "DIRECTIONS", label: "Directions to shop" },
 ];
 
 export const CHANNEL_LABELS: Record<ReviewChannel, string> = {
@@ -199,6 +200,7 @@ export const CHANNEL_LABELS: Record<ReviewChannel, string> = {
   FACEBOOK: "Facebook",
   YOUTUBE: "YouTube",
   WEBSITE: "Website",
+  DIRECTIONS: "Directions to shop",
 };
 
 export interface ReviewLinks {

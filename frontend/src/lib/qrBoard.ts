@@ -21,6 +21,7 @@ export function renderQrDataUrl(text: string, width = 512): Promise<string> {
 export function boardHeadline(channel?: ReviewChannel | null): string {
   if (!channel || channel === "GOOGLE") return "Scan to review us";
   if (channel === "WEBSITE") return "Scan to visit our website";
+  if (channel === "DIRECTIONS") return "Scan for directions to our shop";
   return `Scan to find us on ${CHANNEL_LABELS[channel]}`;
 }
 

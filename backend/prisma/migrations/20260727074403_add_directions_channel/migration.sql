@@ -1,0 +1,8 @@
+-- AlterTable
+ALTER TABLE `businesses` MODIFY `preferredReviewChannel` ENUM('GOOGLE', 'INSTAGRAM', 'FACEBOOK', 'YOUTUBE', 'WEBSITE', 'DIRECTIONS') NULL;
+
+-- AlterTable
+ALTER TABLE `review_qr_codes` MODIFY `channel` ENUM('GOOGLE', 'INSTAGRAM', 'FACEBOOK', 'YOUTUBE', 'WEBSITE', 'DIRECTIONS') NULL;
+
+-- AlterTable
+ALTER TABLE `review_scans` MODIFY `channel` ENUM('GOOGLE', 'INSTAGRAM', 'FACEBOOK', 'YOUTUBE', 'WEBSITE', 'DIRECTIONS') NOT NULL;
