@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import path from "node:path";
 import { WhatsappStatus } from "@prisma/client";
 import { env } from "@/config/env";
@@ -88,6 +89,39 @@ class LogTransport implements WhatsAppTransport {
 // whatsapp-web.js transport
 // ---------------------------------------------------------------------------
 
+/**
+ * Checks the browser before Puppeteer does, so a misconfigured path fails with
+ * the command that fixes it rather than a bare "Browser was not found".
+ *
+ * The install deliberately skips Puppeteer's bundled Chromium download, so a
+ * fresh checkout has no browser at all until someone provides one.
+ */
+function assertChromiumIsUsable(): void {
+  const configured = env.WHATSAPP_CHROMIUM_PATH.trim();
+
+  if (!configured) {
+    // Empty means "let Puppeteer find its own", which only works once its
+    // browser has been installed. Puppeteer's own error covers that case
+    // clearly, so there is nothing useful to add here.
+    return;
+  }
+
+  if (!fs.existsSync(configured)) {
+    throw new Error(
+      `WHATSAPP_CHROMIUM_PATH points at "${configured}", but there is no file there.\n` +
+        "Either run `npx puppeteer browsers install chrome` in the backend and leave " +
+        "WHATSAPP_CHROMIUM_PATH empty, or set it to a browser that exists — find one with " +
+        "`which chromium chromium-browser google-chrome google-chrome-stable`.",
+    );
+  }
+
+  try {
+    fs.accessSync(configured, fs.constants.X_OK);
+  } catch {
+    throw new Error(`WHATSAPP_CHROMIUM_PATH points at "${configured}", but that file is not executable.`);
+  }
+}
+
 interface WebJsClient {
   initialize(): Promise<void>;
   destroy(): Promise<void>;
@@ -115,6 +149,8 @@ class WebJsTransport implements WhatsAppTransport {
   }
 
   private async start(businessId: string): Promise<void> {
+    assertChromiumIsUsable();
+
     // Imported lazily: whatsapp-web.js spawns a browser on load, which no
     // deployment should pay for unless a shop is actually linking an account.
     //

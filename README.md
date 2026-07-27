@@ -160,14 +160,24 @@ cd backend
 npx puppeteer browsers install chrome
 ```
 
-...or point at a Chromium you already have:
+...or point at a Chromium you already have. Find its real path first — do not
+copy a path from this README, it varies by machine:
+
+```bash
+which chromium chromium-browser google-chrome google-chrome-stable
+```
 
 ```bash
 # backend/.env
 WHATSAPP_TRANSPORT=webjs
-WHATSAPP_CHROMIUM_PATH=/usr/bin/chromium        # leave blank to use Puppeteer's
+# Leave EMPTY if you ran `npx puppeteer browsers install chrome` above.
+# Otherwise paste the path `which` actually printed.
+WHATSAPP_CHROMIUM_PATH=
 WHATSAPP_SESSION_DIR=.whatsapp-sessions
 ```
+
+A path that does not exist is caught at connect time and reported with the
+command that fixes it, rather than surfacing as a bare "Browser was not found".
 
 Then restart the backend (`.env` is read at boot, so a file save is not enough)
 and open **Business dashboard → WhatsApp → Connection → Link WhatsApp**. A QR
