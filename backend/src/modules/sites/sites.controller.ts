@@ -9,7 +9,12 @@ function actor(req: Request) {
 }
 
 export async function getSiteHandler(req: Request, res: Response): Promise<void> {
-  ok(res, await sitesService.getSiteForEditor(actor(req), req.params.id));
+  const templateId = typeof req.query.templateId === "string" ? req.query.templateId : undefined;
+  ok(res, await sitesService.getSiteForEditor(actor(req), req.params.id, templateId));
+}
+
+export async function previewTemplateHandler(req: Request, res: Response): Promise<void> {
+  ok(res, await sitesService.previewTemplate(actor(req), req.params.id, req.params.templateId));
 }
 
 export async function saveSiteHandler(req: Request, res: Response): Promise<void> {

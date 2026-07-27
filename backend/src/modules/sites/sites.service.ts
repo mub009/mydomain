@@ -1,7 +1,7 @@
 import { Prisma, UserRole } from "@prisma/client";
 import { prisma } from "@/config/database";
 import { AppError } from "@/common/errors";
-import { buildStarterTemplate } from "./starterTemplate";
+import { buildTemplate, DEFAULT_TEMPLATE_ID, isKnownTemplate, templateChoices } from "./templates";
 import { sanitizeSiteCss, sanitizeSiteHtml } from "./sanitize";
 
 interface Actor {
@@ -35,12 +35,16 @@ async function loadBusiness(businessId: string) {
 // so we hand back a starter page built from the listing's own data — name,
 // contact details, opening hours, services and photos — which the owner then
 // edits. Nothing is persisted until they save.
-export async function getSiteForEditor(actor: Actor, businessId: string) {
+//
+// `templateId` lets the editor preview a different design without committing
+// to it; when omitted the business's own saved choice is used.
+export async function getSiteForEditor(actor: Actor, businessId: string, templateId?: string) {
   const business = await loadBusiness(businessId);
   assertOwnerOrAdmin(actor, business.ownerId);
 
   const site = await prisma.businessSite.findUnique({ where: { businessId } });
-  const starter = buildStarterTemplate(business);
+  const selectedId = templateId ?? site?.templateId ?? DEFAULT_TEMPLATE_ID;
+  const starter = buildTemplate(business, selectedId);
 
   return {
     businessId,
@@ -51,6 +55,10 @@ export async function getSiteForEditor(actor: Actor, businessId: string) {
     publishedAt: site?.publishedAt ?? null,
     updatedAt: site?.updatedAt ?? null,
     hasSavedDraft: !!site,
+    // What the site is saved as, vs. what this response was rendered with.
+    templateId: site?.templateId ?? DEFAULT_TEMPLATE_ID,
+    renderedTemplateId: starter.templateId,
+    templates: templateChoices(),
     starterHtml: starter.html,
     starterCss: starter.css,
     // Handy for "reset to my account data" in the editor.
@@ -58,14 +66,32 @@ export async function getSiteForEditor(actor: Actor, businessId: string) {
   };
 }
 
+/**
+ * Renders one of the designs for a business without saving it, so the picker
+ * can preview a template before the owner commits to it.
+ */
+export async function previewTemplate(actor: Actor, businessId: string, templateId: string) {
+  const business = await loadBusiness(businessId);
+  assertOwnerOrAdmin(actor, business.ownerId);
+
+  if (!isKnownTemplate(templateId)) throw AppError.badRequest(`Unknown website template "${templateId}"`);
+
+  const built = buildTemplate(business, templateId);
+  return { templateId: built.templateId, html: built.html, css: built.css };
+}
+
 export async function saveSite(
   actor: Actor,
   businessId: string,
-  data: { projectData?: unknown; html?: string; css?: string },
+  data: { projectData?: unknown; html?: string; css?: string; templateId?: string },
 ) {
   const business = await prisma.business.findUnique({ where: { id: businessId } });
   if (!business) throw AppError.notFound("Business not found");
   assertOwnerOrAdmin(actor, business.ownerId);
+
+  if (data.templateId && !isKnownTemplate(data.templateId)) {
+    throw AppError.badRequest(`Unknown website template "${data.templateId}"`);
+  }
 
   // The rendered output is served on our own origin, so strip anything
   // executable before it is stored. The editor document is kept as authored —
@@ -74,15 +100,18 @@ export async function saveSite(
     projectData: (data.projectData ?? Prisma.DbNull) as Prisma.InputJsonValue,
     html: data.html ? sanitizeSiteHtml(data.html) : null,
     css: data.css ? sanitizeSiteCss(data.css) : null,
+    // Only overwritten when the editor actually applied a template, so an
+    // ordinary content save keeps the design the owner already picked.
+    ...(data.templateId ? { templateId: data.templateId } : {}),
   };
 
   const site = await prisma.businessSite.upsert({
     where: { businessId },
-    create: { businessId, ...payload },
+    create: { businessId, templateId: data.templateId ?? DEFAULT_TEMPLATE_ID, ...payload },
     update: payload,
   });
 
-  return { savedAt: site.updatedAt, isPublished: site.isPublished };
+  return { savedAt: site.updatedAt, isPublished: site.isPublished, templateId: site.templateId };
 }
 
 export async function setPublished(actor: Actor, businessId: string, isPublished: boolean) {

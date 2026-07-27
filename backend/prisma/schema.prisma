@@ -395,6 +395,9 @@ model BusinessSite {
   id          String    @id @default(uuid()) @db.VarChar(36)
   businessId  String    @unique @db.VarChar(36)
   business    Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  // Which of the built-in designs this site started from. Kept so the editor
+  // can show the current choice and rebuild from the same design on reset.
+  templateId  String    @default("classic") @db.VarChar(40)
   projectData Json?
   html        String?   @db.LongText
   css         String?   @db.LongText

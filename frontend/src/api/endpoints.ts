@@ -129,6 +129,14 @@ export const qrCodesApi = {
     api.patch<ApiResponse<ReviewQrCode>>(`/businesses/${businessId}/qr-codes/${qrId}`, { channel }).then((r) => r.data.data),
 };
 
+export interface SiteTemplateChoice {
+  id: string;
+  name: string;
+  description: string;
+  accent: string;
+  bestFor: string;
+}
+
 export interface SiteEditorPayload {
   businessId: string;
   slug: string;
@@ -137,6 +145,11 @@ export interface SiteEditorPayload {
   publishedAt: string | null;
   updatedAt: string | null;
   hasSavedDraft: boolean;
+  /** The design saved against this site. */
+  templateId: string;
+  /** The design `starterHtml`/`starterCss` below were rendered with. */
+  renderedTemplateId: string;
+  templates: SiteTemplateChoice[];
   starterHtml: string;
   starterCss: string;
   businessData: Record<string, unknown>;
@@ -153,9 +166,22 @@ export const sitesApi = {
   // Builder (owner only)
   get: (businessId: string) =>
     api.get<ApiResponse<SiteEditorPayload>>(`/businesses/${businessId}/site`).then((r) => r.data.data),
-  save: (businessId: string, payload: { projectData?: unknown; html?: string; css?: string }) =>
+  save: (
+    businessId: string,
+    payload: { projectData?: unknown; html?: string; css?: string; templateId?: string },
+  ) =>
     api
-      .put<ApiResponse<{ savedAt: string; isPublished: boolean }>>(`/businesses/${businessId}/site`, payload)
+      .put<ApiResponse<{ savedAt: string; isPublished: boolean; templateId: string }>>(
+        `/businesses/${businessId}/site`,
+        payload,
+      )
+      .then((r) => r.data.data),
+  // Renders one of the designs for this business without saving it.
+  previewTemplate: (businessId: string, templateId: string) =>
+    api
+      .get<ApiResponse<{ templateId: string; html: string; css: string }>>(
+        `/businesses/${businessId}/site/templates/${templateId}`,
+      )
       .then((r) => r.data.data),
   publish: (businessId: string, isPublished: boolean) =>
     api
