@@ -58,6 +58,13 @@ export async function deleteContactHandler(req: Request, res: Response): Promise
   ok(res, await whatsapp.deleteContact(actor(req), req.params.contactId));
 }
 
+export async function contactTemplateHandler(req: Request, res: Response): Promise<void> {
+  const { filename, buffer } = await whatsapp.contactTemplate(actor(req), req.params.id);
+  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+  res.send(buffer);
+}
+
 export async function importContactsHandler(req: Request, res: Response): Promise<void> {
   const file = (req as Request & { file?: { buffer: Buffer } }).file;
   if (!file) throw AppError.badRequest("Attach an Excel file to upload");

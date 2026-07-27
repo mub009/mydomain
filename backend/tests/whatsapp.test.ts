@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import ExcelJS from "exceljs";
 import { formatPhone, normalizePhone, toWhatsappId } from "@/modules/whatsapp/phone";
 import { parseContactSheet } from "@/modules/whatsapp/importer";
+import { buildContactTemplate } from "@/modules/whatsapp/contactTemplate";
 import { renderTemplate } from "@/modules/whatsapp/whatsapp.service";
 import { describeWindow, isWithinWindow, msUntilWindowOpens } from "@/modules/whatsapp/sendingWindow";
 import { isOptOutReply } from "@/modules/whatsapp/transport";
@@ -232,5 +233,36 @@ describe("isOptOutReply", () => {
     for (const reply of ["thanks!", "what time do you open?", "stopped by yesterday", "I want to order", ""]) {
       expect(isOptOutReply(reply), reply).toBe(false);
     }
+  });
+});
+
+// Handing people a correct file to start from only helps if that file
+// actually imports — so the template is round-tripped through the parser.
+describe("contact template", () => {
+  it("parses cleanly through the importer it was built for", async () => {
+    const buffer = await buildContactTemplate("Spice Route Kitchen");
+    const parsed = await parseContactSheet(buffer);
+
+    expect(parsed.problems).toEqual([]);
+    expect(parsed.duplicatesInFile).toBe(0);
+    expect(parsed.contacts).toHaveLength(3);
+    // The three example rows deliberately use different phone shapes; all of
+    // them must normalise to the same stored form.
+    expect(parsed.contacts.map((c) => c.phone)).toEqual(["919876543210", "919800011122", "919876512345"]);
+    expect(parsed.contacts[0]).toMatchObject({ name: "Anil Menon", email: "anil@example.com", tag: "regular" });
+  });
+
+  it("keeps the phone column as text so Excel cannot mangle it", async () => {
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load((await buildContactTemplate("Test Shop")) as unknown as ArrayBuffer);
+    expect(workbook.worksheets[0].getColumn(2).numFmt).toBe("@");
+  });
+
+  // The guidance sheet must not be the first one, or the importer would read
+  // prose as contacts.
+  it("puts the fillable sheet first and the guidance after it", async () => {
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load((await buildContactTemplate("Test Shop")) as unknown as ArrayBuffer);
+    expect(workbook.worksheets.map((w) => w.name)).toEqual(["Contacts", "How to use"]);
   });
 });

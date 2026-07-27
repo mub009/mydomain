@@ -4,6 +4,7 @@ import {
   Ban,
   CheckCircle2,
   Clock,
+  Download,
   FileSpreadsheet,
   FlaskConical,
   Gauge,
@@ -260,6 +261,7 @@ function ContactsTab({ business, onNotice, onError }: TabProps) {
   const [uploading, setUploading] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
   const [adding, setAdding] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   const load = useCallback(async () => {
@@ -304,6 +306,27 @@ function ContactsTab({ business, onNotice, onError }: TabProps) {
     }
   }
 
+  // Hands the shop a correctly shaped sheet to fill in, rather than leaving
+  // them to guess the columns.
+  async function downloadTemplate() {
+    setDownloading(true);
+    onError("");
+    try {
+      const { blob, filename } = await whatsappApi.contactTemplate(business.id);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(url);
+      onNotice("Template downloaded. Fill in the Contacts sheet and upload it here.");
+    } catch (err) {
+      onError(apiErrorMessage(err));
+    } finally {
+      setDownloading(false);
+    }
+  }
+
   async function toggleOptOut(contact: Contact) {
     try {
       await whatsappApi.updateContact(business.id, contact.id, { optedOut: !contact.optedOut });
@@ -333,10 +356,18 @@ function ContactsTab({ business, onNotice, onError }: TabProps) {
             </h4>
             <p className="mt-0.5 text-xs text-ink-500">
               Upload an Excel file (.xlsx) with a name and a phone column. Any column order works — headings like
-              “Mobile No.” or “WhatsApp Number” are recognised.
+              “Mobile No.” or “WhatsApp Number” are recognised. New to this? Download the template to start from a
+              file that is already the right shape.
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={downloadTemplate}
+              disabled={downloading}
+              className="btn-secondary px-3 py-2 text-sm disabled:opacity-50"
+            >
+              <Download size={14} /> {downloading ? "Preparing…" : "Excel template"}
+            </button>
             <button onClick={() => setAdding(true)} className="btn-secondary px-3 py-2 text-sm">
               <Plus size={14} /> Add one
             </button>

@@ -434,6 +434,12 @@ export interface ContactListResponse extends PaginatedResponse<Contact> {
   summary: ContactSummary;
 }
 
+/** Pulls the server's suggested filename out of a Content-Disposition header. */
+function filenameFromDisposition(header: unknown): string {
+  const match = typeof header === "string" ? /filename="?([^";]+)"?/.exec(header) : null;
+  return match?.[1] ?? "contacts-template.xlsx";
+}
+
 export const whatsappApi = {
   // Session
   session: (businessId: string) =>
@@ -467,6 +473,12 @@ export const whatsappApi = {
       .then((r) => r.data.data),
   deleteContact: (businessId: string, contactId: string) =>
     api.delete<ApiResponse<{ id: string }>>(`/businesses/${businessId}/contacts/${contactId}`).then((r) => r.data.data),
+  // The blank sheet to fill in. Comes back as a file, so it is fetched as a
+  // blob and handed to the browser rather than parsed.
+  contactTemplate: (businessId: string) =>
+    api
+      .get<Blob>(`/businesses/${businessId}/contacts/template`, { responseType: "blob" })
+      .then((r) => ({ blob: r.data, filename: filenameFromDisposition(r.headers["content-disposition"]) })),
   importContacts: (businessId: string, file: File, tag?: string) => {
     const form = new FormData();
     form.append("file", file);

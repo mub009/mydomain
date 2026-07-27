@@ -18,6 +18,7 @@ import {
 } from "./whatsapp.validation";
 import {
   connectHandler,
+  contactTemplateHandler,
   createCampaignHandler,
   createContactHandler,
   createTemplateHandler,
@@ -90,6 +91,9 @@ whatsappRouter.post(
   validate({ body: createContactSchema }),
   asyncHandler(createContactHandler),
 );
+// The blank sheet to fill in. Sits above /contacts/:contactId so "template"
+// is never read as a contact id.
+whatsappRouter.get("/:id/contacts/template", requireAuth, asyncHandler(contactTemplateHandler));
 whatsappRouter.post(
   "/:id/contacts/import",
   requireAuth,

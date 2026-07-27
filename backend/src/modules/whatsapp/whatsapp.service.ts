@@ -6,6 +6,7 @@ import { env } from "@/config/env";
 import { normalizePhone } from "./phone";
 import { describeWindow, isWithinWindow } from "./sendingWindow";
 import { parseContactSheet } from "./importer";
+import { buildContactTemplate } from "./contactTemplate";
 import { whatsappTransport } from "./transport";
 
 interface Actor {
@@ -234,6 +235,12 @@ export async function deleteContact(actor: Actor, contactId: string) {
   }
   await prisma.contact.delete({ where: { id: contactId } });
   return { id: contactId };
+}
+
+/** The blank sheet a shop fills in before uploading. */
+export async function contactTemplate(actor: Actor, businessId: string) {
+  const business = await ownedBusiness(actor, businessId);
+  return { filename: `${business.slug}-contacts-template.xlsx`, buffer: await buildContactTemplate(business.name) };
 }
 
 /**

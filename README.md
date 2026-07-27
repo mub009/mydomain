@@ -127,6 +127,11 @@ cd backend && npm test
 Business dashboard → **WhatsApp**. Four steps: link the account, import
 contacts, write a template, send a campaign.
 
+**Download the template** under WhatsApp → Contacts for a sheet that is already
+the right shape: a fillable `Contacts` tab with the phone column formatted as
+text (so Excel cannot turn `9876543210` into `9.87654E+09`), plus a `How to use`
+tab explaining the columns and accepted phone formats.
+
 Contacts are read from a spreadsheet with **exceljs**. Columns are matched by
 heading rather than position, so "Mobile No.", "WhatsApp Number" and "Contact
 no" all find the phone column; a sheet with no header falls back to
