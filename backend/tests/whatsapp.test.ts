@@ -3,6 +3,8 @@ import ExcelJS from "exceljs";
 import { formatPhone, normalizePhone, toWhatsappId } from "@/modules/whatsapp/phone";
 import { parseContactSheet } from "@/modules/whatsapp/importer";
 import { renderTemplate } from "@/modules/whatsapp/whatsapp.service";
+import { describeWindow, isWithinWindow, msUntilWindowOpens } from "@/modules/whatsapp/sendingWindow";
+import { isOptOutReply } from "@/modules/whatsapp/transport";
 
 // Numbers come off spreadsheets typed by many different hands.
 describe("normalizePhone", () => {
@@ -166,5 +168,69 @@ describe("header spellings", () => {
     ]);
     const parsed = await parseContactSheet(file);
     expect(parsed.contacts[0]).toMatchObject({ name: "Anil", phone: expected });
+  });
+});
+
+// A campaign of a few hundred at 8s apart runs for hours, so one started in
+// the evening would otherwise still be going at 3am.
+describe("sending window", () => {
+  const at = (hour: number) => new Date(2026, 6, 27, hour, 30, 0);
+
+  it("allows the hours inside a normal daytime window", () => {
+    const window = { windowStartHour: 9, windowEndHour: 21 };
+    expect(isWithinWindow(window, at(9))).toBe(true);
+    expect(isWithinWindow(window, at(20))).toBe(true);
+    expect(isWithinWindow(window, at(8))).toBe(false);
+    expect(isWithinWindow(window, at(21))).toBe(false);
+    expect(isWithinWindow(window, at(3))).toBe(false);
+  });
+
+  it("handles a window that wraps past midnight", () => {
+    const window = { windowStartHour: 22, windowEndHour: 6 };
+    expect(isWithinWindow(window, at(23))).toBe(true);
+    expect(isWithinWindow(window, at(2))).toBe(true);
+    expect(isWithinWindow(window, at(12))).toBe(false);
+  });
+
+  it("treats equal hours as no restriction", () => {
+    const window = { windowStartHour: 0, windowEndHour: 0 };
+    for (const hour of [0, 3, 12, 23]) expect(isWithinWindow(window, at(hour))).toBe(true);
+  });
+
+  it("reports nothing to wait while inside the window", () => {
+    expect(msUntilWindowOpens({ windowStartHour: 9, windowEndHour: 21 }, at(10))).toBe(0);
+  });
+
+  it("waits until this morning's opening when the night is still young", () => {
+    // 03:30, window opens at 09:00 — five and a half hours.
+    const wait = msUntilWindowOpens({ windowStartHour: 9, windowEndHour: 21 }, at(3));
+    expect(wait).toBe(5.5 * 60 * 60 * 1000);
+  });
+
+  it("rolls to tomorrow when today's opening has passed", () => {
+    // 22:30, window opens at 09:00 — ten and a half hours away, not negative.
+    const wait = msUntilWindowOpens({ windowStartHour: 9, windowEndHour: 21 }, at(22));
+    expect(wait).toBe(10.5 * 60 * 60 * 1000);
+  });
+
+  it("describes the window the way the dashboard shows it", () => {
+    expect(describeWindow({ windowStartHour: 9, windowEndHour: 21 })).toBe("9am – 9pm");
+    expect(describeWindow({ windowStartHour: 0, windowEndHour: 12 })).toBe("12am – 12pm");
+    expect(describeWindow({ windowStartHour: 8, windowEndHour: 8 })).toBe("any time");
+  });
+});
+
+// Someone asking to be left alone should never have to guess the magic word.
+describe("isOptOutReply", () => {
+  it("catches the ways people actually ask to stop", () => {
+    for (const reply of ["STOP", "stop", " Stop ", "unsubscribe", "UNSUB", "opt out", "optout", "remove me", "Don't message me"]) {
+      expect(isOptOutReply(reply), reply).toBe(true);
+    }
+  });
+
+  it("leaves ordinary replies alone", () => {
+    for (const reply of ["thanks!", "what time do you open?", "stopped by yesterday", "I want to order", ""]) {
+      expect(isOptOutReply(reply), reply).toBe(false);
+    }
   });
 });

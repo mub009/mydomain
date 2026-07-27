@@ -33,6 +33,7 @@ import {
   UserRole,
   Visitor,
   WhatsappSession,
+  WhatsappSettings,
 } from "@/types";
 
 export const authApi = {
@@ -441,6 +442,15 @@ export const whatsappApi = {
     api.post<ApiResponse<WhatsappSession>>(`/businesses/${businessId}/whatsapp/connect`).then((r) => r.data.data),
   disconnect: (businessId: string) =>
     api.post<ApiResponse<WhatsappSession>>(`/businesses/${businessId}/whatsapp/disconnect`).then((r) => r.data.data),
+  updateSettings: (businessId: string, payload: Partial<WhatsappSettings>) =>
+    api
+      .patch<ApiResponse<WhatsappSession>>(`/businesses/${businessId}/whatsapp/settings`, payload)
+      .then((r) => r.data.data),
+  // One message to a number of your choosing, to check wording before a blast.
+  sendTest: (businessId: string, phone: string, body: string) =>
+    api
+      .post<ApiResponse<{ phone: string; body: string }>>(`/businesses/${businessId}/whatsapp/test`, { phone, body })
+      .then((r) => r.data.data),
 
   // Contacts
   contacts: (businessId: string, params: Record<string, unknown> = {}) =>
@@ -499,6 +509,12 @@ export const whatsappApi = {
   startCampaign: (businessId: string, campaignId: string) =>
     api
       .post<ApiResponse<Campaign>>(`/businesses/${businessId}/campaigns/${campaignId}/start`)
+      .then((r) => r.data.data),
+  retryFailed: (businessId: string, campaignId: string) =>
+    api
+      .post<ApiResponse<{ requeued: number; campaign: Campaign }>>(
+        `/businesses/${businessId}/campaigns/${campaignId}/retry`,
+      )
       .then((r) => r.data.data),
   setCampaignStatus: (businessId: string, campaignId: string, status: string) =>
     api

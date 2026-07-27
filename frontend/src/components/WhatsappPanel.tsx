@@ -3,7 +3,11 @@ import {
   AlertTriangle,
   Ban,
   CheckCircle2,
+  Clock,
   FileSpreadsheet,
+  FlaskConical,
+  Gauge,
+  RotateCcw,
   Link2,
   MessageSquare,
   Pause,
@@ -30,12 +34,13 @@ import {
   MessageTemplate,
   TEMPLATE_VARIABLES,
   WhatsappSession,
+  WhatsappSettings,
 } from "@/types";
 import { ListSkeleton, Spinner } from "@/components/Loading";
 import Modal from "@/components/Modal";
 import Pagination from "@/components/Pagination";
 
-const TABS = ["Connection", "Contacts", "Templates", "Campaigns"] as const;
+const TABS = ["Connection", "Contacts", "Templates", "Campaigns", "Sending"] as const;
 type Tab = (typeof TABS)[number];
 const PAGE_SIZE = 20;
 
@@ -85,6 +90,7 @@ export default function WhatsappPanel({ business }: { business: Business }) {
       {tab === "Contacts" && <ContactsTab business={business} onNotice={setNotice} onError={setError} />}
       {tab === "Templates" && <TemplatesTab business={business} onNotice={setNotice} onError={setError} />}
       {tab === "Campaigns" && <CampaignsTab business={business} onNotice={setNotice} onError={setError} />}
+      {tab === "Sending" && <SendingTab business={business} onNotice={setNotice} onError={setError} />}
     </div>
   );
 }
@@ -178,8 +184,9 @@ function ConnectionTab({ business, onNotice, onError }: TabProps) {
               </p>
               {connected && (
                 <p className="mt-1 text-xs text-ink-500">
-                  <strong className="text-ink-900">{session.sentToday}</strong> of {session.dailyLimit} messages sent
-                  today
+                  <strong className="text-ink-900">{session.sentToday}</strong> of {session.settings.dailyLimit}{" "}
+                  messages sent today · window {session.windowLabel}
+                  {!session.withinWindow && <span className="ml-1 font-semibold text-amber-700">(outside now)</span>}
                 </p>
               )}
             </div>
@@ -227,8 +234,8 @@ function ConnectionTab({ business, onNotice, onError }: TabProps) {
         <ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-relaxed text-ink-600">
           <li>Only message customers who gave you their number and expect to hear from you.</li>
           <li>
-            Messages go out one at a time with a pause between them, and stop at {session.dailyLimit} a day. Sending
-            faster is the quickest way to get a number restricted.
+            Messages go out one at a time with a pause between them, and stop at {session.settings.dailyLimit} a day.
+            Sending faster is the quickest way to get a number restricted — change the pace under <strong>Sending</strong>.
           </li>
           <li>Give people a way to stop — mark anyone who asks as opted out and they are never messaged again.</li>
           <li>This links a normal WhatsApp account. WhatsApp does not officially support bulk sending this way.</li>
@@ -846,6 +853,18 @@ function CampaignsTab({ business, onNotice, onError }: TabProps) {
     }
   }
 
+  // Numbers that were not on WhatsApp, or a drop mid-send — re-queue just
+  // those rather than rebuilding the whole campaign.
+  async function retry(campaign: Campaign) {
+    try {
+      const { requeued } = await whatsappApi.retryFailed(business.id, campaign.id);
+      onNotice(`${requeued} failed message${requeued === 1 ? "" : "s"} queued again. Press Resume to send them.`);
+      await load();
+    } catch (err) {
+      onError(apiErrorMessage(err));
+    }
+  }
+
   return (
     <div className="space-y-3">
       <div className="card p-4">
@@ -894,6 +913,11 @@ function CampaignsTab({ business, onNotice, onError }: TabProps) {
                       {(campaign.status === "DRAFT" || campaign.status === "PAUSED") && (
                         <button onClick={() => start(campaign)} className="btn-primary px-3 py-1.5 text-xs">
                           <Play size={13} /> {campaign.status === "PAUSED" ? "Resume" : "Send"}
+                        </button>
+                      )}
+                      {campaign.failedCount > 0 && (
+                        <button onClick={() => retry(campaign)} className="btn-secondary px-3 py-1.5 text-xs">
+                          <RotateCcw size={13} /> Retry {campaign.failedCount}
                         </button>
                       )}
                       {campaign.status === "SENDING" && (
@@ -1130,5 +1154,262 @@ function CampaignDetail({
         )}
       </div>
     </Modal>
+  );
+}
+
+// --- Sending controls -------------------------------------------------------
+
+const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
+
+function hourLabel(hour: number): string {
+  if (hour === 0) return "12am";
+  if (hour === 12) return "12pm";
+  return hour < 12 ? `${hour}am` : `${hour - 12}pm`;
+}
+
+/** How long a full day's allowance takes at the chosen pace. */
+function describePace(dailyLimit: number, delayMs: number, jitterMs: number): string {
+  const averageMs = delayMs + jitterMs / 2;
+  const totalMinutes = Math.round((dailyLimit * averageMs) / 60000);
+  if (totalMinutes < 60) return `about ${totalMinutes} min`;
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return minutes === 0 ? `about ${hours}h` : `about ${hours}h ${minutes}m`;
+}
+
+function SendingTab({ business, onNotice, onError }: TabProps) {
+  const [session, setSession] = useState<WhatsappSession | null>(null);
+  const [form, setForm] = useState<WhatsappSettings | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [test, setTest] = useState({ phone: "", body: "Hi {{name}}, this is a test from {{business}}." });
+  const [testing, setTesting] = useState(false);
+
+  useEffect(() => {
+    whatsappApi
+      .session(business.id)
+      .then((data) => {
+        setSession(data);
+        setForm(data.settings);
+      })
+      .catch((err) => onError(apiErrorMessage(err)))
+      .finally(() => setLoading(false));
+  }, [business.id, onError]);
+
+  async function save(event: React.FormEvent) {
+    event.preventDefault();
+    if (!form) return;
+    setSaving(true);
+    onError("");
+    try {
+      const updated = await whatsappApi.updateSettings(business.id, form);
+      setSession(updated);
+      setForm(updated.settings);
+      onNotice("Sending settings saved.");
+    } catch (err) {
+      onError(apiErrorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function sendTest() {
+    setTesting(true);
+    onError("");
+    try {
+      const sent = await whatsappApi.sendTest(business.id, test.phone, test.body);
+      onNotice(`Test sent to ${displayPhone(sent.phone)}.`);
+    } catch (err) {
+      onError(apiErrorMessage(err));
+    } finally {
+      setTesting(false);
+    }
+  }
+
+  if (loading) return <Spinner label="Loading your sending settings…" />;
+  if (!form || !session) return null;
+
+  return (
+    <div className="space-y-3">
+      <form onSubmit={save} className="card space-y-4 p-5">
+        <div>
+          <h4 className="flex items-center gap-1.5 text-sm font-bold text-ink-900">
+            <Gauge size={15} className="text-brand-600" /> How fast to send
+          </h4>
+          <p className="mt-0.5 text-xs text-ink-500">
+            These are per-shop. A slower pace and a lower daily cap are much safer for your number — WhatsApp does not
+            allow bulk sending from a normal account, and a burst is what gets one restricted.
+          </p>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-3">
+          <label className="block">
+            <span className="mb-1 block text-xs font-semibold text-ink-700">Messages per day</span>
+            <input
+              type="number"
+              min={1}
+              max={5000}
+              className="input"
+              value={form.dailyLimit}
+              onChange={(e) => setForm({ ...form, dailyLimit: Number(e.target.value) })}
+            />
+            <span className="mt-1 block text-[11px] text-ink-400">
+              Sending stops for the day once this is reached, and resumes tomorrow.
+            </span>
+          </label>
+
+          <label className="block">
+            <span className="mb-1 block text-xs font-semibold text-ink-700">Gap between messages</span>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={2}
+                max={600}
+                className="input"
+                value={Math.round(form.sendDelayMs / 1000)}
+                onChange={(e) => setForm({ ...form, sendDelayMs: Math.max(2, Number(e.target.value)) * 1000 })}
+              />
+              <span className="text-sm text-ink-500">sec</span>
+            </div>
+            <span className="mt-1 block text-[11px] text-ink-400">Minimum 2 seconds.</span>
+          </label>
+
+          <label className="block">
+            <span className="mb-1 block text-xs font-semibold text-ink-700">Random extra</span>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={0}
+                max={300}
+                className="input"
+                value={Math.round(form.sendJitterMs / 1000)}
+                onChange={(e) => setForm({ ...form, sendJitterMs: Math.max(0, Number(e.target.value)) * 1000 })}
+              />
+              <span className="text-sm text-ink-500">sec</span>
+            </div>
+            <span className="mt-1 block text-[11px] text-ink-400">
+              Added at random on top of the gap so the timing is not machine-regular.
+            </span>
+          </label>
+        </div>
+
+        <p className="rounded-lg bg-gray-50 px-3 py-2.5 text-xs text-ink-600">
+          At this pace a full day of <strong>{form.dailyLimit}</strong> messages takes{" "}
+          <strong>{describePace(form.dailyLimit, form.sendDelayMs, form.sendJitterMs)}</strong> of sending time —
+          roughly {Math.max(1, Math.floor(3600000 / (form.sendDelayMs + form.sendJitterMs / 2)))} an hour.
+        </p>
+
+        <div className="border-t border-gray-100 pt-4">
+          <h4 className="flex items-center gap-1.5 text-sm font-bold text-ink-900">
+            <Clock size={15} className="text-brand-600" /> When to send
+          </h4>
+          <p className="mt-0.5 text-xs text-ink-500">
+            Nothing goes out outside these hours, so a long campaign never wakes anyone at 3am. It waits and picks up
+            again by itself. Set both to the same hour for no restriction.
+          </p>
+          <div className="mt-3 grid gap-4 sm:grid-cols-2">
+            <label className="block">
+              <span className="mb-1 block text-xs font-semibold text-ink-700">Start</span>
+              <select
+                className="input"
+                value={form.windowStartHour}
+                onChange={(e) => setForm({ ...form, windowStartHour: Number(e.target.value) })}
+              >
+                {HOURS.map((hour) => (
+                  <option key={hour} value={hour}>
+                    {hourLabel(hour)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs font-semibold text-ink-700">Stop</span>
+              <select
+                className="input"
+                value={form.windowEndHour}
+                onChange={(e) => setForm({ ...form, windowEndHour: Number(e.target.value) })}
+              >
+                {HOURS.map((hour) => (
+                  <option key={hour} value={hour}>
+                    {hourLabel(hour)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          {!session.withinWindow && (
+            <p className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              It is outside your sending window right now, so campaigns are waiting.
+            </p>
+          )}
+        </div>
+
+        <div className="border-t border-gray-100 pt-4">
+          <label className="flex items-start gap-2.5">
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              checked={form.autoOptOut}
+              onChange={(e) => setForm({ ...form, autoOptOut: e.target.checked })}
+            />
+            <span>
+              <span className="block text-sm font-semibold text-ink-800">
+                Opt people out automatically when they reply STOP
+              </span>
+              <span className="mt-0.5 block text-[11px] leading-relaxed text-ink-500">
+                Also catches “unsubscribe”, “opt out”, “remove me” and similar. Honouring these is both decent and the
+                best protection your number has — leave it on unless you handle replies another way.
+              </span>
+            </span>
+          </label>
+        </div>
+
+        <button disabled={saving} className="btn-primary px-4 py-2 text-sm disabled:opacity-50">
+          {saving ? "Saving…" : "Save sending settings"}
+        </button>
+      </form>
+
+      <div className="card space-y-3 p-5">
+        <div>
+          <h4 className="flex items-center gap-1.5 text-sm font-bold text-ink-900">
+            <FlaskConical size={15} className="text-brand-600" /> Send yourself a test
+          </h4>
+          <p className="mt-0.5 text-xs text-ink-500">
+            Check the wording and how placeholders come out before a list of hundreds goes anywhere. This does not count
+            towards your daily limit.
+          </p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-[220px_1fr]">
+          <label className="block">
+            <span className="mb-1 block text-xs font-semibold text-ink-700">Send to</span>
+            <input
+              className="input"
+              placeholder="9876543210"
+              value={test.phone}
+              onChange={(e) => setTest({ ...test, phone: e.target.value })}
+            />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-semibold text-ink-700">Message</span>
+            <textarea
+              rows={2}
+              className="input"
+              value={test.body}
+              onChange={(e) => setTest({ ...test, body: e.target.value })}
+            />
+          </label>
+        </div>
+        <button
+          onClick={sendTest}
+          disabled={testing || !test.phone.trim() || !session.canSend}
+          className="btn-secondary px-4 py-2 text-sm disabled:opacity-50"
+        >
+          <Send size={14} /> {testing ? "Sending…" : "Send test"}
+        </button>
+        {!session.canSend && (
+          <p className="text-xs text-ink-500">Connect your WhatsApp account first, under Connection.</p>
+        )}
+      </div>
+    </div>
   );
 }

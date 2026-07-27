@@ -755,6 +755,24 @@ model WhatsappSession {
   qrDataUrl   String?        @db.LongText
   lastError   String?        @db.Text
   connectedAt DateTime?
+
+  // Per-shop sending controls. These live here rather than in env because the
+  // right pace differs by shop: a corner shop with 40 regulars and a chain
+  // with 5,000 should not share one setting. Env values seed the defaults.
+  dailyLimit      Int @default(250)
+  // Gap between two messages, plus random jitter on top so the spacing is not
+  // machine-regular. Sending in a burst is what gets a number restricted.
+  sendDelayMs     Int @default(8000)
+  sendJitterMs    Int @default(4000)
+  // Sending window, in whole hours of server local time. Nothing goes out
+  // before the start or after the end, so a campaign left running overnight
+  // does not wake customers at 3am. Equal values mean "any time".
+  windowStartHour Int @default(9)
+  windowEndHour   Int @default(21)
+  // Mark a contact opted out when they reply STOP (or similar). On by default:
+  // honouring it is both decent and the best protection for the shop's number.
+  autoOptOut      Boolean @default(true)
+
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 

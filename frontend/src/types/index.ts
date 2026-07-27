@@ -401,6 +401,16 @@ export interface ShopCustomer {
 
 export type WhatsappStatus = "DISCONNECTED" | "AWAITING_SCAN" | "CONNECTED";
 
+/** Per-shop sending controls. */
+export interface WhatsappSettings {
+  dailyLimit: number;
+  sendDelayMs: number;
+  sendJitterMs: number;
+  windowStartHour: number;
+  windowEndHour: number;
+  autoOptOut: boolean;
+}
+
 export interface WhatsappSession {
   status: WhatsappStatus;
   phoneNumber: string | null;
@@ -410,8 +420,13 @@ export interface WhatsappSession {
   /** True only when a send would work right now. */
   canSend: boolean;
   transport: "log" | "webjs";
-  dailyLimit: number;
   sentToday: number;
+  settings: WhatsappSettings;
+  /** False while the clock is outside the shop's sending window. */
+  withinWindow: boolean;
+  windowLabel: string;
+  /** Roughly how many messages the current pace manages in an hour. */
+  estimatedPerHour: number;
 }
 
 export interface Contact {

@@ -3,20 +3,25 @@ import { prisma } from "@/config/database";
 import { env } from "@/config/env";
 import { logger } from "@/config/logger";
 import { whatsappTransport } from "./transport";
+import { isWithinWindow, msUntilWindowOpens } from "./sendingWindow";
 
 /**
  * Sends queued campaign messages, one at a time, with a pause between each.
  *
  * Everything here is deliberately unhurried. WhatsApp is not a bulk channel —
  * a burst of identical messages from one handset is the fastest way to get a
- * shop's number restricted — so the loop sends a single message per tick, waits
- * a randomised interval, and stops for the day once the business hits its cap.
+ * shop's number restricted — so the loop sends a single message per tick and
+ * waits, using that shop's own configured pace.
  */
 
 const tickState = { running: false, timer: null as NodeJS.Timeout | null };
 
-function nextDelay(): number {
-  return env.WHATSAPP_SEND_DELAY_MS + Math.floor(Math.random() * (env.WHATSAPP_SEND_JITTER_MS + 1));
+// How long to wait before looking again when there is nothing to do, or when
+// sending is blocked for a reason that will not clear quickly.
+const IDLE_DELAY_MS = 15_000;
+
+function withJitter(delayMs: number, jitterMs: number): number {
+  return delayMs + Math.floor(Math.random() * (Math.max(0, jitterMs) + 1));
 }
 
 function startOfToday(): Date {
@@ -35,34 +40,66 @@ async function sentTodayFor(businessId: string): Promise<number> {
   });
 }
 
+export interface TickResult {
+  outcome: "sent" | "idle" | "blocked";
+  /** What the loop should wait before trying again. */
+  nextDelayMs: number;
+}
+
 /**
- * Handles one message and reports whether there is more to do. Exported so a
- * test can drive the loop deterministically instead of waiting on timers.
+ * Handles one message and says how long to wait before the next. Exported so
+ * a test can drive the loop deterministically instead of waiting on timers.
  */
-export async function sendNextMessage(): Promise<"sent" | "idle" | "blocked"> {
+export async function sendNextMessage(): Promise<TickResult> {
   const campaign = await prisma.campaign.findFirst({
     where: { status: CampaignStatus.SENDING },
     orderBy: { startedAt: "asc" },
   });
-  if (!campaign) return "idle";
+  if (!campaign) return { outcome: "idle", nextDelayMs: IDLE_DELAY_MS };
+
+  // Each shop sets its own pace, cap and quiet hours; env only seeds defaults
+  // for a business that has never opened the settings.
+  const session = await prisma.whatsappSession.findUnique({ where: { businessId: campaign.businessId } });
+  const settings = {
+    dailyLimit: session?.dailyLimit ?? env.WHATSAPP_DAILY_LIMIT,
+    sendDelayMs: session?.sendDelayMs ?? env.WHATSAPP_SEND_DELAY_MS,
+    sendJitterMs: session?.sendJitterMs ?? env.WHATSAPP_SEND_JITTER_MS,
+    windowStartHour: session?.windowStartHour ?? 9,
+    windowEndHour: session?.windowEndHour ?? 21,
+  };
+  const pace = withJitter(settings.sendDelayMs, settings.sendJitterMs);
 
   const transport = whatsappTransport();
 
   // A shop that disconnected mid-campaign is paused rather than failed, so
   // they can reconnect and pick up exactly where it stopped.
   if (!transport.isReady(campaign.businessId)) {
-    await prisma.campaign.update({
-      where: { id: campaign.id },
-      data: { status: CampaignStatus.PAUSED },
-    });
+    await prisma.campaign.update({ where: { id: campaign.id }, data: { status: CampaignStatus.PAUSED } });
     logger.warn({ campaignId: campaign.id }, "whatsapp: campaign paused — account not connected");
-    return "blocked";
+    return { outcome: "blocked", nextDelayMs: IDLE_DELAY_MS };
   }
 
-  if ((await sentTodayFor(campaign.businessId)) >= env.WHATSAPP_DAILY_LIMIT) {
+  // Outside quiet hours the campaign stays SENDING and simply waits, so it
+  // resumes by itself in the morning with no one having to touch it.
+  if (!isWithinWindow(settings)) {
+    const wait = msUntilWindowOpens(settings);
+    logger.info(
+      { campaignId: campaign.id, minutes: Math.round(wait / 60_000) },
+      "whatsapp: outside the sending window, waiting",
+    );
+    // Capped at a minute rather than sleeping blindly until morning: a shop
+    // that widens its window should see sending resume straight away, and one
+    // tick a minute overnight costs nothing.
+    return { outcome: "blocked", nextDelayMs: Math.min(wait, 60_000) };
+  }
+
+  if ((await sentTodayFor(campaign.businessId)) >= settings.dailyLimit) {
     await prisma.campaign.update({ where: { id: campaign.id }, data: { status: CampaignStatus.PAUSED } });
-    logger.info({ campaignId: campaign.id }, "whatsapp: daily limit reached, campaign paused until tomorrow");
-    return "blocked";
+    logger.info(
+      { campaignId: campaign.id, dailyLimit: settings.dailyLimit },
+      "whatsapp: daily limit reached, campaign paused until tomorrow",
+    );
+    return { outcome: "blocked", nextDelayMs: IDLE_DELAY_MS };
   }
 
   const message = await prisma.campaignMessage.findFirst({
@@ -76,7 +113,7 @@ export async function sendNextMessage(): Promise<"sent" | "idle" | "blocked"> {
       data: { status: CampaignStatus.COMPLETED, completedAt: new Date() },
     });
     logger.info({ campaignId: campaign.id }, "whatsapp: campaign finished");
-    return "idle";
+    return { outcome: "idle", nextDelayMs: IDLE_DELAY_MS };
   }
 
   // Someone who opted out after the campaign was built must not be messaged.
@@ -93,7 +130,8 @@ export async function sendNextMessage(): Promise<"sent" | "idle" | "blocked"> {
         }),
         prisma.campaign.update({ where: { id: campaign.id }, data: { skippedCount: { increment: 1 } } }),
       ]);
-      return "sent";
+      // Nothing actually left the handset, so there is no need to pace this.
+      return { outcome: "sent", nextDelayMs: 250 };
     }
   }
 
@@ -123,36 +161,34 @@ export async function sendNextMessage(): Promise<"sent" | "idle" | "blocked"> {
     logger.warn({ campaignId: campaign.id, phone: message.phone, reason }, "whatsapp: message failed");
   }
 
-  return "sent";
+  return { outcome: "sent", nextDelayMs: pace };
 }
 
 async function tick(): Promise<void> {
   if (tickState.running) return;
   tickState.running = true;
+  let nextDelayMs = IDLE_DELAY_MS;
   try {
-    await sendNextMessage();
+    ({ nextDelayMs } = await sendNextMessage());
   } catch (err) {
     logger.error({ err }, "whatsapp dispatcher tick failed");
   } finally {
     tickState.running = false;
-    schedule();
+    schedule(nextDelayMs);
   }
 }
 
-function schedule(): void {
+function schedule(delayMs: number): void {
   if (tickState.timer) clearTimeout(tickState.timer);
-  tickState.timer = setTimeout(() => void tick(), nextDelay());
+  tickState.timer = setTimeout(() => void tick(), delayMs);
   // A pending send must never hold the process open on shutdown.
   tickState.timer.unref?.();
 }
 
 export function startDispatcher(): void {
   if (tickState.timer) return;
-  logger.info(
-    { delayMs: env.WHATSAPP_SEND_DELAY_MS, jitterMs: env.WHATSAPP_SEND_JITTER_MS, dailyLimit: env.WHATSAPP_DAILY_LIMIT },
-    "whatsapp dispatcher started",
-  );
-  schedule();
+  logger.info("whatsapp dispatcher started");
+  schedule(IDLE_DELAY_MS);
 }
 
 export function stopDispatcher(): void {

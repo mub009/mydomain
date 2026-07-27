@@ -122,6 +122,44 @@ function assertChromiumIsUsable(): void {
   }
 }
 
+/**
+ * What a customer types to be left alone. Kept broad on purpose: someone
+ * asking to stop should never have to guess the magic word, and a false
+ * positive only costs one unwanted marketing message.
+ */
+const OPT_OUT_PATTERN = /^\s*(stop|stopp|unsubscribe|unsub|opt\s*out|optout|remove me|do not|don'?t)\b/i;
+
+export function isOptOutReply(body: string): boolean {
+  return OPT_OUT_PATTERN.test(body ?? "");
+}
+
+/**
+ * Marks a replying customer as opted out. Runs off an incoming WhatsApp
+ * message, so it must never throw into the client's event loop.
+ */
+async function handleIncoming(businessId: string, fromId: string, body: string): Promise<void> {
+  if (!isOptOutReply(body)) return;
+
+  const session = await prisma.whatsappSession.findUnique({
+    where: { businessId },
+    select: { autoOptOut: true },
+  });
+  if (!session?.autoOptOut) return;
+
+  // "919876543210@c.us" -> "919876543210"
+  const phone = fromId.split("@")[0]?.replace(/[^0-9]/g, "") ?? "";
+  if (!phone) return;
+
+  const contact = await prisma.contact.findUnique({ where: { businessId_phone: { businessId, phone } } });
+  if (!contact || contact.optedOut) return;
+
+  await prisma.contact.update({
+    where: { id: contact.id },
+    data: { optedOut: true, optedOutAt: new Date() },
+  });
+  logger.info({ businessId, phone }, "whatsapp: contact opted out by reply");
+}
+
 interface WebJsClient {
   initialize(): Promise<void>;
   destroy(): Promise<void>;
@@ -203,6 +241,14 @@ class WebJsTransport implements WhatsAppTransport {
         qrDataUrl: null,
         lastError: `Sign-in failed: ${message}`,
       });
+    }) as never);
+
+    // A customer replying STOP is the clearest signal there is. Acting on it
+    // automatically means nobody has to watch the inbox for it.
+    client.on("message", ((msg: { from?: string; body?: string }) => {
+      void handleIncoming(businessId, msg?.from ?? "", msg?.body ?? "").catch((err) =>
+        logger.error({ err, businessId }, "whatsapp: could not process an incoming reply"),
+      );
     }) as never);
 
     client.on("disconnected", ((reason: string) => {

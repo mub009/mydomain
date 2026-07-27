@@ -9,6 +9,8 @@ import {
   createContactSchema,
   importQuerySchema,
   listContactsQuerySchema,
+  sendingSettingsSchema,
+  testMessageSchema,
   listQuerySchema,
   templateSchema,
   updateContactSchema,
@@ -27,7 +29,10 @@ import {
   listCampaignsHandler,
   listContactsHandler,
   listTemplatesHandler,
+  retryFailedHandler,
   sessionHandler,
+  testMessageHandler,
+  updateSettingsHandler,
   setCampaignStatusHandler,
   startCampaignHandler,
   updateContactHandler,
@@ -55,6 +60,21 @@ const listingPriv = requirePrivilege("MANAGE_LISTINGS");
 whatsappRouter.get("/:id/whatsapp/session", requireAuth, asyncHandler(sessionHandler));
 whatsappRouter.post("/:id/whatsapp/connect", requireAuth, listingPriv, asyncHandler(connectHandler));
 whatsappRouter.post("/:id/whatsapp/disconnect", requireAuth, listingPriv, asyncHandler(disconnectHandler));
+whatsappRouter.patch(
+  "/:id/whatsapp/settings",
+  requireAuth,
+  listingPriv,
+  validate({ body: sendingSettingsSchema }),
+  asyncHandler(updateSettingsHandler),
+);
+// One message to a number of your choosing, to check wording before a blast.
+whatsappRouter.post(
+  "/:id/whatsapp/test",
+  requireAuth,
+  listingPriv,
+  validate({ body: testMessageSchema }),
+  asyncHandler(testMessageHandler),
+);
 
 // Contacts
 whatsappRouter.get(
@@ -126,6 +146,12 @@ whatsappRouter.get(
   asyncHandler(getCampaignHandler),
 );
 whatsappRouter.post("/:id/campaigns/:campaignId/start", requireAuth, listingPriv, asyncHandler(startCampaignHandler));
+whatsappRouter.post(
+  "/:id/campaigns/:campaignId/retry",
+  requireAuth,
+  listingPriv,
+  asyncHandler(retryFailedHandler),
+);
 whatsappRouter.patch(
   "/:id/campaigns/:campaignId/status",
   requireAuth,

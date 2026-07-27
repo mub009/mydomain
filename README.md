@@ -143,9 +143,10 @@ account. Two things follow from that:
   supported route; the transport sits behind an interface
   (`modules/whatsapp/transport.ts`) so a Cloud API implementation can be
   dropped in without touching anything else.
-- **Sending is deliberately slow.** One message at a time, an 8-second base
-  pause plus random jitter between each, and a hard daily cap per business
-  (250 by default). All three are configurable — raising them raises the risk.
+- **Sending is deliberately slow.** One message at a time, with a pause and
+  random jitter between each, and a hard daily cap. Each shop sets its own
+  pace, cap and quiet hours under **WhatsApp → Sending**; the env values only
+  seed the defaults. Raising them raises the risk.
 
 `WHATSAPP_TRANSPORT` defaults to `log`, which records what *would* be sent
 without touching WhatsApp, so the whole flow can be exercised safely.
@@ -199,10 +200,30 @@ Notes for a real deployment:
 - One browser runs per linked business, so memory scales with the number of
   shops sending at once.
 
-Opt-outs are respected at two points: contacts marked opted out are excluded
-when a campaign is built, and re-checked again immediately before each message
-goes out, so someone who asks to stop mid-campaign is skipped. Re-importing a
-spreadsheet never resurrects an opted-out number.
+### Sending controls (per shop)
+
+| Control | What it does |
+|---|---|
+| Messages per day | Sending stops once reached and resumes tomorrow. Counts every campaign, not just the current one. |
+| Gap between messages | Pause after each send. Floor of 2s — anything faster is a burst. |
+| Random extra | Jitter added on top, so the spacing is not machine-regular. |
+| Sending window | Whole hours; nothing goes out outside them. A long campaign waits overnight and resumes by itself. Equal start/stop means any time. |
+| Auto opt-out on STOP | Marks a contact opted out when they reply STOP, unsubscribe, opt out, remove me and similar. |
+
+The tab shows what the chosen pace means in practice ("a full day of 250
+messages takes about 42 min of sending time — roughly 360 an hour"), and a
+**test send** delivers one message to a number of your choosing so wording and
+placeholders can be checked before a list of hundreds goes anywhere. Test sends
+do not count towards the daily cap.
+
+A campaign with failures (numbers not on WhatsApp, a drop mid-send) can have
+just those messages re-queued with **Retry**, instead of being rebuilt.
+
+Opt-outs are respected at three points: contacts marked opted out are excluded
+when a campaign is built, re-checked again immediately before each message goes
+out so someone who stops mid-campaign is skipped, and set automatically when a
+customer replies STOP. Re-importing a spreadsheet never resurrects an opted-out
+number.
 
 ## API shape
 

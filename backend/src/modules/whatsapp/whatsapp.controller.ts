@@ -18,6 +18,18 @@ export async function connectHandler(req: Request, res: Response): Promise<void>
   ok(res, await whatsapp.connectSession(actor(req), req.params.id));
 }
 
+export async function updateSettingsHandler(req: Request, res: Response): Promise<void> {
+  ok(res, await whatsapp.updateSendingSettings(actor(req), req.params.id, req.body));
+}
+
+export async function testMessageHandler(req: Request, res: Response): Promise<void> {
+  ok(res, await whatsapp.sendTestMessage(actor(req), req.params.id, req.body.phone, req.body.body));
+}
+
+export async function retryFailedHandler(req: Request, res: Response): Promise<void> {
+  ok(res, await whatsapp.retryFailedMessages(actor(req), req.params.campaignId));
+}
+
 export async function disconnectHandler(req: Request, res: Response): Promise<void> {
   ok(res, await whatsapp.disconnectSession(actor(req), req.params.id));
 }

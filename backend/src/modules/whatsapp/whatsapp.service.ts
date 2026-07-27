@@ -4,6 +4,7 @@ import { AppError } from "@/common/errors";
 import { parsePagination } from "@/common/pagination";
 import { env } from "@/config/env";
 import { normalizePhone } from "./phone";
+import { describeWindow, isWithinWindow } from "./sendingWindow";
 import { parseContactSheet } from "./importer";
 import { whatsappTransport } from "./transport";
 
@@ -36,6 +37,15 @@ export async function getSession(actor: Actor, businessId: string) {
   const live = transport.isReady(businessId);
   const status = session?.status ?? WhatsappStatus.DISCONNECTED;
 
+  const settings = {
+    dailyLimit: session?.dailyLimit ?? env.WHATSAPP_DAILY_LIMIT,
+    sendDelayMs: session?.sendDelayMs ?? env.WHATSAPP_SEND_DELAY_MS,
+    sendJitterMs: session?.sendJitterMs ?? env.WHATSAPP_SEND_JITTER_MS,
+    windowStartHour: session?.windowStartHour ?? 9,
+    windowEndHour: session?.windowEndHour ?? 21,
+    autoOptOut: session?.autoOptOut ?? true,
+  };
+
   return {
     status: status === WhatsappStatus.CONNECTED && !live ? WhatsappStatus.DISCONNECTED : status,
     phoneNumber: session?.phoneNumber ?? null,
@@ -44,9 +54,68 @@ export async function getSession(actor: Actor, businessId: string) {
     connectedAt: session?.connectedAt ?? null,
     canSend: live,
     transport: env.WHATSAPP_TRANSPORT,
-    dailyLimit: env.WHATSAPP_DAILY_LIMIT,
     sentToday: await sentToday(businessId),
+    settings,
+    // Derived, so the dashboard can say "paused until 9am" without repeating
+    // the window arithmetic on the client.
+    withinWindow: isWithinWindow(settings),
+    windowLabel: describeWindow(settings),
+    // Roughly how long a full day's allowance takes at this pace, which is
+    // what makes the delay setting concrete.
+    estimatedPerHour: Math.max(1, Math.floor(3_600_000 / (settings.sendDelayMs + settings.sendJitterMs / 2))),
   };
+}
+
+export interface SendingSettingsInput {
+  dailyLimit?: number;
+  sendDelayMs?: number;
+  sendJitterMs?: number;
+  windowStartHour?: number;
+  windowEndHour?: number;
+  autoOptOut?: boolean;
+}
+
+/** Per-shop sending controls: pace, daily cap, quiet hours, STOP handling. */
+export async function updateSendingSettings(actor: Actor, businessId: string, data: SendingSettingsInput) {
+  await ownedBusiness(actor, businessId);
+
+  await prisma.whatsappSession.upsert({
+    where: { businessId },
+    create: { businessId, ...data },
+    update: data,
+  });
+
+  return getSession(actor, businessId);
+}
+
+/**
+ * Sends a single message to a number of the shop's choosing, so wording and
+ * placeholders can be checked before a list of hundreds goes out. Deliberately
+ * bypasses the campaign machinery — there is nothing to track or resume.
+ */
+export async function sendTestMessage(actor: Actor, businessId: string, phone: string, body: string) {
+  const business = await ownedBusiness(actor, businessId);
+
+  const normalized = normalizePhone(phone);
+  if (!normalized.ok) throw AppError.badRequest(normalized.reason ?? "That phone number does not look right");
+
+  const transport = whatsappTransport();
+  if (!transport.isReady(businessId)) throw AppError.badRequest("Connect your WhatsApp account before sending");
+
+  const rendered = renderTemplate(body, {
+    name: "there",
+    business: business.name,
+    city: business.city,
+    phone: normalized.phone,
+  });
+
+  try {
+    await transport.sendText(businessId, normalized.phone, rendered);
+  } catch (err) {
+    throw AppError.badRequest(err instanceof Error ? err.message : "Could not send the test message");
+  }
+
+  return { phone: normalized.phone, body: rendered };
 }
 
 export async function connectSession(actor: Actor, businessId: string) {
@@ -423,6 +492,45 @@ export async function startCampaign(actor: Actor, campaignId: string) {
       startedAt: campaign.startedAt ?? new Date(),
     },
   });
+}
+
+/**
+ * Re-queues just the failures. A campaign of 500 where 12 numbers were not on
+ * WhatsApp should not have to be rebuilt from scratch to try those 12 again.
+ */
+export async function retryFailedMessages(actor: Actor, campaignId: string) {
+  const campaign = await prisma.campaign.findUnique({
+    where: { id: campaignId },
+    include: { business: { select: { ownerId: true } } },
+  });
+  if (!campaign) throw AppError.notFound("Campaign not found");
+  if (actor.role !== UserRole.ADMIN && campaign.business.ownerId !== actor.sub) {
+    throw AppError.forbidden("You do not own this business");
+  }
+
+  const failed = await prisma.campaignMessage.count({
+    where: { campaignId, status: CampaignMessageStatus.FAILED },
+  });
+  if (failed === 0) throw AppError.badRequest("Nothing failed in this campaign");
+
+  const [, updated] = await prisma.$transaction([
+    prisma.campaignMessage.updateMany({
+      where: { campaignId, status: CampaignMessageStatus.FAILED },
+      data: { status: CampaignMessageStatus.PENDING, error: null },
+    }),
+    prisma.campaign.update({
+      where: { id: campaignId },
+      data: {
+        // Back to a state the shop can start again, with the failures no
+        // longer counted against it.
+        status: CampaignStatus.PAUSED,
+        failedCount: { decrement: failed },
+        completedAt: null,
+      },
+    }),
+  ]);
+
+  return { requeued: failed, campaign: updated };
 }
 
 export async function setCampaignStatus(actor: Actor, campaignId: string, status: CampaignStatus) {
