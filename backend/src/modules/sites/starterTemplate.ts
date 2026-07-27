@@ -70,7 +70,13 @@ export function buildStarterTemplate(business: BusinessWithDetails) {
   const phone = escapeHtml(business.phone);
   const phoneDigits = business.phone.replace(/[^0-9]/g, "");
   const email = escapeHtml(business.email);
-  const logo = escapeHtml(business.logoUrl ?? "");
+  // Most listings have no dedicated logo, so fall back to their first photo
+  // and finally to a lettermark — the header should never look unfinished.
+  const logoSrc = escapeHtml(business.logoUrl ?? business.photos[0]?.url ?? "");
+  const initial = escapeHtml((business.name.trim()[0] ?? "M").toUpperCase());
+  const logoHtml = logoSrc
+    ? `<img class="mk-logo" src="${logoSrc}" alt="${escapeHtml(business.name)}"/>`
+    : `<span class="mk-logo mk-logo-text">${initial}</span>`;
   const hero = escapeHtml(business.photos[0]?.url ?? business.coverImageUrl ?? "");
   const workingTime = escapeHtml(summariseHours(business.hours));
   const instagram = business.instagramUsername?.replace(/^@/, "");
@@ -123,7 +129,7 @@ export function buildStarterTemplate(business: BusinessWithDetails) {
 <header class="mk-header">
   <div class="mk-header-inner">
     <a class="mk-brand" href="#home">
-      ${logo ? `<img class="mk-logo" src="${logo}" alt="${name}"/>` : ""}
+      ${logoHtml}
       <span>${name}</span>
     </a>
     <nav class="mk-nav">
@@ -206,7 +212,8 @@ ${
 .mk-header{position:sticky;top:0;z-index:40;background:#fff;box-shadow:0 1px 10px rgba(0,0,0,.07)}
 .mk-header-inner{max-width:1180px;margin:0 auto;padding:14px 22px;display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap}
 .mk-brand{display:flex;align-items:center;gap:12px;text-decoration:none;color:#111;font-weight:700;font-size:19px;letter-spacing:.4px;text-transform:uppercase}
-.mk-logo{width:52px;height:52px;object-fit:contain;border-radius:50%}
+.mk-logo{width:52px;height:52px;object-fit:cover;border-radius:50%;flex:0 0 auto}
+.mk-logo-text{display:flex;align-items:center;justify-content:center;background:#e11d2e;color:#fff;font-size:22px;font-weight:800;letter-spacing:0}
 .mk-nav{display:flex;gap:26px}
 .mk-nav a{color:#222;text-decoration:none;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase}
 .mk-nav a:hover{color:#e11d2e}

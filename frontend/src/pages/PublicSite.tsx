@@ -87,32 +87,49 @@ export default function PublicSite() {
     return () => root.removeEventListener("submit", handleSubmit);
   }, [site]);
 
-  if (loading) return <Spinner label="Loading website…" />;
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Spinner label="Loading website…" />
+      </div>
+    );
+  }
 
   if (error || !site) {
     return (
-      <div className="mx-auto max-w-md py-16 text-center">
-        <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-gray-100 text-gray-400">
-          <Globe size={28} />
-        </span>
-        <h1 className="mt-4 text-lg font-bold text-ink-900">Website not available</h1>
-        <p className="mt-1 text-sm text-ink-500">{error || "This business has not published a website yet."}</p>
-        <Link to={`/business/${slug}`} className="btn-primary mt-5 inline-flex px-4 py-2.5">
-          View their listing instead
-        </Link>
+      <div className="flex min-h-screen items-center justify-center px-4">
+        <div className="max-w-md text-center">
+          <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-gray-100 text-gray-400">
+            <Globe size={28} />
+          </span>
+          <h1 className="mt-4 text-lg font-bold text-ink-900">Website not available</h1>
+          <p className="mt-1 text-sm text-ink-500">{error || "This business has not published a website yet."}</p>
+          <Link to={`/business/${slug}`} className="btn-primary mt-5 inline-flex px-4 py-2.5">
+            View their listing instead
+          </Link>
+        </div>
       </div>
     );
   }
 
   return (
-    <div>
-      {/* Scope the site's own styles so they cannot restyle the app around it. */}
-      <style>{`#mk-site-root{all:initial;display:block;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+    <div className="mk-site-page">
+      {/*
+        The site owns the whole page. Its CSS is namespaced under the root so
+        it cannot leak into the rest of the app, but the root itself must stay
+        a plain block in normal flow — no transform, filter or overflow — or
+        the page's own `position: sticky` header would have nothing to stick to.
+      */}
+      <style>{`
+.mk-site-page{background:#fff}
+#mk-site-root{display:block;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#1a1a1a;line-height:1.5}
 #mk-site-root *{box-sizing:border-box}
+#mk-site-root img{max-width:100%}
 ${site.css}`}</style>
       <div id="mk-site-root" ref={rootRef} dangerouslySetInnerHTML={{ __html: site.html }} />
 
-      <p className="mt-6 text-center text-xs text-ink-400">
+      {/* Small attribution back to the listing, kept out of the site's design. */}
+      <p className="bg-white py-4 text-center text-xs text-gray-400">
         <Link to={`/business/${site.business.slug}`} className="hover:text-brand-600 hover:underline">
           {site.business.name} on Markkito
         </Link>

@@ -29,6 +29,20 @@ export default function App() {
   }, [accessToken, updateUser]);
 
   return (
+    <Routes>
+      {/* A business's own published website renders standalone — no Markkito
+          header, footer or page container, so its full-width hero, map and
+          sticky nav behave the way they do on a normal site. */}
+      <Route path="/site/:slug" element={<PublicSite />} />
+
+      <Route path="*" element={<AppShell />} />
+    </Routes>
+  );
+}
+
+// Everything except a published business site renders inside the app chrome.
+function AppShell() {
+  return (
     <Layout>
       <Routes>
         <Route path="/" element={<Home />} />
@@ -37,8 +51,6 @@ export default function App() {
         <Route path="/qr" element={<QrClaim />} />
         <Route path="/qr/:code" element={<QrClaim />} />
         <Route path="/business/:slug" element={<BusinessDetail />} />
-        {/* A business's own published website */}
-        <Route path="/site/:slug" element={<PublicSite />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/b2b" element={<B2BMarketplace />} />
