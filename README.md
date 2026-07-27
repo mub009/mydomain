@@ -148,8 +148,46 @@ account. Two things follow from that:
   (250 by default). All three are configurable — raising them raises the risk.
 
 `WHATSAPP_TRANSPORT` defaults to `log`, which records what *would* be sent
-without touching WhatsApp, so the whole flow can be exercised safely. Set it to
-`webjs` to send for real.
+without touching WhatsApp, so the whole flow can be exercised safely.
+
+### Switching on real sending (`webjs`)
+
+whatsapp-web.js drives a real Chromium. The install skips Puppeteer's bundled
+browser download, so you must give it one — either install Puppeteer's:
+
+```bash
+cd backend
+npx puppeteer browsers install chrome
+```
+
+...or point at a Chromium you already have:
+
+```bash
+# backend/.env
+WHATSAPP_TRANSPORT=webjs
+WHATSAPP_CHROMIUM_PATH=/usr/bin/chromium        # leave blank to use Puppeteer's
+WHATSAPP_SESSION_DIR=.whatsapp-sessions
+```
+
+Then restart the backend (`.env` is read at boot, so a file save is not enough)
+and open **Business dashboard → WhatsApp → Connection → Link WhatsApp**. A QR
+appears; on the phone go to **WhatsApp → Settings → Linked devices → Link a
+device** and scan it. The page polls and flips to "connected" on its own.
+
+Notes for a real deployment:
+
+- **The session directory is live credentials.** Anyone with a copy can send as
+  that shop. It is gitignored; back it up like a secret, or every shop must
+  re-scan after a deploy.
+- **The linked phone must stay online.** WhatsApp Web is a companion to the
+  handset, not a replacement for it.
+- **The server needs outbound access to `web.whatsapp.com`.** Behind a proxy
+  that blocks it, linking fails with `ERR_TUNNEL_CONNECTION_FAILED`.
+- **Chromium needs its own dependencies.** On a slim container that usually
+  means `libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0
+  libxcomposite1 libxdamage1 libxrandr2 libgbm1 libpango-1.0-0 libasound2`.
+- One browser runs per linked business, so memory scales with the number of
+  shops sending at once.
 
 Opt-outs are respected at two points: contacts marked opted out are excluded
 when a campaign is built, and re-checked again immediately before each message

@@ -117,8 +117,15 @@ class WebJsTransport implements WhatsAppTransport {
   private async start(businessId: string): Promise<void> {
     // Imported lazily: whatsapp-web.js spawns a browser on load, which no
     // deployment should pay for unless a shop is actually linking an account.
-    const { Client, LocalAuth } = await import("whatsapp-web.js");
-    const QRCode = await import("qrcode");
+    //
+    // Both packages are CommonJS. Node's named-export detection finds `Client`
+    // on the namespace but not `LocalAuth`, so destructuring the namespace
+    // yields `undefined` for it and fails with "LocalAuth is not a
+    // constructor". Everything is present on `default`, so read from there.
+    const wwebjs = await import("whatsapp-web.js");
+    const { Client, LocalAuth } = (wwebjs as unknown as { default?: typeof wwebjs }).default ?? wwebjs;
+    const qrcodeModule = await import("qrcode");
+    const QRCode = (qrcodeModule as unknown as { default?: typeof qrcodeModule }).default ?? qrcodeModule;
 
     const client = new Client({
       // One session directory per business, so shops never share a login.
