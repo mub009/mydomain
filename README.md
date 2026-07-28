@@ -59,7 +59,9 @@ npm run dev                # restart — the client is loaded at boot
 ```
 
 The server refuses to start against a stale client and names exactly what is
-missing, rather than failing later with an opaque error mid-request.
+missing — including individual **columns**, not just whole tables, since a
+migration that only adds fields otherwise starts up fine and then fails
+mid-request with `Unknown field \`bandStyle\` for select statement`.
 
 Seeded accounts (password `Password123!`):
 - `admin@mydomain.dev` — ADMIN

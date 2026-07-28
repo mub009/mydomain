@@ -55,3 +55,60 @@ describe("findGaps", () => {
     expect(findGaps(currentRuntime, withoutProduct)).toEqual(["model product"]);
   });
 });
+
+// The model/enum checks pass happily for a migration that only adds columns —
+// which is how "Unknown field `bandStyle` for select statement" reached a
+// user's browser after the models had all existed for weeks.
+describe("findGaps — fields", () => {
+  const runtime = {
+    UserRole: {},
+    BusinessStatus: {},
+    LeadStatus: {},
+    SiteType: {},
+    OrderStatus: {},
+    OrderPaymentMethod: {},
+    ReviewChannel: {},
+    PosterSize: {},
+  };
+  const client = {
+    user: {},
+    business: {},
+    businessSite: {},
+    product: {},
+    order: {},
+    orderItem: {},
+    reviewQrCode: {},
+    posterDesign: {},
+  };
+
+  const current = {
+    BusinessSite: ["siteType", "templateId"],
+    Business: ["preferredReviewChannel"],
+    WhatsappSession: ["dailyLimit", "sendDelayMs", "windowStartHour", "autoOptOut"],
+    PosterDesign: ["artworkUrl", "headerText", "footerText", "logoPosition", "bandStyle", "bandColor"],
+  };
+
+  it("reports nothing when every field is generated", () => {
+    expect(findGaps(runtime, client, current)).toEqual([]);
+  });
+
+  it("names the column a client generated before the last migration lacks", () => {
+    const stale = { ...current, PosterDesign: current.PosterDesign.filter((f) => !f.startsWith("band")) };
+    expect(findGaps(runtime, client, stale)).toEqual(["field PosterDesign.bandStyle", "field PosterDesign.bandColor"]);
+  });
+
+  // Without a datamodel there is nothing to compare against; claiming every
+  // field is missing would turn a readable message into noise.
+  it("says nothing about fields when the datamodel could not be read", () => {
+    expect(findGaps(runtime, client)).toEqual([]);
+    expect(findGaps(runtime, client, {})).toEqual([]);
+  });
+
+  it("does not repeat a model it cannot see as a pile of missing fields", () => {
+    const { posterDesign, ...withoutModel } = client;
+    void posterDesign;
+    const { PosterDesign, ...withoutFields } = current;
+    void PosterDesign;
+    expect(findGaps(runtime, withoutModel, withoutFields)).toEqual(["model posterDesign"]);
+  });
+});
