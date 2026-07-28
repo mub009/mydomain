@@ -26,6 +26,7 @@ import { qrCodesRouter, reviewLinksRouter, reviewScanRouter } from "@/modules/re
 import { publicSiteRouter, siteBuilderRouter } from "@/modules/sites/sites.routes";
 import { publicStorefrontRouter, storefrontRouter } from "@/modules/storefront/storefront.routes";
 import { whatsappRouter } from "@/modules/whatsapp/whatsapp.routes";
+import { businessPostersRouter } from "@/modules/posters/posters.routes";
 
 export function createApp(): Express {
   const app = express();
@@ -65,6 +66,7 @@ export function createApp(): Express {
   app.use("/api/v1/businesses", siteBuilderRouter);
   app.use("/api/v1/businesses", storefrontRouter);
   app.use("/api/v1/businesses", whatsappRouter);
+  app.use("/api/v1/businesses", businessPostersRouter);
   app.use("/api/v1/sites", publicSiteRouter);
   app.use("/api/v1/sites", publicStorefrontRouter);
   // Short public path for the printed QR board: https://host/r/<slug>

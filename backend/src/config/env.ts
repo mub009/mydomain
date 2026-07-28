@@ -36,6 +36,13 @@ const envSchema = z.object({
   WHATSAPP_SEND_JITTER_MS: z.coerce.number().min(0).default(4000),
   // Ceiling per business per calendar day.
   WHATSAPP_DAILY_LIMIT: z.coerce.number().min(1).default(250),
+
+  // Poster Studio copywriting. "offline" is a built-in phrase bank that needs
+  // no account — the default, so posters work out of the box. "claude" calls
+  // the Anthropic API and falls back to the phrase bank if the call fails.
+  POSTER_AI_PROVIDER: z.enum(["offline", "claude"]).default("offline"),
+  ANTHROPIC_API_KEY: z.string().optional().default(""),
+  POSTER_AI_MODEL: z.string().default("claude-opus-5"),
 });
 
 const parsed = envSchema.safeParse(process.env);

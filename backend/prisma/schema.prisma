@@ -58,6 +58,7 @@ model User {
   refreshTokens RefreshToken[]
   notifications Notification[]
   orders        Order[]
+  posterDesigns PosterDesign[] @relation("PosterAuthor")
 
   pointTransactions      PointTransaction[] @relation("PointOwner")
   grantedPointTransactions PointTransaction[] @relation("PointGrantedBy")
@@ -134,6 +135,7 @@ model Category {
   children    Category[] @relation("CategoryTree")
   businesses  Business[]
   rfqs        Rfq[]
+  posterDesigns PosterDesign[]
   createdAt   DateTime   @default(now())
 
   @@index([parentId])
@@ -205,6 +207,7 @@ model Business {
   contacts        Contact[]
   messageTemplates MessageTemplate[]
   campaigns       Campaign[]
+  posterRenders   PosterRender[]
 
   @@index([categoryId])
   @@index([city, state])
@@ -887,4 +890,74 @@ model CampaignMessage {
 
   @@index([campaignId, status])
   @@map("campaign_messages")
+}
+
+// ---------------------------------------------------------------------------
+// Poster Studio
+// ---------------------------------------------------------------------------
+// Admin designs a poster once; every business renders it with their own logo,
+// name and contact number substituted in. Nothing is stored per business —
+// the artwork is generated on demand from the design plus the listing.
+
+enum PosterSize {
+  SQUARE // 1080x1080 — feed post
+  PORTRAIT // 1080x1350 — feed post, taller
+  STORY // 1080x1920 — status / story
+}
+
+model PosterDesign {
+  id          String     @id @default(uuid()) @db.VarChar(36)
+  name        String
+  description String?    @db.Text
+  layout      String     @db.VarChar(50) // registry id, e.g. "spotlight"
+  palette     String     @db.VarChar(50) // registry id, e.g. "crimson"
+  size        PosterSize @default(PORTRAIT)
+
+  // Wording. May contain {{business}}, {{phone}}, {{city}} … placeholders,
+  // which are filled per business at render time.
+  headline    String  @db.Text
+  subheadline String? @db.Text
+  ctaText     String? @db.Text
+  badgeText   String? @db.VarChar(60) // corner flash, e.g. "30% OFF"
+  footnote    String? @db.Text
+
+  backgroundImageUrl String? @db.Text
+
+  // Targeting. Null on both means every published business sees it.
+  categoryId String?   @db.VarChar(36)
+  category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  city       String?   @db.VarChar(100)
+
+  isPublished Boolean @default(false)
+
+  // Provenance of the wording, so a design written by the assistant is
+  // distinguishable from one typed by hand.
+  aiBrief  String? @db.Text
+  aiEngine String? @db.VarChar(40) // "offline" | "claude" | null when hand-written
+
+  createdById String   @db.VarChar(36)
+  createdBy   User     @relation("PosterAuthor", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  renders PosterRender[]
+
+  @@index([isPublished, categoryId])
+  @@map("poster_designs")
+}
+
+// One row per (design, business) that has actually been downloaded — the
+// usage report, not a cache of the artwork.
+model PosterRender {
+  id         String   @id @default(uuid()) @db.VarChar(36)
+  designId   String   @db.VarChar(36)
+  design     PosterDesign @relation(fields: [designId], references: [id], onDelete: Cascade)
+  businessId String   @db.VarChar(36)
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  downloads  Int      @default(0)
+  lastAt     DateTime @default(now())
+
+  @@unique([designId, businessId])
+  @@index([businessId])
+  @@map("poster_renders")
 }

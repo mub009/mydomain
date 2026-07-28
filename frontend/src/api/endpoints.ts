@@ -533,3 +533,140 @@ export const whatsappApi = {
       .patch<ApiResponse<Campaign>>(`/businesses/${businessId}/campaigns/${campaignId}/status`, { status })
       .then((r) => r.data.data),
 };
+
+// ---------------------------------------------------------------------------
+// Poster Studio
+// ---------------------------------------------------------------------------
+
+export type PosterSize = "SQUARE" | "PORTRAIT" | "STORY";
+export type PosterCopyEngine = "offline" | "claude";
+
+export interface PosterDesign {
+  id: string;
+  name: string;
+  description: string | null;
+  layout: string;
+  palette: string;
+  size: PosterSize;
+  headline: string;
+  subheadline: string | null;
+  ctaText: string | null;
+  badgeText: string | null;
+  footnote: string | null;
+  backgroundImageUrl: string | null;
+  categoryId: string | null;
+  city: string | null;
+  isPublished: boolean;
+  aiBrief: string | null;
+  aiEngine: string | null;
+  updatedAt: string;
+  category?: { id: string; name: string } | null;
+  /** Placeholders nothing will fill — shown before the design is published. */
+  warnings?: string[];
+  businessesUsing?: number;
+  downloads?: number;
+}
+
+export interface PosterStudioOptions {
+  layouts: { id: string; name: string; description: string; bestFor: string }[];
+  palettes: { id: string; name: string; bg: string; accent: string; ink: string; dark: boolean }[];
+  sizes: { id: PosterSize; width: number; height: number; label: string; hint: string }[];
+  placeholders: { token: string; label: string; example: string }[];
+  tones: string[];
+  ai: { engine: PosterCopyEngine };
+}
+
+export interface PosterCopySuggestion {
+  headline: string;
+  subheadline: string;
+  ctaText: string;
+  badgeText: string;
+  footnote: string;
+}
+
+export interface RenderedPoster {
+  designId: string;
+  name: string;
+  layout: string;
+  palette: string;
+  size: PosterSize;
+  width: number;
+  height: number;
+  svg: string;
+  fileName: string;
+  logoEmbedded: boolean;
+}
+
+export interface PosterPreviewBusiness {
+  id: string;
+  name: string;
+  city: string;
+  logoUrl: string | null;
+  category: { name: string } | null;
+}
+
+export const postersApi = {
+  options: () => api.get<ApiResponse<PosterStudioOptions>>("/admin/posters/options").then((r) => r.data.data),
+  list: (params: Record<string, unknown> = {}) =>
+    api.get<PaginatedResponse<PosterDesign>>("/admin/posters", { params }).then((r) => r.data),
+  create: (payload: Record<string, unknown>) =>
+    api.post<ApiResponse<PosterDesign>>("/admin/posters", payload).then((r) => r.data.data),
+  update: (id: string, payload: Record<string, unknown>) =>
+    api.patch<ApiResponse<PosterDesign>>(`/admin/posters/${id}`, payload).then((r) => r.data.data),
+  remove: (id: string) => api.delete(`/admin/posters/${id}`).then(() => undefined),
+  usage: (id: string) =>
+    api
+      .get<ApiResponse<{ downloads: number; lastAt: string; business: { id: string; name: string; city: string } }[]>>(
+        `/admin/posters/${id}/usage`,
+      )
+      .then((r) => r.data.data),
+  // Renders a design that has not been saved yet, against a real listing.
+  preview: (payload: Record<string, unknown>) =>
+    api.post<ApiResponse<RenderedPoster>>("/admin/posters/preview", payload).then((r) => r.data.data),
+  previewBusinesses: (search?: string) =>
+    api
+      .get<ApiResponse<PosterPreviewBusiness[]>>("/admin/posters/preview-businesses", {
+        params: search ? { search } : undefined,
+      })
+      .then((r) => r.data.data),
+  aiSuggest: (brief: Record<string, unknown>) =>
+    api
+      .post<ApiResponse<{ engine: PosterCopyEngine; suggestions: PosterCopySuggestion[]; note?: string }>>(
+        "/admin/posters/ai-suggest",
+        brief,
+      )
+      .then((r) => r.data.data),
+};
+
+export interface BusinessPoster {
+  id: string;
+  name: string;
+  description: string | null;
+  layout: string;
+  palette: string;
+  size: PosterSize;
+  dimensions: { width: number; height: number; label: string; hint: string };
+  updatedAt: string;
+  forCategory: string | null;
+  forCity: string | null;
+  downloads: number;
+  lastDownloadedAt: string | null;
+}
+
+export const businessPostersApi = {
+  list: (businessId: string) =>
+    api
+      .get<
+        ApiResponse<{
+          business: { id: string; name: string; logoUrl: string | null; hasLogo: boolean };
+          designs: BusinessPoster[];
+        }>
+      >(`/businesses/${businessId}/posters`)
+      .then((r) => r.data.data),
+  render: (businessId: string, designId: string) =>
+    api.get<ApiResponse<RenderedPoster>>(`/businesses/${businessId}/posters/${designId}`).then((r) => r.data.data),
+  countDownload: (businessId: string, designId: string) =>
+    api
+      .post<ApiResponse<{ downloads: number }>>(`/businesses/${businessId}/posters/${designId}/downloaded`)
+      .then((r) => r.data.data),
+};

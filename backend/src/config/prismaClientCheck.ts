@@ -23,6 +23,7 @@ const REQUIRED_ENUMS = [
   "OrderStatus",
   "OrderPaymentMethod",
   "ReviewChannel",
+  "PosterSize",
 ] as const;
 
 const REQUIRED_MODELS = [
@@ -33,6 +34,7 @@ const REQUIRED_MODELS = [
   "order",
   "orderItem",
   "reviewQrCode",
+  "posterDesign",
 ] as const;
 
 export class StalePrismaClientError extends Error {

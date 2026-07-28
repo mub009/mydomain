@@ -40,9 +40,15 @@ import {
   updateQrCodeHandler,
 } from "@/modules/reviewqr/qrcodes.controller";
 
+import { adminPostersRouter } from "@/modules/posters/posters.routes";
+
 export const adminRouter = Router();
 
 adminRouter.use(requireAuth, requireRole(UserRole.ADMIN));
+
+// Poster Studio — designs admins write once and every business renders with
+// its own logo and number.
+adminRouter.use(adminPostersRouter);
 
 // Dealer points
 adminRouter.patch("/users/:id/points", validate({ body: adjustPointsSchema }), asyncHandler(adjustPointsHandler));

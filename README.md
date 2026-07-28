@@ -121,6 +121,8 @@ cd backend && npm test
 - **WhatsApp broadcasts** — a shop links its own WhatsApp number by scanning a
   QR code, imports customers from an .xlsx file, saves reusable templates with
   `{{name}}`-style placeholders, and sends a campaign. See below.
+- **Poster Studio** — an admin designs a poster once; every business downloads
+  it with their own logo, name and phone number already in it. See below.
 
 ## WhatsApp broadcasts
 
@@ -229,6 +231,80 @@ when a campaign is built, re-checked again immediately before each message goes
 out so someone who stops mid-campaign is skipped, and set automatically when a
 customer replies STOP. Re-importing a spreadsheet never resurrects an opted-out
 number.
+
+## Poster Studio
+
+Admin console → **Posters**. One design serves every shop: the admin writes it
+once, and each business renders it with **their own** logo, name, phone, city
+and address substituted in. Nothing is stored per business — the artwork is
+generated on demand from the design plus the listing, so a shop that changes
+its number gets a corrected poster the next time it downloads one.
+
+Wording is written with `{{business}}`-style placeholders (`business`, `phone`,
+`city`, `category`, `address`, `website`, `rating`, `reviews`). An unknown
+placeholder is left visible rather than blanked — a typo shows up in the
+preview instead of quietly deleting words, and the editor warns before the
+design is published. A known-but-empty value (a shop with no website) is
+removed along with its leftover punctuation.
+
+Four layouts — **Spotlight** (announcements), **Offer** (discounts),
+**Festival** (seasonal greetings) and **Minimal** (clinics, consultants) — in
+six palettes and three sizes: square, portrait and story. A design can be
+targeted at one category, one city, both or neither; targeting is enforced when
+the poster is fetched, not only when the list is built, so a guessed id cannot
+pull a poster meant for another trade or town.
+
+The editor previews against a **real listing** — its actual logo and number —
+so an admin sees what a shop will get before publishing. Shops find their
+posters under **Manage → Posters** and save them as PNG or SVG.
+
+### How the artwork is made
+
+Posters are SVG, generated server-side. There is no headless browser and no
+image library: each layout is drawn from the palette, the fitted text and the
+business's own details.
+
+SVG has no automatic line wrapping, so `modules/posters/text.ts` decides the
+breaks itself, estimating character widths from the font size, weight,
+letter-spacing and whether the line is uppercase. Text that will not fit is
+wrapped, then shrunk, then truncated — and each layout measures its stack
+before placing it, so a headline two lines longer than the design assumed
+pushes the rest around rather than through it. When the space runs out
+entirely, the poster gives things up in order of least value: gaps close first,
+then the subheadline sheds lines, then the button goes. The headline and the
+phone number are never sacrificed. `backend/tests/posters.test.ts` renders
+deliberately overlong copy at every layout and size and asserts nothing leaves
+the safe area.
+
+The shop's logo is fetched and **embedded as a data URI** rather than linked.
+That makes the file self-contained when it is re-shared, and it is what allows
+the browser to export a PNG: a canvas that has drawn a cross-origin image
+refuses to produce one. A logo that cannot be loaded falls back to a monogram,
+and the shop is told so rather than being handed initials silently.
+
+### Who writes the wording
+
+Click **Write it for me**, describe the poster ("Onam, warm tone, 20% off") and
+pick from three finished options. Two engines sit behind one interface, the
+same arrangement the WhatsApp transport uses:
+
+| `POSTER_AI_PROVIDER` | What it does |
+|---|---|
+| `offline` (default) | A built-in phrase bank. No account, no network, deterministic — the same brief gives the same three options. |
+| `claude` | Calls the Anthropic API. Falls back to the phrase bank if the key is missing or the call fails, and says which engine actually ran. |
+
+```bash
+# backend/.env
+POSTER_AI_PROVIDER=claude
+ANTHROPIC_API_KEY=sk-ant-…
+POSTER_AI_MODEL=claude-opus-5
+```
+
+**AI writes the copy, not the artwork.** The layouts, colours and composition
+are code — deterministic, instant, and free to render for a thousand shops.
+Generating the *image* with a model would need an image-generation provider
+this project has no account for, and would produce something different for
+every shop rather than one consistent design.
 
 ## API shape
 

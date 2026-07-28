@@ -20,6 +20,7 @@ import ProductsManager from "@/components/ProductsManager";
 import OrdersManager from "@/components/OrdersManager";
 import CustomersReport from "@/components/CustomersReport";
 import WhatsappPanel from "@/components/WhatsappPanel";
+import PostersForBusiness from "@/components/PostersForBusiness";
 // The builder pulls in GrapesJS, so keep it out of the main bundle.
 const SiteBuilder = lazy(() => import("@/components/SiteBuilder"));
 
@@ -35,6 +36,7 @@ const SECTIONS = [
   "Orders",
   "Customers",
   "WhatsApp",
+  "Posters",
 ] as const;
 type Section = (typeof SECTIONS)[number];
 
@@ -574,6 +576,7 @@ export default function BusinessManager({
       {section === "Orders" && <OrdersManager business={biz} />}
       {section === "Customers" && <CustomersReport business={biz} />}
       {section === "WhatsApp" && <WhatsappPanel business={biz} />}
+      {section === "Posters" && <PostersForBusiness business={biz} />}
     </div>
   );
 }

@@ -15,6 +15,7 @@ describe("findGaps", () => {
     OrderStatus: {},
     OrderPaymentMethod: {},
     ReviewChannel: {},
+    PosterSize: {},
   };
   const currentClient = {
     user: {},
@@ -24,6 +25,7 @@ describe("findGaps", () => {
     order: {},
     orderItem: {},
     reviewQrCode: {},
+    posterDesign: {},
   };
 
   it("reports nothing when the client is current", () => {

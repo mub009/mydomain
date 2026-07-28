@@ -5,10 +5,13 @@ export default function Modal({
   title,
   onClose,
   children,
+  /** Roomier shell, for editors that put a form and a preview side by side. */
+  wide = false,
 }: {
   title: string;
   onClose: () => void;
   children: React.ReactNode;
+  wide?: boolean;
 }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -23,7 +26,7 @@ export default function Modal({
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center p-4 sm:p-6 overflow-y-auto">
       <div className="fixed inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-popover my-8">
+      <div className={`relative w-full ${wide ? "max-w-4xl" : "max-w-lg"} bg-white rounded-2xl shadow-popover my-8`}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <h3 className="font-bold text-ink-900">{title}</h3>
           <button onClick={onClose} className="text-ink-400 hover:text-ink-700 p-1" aria-label="Close">

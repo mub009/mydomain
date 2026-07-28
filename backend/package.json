@@ -20,6 +20,7 @@
     "seed:businesses": "tsx prisma/seed-businesses.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.115.0",
     "@prisma/client": "^5.20.0",
     "bcryptjs": "^2.4.3",
     "compression": "^1.7.4",
