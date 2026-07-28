@@ -923,6 +923,24 @@ model PosterDesign {
 
   backgroundImageUrl String? @db.Text
 
+  // A finished poster supplied by a designer, uploaded through the admin
+  // panel. When set, the layouts stop drawing a composition of their own and
+  // the artwork fills the poster, with only the header and footer bands laid
+  // over it. LongText because an uploaded file is stored inline as a data URI
+  // — this project has no object storage.
+  artworkUrl String? @db.LongText
+  // The two strips composited over the artwork. Placeholders as everywhere
+  // else, so one uploaded design still carries each shop's own details.
+  headerText String? @db.Text
+  footerText String? @db.Text
+  showHeader Boolean @default(true)
+  showFooter Boolean @default(true)
+  // Where the shop's own logo sits on the artwork, and how big. "header"
+  // keeps it inside the top strip; the corner values float it over the
+  // design itself, for artwork that left a space for it.
+  logoPosition String  @default("header") @db.VarChar(20)
+  logoScale    Float   @default(1)
+
   // Targeting. Null on both means every published business sees it.
   categoryId String?   @db.VarChar(36)
   category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)

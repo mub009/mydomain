@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { created, noContent, ok, paginated } from "@/common/apiResponse";
 import { AppError } from "@/common/errors";
 import * as postersService from "./posters.service";
+import { readUploadedImage } from "./upload";
 
 function actor(req: Request) {
   if (!req.user) throw AppError.unauthorized();
@@ -47,6 +48,15 @@ export async function previewBusinessesHandler(req: Request, res: Response): Pro
 
 export async function aiSuggestHandler(req: Request, res: Response): Promise<void> {
   ok(res, await postersService.aiSuggest(req.body));
+}
+
+export async function aiBandsHandler(req: Request, res: Response): Promise<void> {
+  ok(res, await postersService.aiBands(req.body));
+}
+
+/** Validates an uploaded design and hands back the data URI to save with it. */
+export async function uploadArtworkHandler(req: Request, res: Response): Promise<void> {
+  ok(res, readUploadedImage(req.file));
 }
 
 export async function designUsageHandler(req: Request, res: Response): Promise<void> {

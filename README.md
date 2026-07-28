@@ -247,9 +247,10 @@ preview instead of quietly deleting words, and the editor warns before the
 design is published. A known-but-empty value (a shop with no website) is
 removed along with its leftover punctuation.
 
-Four layouts — **Spotlight** (announcements), **Offer** (discounts),
-**Festival** (seasonal greetings) and **Minimal** (clinics, consultants) — in
-six palettes and three sizes: square, portrait and story. A design can be
+Five layouts — **Spotlight** (announcements), **Offer** (discounts),
+**Festival** (seasonal greetings), **Minimal** (clinics, consultants) and
+**Uploaded artwork** (a design made elsewhere, see below) — in six palettes and
+three sizes: square, portrait and story. A design can be
 targeted at one category, one city, both or neither; targeting is enforced when
 the poster is fetched, not only when the list is built, so a guessed id cannot
 pull a poster meant for another trade or town.
@@ -257,6 +258,38 @@ pull a poster meant for another trade or town.
 The editor previews against a **real listing** — its actual logo and number —
 so an admin sees what a shop will get before publishing. Shops find their
 posters under **Manage → Posters** and save them as PNG or SVG.
+
+### Bringing your own artwork
+
+A design does not have to be composed by the platform. Pick the **Uploaded
+artwork** layout, upload a finished poster a designer made elsewhere (PNG,
+JPEG, WebP or GIF, up to 4MB), and the platform adds only three things:
+
+| Element | What it carries |
+|---|---|
+| Header strip | A line of copy — usually the shop's name — over a soft fade, so it never looks pasted onto the top edge |
+| Footer strip | A second line, with the shop's phone number and city beneath it |
+| Logo | The shop's own logo, in the header or floated into any corner |
+
+Everything else is left exactly as drawn. Both strips can be switched off
+individually, and the logo can be placed in the header, any of the four
+corners, the centre, or omitted entirely for artwork that is already branded —
+with a size slider, because a corner mark and a header mark want different
+weights. A logo floated over the artwork gets a plate behind it, or a dark
+logo on a dark design would simply vanish.
+
+Click **Write it for me** on that panel, describe the artwork in a sentence
+("Diwali artwork, deep red and gold, top-right corner is clear, for jewellery
+shops"), and the header line, the footer line **and** the logo placement come
+back together — the placement matters as much as the wording, since only the
+brief knows which corner the design left free.
+
+The upload is validated on its **bytes**, not on the mimetype the browser
+claims, and SVG is refused outright: an SVG is a document that can carry
+script, and this file is about to be embedded in a document the platform
+serves from its own origin. Since there is no object storage here, the image is
+kept inline on the design row as a data URI — which is also what the renderer
+needs for the PNG export to work.
 
 ### How the artwork is made
 
@@ -300,11 +333,12 @@ ANTHROPIC_API_KEY=sk-ant-…
 POSTER_AI_MODEL=claude-opus-5
 ```
 
-**AI writes the copy, not the artwork.** The layouts, colours and composition
-are code — deterministic, instant, and free to render for a thousand shops.
-Generating the *image* with a model would need an image-generation provider
-this project has no account for, and would produce something different for
-every shop rather than one consistent design.
+**AI writes the copy and the placement, not the artwork.** The four drawn
+layouts are code — deterministic, instant, and free to render for a thousand
+shops; for anything beyond them a designer supplies the image and the assistant
+decides what goes over it. Generating the artwork itself with a model would
+need an image-generation provider this project has no account for, and would
+produce something different for every shop rather than one consistent design.
 
 ## API shape
 

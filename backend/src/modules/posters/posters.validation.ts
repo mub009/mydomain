@@ -28,6 +28,25 @@ const designFields = {
   badgeText: z.string().trim().max(40).nullable().optional(),
   footnote: z.string().trim().max(160).nullable().optional(),
   backgroundImageUrl: imageUrl.nullable().optional(),
+  // Either an http(s) URL or the data URI returned by the upload endpoint.
+  // Only raster types — an SVG here would be a document embedded in a
+  // document the platform serves.
+  artworkUrl: z
+    .string()
+    .trim()
+    .max(6_000_000)
+    .refine(
+      (value) => /^https?:\/\//i.test(value) || /^data:image\/(png|jpeg|webp|gif);base64,/i.test(value),
+      "Must be an http(s) URL or an uploaded PNG, JPEG, WebP or GIF",
+    )
+    .nullable()
+    .optional(),
+  headerText: z.string().trim().max(160).nullable().optional(),
+  footerText: z.string().trim().max(200).nullable().optional(),
+  showHeader: z.boolean().optional(),
+  showFooter: z.boolean().optional(),
+  logoPosition: z.enum(["header", "top-left", "top-right", "bottom-left", "bottom-right", "center", "none"]).optional(),
+  logoScale: z.coerce.number().min(0.5).max(2).optional(),
   categoryId: z.string().uuid().nullable().optional(),
   city: z.string().trim().max(100).nullable().optional(),
   isPublished: z.boolean().optional(),
@@ -68,6 +87,11 @@ export const aiBriefSchema = z.object({
   city: z.string().trim().max(80).optional(),
   offer: z.string().trim().max(60).optional(),
   notes: z.string().trim().max(600).optional(),
+  count: z.coerce.number().int().min(1).max(5).default(3),
+});
+
+export const bandBriefSchema = z.object({
+  prompt: z.string().trim().min(3).max(600),
   count: z.coerce.number().int().min(1).max(5).default(3),
 });
 

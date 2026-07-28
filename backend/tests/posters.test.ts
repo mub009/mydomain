@@ -4,7 +4,9 @@ import { escapeXml, fitText, initials } from "@/modules/posters/text";
 import { displayPhone, fillPlaceholders, PosterSubject, unknownPlaceholders } from "@/modules/posters/placeholders";
 import { POSTER_LAYOUTS, POSTER_SIZES, renderPosterSvg, resolveLayout } from "@/modules/posters/layouts";
 import { PALETTES, resolvePalette } from "@/modules/posters/palettes";
-import { offlineSuggestions } from "@/modules/posters/copywriter";
+import { offlineBands, offlineSuggestions } from "@/modules/posters/copywriter";
+import { MAX_ARTWORK_BYTES, readUploadedImage } from "@/modules/posters/upload";
+import { inlineImage } from "@/modules/posters/assets";
 
 const subject: PosterSubject = {
   name: "Spice Route Kitchen",
@@ -122,6 +124,8 @@ describe("renderPosterSvg", () => {
     ctaText: "Call us today",
     badgeText: "20% OFF",
     footnote: "Spice Route Kitchen · Kozhikode",
+    headerText: "",
+    footerText: "",
   };
 
   const sizes = Object.keys(POSTER_SIZES) as PosterSize[];
@@ -176,7 +180,7 @@ describe("renderPosterSvg", () => {
       {
         size: "PORTRAIT",
         palette: PALETTES[2],
-        copy: { headline: "Now open", subheadline: "", ctaText: "", badgeText: "", footnote: "" },
+        copy: { headline: "Now open", subheadline: "", ctaText: "", badgeText: "", footnote: "", headerText: "", footerText: "" },
         subject,
         logoHref: null,
         backgroundHref: null,
@@ -268,6 +272,8 @@ describe("worst-case copy stays inside the poster", () => {
     ctaText: "Book a consultation",
     badgeText: "30% OFF",
     footnote: "Sree Padmanabha Ayurvedic Wellness Centre · Thiruvananthapuram",
+    headerText: "",
+    footerText: "",
   };
 
   const cases = POSTER_LAYOUTS.flatMap((l) => (Object.keys(POSTER_SIZES) as PosterSize[]).map((s) => [l.id, s] as const));
@@ -331,6 +337,142 @@ describe("offline copywriter", () => {
       for (const suggestion of offlineSuggestions({ tone, count: 3 })) {
         expect(suggestion.subheadline, tone).toContain("{{phone}}");
       }
+    }
+  });
+});
+
+// A designer supplies the finished poster; the platform adds only the bands
+// and the logo. Nothing may be drawn over the artwork uninvited.
+describe("uploaded artwork", () => {
+  const copy = {
+    headline: "",
+    subheadline: "",
+    ctaText: "",
+    badgeText: "",
+    footnote: "",
+    headerText: "{{business}}",
+    footerText: "Trusted in {{city}}",
+  };
+
+  const art = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==";
+
+  const render = (over: Partial<Parameters<typeof renderPosterSvg>[0]> = {}) =>
+    renderPosterSvg(
+      {
+        size: "PORTRAIT",
+        palette: PALETTES[0],
+        copy: { ...copy, headerText: "Spice Route Kitchen", footerText: "Trusted in Kozhikode" },
+        subject,
+        logoHref: null,
+        backgroundHref: art,
+        ...over,
+      },
+      "artwork",
+    ).svg;
+
+  it("fills the poster with the artwork and still prints the number", () => {
+    const svg = render();
+    expect(svg).toContain(art);
+    expect(svg).toContain("+91 98765 43210");
+    expect(svg).toContain("Spice Route Kitchen");
+    expect(svg).toContain("Trusted in Kozhikode");
+  });
+
+  it("draws nothing but the artwork when both bands are off", () => {
+    const svg = render({ showHeader: false, showFooter: false, logoPosition: "none" });
+    expect(svg).toContain(art);
+    expect(svg).not.toContain("<text");
+  });
+
+  // The corner spots are for artwork that left a space; they must actually
+  // move, or the option is a lie.
+  it("puts the logo where it was told to", () => {
+    const positions = ["top-left", "top-right", "bottom-left", "bottom-right", "center"] as const;
+    const centres = positions.map((logoPosition) => {
+      const svg = render({ logoPosition, logoHref: "data:image/png;base64,iVBORw0KGgo=" });
+      const circle = svg.match(/<circle cx="([\d.]+)" cy="([\d.]+)"/);
+      return `${circle?.[1]},${circle?.[2]}`;
+    });
+    expect(new Set(centres).size).toBe(positions.length);
+  });
+
+  it("scales the logo when asked", () => {
+    const radius = (scale: number) => {
+      const svg = render({ logoPosition: "top-left", logoScale: scale });
+      return Number(svg.match(/<circle cx="[\d.]+" cy="[\d.]+" r="([\d.]+)"/)?.[1]);
+    };
+    expect(radius(2)).toBeGreaterThan(radius(0.5));
+  });
+
+  it("leaves the logo out entirely for artwork that is already branded", () => {
+    const svg = render({ logoPosition: "none", logoHref: "data:image/png;base64,iVBORw0KGgo=" });
+    // The artwork itself is the only <image>; no logo was added.
+    expect(svg.match(/<image /g)).toHaveLength(1);
+  });
+});
+
+describe("readUploadedImage", () => {
+  const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0]);
+
+  it("accepts a real PNG and returns it as a data URI", () => {
+    const result = readUploadedImage({ buffer: png });
+    expect(result.type).toBe("image/png");
+    expect(result.dataUrl.startsWith("data:image/png;base64,")).toBe(true);
+  });
+
+  // The browser's declared mimetype is not evidence; the bytes are.
+  it("rejects a file that only claims to be an image", () => {
+    expect(() => readUploadedImage({ buffer: Buffer.from("<html>not an image</html>") })).toThrow(/not a PNG/i);
+  });
+
+  // An SVG is a document — it can carry script — and this file is about to be
+  // embedded in a document the platform serves from its own origin.
+  it("rejects SVG, however it is dressed up", () => {
+    const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>');
+    expect(() => readUploadedImage({ buffer: svg })).toThrow(/not a PNG/i);
+  });
+
+  it("refuses an empty upload and one over the size cap", () => {
+    expect(() => readUploadedImage({ buffer: Buffer.alloc(0) })).toThrow(/no file/i);
+    const huge = Buffer.concat([png, Buffer.alloc(MAX_ARTWORK_BYTES)]);
+    expect(() => readUploadedImage({ buffer: huge })).toThrow(/larger than/i);
+  });
+});
+
+describe("inlineImage", () => {
+  // Uploaded artwork arrives already encoded; re-fetching it would be absurd.
+  it("passes a raster data URI straight through", async () => {
+    const uri = "data:image/jpeg;base64,/9j/4AAQ";
+    await expect(inlineImage(uri)).resolves.toBe(uri);
+  });
+
+  it("refuses an SVG data URI, which would be a document not a picture", async () => {
+    await expect(inlineImage("data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=")).resolves.toBeNull();
+  });
+
+  it("refuses anything that is not http(s)", async () => {
+    for (const url of ["javascript:alert(1)", "file:///etc/passwd", "/relative.png", ""]) {
+      await expect(inlineImage(url), url).resolves.toBeNull();
+    }
+  });
+});
+
+describe("offline bands", () => {
+  it("identifies the shop and picks a logo spot", () => {
+    const [first] = offlineBands({ prompt: "premium clinic", count: 1 });
+    expect(first.headerText).toContain("{{business}}");
+    expect(first.logoPosition).toBe("header");
+  });
+
+  it("never repeats a suggestion", () => {
+    const bands = offlineBands({ prompt: "anything", count: 5 });
+    expect(new Set(bands.map((b) => b.headerText + b.footerText)).size).toBe(5);
+  });
+
+  // The footer sits directly above the number, so repeating it there is noise.
+  it("keeps the phone out of the footer line", () => {
+    for (const band of offlineBands({ prompt: "x", count: 5 })) {
+      expect(band.footerText).not.toContain("{{phone}}");
     }
   });
 });

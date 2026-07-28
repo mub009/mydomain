@@ -22,6 +22,10 @@ export interface PosterCopy {
   ctaText: string;
   badgeText: string;
   footnote: string;
+  /** The two strips laid over uploaded artwork. Ignored by the drawn layouts,
+   *  which compose their own header and footer. */
+  headerText: string;
+  footerText: string;
 }
 
 export interface RenderInput {
@@ -31,8 +35,39 @@ export interface RenderInput {
   subject: PosterSubject;
   /** Data URI for the shop's logo, or null when it could not be inlined. */
   logoHref: string | null;
-  /** Data URI for the design's background image, or null. */
+  /** Data URI for the design's background image or uploaded artwork, or null. */
   backgroundHref: string | null;
+  /** Whether the artwork layout stamps its bands. Defaults to on. */
+  showHeader?: boolean;
+  showFooter?: boolean;
+  /** Where the shop's logo sits on uploaded artwork, and how big. */
+  logoPosition?: LogoPosition;
+  logoScale?: number;
+}
+
+/**
+ * Where the shop's own logo goes on someone else's artwork.
+ *
+ * "header" is the safe default — inside the strip the platform already owns,
+ * where it cannot cover anything the designer drew. The corner values float
+ * it over the artwork itself, which is what a design that deliberately left
+ * a clear space wants, and "none" is for artwork that already has branding of
+ * its own.
+ */
+export const LOGO_POSITIONS = [
+  { id: "header", label: "In the header strip" },
+  { id: "top-left", label: "Top left corner" },
+  { id: "top-right", label: "Top right corner" },
+  { id: "bottom-left", label: "Bottom left corner" },
+  { id: "bottom-right", label: "Bottom right corner" },
+  { id: "center", label: "Centred" },
+  { id: "none", label: "No logo" },
+] as const;
+
+export type LogoPosition = (typeof LOGO_POSITIONS)[number]["id"];
+
+export function resolveLogoPosition(value?: string | null): LogoPosition {
+  return (LOGO_POSITIONS.find((p) => p.id === value)?.id ?? "header") as LogoPosition;
 }
 
 export interface PosterLayout {
@@ -807,7 +842,124 @@ const minimal: PosterLayout = {
   },
 };
 
-export const POSTER_LAYOUTS: PosterLayout[] = [spotlight, offer, festival, minimal];
+/**
+ * A finished poster from a designer, with only the two bands laid over it.
+ *
+ * The other layouts compose a poster out of type and colour. This one does
+ * not: the artwork is the design, and the platform's job is limited to
+ * stamping the shop's identity on it. So it draws exactly two things — a
+ * header strip carrying the logo and a line of copy, and a footer strip
+ * carrying the number — and otherwise leaves the image alone.
+ */
+const artwork: PosterLayout = {
+  id: "artwork",
+  name: "Uploaded artwork",
+  description: "Your own poster image, with a header and footer band added for each shop's logo and number.",
+  bestFor: "Designs made outside the platform",
+  render(input, dim) {
+    const p = input.palette;
+    const { width: W, height: H } = dim;
+    const M = W * 0.05;
+    const headerH = H * 0.105;
+    const footerH = H * 0.115;
+    const hasArt = Boolean(input.backgroundHref);
+
+    // Both bands are on unless a design says otherwise; an undefined flag
+    // from an older row must not silently strip the shop's number off.
+    const showHeader = input.showHeader ?? true;
+    const showFooter = input.showFooter ?? true;
+
+    const placement = resolveLogoPosition(input.logoPosition);
+    const scale = Math.min(2, Math.max(0.5, input.logoScale ?? 1));
+
+    // In the strip the logo is sized to the strip; floating over the artwork
+    // it is sized to the poster, because there is no band to sit inside.
+    const logoR = (placement === "header" ? headerH * 0.36 : W * 0.075) * scale;
+    const inset = M + logoR;
+
+    const LOGO_SPOTS: Record<string, { cx: number; cy: number } | null> = {
+      header: { cx: M + logoR + W * 0.01, cy: headerH * 0.5 },
+      "top-left": { cx: inset, cy: (showHeader ? headerH * 1.35 : 0) + logoR + M },
+      "top-right": { cx: W - inset, cy: (showHeader ? headerH * 1.35 : 0) + logoR + M },
+      "bottom-left": { cx: inset, cy: H - (showFooter ? footerH : 0) - logoR - M },
+      "bottom-right": { cx: W - inset, cy: H - (showFooter ? footerH : 0) - logoR - M },
+      center: { cx: W / 2, cy: H / 2 },
+      none: null,
+    };
+
+    const spot = LOGO_SPOTS[placement];
+    // The header strip only reserves room for the logo when the logo is
+    // actually in it; otherwise the copy gets the full width.
+    const headerTextX = placement === "header" ? (spot?.cx ?? M) + logoR + W * 0.03 : M;
+
+    const header = showHeader
+      ? textBlock(input.copy.headerText || input.subject.name, {
+          x: headerTextX,
+          y: headerH * 0.62,
+          maxWidth: W - headerTextX - M,
+          fontSize: W * 0.042,
+          maxLines: 2,
+          fill: p.onAccent,
+          weight: 800,
+          lineHeight: 1.1,
+        })
+      : null;
+
+    // A logo floating on the artwork gets a plate behind it, or a dark logo
+    // on a dark design would simply disappear.
+    const floatingLogo =
+      spot && placement !== "header"
+        ? `<circle cx="${spot.cx}" cy="${spot.cy}" r="${logoR * 1.14}" fill="${p.bg}" opacity="0.82"/>` +
+          logoMark(input, spot.cx, spot.cy, logoR, p.accent, p.bgAlt, p.ink)
+        : "";
+
+    const footerLine = input.copy.footerText.trim();
+    // With a line above it the number drops; alone, it centres in the strip.
+    const contactY = footerLine ? H - footerH * 0.3 : H - footerH * 0.38;
+
+    return [
+      // Without artwork this is still a usable poster rather than a blank —
+      // the palette gradient stands in until the designer's file arrives.
+      hasArt
+        ? `<rect width="${W}" height="${H}" fill="${p.bg}"/>` +
+          `<image href="${escapeXml(input.backgroundHref!)}" x="0" y="0" width="${W}" height="${H}" preserveAspectRatio="xMidYMid slice"/>`
+        : backdrop(input, dim, 0, "artwork-bg"),
+
+      showHeader
+        ? // A soft fade under the strip, so the band never looks pasted onto
+          // whatever the artwork happens to have at the top edge.
+          `<defs><linearGradient id="artwork-head" x1="0" y1="0" x2="0" y2="1">` +
+          `<stop offset="0" stop-color="${p.bg}" stop-opacity="0.92"/>` +
+          `<stop offset="1" stop-color="${p.bg}" stop-opacity="0"/></linearGradient></defs>` +
+          `<rect x="0" y="0" width="${W}" height="${headerH * 1.35}" fill="url(#artwork-head)"/>` +
+          (placement === "header" && spot ? logoMark(input, spot.cx, spot.cy, logoR, p.accent, p.bgAlt, p.ink) : "") +
+          (header?.svg ?? "")
+        : "",
+
+      floatingLogo,
+
+      showFooter
+        ? `<rect x="0" y="${H - footerH}" width="${W}" height="${footerH}" fill="${p.accent}"/>` +
+          (footerLine
+            ? textBlock(footerLine, {
+                x: M,
+                y: H - footerH * 0.72,
+                maxWidth: W - M * 2,
+                fontSize: W * 0.032,
+                maxLines: 1,
+                fill: p.onAccent,
+                weight: 600,
+              }).svg
+            : "") +
+          contactRow(input, M, contactY, W * 0.045, p.onAccent, p.onAccent, W - M * 2)
+        : "",
+
+      badge(input, W - M - W * 0.02, H * 0.24, W * 0.1),
+    ].join("");
+  },
+};
+
+export const POSTER_LAYOUTS: PosterLayout[] = [spotlight, offer, festival, minimal, artwork];
 export const DEFAULT_LAYOUT_ID = POSTER_LAYOUTS[0].id;
 
 export function resolveLayout(id?: string | null): PosterLayout {

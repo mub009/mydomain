@@ -3,10 +3,11 @@ import { prisma } from "@/config/database";
 import { AppError } from "@/common/errors";
 import { parsePagination } from "@/common/pagination";
 import { inlineImage } from "./assets";
-import { layoutChoices, POSTER_SIZES, renderPosterSvg, sizeChoices } from "./layouts";
+import { layoutChoices, LOGO_POSITIONS, POSTER_SIZES, renderPosterSvg, resolveLogoPosition, sizeChoices } from "./layouts";
 import { PALETTES, resolvePalette } from "./palettes";
 import { fillPlaceholders, PLACEHOLDERS, PosterSubject, unknownPlaceholders } from "./placeholders";
-import { CopyBrief, claudeConfigured, suggestCopy, TONES } from "./copywriter";
+import { BandBrief, CopyBrief, claudeConfigured, suggestBands, suggestCopy, TONES } from "./copywriter";
+import { MAX_ARTWORK_BYTES } from "./upload";
 
 interface Actor {
   sub: string;
@@ -77,9 +78,11 @@ function fileNameFor(design: { name: string }, subject: PosterSubject): string {
 export async function renderForBusiness(design: PosterDesign, business: BusinessForPoster): Promise<RenderedPoster> {
   const subject = toSubject(business);
 
+  // A design with uploaded artwork uses it as the image; anything else falls
+  // back to the background field the drawn layouts use.
   const [logoHref, backgroundHref] = await Promise.all([
     inlineImage(business.logoUrl),
-    inlineImage(design.backgroundImageUrl),
+    inlineImage(design.artworkUrl ?? design.backgroundImageUrl),
   ]);
 
   const copy = {
@@ -88,6 +91,8 @@ export async function renderForBusiness(design: PosterDesign, business: Business
     ctaText: fillPlaceholders(design.ctaText, subject),
     badgeText: fillPlaceholders(design.badgeText, subject),
     footnote: keepIfSubstantial(design.footnote ?? "", fillPlaceholders(design.footnote, subject)),
+    headerText: keepIfSubstantial(design.headerText ?? "", fillPlaceholders(design.headerText, subject)),
+    footerText: keepIfSubstantial(design.footerText ?? "", fillPlaceholders(design.footerText, subject)),
   };
 
   const { svg, width, height } = renderPosterSvg(
@@ -98,6 +103,10 @@ export async function renderForBusiness(design: PosterDesign, business: Business
       subject,
       logoHref,
       backgroundHref,
+      showHeader: design.showHeader,
+      showFooter: design.showFooter,
+      logoPosition: resolveLogoPosition(design.logoPosition),
+      logoScale: design.logoScale,
     },
     design.layout,
   );
@@ -132,6 +141,13 @@ export interface DesignInput {
   badgeText?: string | null;
   footnote?: string | null;
   backgroundImageUrl?: string | null;
+  artworkUrl?: string | null;
+  headerText?: string | null;
+  footerText?: string | null;
+  showHeader?: boolean;
+  showFooter?: boolean;
+  logoPosition?: string;
+  logoScale?: number;
   categoryId?: string | null;
   city?: string | null;
   isPublished?: boolean;
@@ -140,7 +156,15 @@ export interface DesignInput {
 }
 
 function warningsFor(input: Partial<DesignInput>): string[] {
-  const unknown = unknownPlaceholders(input.headline, input.subheadline, input.ctaText, input.badgeText, input.footnote);
+  const unknown = unknownPlaceholders(
+    input.headline,
+    input.subheadline,
+    input.ctaText,
+    input.badgeText,
+    input.footnote,
+    input.headerText,
+    input.footerText,
+  );
   return unknown.map((token) => `Nothing will fill {{${token}}} — it will print as written.`);
 }
 
@@ -159,7 +183,35 @@ export async function listDesigns(query: { page?: number; pageSize?: number; sea
       orderBy: { updatedAt: "desc" },
       skip,
       take: pageSize,
-      include: {
+      // Every field except `artworkUrl`, which holds an uploaded image inline
+      // and would put megabytes per row into a list nobody renders it from.
+      // The list reports whether there is artwork; the editor fetches it.
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        layout: true,
+        palette: true,
+        size: true,
+        headline: true,
+        subheadline: true,
+        ctaText: true,
+        badgeText: true,
+        footnote: true,
+        backgroundImageUrl: true,
+        headerText: true,
+        footerText: true,
+        showHeader: true,
+        showFooter: true,
+        logoPosition: true,
+        logoScale: true,
+        categoryId: true,
+        city: true,
+        isPublished: true,
+        aiBrief: true,
+        aiEngine: true,
+        createdAt: true,
+        updatedAt: true,
         category: { select: { id: true, name: true } },
         createdBy: { select: { firstName: true, lastName: true } },
         _count: { select: { renders: true } },
@@ -175,9 +227,19 @@ export async function listDesigns(query: { page?: number; pageSize?: number; sea
   });
   const byDesign = new Map(downloads.map((row) => [row.designId, row._sum.downloads ?? 0]));
 
+  const withArtwork = new Set(
+    (
+      await prisma.posterDesign.findMany({
+        where: { id: { in: items.map((d) => d.id) }, NOT: { artworkUrl: null } },
+        select: { id: true },
+      })
+    ).map((d) => d.id),
+  );
+
   return {
     items: items.map((design) => ({
       ...design,
+      hasArtwork: withArtwork.has(design.id),
       businessesUsing: design._count.renders,
       downloads: byDesign.get(design.id) ?? 0,
       warnings: warningsFor(design),
@@ -216,6 +278,13 @@ export async function createDesign(actor: Actor, input: DesignInput) {
       badgeText: input.badgeText ?? null,
       footnote: input.footnote ?? null,
       backgroundImageUrl: input.backgroundImageUrl ?? null,
+      artworkUrl: input.artworkUrl ?? null,
+      headerText: input.headerText ?? null,
+      footerText: input.footerText ?? null,
+      showHeader: input.showHeader ?? true,
+      showFooter: input.showFooter ?? true,
+      logoPosition: input.logoPosition ?? "header",
+      logoScale: input.logoScale ?? 1,
       categoryId: input.categoryId ?? null,
       city: input.city?.trim() || null,
       isPublished: input.isPublished ?? false,
@@ -246,6 +315,13 @@ export async function updateDesign(id: string, input: Partial<DesignInput>) {
       ...(input.badgeText !== undefined ? { badgeText: input.badgeText } : {}),
       ...(input.footnote !== undefined ? { footnote: input.footnote } : {}),
       ...(input.backgroundImageUrl !== undefined ? { backgroundImageUrl: input.backgroundImageUrl } : {}),
+      ...(input.artworkUrl !== undefined ? { artworkUrl: input.artworkUrl } : {}),
+      ...(input.headerText !== undefined ? { headerText: input.headerText } : {}),
+      ...(input.footerText !== undefined ? { footerText: input.footerText } : {}),
+      ...(input.showHeader !== undefined ? { showHeader: input.showHeader } : {}),
+      ...(input.showFooter !== undefined ? { showFooter: input.showFooter } : {}),
+      ...(input.logoPosition !== undefined ? { logoPosition: input.logoPosition } : {}),
+      ...(input.logoScale !== undefined ? { logoScale: input.logoScale } : {}),
       ...(input.categoryId !== undefined ? { categoryId: input.categoryId } : {}),
       ...(input.city !== undefined ? { city: input.city?.trim() || null } : {}),
       ...(input.isPublished !== undefined ? { isPublished: input.isPublished } : {}),
@@ -292,6 +368,13 @@ export async function previewDesign(input: DesignInput, businessId?: string): Pr
     badgeText: input.badgeText ?? null,
     footnote: input.footnote ?? null,
     backgroundImageUrl: input.backgroundImageUrl ?? null,
+    artworkUrl: input.artworkUrl ?? null,
+    headerText: input.headerText ?? null,
+    footerText: input.footerText ?? null,
+    showHeader: input.showHeader ?? true,
+    showFooter: input.showFooter ?? true,
+    logoPosition: input.logoPosition ?? "header",
+    logoScale: input.logoScale ?? 1,
   } as PosterDesign;
 
   return renderForBusiness(draft, business);
@@ -312,12 +395,18 @@ export async function aiSuggest(brief: CopyBrief) {
   return suggestCopy(brief);
 }
 
+export async function aiBands(brief: BandBrief) {
+  return suggestBands(brief);
+}
+
 /** Everything the editor needs to build its pickers in one call. */
 export function studioOptions() {
   return {
     layouts: layoutChoices(),
     palettes: PALETTES.map(({ id, name, bg, accent, ink, dark }) => ({ id, name, bg, accent, ink, dark })),
     sizes: sizeChoices(),
+    logoPositions: LOGO_POSITIONS.map(({ id, label }) => ({ id, label })),
+    maxArtworkBytes: MAX_ARTWORK_BYTES,
     placeholders: PLACEHOLDERS,
     tones: TONES,
     // So the editor can label the button honestly rather than implying a
@@ -387,6 +476,7 @@ export async function listForBusiness(actor: Actor, businessId: string) {
       size: design.size,
       dimensions: POSTER_SIZES[design.size],
       updatedAt: design.updatedAt,
+      hasArtwork: Boolean(design.artworkUrl),
       forCategory: design.category?.name ?? null,
       forCity: design.city,
       downloads: byDesign.get(design.id)?.downloads ?? 0,

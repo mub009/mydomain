@@ -41,7 +41,18 @@ function isFetchable(url: string): boolean {
  * gradient, so a shop with a dead logo URL still gets a poster.
  */
 export async function inlineImage(url: string | null | undefined): Promise<string | null> {
-  if (!url || !isFetchable(url)) return null;
+  if (!url) return null;
+
+  // Artwork uploaded through the admin panel is stored as a data URI already.
+  // It was validated on the way in (see `readUploadedImage`), so it is used
+  // as-is rather than being re-parsed here — but only for raster types: an
+  // `image/svg+xml` data URI would be a document, not a picture, and it is
+  // about to be embedded in a document we serve.
+  if (url.startsWith("data:")) {
+    return /^data:image\/(png|jpeg|webp|gif);base64,/i.test(url) ? url : null;
+  }
+
+  if (!isFetchable(url)) return null;
 
   const cached = cache.get(url);
   if (cached && Date.now() - cached.at < CACHE_TTL_MS) return cached.href;

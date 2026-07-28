@@ -272,3 +272,163 @@ export async function suggestCopy(brief: CopyBrief): Promise<SuggestionResult> {
     };
   }
 }
+
+// ---------------------------------------------------------------------------
+// Header and footer bands
+// ---------------------------------------------------------------------------
+
+/**
+ * When a designer supplies the finished artwork, the platform adds only two
+ * strips: a header carrying the shop's logo and a line of copy, and a footer
+ * carrying its number. Those two lines are what this writes, from whatever
+ * the admin types as a prompt.
+ *
+ * They are much tighter than poster copy — a band is one line, at a size that
+ * has to survive on a phone screen — so this is a separate brief rather than
+ * a variant of the poster one.
+ */
+export interface BandBrief {
+  /** Free text from the admin: "premium clinic, calm, mention 24x7". */
+  prompt: string;
+  count: number;
+}
+
+export interface BandSuggestion {
+  headerText: string;
+  footerText: string;
+  /** Where the shop's logo should sit on this artwork. */
+  logoPosition: string;
+}
+
+export interface BandResult {
+  engine: CopyEngine;
+  suggestions: BandSuggestion[];
+  note?: string;
+}
+
+// Deliberately plain. A band sits on someone else's artwork, so it should
+// identify the shop and get out of the way.
+const OFFLINE_BANDS: BandSuggestion[] = [
+  { headerText: "{{business}}", footerText: "{{address}}, {{city}}", logoPosition: "header" },
+  { headerText: "{{business}} · {{city}}", footerText: "Call us — we're open today", logoPosition: "header" },
+  { headerText: "{{business}}", footerText: "Trusted {{category}} in {{city}}", logoPosition: "top-right" },
+  { headerText: "{{business}} — {{category}}", footerText: "Visit us at {{address}}", logoPosition: "header" },
+  { headerText: "{{business}}", footerText: "Rated {{rating}} by {{reviews}} customers", logoPosition: "bottom-right" },
+];
+
+export function offlineBands(brief: BandBrief): BandSuggestion[] {
+  return OFFLINE_BANDS.slice(0, Math.max(1, Math.min(brief.count, OFFLINE_BANDS.length)));
+}
+
+const LOGO_SPOT_IDS = ["header", "top-left", "top-right", "bottom-left", "bottom-right", "center", "none"] as const;
+
+const bandSchema = z.object({
+  headerText: z.string().max(70),
+  footerText: z.string().max(90).default(""),
+  logoPosition: z.enum(LOGO_SPOT_IDS).default("header"),
+});
+const bandResponseSchema = z.object({ suggestions: z.array(bandSchema).min(1) });
+
+const BAND_OUTPUT_SCHEMA = {
+  type: "object",
+  properties: {
+    suggestions: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          headerText: { type: "string" },
+          footerText: { type: "string" },
+          logoPosition: { type: "string", enum: [...LOGO_SPOT_IDS] },
+        },
+        required: ["headerText", "footerText", "logoPosition"],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ["suggestions"],
+  additionalProperties: false,
+} as const;
+
+function bandSystemPrompt(): string {
+  const tokens = PLACEHOLDERS.map((p) => `{{${p.token}}} — ${p.label}`).join("\n");
+  return [
+    "A designer has supplied finished poster artwork. Your job is only the two strips the",
+    "platform lays over it: a header band beside the shop's logo, and a footer band above",
+    "its phone number.",
+    "",
+    "One design is used by hundreds of different businesses, so never name a specific",
+    "business, city or number. Use these placeholders; they are filled per business:",
+    tokens,
+    "",
+    "Rules:",
+    "- headerText: at most 6 words. It sits next to the logo and should identify the shop —",
+    "  {{business}} almost always belongs in it.",
+    "- footerText: at most 8 words, and it sits directly above the phone number, so do not",
+    "  repeat {{phone}} in it. An empty string is fine when the number says enough.",
+    "- These are strips over someone else's artwork. Say who the shop is and step back —",
+    "  no slogans competing with the design, no emoji, no ALL CAPS, no exclamation marks.",
+    "- Do not invent offers, guarantees or claims that were not in the brief.",
+    "- Every suggestion must be meaningfully different.",
+    "",
+    "You also choose where the shop's logo goes, from exactly these values:",
+    LOGO_SPOT_IDS.join(", "),
+    "Default to \"header\" — inside the strip, where it cannot cover the artwork. Choose a",
+    "corner only when the brief says the design leaves that corner clear, and \"none\" only",
+    "when the brief says the artwork is already branded.",
+  ].join("\n");
+}
+
+async function claudeBands(brief: BandBrief): Promise<BandSuggestion[]> {
+  const { default: Anthropic } = await import("@anthropic-ai/sdk");
+  const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+
+  const message = await client.messages.create({
+    model: env.POSTER_AI_MODEL,
+    max_tokens: 2000,
+    thinking: { type: "adaptive" },
+    output_config: { effort: "high", format: { type: "json_schema", schema: BAND_OUTPUT_SCHEMA } },
+    system: bandSystemPrompt(),
+    messages: [
+      {
+        role: "user",
+        content: `Write ${brief.count} header/footer options.\nThe designer's brief: ${brief.prompt}`,
+      },
+    ],
+  });
+
+  const text = message.content
+    .filter((block): block is { type: "text"; text: string } & typeof block => block.type === "text")
+    .map((block) => block.text)
+    .join("");
+  if (!text.trim()) throw new Error("The model returned no text");
+
+  return bandResponseSchema.parse(JSON.parse(text)).suggestions.slice(0, brief.count);
+}
+
+/** Same fallback contract as `suggestCopy`: never dead, always honest about
+ *  which engine produced the words. */
+export async function suggestBands(brief: BandBrief): Promise<BandResult> {
+  if (env.POSTER_AI_PROVIDER !== "claude") {
+    return { engine: "offline", suggestions: offlineBands(brief) };
+  }
+  if (!env.ANTHROPIC_API_KEY) {
+    return {
+      engine: "offline",
+      suggestions: offlineBands(brief),
+      note: "POSTER_AI_PROVIDER is claude but ANTHROPIC_API_KEY is not set — used the built-in phrasings.",
+    };
+  }
+
+  try {
+    return { engine: "claude", suggestions: await claudeBands(brief) };
+  } catch (err) {
+    logger.warn({ err }, "Poster band generation fell back to the offline engine");
+    const reason = err instanceof Error ? err.message : "unknown error";
+    return {
+      engine: "offline",
+      suggestions: offlineBands(brief),
+      note: `Claude could not be reached (${reason}) — used the built-in phrasings.`,
+    };
+  }
+}

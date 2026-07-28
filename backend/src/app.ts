@@ -40,6 +40,12 @@ export function createApp(): Express {
   // so it must be registered before the global JSON body parser.
   app.post("/api/v1/payments/webhook", express.raw({ type: "application/json" }), asyncHandler(stripeWebhookHandler));
 
+  // Poster artwork is uploaded as a file, but it travels back to the server
+  // inside the design body as a data URI — this project has no object storage,
+  // so the image lives on the row. That does not fit the 1mb default, and
+  // like the webhook above it has to be registered before the global parser.
+  app.use("/api/v1/admin/posters", express.json({ limit: "8mb" }));
+
   app.use(express.json({ limit: "1mb" }));
   app.use(express.urlencoded({ extended: true }));
   app.use("/api", apiRateLimit);

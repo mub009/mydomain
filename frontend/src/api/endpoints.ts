@@ -554,6 +554,16 @@ export interface PosterDesign {
   badgeText: string | null;
   footnote: string | null;
   backgroundImageUrl: string | null;
+  /** Only returned by `get`; the list reports `hasArtwork` instead, because
+   *  an uploaded image lives inline and would be megabytes per row. */
+  artworkUrl?: string | null;
+  hasArtwork?: boolean;
+  headerText: string | null;
+  footerText: string | null;
+  showHeader: boolean;
+  showFooter: boolean;
+  logoPosition: string;
+  logoScale: number;
   categoryId: string | null;
   city: string | null;
   isPublished: boolean;
@@ -572,8 +582,16 @@ export interface PosterStudioOptions {
   palettes: { id: string; name: string; bg: string; accent: string; ink: string; dark: boolean }[];
   sizes: { id: PosterSize; width: number; height: number; label: string; hint: string }[];
   placeholders: { token: string; label: string; example: string }[];
+  logoPositions: { id: string; label: string }[];
+  maxArtworkBytes: number;
   tones: string[];
   ai: { engine: PosterCopyEngine };
+}
+
+export interface PosterBandSuggestion {
+  headerText: string;
+  footerText: string;
+  logoPosition: string;
 }
 
 export interface PosterCopySuggestion {
@@ -609,6 +627,8 @@ export const postersApi = {
   options: () => api.get<ApiResponse<PosterStudioOptions>>("/admin/posters/options").then((r) => r.data.data),
   list: (params: Record<string, unknown> = {}) =>
     api.get<PaginatedResponse<PosterDesign>>("/admin/posters", { params }).then((r) => r.data),
+  // The only call that returns the uploaded artwork itself.
+  get: (id: string) => api.get<ApiResponse<PosterDesign>>(`/admin/posters/${id}`).then((r) => r.data.data),
   create: (payload: Record<string, unknown>) =>
     api.post<ApiResponse<PosterDesign>>("/admin/posters", payload).then((r) => r.data.data),
   update: (id: string, payload: Record<string, unknown>) =>
@@ -629,6 +649,21 @@ export const postersApi = {
         params: search ? { search } : undefined,
       })
       .then((r) => r.data.data),
+  // Header, footer and logo placement for an uploaded design.
+  aiBands: (prompt: string, count = 3) =>
+    api
+      .post<ApiResponse<{ engine: PosterCopyEngine; suggestions: PosterBandSuggestion[]; note?: string }>>(
+        "/admin/posters/ai-bands",
+        { prompt, count },
+      )
+      .then((r) => r.data.data),
+  uploadArtwork: (file: File) => {
+    const body = new FormData();
+    body.append("file", file);
+    return api
+      .post<ApiResponse<{ dataUrl: string; type: string; bytes: number }>>("/admin/posters/artwork", body)
+      .then((r) => r.data.data);
+  },
   aiSuggest: (brief: Record<string, unknown>) =>
     api
       .post<ApiResponse<{ engine: PosterCopyEngine; suggestions: PosterCopySuggestion[]; note?: string }>>(

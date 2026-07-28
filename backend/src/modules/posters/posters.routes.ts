@@ -1,9 +1,11 @@
 import { Router } from "express";
+import multer from "multer";
 import { asyncHandler } from "@/common/asyncHandler";
 import { validate } from "@/middleware/validate";
 import { requireAuth } from "@/middleware/auth";
 import {
   aiBriefSchema,
+  bandBriefSchema,
   createDesignSchema,
   listDesignsQuerySchema,
   previewBusinessQuerySchema,
@@ -11,6 +13,7 @@ import {
   updateDesignSchema,
 } from "./posters.validation";
 import {
+  aiBandsHandler,
   aiSuggestHandler,
   businessPostersHandler,
   createDesignHandler,
@@ -24,7 +27,17 @@ import {
   renderPosterHandler,
   studioOptionsHandler,
   updateDesignHandler,
+  uploadArtworkHandler,
 } from "./posters.controller";
+import { MAX_ARTWORK_BYTES } from "./upload";
+
+// Held in memory and returned as a data URI — nothing is written to disk, and
+// the real check is on the bytes (see `readUploadedImage`), not this filter.
+const artwork = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_ARTWORK_BYTES, files: 1 },
+  fileFilter: (_req, file, cb) => cb(null, file.mimetype.startsWith("image/")),
+});
 
 /** Admin Poster Studio. Mounted under /admin, which already requires ADMIN. */
 export const adminPostersRouter = Router();
@@ -37,6 +50,8 @@ adminPostersRouter.get(
 );
 adminPostersRouter.post("/posters/preview", validate({ body: previewSchema }), asyncHandler(previewHandler));
 adminPostersRouter.post("/posters/ai-suggest", validate({ body: aiBriefSchema }), asyncHandler(aiSuggestHandler));
+adminPostersRouter.post("/posters/ai-bands", validate({ body: bandBriefSchema }), asyncHandler(aiBandsHandler));
+adminPostersRouter.post("/posters/artwork", artwork.single("file"), asyncHandler(uploadArtworkHandler));
 
 adminPostersRouter.get("/posters", validate({ query: listDesignsQuerySchema }), asyncHandler(listDesignsHandler));
 adminPostersRouter.post("/posters", validate({ body: createDesignSchema }), asyncHandler(createDesignHandler));

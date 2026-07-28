@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Download, Image as ImageIcon, Loader2, Plus, Search, Sparkles, Trash2, Wand2 } from "lucide-react";
+import { Download, Image as ImageIcon, Loader2, Plus, Search, Sparkles, Trash2, Upload, Wand2 } from "lucide-react";
 import {
   categoriesApi,
+  PosterBandSuggestion,
   PosterCopySuggestion,
   PosterDesign,
   PosterPreviewBusiness,
@@ -29,6 +30,13 @@ interface DesignForm {
   badgeText: string;
   footnote: string;
   backgroundImageUrl: string;
+  artworkUrl: string;
+  headerText: string;
+  footerText: string;
+  showHeader: boolean;
+  showFooter: boolean;
+  logoPosition: string;
+  logoScale: number;
   categoryId: string;
   city: string;
   isPublished: boolean;
@@ -48,6 +56,13 @@ const BLANK: DesignForm = {
   badgeText: "",
   footnote: "",
   backgroundImageUrl: "",
+  artworkUrl: "",
+  headerText: "{{business}}",
+  footerText: "{{address}}, {{city}}",
+  showHeader: true,
+  showFooter: true,
+  logoPosition: "header",
+  logoScale: 1,
   categoryId: "",
   city: "",
   isPublished: false,
@@ -68,6 +83,13 @@ function toForm(design: PosterDesign): DesignForm {
     badgeText: design.badgeText ?? "",
     footnote: design.footnote ?? "",
     backgroundImageUrl: design.backgroundImageUrl ?? "",
+    artworkUrl: design.artworkUrl ?? "",
+    headerText: design.headerText ?? "",
+    footerText: design.footerText ?? "",
+    showHeader: design.showHeader ?? true,
+    showFooter: design.showFooter ?? true,
+    logoPosition: design.logoPosition ?? "header",
+    logoScale: design.logoScale ?? 1,
     categoryId: design.categoryId ?? "",
     city: design.city ?? "",
     isPublished: design.isPublished,
@@ -91,6 +113,13 @@ function toPayload(form: DesignForm) {
     badgeText: orNull(form.badgeText),
     footnote: orNull(form.footnote),
     backgroundImageUrl: orNull(form.backgroundImageUrl),
+    artworkUrl: orNull(form.artworkUrl),
+    headerText: orNull(form.headerText),
+    footerText: orNull(form.footerText),
+    showHeader: form.showHeader,
+    showFooter: form.showFooter,
+    logoPosition: form.logoPosition,
+    logoScale: form.logoScale,
     categoryId: form.categoryId || null,
     city: orNull(form.city),
     isPublished: form.isPublished,
@@ -233,6 +262,97 @@ function AiWriter({
   );
 }
 
+
+// ---------------------------------------------------------------------------
+
+/**
+ * For an uploaded design the platform adds only two strips and a logo, so the
+ * brief is one free-text box rather than a form: describe the artwork and get
+ * back the header line, the footer line and where the logo should sit.
+ */
+function BandWriter({
+  options,
+  onApply,
+  onClose,
+}: {
+  options: PosterStudioOptions;
+  onApply: (suggestion: PosterBandSuggestion, prompt: string, engine: string) => void;
+  onClose: () => void;
+}) {
+  const [prompt, setPrompt] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [note, setNote] = useState("");
+  const [engine, setEngine] = useState("");
+  const [suggestions, setSuggestions] = useState<PosterBandSuggestion[]>([]);
+
+  const spotLabel = (id: string) => options.logoPositions.find((p) => p.id === id)?.label ?? id;
+
+  async function write() {
+    setBusy(true);
+    setError("");
+    try {
+      const result = await postersApi.aiBands(prompt);
+      setSuggestions(result.suggestions);
+      setEngine(result.engine);
+      setNote(result.note ?? "");
+    } catch (err) {
+      setError(apiErrorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Modal title="Write the header, footer and logo placement" onClose={onClose}>
+      <p className="mb-3 text-sm text-ink-600">
+        Describe the artwork and who it is for. You get back the two strips laid over it — with{" "}
+        {"{{business}}"}-style placeholders, so one design serves every shop — and where the logo should sit.
+        {options.ai.engine === "offline" && (
+          <span className="mt-1 block text-xs text-ink-500">
+            Using the built-in phrasings. Set <code className="font-mono">POSTER_AI_PROVIDER=claude</code> and an API
+            key for model-written copy.
+          </span>
+        )}
+      </p>
+
+      <textarea
+        className="input h-24 resize-none"
+        placeholder="Diwali artwork, deep red and gold, lamps down the left side. Top-right corner is empty. For jewellery shops — keep it understated."
+        value={prompt}
+        onChange={(e) => setPrompt(e.target.value)}
+      />
+
+      <button onClick={write} disabled={busy || prompt.trim().length < 3} className="btn-primary mt-3 w-full py-2.5">
+        {busy ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+        {busy ? "Writing…" : suggestions.length ? "Write three more" : "Write three options"}
+      </button>
+
+      {error && <p className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+      {note && <p className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">{note}</p>}
+
+      {suggestions.length > 0 && (
+        <div className="mt-4 space-y-2">
+          {suggestions.map((suggestion, i) => (
+            <button
+              key={i}
+              onClick={() => onApply(suggestion, prompt, engine)}
+              className="block w-full rounded-lg border border-gray-200 p-3 text-left hover:border-brand-500 hover:bg-brand-50/40"
+            >
+              <p className="font-bold text-ink-900">{suggestion.headerText}</p>
+              {suggestion.footerText && <p className="mt-0.5 text-sm text-ink-600">{suggestion.footerText}</p>}
+              <span className="badge mt-1.5 bg-violet-50 text-violet-700">
+                Logo: {spotLabel(suggestion.logoPosition)}
+              </span>
+            </button>
+          ))}
+          <p className="text-center text-xs text-ink-400">Click one to use it.</p>
+        </div>
+      )}
+    </Modal>
+  );
+}
+
 // ---------------------------------------------------------------------------
 
 function DesignEditor({
@@ -252,6 +372,8 @@ function DesignEditor({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [showAi, setShowAi] = useState(false);
+  const [showBands, setShowBands] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   const [businesses, setBusinesses] = useState<PosterPreviewBusiness[]>([]);
   const [previewFor, setPreviewFor] = useState("");
@@ -260,6 +382,34 @@ function DesignEditor({
   const [rendering, setRendering] = useState(false);
 
   const set = <K extends keyof DesignForm>(key: K, value: DesignForm[K]) => setForm((f) => ({ ...f, [key]: value }));
+
+  const usingArtwork = form.layout === "artwork";
+
+  // The file never reaches the design row as a file — the server validates the
+  // bytes and hands back a data URI, which is what gets saved.
+  async function uploadArtwork(file: File | undefined) {
+    if (!file) return;
+    setUploading(true);
+    setError("");
+    try {
+      const result = await postersApi.uploadArtwork(file);
+      setForm((f) => ({ ...f, artworkUrl: result.dataUrl, layout: "artwork" }));
+    } catch (err) {
+      setError(apiErrorMessage(err));
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  // The list omits the uploaded artwork, so an edit has to fetch the design
+  // in full or the first save would drop the image.
+  useEffect(() => {
+    if (!existing?.hasArtwork) return;
+    postersApi
+      .get(existing.id)
+      .then((full) => setForm((f) => ({ ...f, artworkUrl: full.artworkUrl ?? "" })))
+      .catch(() => undefined);
+  }, [existing]);
 
   useEffect(() => {
     postersApi
@@ -381,9 +531,11 @@ function DesignEditor({
             </div>
           </div>
 
-          <div className="rounded-lg border border-gray-200 p-3">
+          <div className={`rounded-lg border border-gray-200 p-3 ${usingArtwork ? "opacity-50" : ""}`}>
             <div className="mb-2 flex items-center justify-between">
-              <p className="text-xs font-semibold text-ink-700">Wording</p>
+              <p className="text-xs font-semibold text-ink-700">
+                Wording{usingArtwork && <span className="ml-1 font-normal text-ink-400">— not used by uploaded artwork</span>}
+              </p>
               <button type="button" onClick={() => setShowAi(true)} className="btn-secondary px-3 py-1.5 text-xs">
                 <Wand2 size={13} /> Write it for me
               </button>
@@ -451,6 +603,130 @@ function DesignEditor({
             </div>
           </div>
 
+          <div className="rounded-lg border border-gray-200 p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-xs font-semibold text-ink-700">Designer's artwork</p>
+              {form.artworkUrl && (
+                <button
+                  type="button"
+                  onClick={() => setForm((f) => ({ ...f, artworkUrl: "", layout: "spotlight" }))}
+                  className="text-xs text-red-700 hover:underline"
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+
+            {form.artworkUrl ? (
+              <img
+                src={form.artworkUrl}
+                alt="Uploaded artwork"
+                className="max-h-40 w-full rounded-md border border-gray-200 object-contain"
+              />
+            ) : (
+              <label className="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-gray-300 px-3 py-6 text-sm text-ink-500 hover:border-brand-500 hover:text-brand-700">
+                {uploading ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
+                {uploading ? "Uploading…" : "Upload a finished poster (PNG, JPEG, WebP)"}
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/gif"
+                  className="hidden"
+                  onChange={(e) => uploadArtwork(e.target.files?.[0])}
+                />
+              </label>
+            )}
+            <p className="mt-1.5 text-[11px] leading-snug text-ink-500">
+              Upload a design made elsewhere and the platform adds only the header, footer and logo — everything else
+              is left exactly as drawn. Up to {Math.round(options.maxArtworkBytes / 1024 / 1024)}MB.
+            </p>
+          </div>
+
+          {usingArtwork && (
+            <div className="rounded-lg border border-gray-200 p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-xs font-semibold text-ink-700">What goes over the artwork</p>
+                <button type="button" onClick={() => setShowBands(true)} className="btn-secondary px-3 py-1.5 text-xs">
+                  <Wand2 size={13} /> Write it for me
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                <div>
+                  <div className="mb-1 flex items-center justify-between">
+                    <label className="text-[11px] font-semibold text-ink-600">Header line</label>
+                    <label className="flex items-center gap-1 text-[11px] text-ink-500">
+                      <input
+                        type="checkbox"
+                        checked={form.showHeader}
+                        onChange={(e) => set("showHeader", e.target.checked)}
+                      />
+                      show
+                    </label>
+                  </div>
+                  <input
+                    className="input"
+                    placeholder="{{business}}"
+                    value={form.headerText}
+                    onFocus={() => setTarget("headerText")}
+                    onChange={(e) => set("headerText", e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <div className="mb-1 flex items-center justify-between">
+                    <label className="text-[11px] font-semibold text-ink-600">Footer line (above the number)</label>
+                    <label className="flex items-center gap-1 text-[11px] text-ink-500">
+                      <input
+                        type="checkbox"
+                        checked={form.showFooter}
+                        onChange={(e) => set("showFooter", e.target.checked)}
+                      />
+                      show
+                    </label>
+                  </div>
+                  <input
+                    className="input"
+                    placeholder="{{address}}, {{city}}"
+                    value={form.footerText}
+                    onFocus={() => setTarget("footerText")}
+                    onChange={(e) => set("footerText", e.target.value)}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="mb-1 block text-[11px] font-semibold text-ink-600">Logo position</label>
+                    <select
+                      className="input"
+                      value={form.logoPosition}
+                      onChange={(e) => set("logoPosition", e.target.value)}
+                    >
+                      {options.logoPositions.map((spot) => (
+                        <option key={spot.id} value={spot.id}>
+                          {spot.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[11px] font-semibold text-ink-600">
+                      Logo size ({form.logoScale.toFixed(1)}×)
+                    </label>
+                    <input
+                      type="range"
+                      min="0.5"
+                      max="2"
+                      step="0.1"
+                      className="w-full"
+                      value={form.logoScale}
+                      onChange={(e) => set("logoScale", Number(e.target.value))}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div>
             <label className="mb-1 block text-xs font-semibold text-ink-700">Background image URL (optional)</label>
             <input
@@ -510,6 +786,24 @@ function DesignEditor({
           </p>
         </div>
       </div>
+
+      {showBands && (
+        <BandWriter
+          options={options}
+          onClose={() => setShowBands(false)}
+          onApply={(suggestion, prompt, engine) => {
+            setForm((f) => ({
+              ...f,
+              headerText: suggestion.headerText,
+              footerText: suggestion.footerText,
+              logoPosition: suggestion.logoPosition,
+              aiBrief: prompt,
+              aiEngine: engine,
+            }));
+            setShowBands(false);
+          }}
+        />
+      )}
 
       {showAi && (
         <AiWriter
@@ -618,6 +912,14 @@ export default function PostersPanel() {
         badgeText: design.badgeText,
         footnote: design.footnote,
         backgroundImageUrl: design.backgroundImageUrl,
+        headerText: design.headerText,
+        footerText: design.footerText,
+        showHeader: design.showHeader,
+        showFooter: design.showFooter,
+        logoPosition: design.logoPosition,
+        logoScale: design.logoScale,
+        // Fetched rather than taken from the list, which omits it.
+        artworkUrl: design.hasArtwork ? (await postersApi.get(design.id)).artworkUrl : null,
       });
       await downloadPng(rendered.svg, rendered.width, rendered.height, rendered.fileName);
     } catch (err) {
@@ -675,9 +977,12 @@ export default function PostersPanel() {
                   <span className="badge bg-brand-50 text-brand-700">
                     {layoutNames[design.layout] ?? design.layout} · {design.size.toLowerCase()}
                   </span>
+                  {design.hasArtwork && <span className="badge bg-amber-50 text-amber-800">uploaded artwork</span>}
                   {design.aiEngine && <span className="badge bg-violet-50 text-violet-700">written by {design.aiEngine}</span>}
                 </div>
-                <p className="mt-0.5 truncate text-sm text-ink-600">{design.headline}</p>
+                <p className="mt-0.5 truncate text-sm text-ink-600">
+                  {design.hasArtwork ? design.headerText || design.name : design.headline}
+                </p>
                 <p className="mt-0.5 text-[11px] text-ink-400">
                   {design.category?.name ?? "All categories"} · {design.city ?? "All cities"}
                   {design.businessesUsing ? ` · ${design.businessesUsing} shops, ${design.downloads} downloads` : ""}
