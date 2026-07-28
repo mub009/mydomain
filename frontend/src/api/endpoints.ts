@@ -564,6 +564,9 @@ export interface PosterDesign {
   showFooter: boolean;
   logoPosition: string;
   logoScale: number;
+  bandStyle: string;
+  bandColor: string | null;
+  bandTextColor: string | null;
   categoryId: string | null;
   city: string | null;
   isPublished: boolean;
@@ -583,6 +586,7 @@ export interface PosterStudioOptions {
   sizes: { id: PosterSize; width: number; height: number; label: string; hint: string }[];
   placeholders: { token: string; label: string; example: string }[];
   logoPositions: { id: string; label: string }[];
+  bandStyles: { id: string; label: string; hint: string }[];
   maxArtworkBytes: number;
   tones: string[];
   ai: { engine: PosterCopyEngine };
@@ -592,6 +596,7 @@ export interface PosterBandSuggestion {
   headerText: string;
   footerText: string;
   logoPosition: string;
+  bandStyle: string;
 }
 
 export interface PosterCopySuggestion {

@@ -941,6 +941,14 @@ model PosterDesign {
   logoPosition String  @default("header") @db.VarChar(20)
   logoScale    Float   @default(1)
 
+  // How the two strips sit on the artwork, and in what colour. Left null the
+  // colours fall back to the palette; the editor fills them by sampling the
+  // uploaded image, so the bands belong to the design rather than to a theme
+  // chosen separately from it.
+  bandStyle     String  @default("gradient") @db.VarChar(20)
+  bandColor     String? @db.VarChar(9)
+  bandTextColor String? @db.VarChar(9)
+
   // Targeting. Null on both means every published business sees it.
   categoryId String?   @db.VarChar(36)
   category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)

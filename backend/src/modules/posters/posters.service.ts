@@ -3,7 +3,16 @@ import { prisma } from "@/config/database";
 import { AppError } from "@/common/errors";
 import { parsePagination } from "@/common/pagination";
 import { inlineImage } from "./assets";
-import { layoutChoices, LOGO_POSITIONS, POSTER_SIZES, renderPosterSvg, resolveLogoPosition, sizeChoices } from "./layouts";
+import {
+  BAND_STYLES,
+  layoutChoices,
+  LOGO_POSITIONS,
+  POSTER_SIZES,
+  renderPosterSvg,
+  resolveBandStyle,
+  resolveLogoPosition,
+  sizeChoices,
+} from "./layouts";
 import { PALETTES, resolvePalette } from "./palettes";
 import { fillPlaceholders, PLACEHOLDERS, PosterSubject, unknownPlaceholders } from "./placeholders";
 import { BandBrief, CopyBrief, claudeConfigured, suggestBands, suggestCopy, TONES } from "./copywriter";
@@ -107,6 +116,9 @@ export async function renderForBusiness(design: PosterDesign, business: Business
       showFooter: design.showFooter,
       logoPosition: resolveLogoPosition(design.logoPosition),
       logoScale: design.logoScale,
+      bandStyle: resolveBandStyle(design.bandStyle),
+      bandColor: design.bandColor,
+      bandTextColor: design.bandTextColor,
     },
     design.layout,
   );
@@ -148,6 +160,9 @@ export interface DesignInput {
   showFooter?: boolean;
   logoPosition?: string;
   logoScale?: number;
+  bandStyle?: string;
+  bandColor?: string | null;
+  bandTextColor?: string | null;
   categoryId?: string | null;
   city?: string | null;
   isPublished?: boolean;
@@ -205,6 +220,9 @@ export async function listDesigns(query: { page?: number; pageSize?: number; sea
         showFooter: true,
         logoPosition: true,
         logoScale: true,
+        bandStyle: true,
+        bandColor: true,
+        bandTextColor: true,
         categoryId: true,
         city: true,
         isPublished: true,
@@ -285,6 +303,9 @@ export async function createDesign(actor: Actor, input: DesignInput) {
       showFooter: input.showFooter ?? true,
       logoPosition: input.logoPosition ?? "header",
       logoScale: input.logoScale ?? 1,
+      bandStyle: input.bandStyle ?? "gradient",
+      bandColor: input.bandColor ?? null,
+      bandTextColor: input.bandTextColor ?? null,
       categoryId: input.categoryId ?? null,
       city: input.city?.trim() || null,
       isPublished: input.isPublished ?? false,
@@ -322,6 +343,9 @@ export async function updateDesign(id: string, input: Partial<DesignInput>) {
       ...(input.showFooter !== undefined ? { showFooter: input.showFooter } : {}),
       ...(input.logoPosition !== undefined ? { logoPosition: input.logoPosition } : {}),
       ...(input.logoScale !== undefined ? { logoScale: input.logoScale } : {}),
+      ...(input.bandStyle !== undefined ? { bandStyle: input.bandStyle } : {}),
+      ...(input.bandColor !== undefined ? { bandColor: input.bandColor } : {}),
+      ...(input.bandTextColor !== undefined ? { bandTextColor: input.bandTextColor } : {}),
       ...(input.categoryId !== undefined ? { categoryId: input.categoryId } : {}),
       ...(input.city !== undefined ? { city: input.city?.trim() || null } : {}),
       ...(input.isPublished !== undefined ? { isPublished: input.isPublished } : {}),
@@ -375,6 +399,9 @@ export async function previewDesign(input: DesignInput, businessId?: string): Pr
     showFooter: input.showFooter ?? true,
     logoPosition: input.logoPosition ?? "header",
     logoScale: input.logoScale ?? 1,
+    bandStyle: input.bandStyle ?? "gradient",
+    bandColor: input.bandColor ?? null,
+    bandTextColor: input.bandTextColor ?? null,
   } as PosterDesign;
 
   return renderForBusiness(draft, business);
@@ -406,6 +433,7 @@ export function studioOptions() {
     palettes: PALETTES.map(({ id, name, bg, accent, ink, dark }) => ({ id, name, bg, accent, ink, dark })),
     sizes: sizeChoices(),
     logoPositions: LOGO_POSITIONS.map(({ id, label }) => ({ id, label })),
+    bandStyles: BAND_STYLES.map(({ id, label, hint }) => ({ id, label, hint })),
     maxArtworkBytes: MAX_ARTWORK_BYTES,
     placeholders: PLACEHOLDERS,
     tones: TONES,

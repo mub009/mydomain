@@ -298,6 +298,8 @@ export interface BandSuggestion {
   footerText: string;
   /** Where the shop's logo should sit on this artwork. */
   logoPosition: string;
+  /** How the strips should meet the artwork. */
+  bandStyle: string;
 }
 
 export interface BandResult {
@@ -309,11 +311,11 @@ export interface BandResult {
 // Deliberately plain. A band sits on someone else's artwork, so it should
 // identify the shop and get out of the way.
 const OFFLINE_BANDS: BandSuggestion[] = [
-  { headerText: "{{business}}", footerText: "{{address}}, {{city}}", logoPosition: "header" },
-  { headerText: "{{business}} · {{city}}", footerText: "Call us — we're open today", logoPosition: "header" },
-  { headerText: "{{business}}", footerText: "Trusted {{category}} in {{city}}", logoPosition: "top-right" },
-  { headerText: "{{business}} — {{category}}", footerText: "Visit us at {{address}}", logoPosition: "header" },
-  { headerText: "{{business}}", footerText: "Rated {{rating}} by {{reviews}} customers", logoPosition: "bottom-right" },
+  { headerText: "{{business}}", footerText: "{{address}}, {{city}}", logoPosition: "header", bandStyle: "gradient" },
+  { headerText: "{{business}} · {{city}}", footerText: "Call us — we're open today", logoPosition: "header", bandStyle: "solid" },
+  { headerText: "{{business}}", footerText: "Trusted {{category}} in {{city}}", logoPosition: "top-right", bandStyle: "gradient" },
+  { headerText: "{{business}} — {{category}}", footerText: "Visit us at {{address}}", logoPosition: "header", bandStyle: "glass" },
+  { headerText: "{{business}}", footerText: "Rated {{rating}} by {{reviews}} customers", logoPosition: "bottom-right", bandStyle: "none" },
 ];
 
 export function offlineBands(brief: BandBrief): BandSuggestion[] {
@@ -321,11 +323,13 @@ export function offlineBands(brief: BandBrief): BandSuggestion[] {
 }
 
 const LOGO_SPOT_IDS = ["header", "top-left", "top-right", "bottom-left", "bottom-right", "center", "none"] as const;
+const BAND_STYLE_IDS = ["solid", "gradient", "glass", "none"] as const;
 
 const bandSchema = z.object({
   headerText: z.string().max(70),
   footerText: z.string().max(90).default(""),
   logoPosition: z.enum(LOGO_SPOT_IDS).default("header"),
+  bandStyle: z.enum(BAND_STYLE_IDS).default("gradient"),
 });
 const bandResponseSchema = z.object({ suggestions: z.array(bandSchema).min(1) });
 
@@ -340,8 +344,9 @@ const BAND_OUTPUT_SCHEMA = {
           headerText: { type: "string" },
           footerText: { type: "string" },
           logoPosition: { type: "string", enum: [...LOGO_SPOT_IDS] },
+          bandStyle: { type: "string", enum: [...BAND_STYLE_IDS] },
         },
-        required: ["headerText", "footerText", "logoPosition"],
+        required: ["headerText", "footerText", "logoPosition", "bandStyle"],
         additionalProperties: false,
       },
     },
@@ -376,6 +381,15 @@ function bandSystemPrompt(): string {
     "Default to \"header\" — inside the strip, where it cannot cover the artwork. Choose a",
     "corner only when the brief says the design leaves that corner clear, and \"none\" only",
     "when the brief says the artwork is already branded.",
+    "",
+    "You also choose how the two strips meet the artwork, from exactly these values:",
+    BAND_STYLE_IDS.join(", "),
+    "The strips take their colour from the artwork itself, so this is only about the edge",
+    "between them. \"gradient\" fades into the design and is the safe choice for busy or",
+    "photographic artwork. \"solid\" is a clean bar, for a design with a plain border or a",
+    "lot of empty space at top and bottom. \"glass\" is translucent. \"none\" drops the panel",
+    "entirely and sets the type straight on the artwork — only where the brief says those",
+    "areas are calm and uncluttered.",
   ].join("\n");
 }
 

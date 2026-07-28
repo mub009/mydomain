@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Download, Image as ImageIcon, Loader2, Plus, Search, Sparkles, Trash2, Upload, Wand2 } from "lucide-react";
+import { Download, Image as ImageIcon, Loader2, Pipette, Plus, Search, Sparkles, Trash2, Upload, Wand2 } from "lucide-react";
 import {
   categoriesApi,
   PosterBandSuggestion,
@@ -17,6 +17,7 @@ import { ListSkeleton } from "@/components/Loading";
 import Modal from "@/components/Modal";
 import Pagination from "@/components/Pagination";
 import { downloadPng, svgToDataUrl } from "@/lib/posterFile";
+import { sampleBandColors } from "@/lib/artworkColors";
 
 interface DesignForm {
   name: string;
@@ -37,6 +38,9 @@ interface DesignForm {
   showFooter: boolean;
   logoPosition: string;
   logoScale: number;
+  bandStyle: string;
+  bandColor: string;
+  bandTextColor: string;
   categoryId: string;
   city: string;
   isPublished: boolean;
@@ -63,6 +67,9 @@ const BLANK: DesignForm = {
   showFooter: true,
   logoPosition: "header",
   logoScale: 1,
+  bandStyle: "gradient",
+  bandColor: "",
+  bandTextColor: "",
   categoryId: "",
   city: "",
   isPublished: false,
@@ -90,6 +97,9 @@ function toForm(design: PosterDesign): DesignForm {
     showFooter: design.showFooter ?? true,
     logoPosition: design.logoPosition ?? "header",
     logoScale: design.logoScale ?? 1,
+    bandStyle: design.bandStyle ?? "gradient",
+    bandColor: design.bandColor ?? "",
+    bandTextColor: design.bandTextColor ?? "",
     categoryId: design.categoryId ?? "",
     city: design.city ?? "",
     isPublished: design.isPublished,
@@ -120,6 +130,9 @@ function toPayload(form: DesignForm) {
     showFooter: form.showFooter,
     logoPosition: form.logoPosition,
     logoScale: form.logoScale,
+    bandStyle: form.bandStyle,
+    bandColor: orNull(form.bandColor),
+    bandTextColor: orNull(form.bandTextColor),
     categoryId: form.categoryId || null,
     city: orNull(form.city),
     isPublished: form.isPublished,
@@ -287,6 +300,7 @@ function BandWriter({
   const [suggestions, setSuggestions] = useState<PosterBandSuggestion[]>([]);
 
   const spotLabel = (id: string) => options.logoPositions.find((p) => p.id === id)?.label ?? id;
+  const styleLabel = (id: string) => options.bandStyles.find((b) => b.id === id)?.label ?? id;
 
   async function write() {
     setBusy(true);
@@ -341,9 +355,10 @@ function BandWriter({
             >
               <p className="font-bold text-ink-900">{suggestion.headerText}</p>
               {suggestion.footerText && <p className="mt-0.5 text-sm text-ink-600">{suggestion.footerText}</p>}
-              <span className="badge mt-1.5 bg-violet-50 text-violet-700">
-                Logo: {spotLabel(suggestion.logoPosition)}
-              </span>
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                <span className="badge bg-violet-50 text-violet-700">Logo: {spotLabel(suggestion.logoPosition)}</span>
+                <span className="badge bg-sky-50 text-sky-700">{styleLabel(suggestion.bandStyle)}</span>
+              </div>
             </button>
           ))}
           <p className="text-center text-xs text-ink-400">Click one to use it.</p>
@@ -393,7 +408,15 @@ function DesignEditor({
     setError("");
     try {
       const result = await postersApi.uploadArtwork(file);
-      setForm((f) => ({ ...f, artworkUrl: result.dataUrl, layout: "artwork" }));
+      // Take the strips' colour from the design itself, so the footer looks
+      // like part of the poster rather than a bar laid across it.
+      const sampled = await sampleBandColors(result.dataUrl).catch(() => null);
+      setForm((f) => ({
+        ...f,
+        artworkUrl: result.dataUrl,
+        layout: "artwork",
+        ...(sampled ? { bandColor: sampled.band, bandTextColor: sampled.text } : {}),
+      }));
     } catch (err) {
       setError(apiErrorMessage(err));
     } finally {
@@ -693,6 +716,64 @@ function DesignEditor({
                   />
                 </div>
 
+                <div>
+                  <div className="mb-1 flex items-center justify-between">
+                    <label className="text-[11px] font-semibold text-ink-600">How the strips meet the artwork</label>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        sampleBandColors(form.artworkUrl)
+                          .then((c) => setForm((f) => ({ ...f, bandColor: c.band, bandTextColor: c.text })))
+                          .catch(() => setError("That artwork could not be sampled."))
+                      }
+                      className="flex items-center gap-1 text-[11px] text-brand-600 hover:underline"
+                    >
+                      <Pipette size={12} /> Re-match to artwork
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {options.bandStyles.map((band) => (
+                      <button
+                        key={band.id}
+                        type="button"
+                        onClick={() => set("bandStyle", band.id)}
+                        className={`rounded-lg border p-2 text-left text-xs ${
+                          form.bandStyle === band.id
+                            ? "border-brand-600 bg-brand-50"
+                            : "border-gray-200 hover:border-gray-300"
+                        }`}
+                      >
+                        <span className="font-semibold text-ink-900">{band.label}</span>
+                        <span className="mt-0.5 block text-[10px] leading-snug text-ink-500">{band.hint}</span>
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="mt-2 flex items-center gap-3">
+                    <label className="flex items-center gap-1.5 text-[11px] text-ink-600">
+                      Panel
+                      <input
+                        type="color"
+                        className="h-7 w-9 cursor-pointer rounded border border-gray-200"
+                        value={form.bandColor || "#111111"}
+                        onChange={(e) => set("bandColor", e.target.value)}
+                      />
+                    </label>
+                    <label className="flex items-center gap-1.5 text-[11px] text-ink-600">
+                      Text
+                      <input
+                        type="color"
+                        className="h-7 w-9 cursor-pointer rounded border border-gray-200"
+                        value={form.bandTextColor || "#ffffff"}
+                        onChange={(e) => set("bandTextColor", e.target.value)}
+                      />
+                    </label>
+                    <span className="text-[10px] leading-snug text-ink-400">
+                      Sampled from the artwork on upload — override if you want.
+                    </span>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className="mb-1 block text-[11px] font-semibold text-ink-600">Logo position</label>
@@ -797,6 +878,7 @@ function DesignEditor({
               headerText: suggestion.headerText,
               footerText: suggestion.footerText,
               logoPosition: suggestion.logoPosition,
+              bandStyle: suggestion.bandStyle,
               aiBrief: prompt,
               aiEngine: engine,
             }));
@@ -918,6 +1000,9 @@ export default function PostersPanel() {
         showFooter: design.showFooter,
         logoPosition: design.logoPosition,
         logoScale: design.logoScale,
+        bandStyle: design.bandStyle,
+        bandColor: design.bandColor,
+        bandTextColor: design.bandTextColor,
         // Fetched rather than taken from the list, which omits it.
         artworkUrl: design.hasArtwork ? (await postersApi.get(design.id)).artworkUrl : null,
       });

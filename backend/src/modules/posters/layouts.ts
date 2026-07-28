@@ -43,6 +43,37 @@ export interface RenderInput {
   /** Where the shop's logo sits on uploaded artwork, and how big. */
   logoPosition?: LogoPosition;
   logoScale?: number;
+  /** How the strips sit on the artwork, and in what colour. */
+  bandStyle?: BandStyle;
+  bandColor?: string | null;
+  bandTextColor?: string | null;
+}
+
+/**
+ * How the two strips meet the artwork.
+ *
+ * A solid bar in a colour picked from a palette is a slab pasted over someone
+ * else's work. These are the ways to avoid that: take the colour *from* the
+ * design, and choose how hard the edge between the two should be.
+ */
+export const BAND_STYLES = [
+  { id: "solid", label: "Solid bar", hint: "A clean edge. Best on artwork with a plain border." },
+  { id: "gradient", label: "Faded", hint: "Melts into the artwork — best on busy or photographic designs." },
+  { id: "glass", label: "Frosted", hint: "A translucent plate; the artwork shows through." },
+  { id: "none", label: "No panel", hint: "Text straight on the artwork, with a soft shadow for legibility." },
+] as const;
+
+export type BandStyle = (typeof BAND_STYLES)[number]["id"];
+
+/** Faded is the default: it is the only style that cannot leave a visible
+ *  seam, whatever the artwork happens to have at its edges. */
+export function resolveBandStyle(value?: string | null): BandStyle {
+  return (BAND_STYLES.find((b) => b.id === value)?.id ?? "gradient") as BandStyle;
+}
+
+/** Only `#rgb`, `#rrggbb` and `#rrggbbaa` reach an SVG attribute. */
+export function safeColor(value: string | null | undefined, fallback: string): string {
+  return value && /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(value.trim()) ? value.trim() : fallback;
 }
 
 /**
@@ -914,8 +945,50 @@ const artwork: PosterLayout = {
         : "";
 
     const footerLine = input.copy.footerText.trim();
+
+    // The band belongs to the artwork, not to a palette chosen beside it. The
+    // editor samples the uploaded image and stores the two colours here; the
+    // palette is only the fallback for a design with no artwork yet.
+    const style = resolveBandStyle(input.bandStyle);
+    const panel = safeColor(input.bandColor, p.accent);
+    const ink = safeColor(input.bandTextColor, p.onAccent);
+
+    /**
+     * Paints one strip. "solid" is a clean edge; "gradient" fades into the
+     * design so a busy or photographic artwork has no visible seam; "glass"
+     * lets the artwork through; "none" drops the panel and leans on a shadow
+     * to keep the type readable.
+     */
+    const band = (id: string, y: number, height: number, fromBottom: boolean): string => {
+      if (style === "none") return "";
+      if (style === "glass") {
+        return `<rect x="0" y="${y}" width="${W}" height="${height}" fill="${panel}" opacity="0.55"/>`;
+      }
+      if (style === "solid") {
+        return `<rect x="0" y="${y}" width="${W}" height="${height}" fill="${panel}"/>`;
+      }
+      // Opaque at the poster's edge, clear where it meets the design.
+      const stops = fromBottom
+        ? `<stop offset="0" stop-color="${panel}" stop-opacity="0"/><stop offset="1" stop-color="${panel}" stop-opacity="0.97"/>`
+        : `<stop offset="0" stop-color="${panel}" stop-opacity="0.97"/><stop offset="1" stop-color="${panel}" stop-opacity="0"/>`;
+      return (
+        `<defs><linearGradient id="band-${id}" x1="0" y1="0" x2="0" y2="1">${stops}</linearGradient></defs>` +
+        `<rect x="0" y="${y}" width="${W}" height="${height}" fill="url(#band-${id})"/>`
+      );
+    };
     // With a line above it the number drops; alone, it centres in the strip.
     const contactY = footerLine ? H - footerH * 0.3 : H - footerH * 0.38;
+
+    /** Wraps type in the drop shadow, but only where there is no panel to sit
+     *  on. Logos are left out of it — they carry their own plate. */
+    const lift = (svg: string) => (style === "none" && svg ? `<g filter="url(#band-shadow)">${svg}</g>` : svg);
+
+    // Only the panel-less style needs it, and only then is it worth the filter.
+    const shadow =
+      style === "none"
+        ? `<defs><filter id="band-shadow" x="-10%" y="-40%" width="120%" height="180%">` +
+          `<feDropShadow dx="0" dy="2" stdDeviation="6" flood-color="#000" flood-opacity="0.75"/></filter></defs>`
+        : "";
 
     return [
       // Without artwork this is still a usable poster rather than a blank —
@@ -925,33 +998,31 @@ const artwork: PosterLayout = {
           `<image href="${escapeXml(input.backgroundHref!)}" x="0" y="0" width="${W}" height="${H}" preserveAspectRatio="xMidYMid slice"/>`
         : backdrop(input, dim, 0, "artwork-bg"),
 
+      shadow,
+
       showHeader
-        ? // A soft fade under the strip, so the band never looks pasted onto
-          // whatever the artwork happens to have at the top edge.
-          `<defs><linearGradient id="artwork-head" x1="0" y1="0" x2="0" y2="1">` +
-          `<stop offset="0" stop-color="${p.bg}" stop-opacity="0.92"/>` +
-          `<stop offset="1" stop-color="${p.bg}" stop-opacity="0"/></linearGradient></defs>` +
-          `<rect x="0" y="0" width="${W}" height="${headerH * 1.35}" fill="url(#artwork-head)"/>` +
-          (placement === "header" && spot ? logoMark(input, spot.cx, spot.cy, logoR, p.accent, p.bgAlt, p.ink) : "") +
-          (header?.svg ?? "")
+        ? band("head", 0, headerH * (style === "gradient" ? 1.4 : 1), false) +
+          (placement === "header" && spot ? logoMark(input, spot.cx, spot.cy, logoR, ink, panel, ink) : "") +
+          lift(header?.svg ?? "")
         : "",
 
       floatingLogo,
 
       showFooter
-        ? `<rect x="0" y="${H - footerH}" width="${W}" height="${footerH}" fill="${p.accent}"/>` +
-          (footerLine
-            ? textBlock(footerLine, {
-                x: M,
-                y: H - footerH * 0.72,
-                maxWidth: W - M * 2,
-                fontSize: W * 0.032,
-                maxLines: 1,
-                fill: p.onAccent,
-                weight: 600,
-              }).svg
-            : "") +
-          contactRow(input, M, contactY, W * 0.045, p.onAccent, p.onAccent, W - M * 2)
+        ? band("foot", H - footerH * (style === "gradient" ? 1.6 : 1), footerH * (style === "gradient" ? 1.6 : 1), true) +
+          lift(
+            (footerLine
+              ? textBlock(footerLine, {
+                  x: M,
+                  y: H - footerH * 0.72,
+                  maxWidth: W - M * 2,
+                  fontSize: W * 0.032,
+                  maxLines: 1,
+                  fill: ink,
+                  weight: 600,
+                }).svg
+              : "") + contactRow(input, M, contactY, W * 0.045, ink, ink, W - M * 2),
+          )
         : "",
 
       badge(input, W - M - W * 0.02, H * 0.24, W * 0.1),

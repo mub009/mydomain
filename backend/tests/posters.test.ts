@@ -476,3 +476,75 @@ describe("offline bands", () => {
     }
   });
 });
+
+// A solid bar in a colour picked from a palette is a slab pasted over someone
+// else's work. The bands have to take their colour from the design.
+describe("bands match the artwork", () => {
+  const art = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==";
+  const copy = {
+    headline: "",
+    subheadline: "",
+    ctaText: "",
+    badgeText: "",
+    footnote: "",
+    headerText: "Spice Route Kitchen",
+    footerText: "Trusted in Kozhikode",
+  };
+
+  const render = (over: Record<string, unknown> = {}) =>
+    renderPosterSvg(
+      {
+        size: "PORTRAIT",
+        palette: PALETTES[0],
+        copy,
+        subject,
+        logoHref: null,
+        backgroundHref: art,
+        ...over,
+      } as Parameters<typeof renderPosterSvg>[0],
+      "artwork",
+    ).svg;
+
+  it("uses the sampled colour rather than the palette accent", () => {
+    const svg = render({ bandColor: "#b8860b", bandTextColor: "#241701" });
+    expect(svg).toContain("#b8860b");
+    expect(svg).toContain("#241701");
+    expect(svg).not.toContain(PALETTES[0].accent);
+  });
+
+  it("falls back to the palette when nothing was sampled", () => {
+    expect(render()).toContain(PALETTES[0].accent);
+  });
+
+  it("draws each style differently", () => {
+    const solid = render({ bandStyle: "solid", bandColor: "#b8860b" });
+    const gradient = render({ bandStyle: "gradient", bandColor: "#b8860b" });
+    const glass = render({ bandStyle: "glass", bandColor: "#b8860b" });
+    const none = render({ bandStyle: "none", bandColor: "#b8860b" });
+
+    // Faded means a gradient the solid bar does not have.
+    expect(gradient).toContain("linearGradient");
+    expect(solid).not.toContain("linearGradient");
+    // Frosted lets the artwork through.
+    expect(glass).toContain('opacity="0.55"');
+    // No panel at all — but the type must still be legible on a busy design.
+    expect(none).not.toMatch(/<rect x="0" y="\d+(\.\d+)?" width="1080"/);
+    expect(none).toContain("feDropShadow");
+  });
+
+  // The shadow is for type only; a logo already carries its own plate.
+  it("keeps the logo out of the drop shadow", () => {
+    const svg = render({ bandStyle: "none", logoPosition: "top-left", logoHref: "data:image/png;base64,iVBORw0KGgo=" });
+    const shadowed = svg.slice(svg.indexOf('<g filter="url(#band-shadow)">'), svg.indexOf("</g>"));
+    expect(shadowed).not.toContain("<image");
+  });
+
+  // These values land in an SVG fill attribute, so nothing but hex gets in.
+  it("refuses a colour that is not a hex value", () => {
+    for (const bad of ['red" onload="alert(1)', "url(#x)", "javascript:alert(1)", "rgb(1,2,3)"]) {
+      const svg = render({ bandColor: bad });
+      expect(svg, bad).not.toContain(bad);
+      expect(svg).toContain(PALETTES[0].accent);
+    }
+  });
+});

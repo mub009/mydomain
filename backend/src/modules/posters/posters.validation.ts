@@ -16,6 +16,11 @@ const imageUrl = z
   .url()
   .refine((value) => /^https?:\/\//i.test(value), "Must be an http(s) URL");
 
+const hexColor = z
+  .string()
+  .trim()
+  .regex(/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/, "Must be a hex colour like #b8860b");
+
 const designFields = {
   name: z.string().trim().min(2).max(120),
   description: z.string().trim().max(500).nullable().optional(),
@@ -47,6 +52,10 @@ const designFields = {
   showFooter: z.boolean().optional(),
   logoPosition: z.enum(["header", "top-left", "top-right", "bottom-left", "bottom-right", "center", "none"]).optional(),
   logoScale: z.coerce.number().min(0.5).max(2).optional(),
+  bandStyle: z.enum(["solid", "gradient", "glass", "none"]).optional(),
+  // Hex only — these values go straight into an SVG fill attribute.
+  bandColor: hexColor.nullable().optional(),
+  bandTextColor: hexColor.nullable().optional(),
   categoryId: z.string().uuid().nullable().optional(),
   city: z.string().trim().max(100).nullable().optional(),
   isPublished: z.boolean().optional(),

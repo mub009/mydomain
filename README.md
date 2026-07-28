@@ -267,9 +267,24 @@ JPEG, WebP or GIF, up to 4MB), and the platform adds only three things:
 
 | Element | What it carries |
 |---|---|
-| Header strip | A line of copy — usually the shop's name — over a soft fade, so it never looks pasted onto the top edge |
+| Header strip | A line of copy — usually the shop's name |
 | Footer strip | A second line, with the shop's phone number and city beneath it |
 | Logo | The shop's own logo, in the header or floated into any corner |
+
+**The strips take their colour from the artwork, not from a palette.** On
+upload the editor samples the image's bottom edge and sets the panel and text
+colours from it — a red bar across a gold-and-red Diwali poster reads as
+something pasted on afterwards. Both are overridable, and **Re-match to
+artwork** re-samples at any time.
+
+How hard the edge between strip and design should be is a separate choice:
+
+| Style | When |
+|---|---|
+| **Faded** (default) | Melts into the artwork. The only style that cannot leave a visible seam, whatever the design has at its edges. |
+| **Solid bar** | A clean edge — for artwork with a plain border or empty space top and bottom. |
+| **Frosted** | Translucent; the design shows through. |
+| **No panel** | Type straight on the artwork, with a drop shadow so it stays readable. The shadow is applied to the type only — a logo carries its own plate. |
 
 Everything else is left exactly as drawn. Both strips can be switched off
 individually, and the logo can be placed in the header, any of the four
@@ -280,9 +295,10 @@ logo on a dark design would simply vanish.
 
 Click **Write it for me** on that panel, describe the artwork in a sentence
 ("Diwali artwork, deep red and gold, top-right corner is clear, for jewellery
-shops"), and the header line, the footer line **and** the logo placement come
-back together — the placement matters as much as the wording, since only the
-brief knows which corner the design left free.
+shops"), and the header line, the footer line, the logo placement **and** the
+band style come back together. The placement and the style matter as much as
+the wording: only the brief knows which corner the design left free, or whether
+its edges are calm enough to set type straight onto.
 
 The upload is validated on its **bytes**, not on the mimetype the browser
 claims, and SVG is refused outright: an SVG is a document that can carry
