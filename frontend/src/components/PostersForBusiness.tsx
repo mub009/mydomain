@@ -1,16 +1,19 @@
 import { useEffect, useState } from "react";
-import { Download, FileImage, Loader2 } from "lucide-react";
-import { BusinessPoster, businessPostersApi, RenderedPoster } from "@/api/endpoints";
+import { Download, RefreshCw, Sparkles, Loader2 } from "lucide-react";
+import { BusinessPoster, businessPostersApi, GeneratedPoster } from "@/api/endpoints";
 import { apiErrorMessage } from "@/api/client";
 import { Business } from "@/types";
 import { ListSkeleton } from "@/components/Loading";
 import Modal from "@/components/Modal";
-import { downloadPng, downloadSvg, svgToDataUrl } from "@/lib/posterFile";
+import { downloadGeneratedPng, downloadGeneratedSvg, isSvgDataUrl } from "@/lib/posterFile";
 
 /**
- * The shop's side of the Poster Studio: designs an admin published, already
- * rendered with this shop's own logo, name and number. Nothing to edit — just
- * pick one and save it.
+ * The shop's side of the Poster Studio.
+ *
+ * An admin publishes one master template; each shop asks for its own copy of
+ * it, carrying that shop's logo, name, number and QR. The copy is kept once
+ * made, so opening a poster a second time is instant and — when an image model
+ * is doing the drawing — free. "Make a new one" is the way to spend that again.
  */
 export default function PostersForBusiness({ business }: { business: Business }) {
   const [designs, setDesigns] = useState<BusinessPoster[]>([]);
@@ -18,8 +21,8 @@ export default function PostersForBusiness({ business }: { business: Business })
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const [opening, setOpening] = useState("");
-  const [open, setOpen] = useState<{ design: BusinessPoster; rendered: RenderedPoster } | null>(null);
+  const [working, setWorking] = useState("");
+  const [open, setOpen] = useState<{ design: BusinessPoster; poster: GeneratedPoster } | null>(null);
   const [saving, setSaving] = useState("");
 
   function load() {
@@ -36,30 +39,33 @@ export default function PostersForBusiness({ business }: { business: Business })
 
   useEffect(load, [business.id]);
 
-  async function preview(design: BusinessPoster) {
-    setOpening(design.id);
+  async function generate(design: BusinessPoster, regenerate = false) {
+    setWorking(regenerate ? "again" : design.id);
     setError("");
     try {
-      setOpen({ design, rendered: await businessPostersApi.render(business.id, design.id) });
+      const poster = await businessPostersApi.generate(business.id, design.id, regenerate);
+      setOpen({ design, poster });
+      if (!poster.reused) load();
     } catch (err) {
       setError(apiErrorMessage(err));
     } finally {
-      setOpening("");
+      setWorking("");
     }
   }
 
   // Counted only when the file is actually saved, so the report reflects use
   // rather than curiosity.
-  async function save(rendered: RenderedPoster, format: "png" | "svg") {
+  async function save(design: BusinessPoster, poster: GeneratedPoster, format: "png" | "svg") {
     setSaving(format);
     setError("");
     try {
+      const base = `${slug(design.name)}-${slug(business.name)}`;
       if (format === "png") {
-        await downloadPng(rendered.svg, rendered.width, rendered.height, rendered.fileName);
+        await downloadGeneratedPng(poster.image, poster.dimensions.width, poster.dimensions.height, `${base}.png`);
       } else {
-        downloadSvg(rendered.svg, rendered.fileName);
+        downloadGeneratedSvg(poster.image, `${base}.svg`);
       }
-      await businessPostersApi.countDownload(business.id, rendered.designId);
+      await businessPostersApi.countDownload(business.id, design.id);
       load();
     } catch (err) {
       setError(err instanceof Error ? err.message : apiErrorMessage(err));
@@ -73,8 +79,8 @@ export default function PostersForBusiness({ business }: { business: Business })
       <div className="mb-4">
         <h3 className="font-bold text-ink-900">Ready-made posters</h3>
         <p className="mt-0.5 text-sm text-ink-600">
-          Designs from Markkito, already filled in with your name, logo and phone number. Save one and share it on
-          WhatsApp or Instagram.
+          Designs from Markkito. Make your own copy of one — it comes out with your name, logo, phone number and QR
+          code on it, ready to share on WhatsApp or Instagram.
         </p>
       </div>
 
@@ -111,16 +117,16 @@ export default function PostersForBusiness({ business }: { business: Business })
                 </p>
               )}
               <button
-                onClick={() => preview(design)}
-                disabled={opening === design.id}
+                onClick={() => generate(design)}
+                disabled={working !== ""}
                 className="btn-primary mt-3 w-full py-2"
               >
-                {opening === design.id ? (
+                {working === design.id ? (
                   <Loader2 size={15} className="animate-spin" />
                 ) : (
-                  <FileImage size={15} />
+                  <Sparkles size={15} />
                 )}
-                {opening === design.id ? "Preparing…" : "Preview & download"}
+                {working === design.id ? "Making yours…" : design.generatedAt ? "Open my poster" : "Make my poster"}
               </button>
             </div>
           ))}
@@ -130,37 +136,64 @@ export default function PostersForBusiness({ business }: { business: Business })
       {open && (
         <Modal title={open.design.name} onClose={() => setOpen(null)}>
           <img
-            src={svgToDataUrl(open.rendered.svg)}
+            src={open.poster.image}
             alt={open.design.name}
             className="mx-auto w-full rounded-lg border border-gray-200"
           />
-          {!open.rendered.logoEmbedded && (
-            <p className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
-              Your logo could not be loaded, so this poster shows your initials. Check the logo URL under Details.
-            </p>
+
+          {open.poster.note && (
+            <p className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">{open.poster.note}</p>
           )}
+
           <div className="mt-4 flex gap-2">
             <button
-              onClick={() => save(open.rendered, "png")}
+              onClick={() => save(open.design, open.poster, "png")}
               disabled={saving !== ""}
               className="btn-primary flex-1 py-2.5"
             >
               {saving === "png" ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
               {saving === "png" ? "Saving…" : "Download PNG"}
             </button>
+            {/* Only the local engine makes a vector file; an image model returns
+                pixels, and offering "SVG" for those would be a lie. */}
+            {isSvgDataUrl(open.poster.image) && (
+              <button
+                onClick={() => save(open.design, open.poster, "svg")}
+                disabled={saving !== ""}
+                className="btn-secondary flex-1 py-2.5"
+              >
+                <Download size={15} /> Download SVG
+              </button>
+            )}
+          </div>
+
+          <div className="mt-3 flex items-center justify-between gap-3 text-[11px] text-ink-400">
+            <span>Made {new Date(open.poster.generatedAt).toLocaleDateString()}</span>
             <button
-              onClick={() => save(open.rendered, "svg")}
-              disabled={saving !== ""}
-              className="btn-secondary flex-1 py-2.5"
+              onClick={() => generate(open.design, true)}
+              disabled={working !== ""}
+              className="inline-flex items-center gap-1 font-semibold text-brand-700 hover:underline disabled:opacity-50"
             >
-              <Download size={15} /> Download SVG
+              {working === "again" ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+              {working === "again" ? "Making a new one…" : "Make a new one"}
             </button>
           </div>
+
           <p className="mt-2 text-center text-[11px] text-ink-400">
-            PNG for WhatsApp and Instagram. SVG if a printer asks for it — it stays sharp at any size.
+            PNG for WhatsApp and Instagram.
+            {isSvgDataUrl(open.poster.image) && " SVG if a printer asks for it — it stays sharp at any size."}
           </p>
         </Modal>
       )}
     </div>
+  );
+}
+
+function slug(value: string): string {
+  return (
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "") || "poster"
   );
 }

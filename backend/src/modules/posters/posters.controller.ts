@@ -76,6 +76,15 @@ export async function renderPosterHandler(req: Request, res: Response): Promise<
   ok(res, await postersService.renderForOwner(actor(req), req.params.id, req.params.designId));
 }
 
+export async function generatePosterHandler(req: Request, res: Response): Promise<void> {
+  ok(
+    res,
+    await postersService.generateForOwner(actor(req), req.params.id, req.params.designId, {
+      regenerate: req.body?.regenerate === true,
+    }),
+  );
+}
+
 export async function recordDownloadHandler(req: Request, res: Response): Promise<void> {
   ok(res, await postersService.recordDownload(actor(req), req.params.id, req.params.designId));
 }

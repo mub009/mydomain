@@ -708,6 +708,21 @@ export interface BusinessPoster {
   forCity: string | null;
   downloads: number;
   lastDownloadedAt: string | null;
+  /** When this shop's own copy was last made, or null if it never has been. */
+  generatedAt: string | null;
+}
+
+/** One shop's poster, made from the admin's master template. */
+export interface GeneratedPoster {
+  /** A data URI — SVG from the local engine, PNG from an image model. */
+  image: string;
+  engine: "local" | "openai";
+  generatedAt: string;
+  /** True when this came back from storage instead of being made just now. */
+  reused: boolean;
+  dimensions: { width: number; height: number };
+  /** Why the poster was composited when an image model was asked for. */
+  note?: string;
 }
 
 export const businessPostersApi = {
@@ -722,6 +737,12 @@ export const businessPostersApi = {
       .then((r) => r.data.data),
   render: (businessId: string, designId: string) =>
     api.get<ApiResponse<RenderedPoster>>(`/businesses/${businessId}/posters/${designId}`).then((r) => r.data.data),
+  // Makes this shop's poster, or hands back the one already made for it.
+  // `regenerate` throws that one away and starts again.
+  generate: (businessId: string, designId: string, regenerate = false) =>
+    api
+      .post<ApiResponse<GeneratedPoster>>(`/businesses/${businessId}/posters/${designId}/generate`, { regenerate })
+      .then((r) => r.data.data),
   countDownload: (businessId: string, designId: string) =>
     api
       .post<ApiResponse<{ downloads: number }>>(`/businesses/${businessId}/posters/${designId}/downloaded`)

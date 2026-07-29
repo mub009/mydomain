@@ -124,7 +124,8 @@ cd backend && npm test
   QR code, imports customers from an .xlsx file, saves reusable templates with
   `{{name}}`-style placeholders, and sends a campaign. See below.
 - **Poster Studio** — admins catalogue posters: name, category, the image file
-  and the prompt it came from. See below.
+  and the prompt it came from. Each shop makes its own copy, carrying its logo,
+  number and QR. See below.
 
 ## WhatsApp broadcasts
 
@@ -303,10 +304,6 @@ one. Rather than stacking invisibly, the QR walks to the next free corner in a
 fixed order — predictable, and visible, instead of leaving the admin wondering
 where it went.
 
-**The prompt is stored, not executed.** It is the record of what was asked for
-and the input for whatever generates the image; generating from it is a later
-step.
-
 Uploads are judged on their **bytes**, not the mimetype the browser claims — a
 text file renamed `.png` is refused. SVG is refused outright: it is a document
 that can carry script, and it would be embedded in a document the platform
@@ -318,14 +315,40 @@ the global one the way the Stripe webhook already is; and the list query
 excludes the image column, because twenty-five rows of inline image is not a
 list response.
 
-### Rendering — still to come
+### The shop — making its own copy
 
-The per-business side is built but is **not** part of the admin flow above: a
-shop opens **Manage → Posters** and downloads a published design with its own
-logo, name and phone number composited on, as SVG or PNG. How that should work
-is the next thing to settle — the machinery in `modules/posters/layouts.ts`
-(header/footer bands sampled from the artwork, logo placement, four drawn
-layouts) is what exists today, not a decision that has been signed off.
+**Manage → Posters** lists the published designs that shop is entitled to.
+"Make my poster" produces its copy of the master template — its logo, name,
+phone number and QR — and it downloads that as PNG, or as SVG when the file is
+a vector one.
+
+The result is **kept once made**, so opening it again is instant and costs
+nothing. "Make a new one" is the only thing that spends the work again, which
+matters when an image model is doing the drawing: that is money and seconds per
+poster, and a shop clicking through its list should not trigger either.
+
+Targeting is re-checked here as an entitlement, not just used as a list filter,
+so a guessed design id cannot fetch a poster meant for another trade or town.
+
+### Two image engines
+
+Which engine makes that copy is `POSTER_IMAGE_ENGINE`:
+
+| | |
+|---|---|
+| **`local`** *(default)* | Composites the admin's template with the shop's own details, server-side. No account, no cost, instant, and every shop gets recognisably the **same** design — which is the point of a master template. |
+| **`openai`** | Sends the template and the resolved prompt to an image model (`images.edit`, so the admin's artwork is the starting point rather than a fresh picture that happens to share a prompt). Set `OPENAI_API_KEY`, and `POSTER_IMAGE_MODEL` if not `gpt-image-1`. |
+
+The local engine is **not** a fallback for the other one — it is the better
+answer for most posters, and the reason the image API is opt-in rather than
+assumed. An image model redraws, so the fifth shop's poster may no longer look
+like the design the admin published; compositing cannot drift.
+
+Every path still returns a poster. Selecting `openai` without a key, or an API
+call that fails, composites instead and says so on the result — the shop asked
+for a poster and the local one is a real poster, not a placeholder. This is the
+same shape as the WhatsApp transport (`log`/`webjs`) and the copywriter
+(`offline`/`claude`): a safe default that always works, and an opt-in upgrade.
 
 ## API shape
 

@@ -11,6 +11,7 @@ import QRCode from "qrcode";
 import { env } from "@/config/env";
 import { businessQrDataUrl, clearQrCache } from "@/modules/posters/qr";
 import { promptWantsQr, qrCornerFromPrompt } from "@/modules/posters/placeholders";
+import { generatePosterImage, openAiConfigured } from "@/modules/posters/imageEngine";
 
 const subject: PosterSubject = {
   name: "Spice Route Kitchen",
@@ -779,5 +780,85 @@ describe("qrCornerFromPrompt — clauses", () => {
   // A corner named in a different clause is still better than ignoring it.
   it("uses a corner from elsewhere when the token's own clause names none", () => {
     expect(qrCornerFromPrompt("Leave the top right empty. Add @qr")).toBe("top-right");
+  });
+});
+
+// The image engine is the same shape as the WhatsApp transport and the
+// copywriter: a safe default that always works, and an opt-in upgrade. A shop
+// that clicks "make my poster" must get a poster either way, so every path
+// through here has to return an image.
+describe("poster image engine", () => {
+  const composited = { svg: '<svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>', width: 1080, height: 1350 };
+  const input = { template: null, prompt: "Diwali poster for Spice Route Kitchen", composited };
+
+  const withEnv = async <T>(patch: Partial<typeof env>, run: () => Promise<T>): Promise<T> => {
+    const before = { ...env };
+    Object.assign(env, patch);
+    try {
+      return await run();
+    } finally {
+      Object.assign(env, before);
+    }
+  };
+
+  it("composites locally by default, and says so", async () => {
+    const result = await withEnv({ POSTER_IMAGE_ENGINE: "local" }, () => generatePosterImage(input));
+
+    expect(result.engine).toBe("local");
+    expect(result.note).toBeUndefined();
+    expect(result).toMatchObject({ width: 1080, height: 1350 });
+    expect(result.image.startsWith("data:image/svg+xml;base64,")).toBe(true);
+  });
+
+  // The data URI has to carry the poster itself — the frontend draws it onto a
+  // canvas to export a PNG, so a link or a placeholder would be useless.
+  it("returns the composited poster, not a reference to it", async () => {
+    const result = await withEnv({ POSTER_IMAGE_ENGINE: "local" }, () => generatePosterImage(input));
+    const decoded = Buffer.from(result.image.split(",")[1], "base64").toString();
+
+    expect(decoded).toBe(composited.svg);
+  });
+
+  it("is not configured for the image model without a key", () => {
+    expect(env.POSTER_IMAGE_ENGINE).toBe("local");
+    expect(openAiConfigured()).toBe(false);
+  });
+
+  it("needs both the engine and the key before it counts as configured", async () => {
+    await withEnv({ POSTER_IMAGE_ENGINE: "openai", OPENAI_API_KEY: "" }, async () => {
+      expect(openAiConfigured()).toBe(false);
+    });
+    await withEnv({ POSTER_IMAGE_ENGINE: "local", OPENAI_API_KEY: "sk-test" }, async () => {
+      expect(openAiConfigured()).toBe(false);
+    });
+    await withEnv({ POSTER_IMAGE_ENGINE: "openai", OPENAI_API_KEY: "sk-test" }, async () => {
+      expect(openAiConfigured()).toBe(true);
+    });
+  });
+
+  // Asking for the image model without a key is a deployment mistake, not a
+  // reason to hand the shop an error page.
+  it("composites and explains when the key is missing", async () => {
+    const result = await withEnv({ POSTER_IMAGE_ENGINE: "openai", OPENAI_API_KEY: "" }, () =>
+      generatePosterImage(input),
+    );
+
+    expect(result.engine).toBe("local");
+    expect(result.note).toMatch(/OPENAI_API_KEY/);
+    expect(result.image.startsWith("data:image/svg+xml;base64,")).toBe(true);
+  });
+
+  // Every way the image call can go wrong lands in one catch — here it is a
+  // design with no template to edit, which never reaches the network. A key
+  // the API rejects or a model that returns nothing ends the same way: the
+  // shop still gets its poster, with a line saying why it is the local one.
+  it("composites and explains when the image call fails", async () => {
+    const result = await withEnv({ POSTER_IMAGE_ENGINE: "openai", OPENAI_API_KEY: "sk-not-a-real-key" }, () =>
+      generatePosterImage({ ...input, template: null }),
+    );
+
+    expect(result.engine).toBe("local");
+    expect(result.note).toMatch(/composited instead/);
+    expect(result.image.startsWith("data:image/svg+xml;base64,")).toBe(true);
   });
 });

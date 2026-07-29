@@ -43,6 +43,15 @@ const envSchema = z.object({
   POSTER_AI_PROVIDER: z.enum(["offline", "claude"]).default("offline"),
   ANTHROPIC_API_KEY: z.string().optional().default(""),
   POSTER_AI_MODEL: z.string().default("claude-opus-5"),
+
+  // How a shop's finished poster is made. "local" composites the admin's
+  // master template with that shop's details — no account, no cost, instant,
+  // and the same design every time. "openai" sends the template and the
+  // resolved prompt to an image model instead, which costs money per poster
+  // and returns something different each run.
+  POSTER_IMAGE_ENGINE: z.enum(["local", "openai"]).default("local"),
+  OPENAI_API_KEY: z.string().optional().default(""),
+  POSTER_IMAGE_MODEL: z.string().default("gpt-image-1"),
 });
 
 const parsed = envSchema.safeParse(process.env);

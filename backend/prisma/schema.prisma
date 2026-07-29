@@ -986,6 +986,13 @@ model PosterRender {
   downloads  Int      @default(0)
   lastAt     DateTime @default(now())
 
+  // The finished poster for this shop. Compositing is cheap enough to redo on
+  // demand, but a generated image costs money and seconds, so once one exists
+  // it is kept and reused until the shop asks for a new one.
+  imageUrl    String?   @db.LongText
+  engine      String?   @db.VarChar(20)
+  generatedAt DateTime?
+
   @@unique([designId, businessId])
   @@index([businessId])
   @@map("poster_renders")

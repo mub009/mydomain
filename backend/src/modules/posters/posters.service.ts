@@ -25,6 +25,7 @@ import {
 import { BandBrief, CopyBrief, claudeConfigured, suggestBands, suggestCopy, TONES } from "./copywriter";
 import { MAX_ARTWORK_BYTES } from "./upload";
 import { businessQrDataUrl } from "./qr";
+import { generatePosterImage, ImageEngineId, openAiConfigured } from "./imageEngine";
 import { markkitoLink } from "@/modules/reviewqr/reviewqr.service";
 
 interface Actor {
@@ -486,6 +487,7 @@ export function studioOptions() {
     // So the editor can label the button honestly rather than implying a
     // model is involved when the phrase bank is doing the work.
     ai: { engine: claudeConfigured() ? "claude" : "offline" },
+    imageEngine: openAiConfigured() ? "openai" : "local",
   };
 }
 
@@ -535,7 +537,7 @@ export async function listForBusiness(actor: Actor, businessId: string) {
 
   const renders = await prisma.posterRender.findMany({
     where: { businessId, designId: { in: designs.map((d) => d.id) } },
-    select: { designId: true, downloads: true, lastAt: true },
+    select: { designId: true, downloads: true, lastAt: true, generatedAt: true },
   });
   const byDesign = new Map(renders.map((r) => [r.designId, r]));
 
@@ -555,6 +557,7 @@ export async function listForBusiness(actor: Actor, businessId: string) {
       forCity: design.city,
       downloads: byDesign.get(design.id)?.downloads ?? 0,
       lastDownloadedAt: byDesign.get(design.id)?.lastAt ?? null,
+      generatedAt: byDesign.get(design.id)?.generatedAt ?? null,
     })),
   };
 }
@@ -572,6 +575,64 @@ async function publishedDesignFor(business: BusinessForPoster, designId: string)
 export async function renderForOwner(actor: Actor, businessId: string, designId: string): Promise<RenderedPoster> {
   const business = await accessibleBusiness(actor, businessId);
   return renderForBusiness(await publishedDesignFor(business, designId), business);
+}
+
+/**
+ * The shop's finished poster, made from the admin's master template.
+ *
+ * Kept once made: compositing is cheap enough to repeat, but an image model
+ * costs money and seconds per poster, so the first result is stored and reused
+ * until the shop asks for a new one.
+ */
+export async function generateForOwner(
+  actor: Actor,
+  businessId: string,
+  designId: string,
+  options: { regenerate?: boolean } = {},
+) {
+  const business = await accessibleBusiness(actor, businessId);
+  const design = await publishedDesignFor(business, designId);
+
+  const existing = await prisma.posterRender.findUnique({
+    where: { designId_businessId: { designId, businessId } },
+  });
+  if (existing?.imageUrl && !options.regenerate) {
+    return {
+      image: existing.imageUrl,
+      engine: (existing.engine ?? "local") as ImageEngineId,
+      generatedAt: existing.generatedAt,
+      reused: true,
+      dimensions: POSTER_SIZES[design.size],
+    };
+  }
+
+  const composited = await renderForBusiness(design, business);
+  const generated = await generatePosterImage({
+    template: await inlineImage(design.artworkUrl),
+    prompt: fillPlaceholders(design.aiPrompt, toSubject(business)),
+    composited: { svg: composited.svg, width: composited.width, height: composited.height },
+  });
+
+  const saved = await prisma.posterRender.upsert({
+    where: { designId_businessId: { designId, businessId } },
+    create: {
+      designId,
+      businessId,
+      imageUrl: generated.image,
+      engine: generated.engine,
+      generatedAt: new Date(),
+    },
+    update: { imageUrl: generated.image, engine: generated.engine, generatedAt: new Date() },
+  });
+
+  return {
+    image: generated.image,
+    engine: generated.engine,
+    note: generated.note,
+    generatedAt: saved.generatedAt,
+    reused: false,
+    dimensions: { width: generated.width, height: generated.height },
+  };
 }
 
 /** Counted when the shop actually saves the file, not when it previews one. */

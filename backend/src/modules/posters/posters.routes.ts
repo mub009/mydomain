@@ -17,6 +17,7 @@ import {
   aiBandsHandler,
   aiSuggestHandler,
   businessPostersHandler,
+  generatePosterHandler,
   createDesignHandler,
   deleteDesignHandler,
   designUsageHandler,
@@ -73,4 +74,7 @@ export const businessPostersRouter = Router();
 
 businessPostersRouter.get("/:id/posters", requireAuth, asyncHandler(businessPostersHandler));
 businessPostersRouter.get("/:id/posters/:designId", requireAuth, asyncHandler(renderPosterHandler));
+// Makes this shop's poster from the master template, or hands back the one
+// already made for it.
+businessPostersRouter.post("/:id/posters/:designId/generate", requireAuth, asyncHandler(generatePosterHandler));
 businessPostersRouter.post("/:id/posters/:designId/downloaded", requireAuth, asyncHandler(recordDownloadHandler));
