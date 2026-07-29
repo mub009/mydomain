@@ -28,7 +28,6 @@ interface PosterForm {
   categoryId: string;
   artworkUrl: string;
   aiPrompt: string;
-  showQr: boolean;
   qrPosition: string;
   isPublished: boolean;
 }
@@ -38,7 +37,6 @@ const BLANK: PosterForm = {
   categoryId: "",
   artworkUrl: "",
   aiPrompt: "",
-  showQr: true,
   qrPosition: "bottom-right",
   isPublished: false,
 };
@@ -49,7 +47,6 @@ function toForm(design: PosterDesign): PosterForm {
     categoryId: design.categoryId ?? "",
     artworkUrl: design.artworkUrl ?? "",
     aiPrompt: design.aiPrompt ?? "",
-    showQr: design.showQr ?? false,
     qrPosition: design.qrPosition ?? "bottom-right",
     isPublished: design.isPublished,
   };
@@ -150,6 +147,10 @@ function PosterEditor({
     }
   }
 
+  // Mirrors the server's `promptWantsQr`: an @qr or {{qr}} token, but not
+  // "@qrcode", and not the "@" in an email address.
+  const wantsQr = /(?<![\w@])@qr(?![\w])/i.test(form.aiPrompt) || /\{\{\s*qr\s*\}\}/i.test(form.aiPrompt);
+
   const missing = [
     !form.name.trim() && "a design name",
     !form.categoryId && "a category",
@@ -165,7 +166,6 @@ function PosterEditor({
       categoryId: form.categoryId || null,
       artworkUrl: form.artworkUrl || null,
       aiPrompt: form.aiPrompt.trim() || null,
-      showQr: form.showQr,
       qrPosition: form.qrPosition,
       isPublished: publish ?? form.isPublished,
     };
@@ -268,42 +268,31 @@ function PosterEditor({
             )}
           </div>
 
-          <div className="rounded-lg border border-gray-200 p-3">
-            <label className="flex cursor-pointer items-start gap-2">
-              <input
-                type="checkbox"
-                className="mt-0.5"
-                checked={form.showQr}
-                onChange={(e) => patch({ showQr: e.target.checked })}
-              />
-              <span>
-                <span className="flex items-center gap-1.5 text-xs font-semibold text-ink-700">
-                  <QrCode size={13} /> Print the business QR on this poster
-                </span>
-                <span className="mt-0.5 block text-[11px] leading-snug text-ink-500">
-                  Each shop gets a QR to its own Markkito page, so a customer can scan the poster off a screen or a
-                  window.
-                </span>
-              </span>
-            </label>
-
-            {form.showQr && (
-              <div className="mt-2 pl-6">
-                <label className="mb-1 block text-[11px] font-semibold text-ink-600">Where it sits</label>
-                <select
-                  className="input"
-                  value={form.qrPosition}
-                  onChange={(e) => patch({ qrPosition: e.target.value })}
-                >
-                  {options.qrPositions.map((spot) => (
-                    <option key={spot.id} value={spot.id}>
-                      {spot.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-          </div>
+          {/* No checkbox: the prompt says whether there is a QR. This only
+              appears once it does, and asks the one thing the prompt cannot. */}
+          {wantsQr && (
+            <div className="rounded-lg border border-sky-200 bg-sky-50/50 p-3">
+              <p className="flex items-center gap-1.5 text-xs font-semibold text-ink-700">
+                <QrCode size={13} /> This poster carries a business QR
+              </p>
+              <p className="mt-0.5 text-[11px] leading-snug text-ink-500">
+                Because the prompt says <span className="font-mono">@qr</span>. Each shop gets a code to its own
+                Markkito page. Remove the token to drop it.
+              </p>
+              <label className="mt-2 block text-[11px] font-semibold text-ink-600">Where it sits</label>
+              <select
+                className="input mt-1"
+                value={form.qrPosition}
+                onChange={(e) => patch({ qrPosition: e.target.value })}
+              >
+                {options.qrPositions.map((spot) => (
+                  <option key={spot.id} value={spot.id}>
+                    {spot.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {error && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
           {missing.length > 0 && (

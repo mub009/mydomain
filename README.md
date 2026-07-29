@@ -247,7 +247,6 @@ designed, and the form is exactly that:
 | **Category** | Which trade it is for |
 | **Image file** | The design itself: PNG, JPEG, WebP or GIF, up to 4MB |
 | **AI prompt** | The prompt, written once with `@tokens` for the business data |
-| **Business QR** | Optional. Prints a QR to each shop's own Markkito page, in the corner you pick |
 
 Save as a draft or publish it. Nothing about layout, colour or wording is
 asked for: a poster is catalogued, not composed. Who filed it is recorded on
@@ -259,7 +258,7 @@ The prompt is written once and used for every shop, so business details go in
 as `@tokens` and are filled in when the image is made:
 
 `@business_name` `@phone` `@city` `@state` `@category` `@address` `@website`
-`@email` `@rating` `@reviews`
+`@email` `@rating` `@reviews` `@qr`
 
 > Diwali poster for **@business_name**, a **@category** in **@city**. Deep red
 > and gold, diyas along the bottom. Show the phone **@phone**.
@@ -274,13 +273,22 @@ not become a token called `shop`. `{{business_name}}` still works too, and the
 older `{{business}}` spelling resolves to the same value, so designs saved
 before this change are unaffected.
 
-#### The business QR
+#### The business QR — `@qr`
 
-Switch it on and every shop's poster carries a QR to **its own** Markkito page
-(`/business/<slug>`) — the same destination the printed review boards use, so
-the URL is built in one place rather than two that can drift apart. It sits on
-a white plate, because a QR needs its quiet zone and its contrast and the
-artwork underneath offers neither.
+Put **`@qr`** in the prompt and every shop's poster carries a QR to **its own**
+Markkito page (`/business/<slug>`). Leave it out and there is no QR. There is
+no separate checkbox: the prompt is the one description of what the poster
+carries, and a flag beside it could only ever disagree with it.
+
+As text the token resolves to the address the code points at, so a prompt can
+say *"leave the bottom-right clear for a QR to `@qr`"* and an image generator
+is told exactly where it leads. The destination comes from the same helper the
+printed review boards use, so the URL is built in one place rather than two
+that drift.
+
+Once the token is there the editor asks the one thing the prompt cannot — which
+corner — and the code sits on a white plate, because a QR needs its quiet zone
+and its contrast and artwork offers neither.
 
 The logo and the QR are both placed by corner, so they can be aimed at the same
 one. Rather than stacking invisibly, the QR walks to the next free corner in a

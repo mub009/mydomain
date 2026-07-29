@@ -85,7 +85,7 @@ describe("findGaps — fields", () => {
     BusinessSite: ["siteType", "templateId"],
     Business: ["preferredReviewChannel"],
     WhatsappSession: ["dailyLimit", "sendDelayMs", "windowStartHour", "autoOptOut"],
-    PosterDesign: ["artworkUrl", "headerText", "footerText", "logoPosition", "bandStyle", "bandColor", "aiPrompt", "showQr"],
+    PosterDesign: ["artworkUrl", "headerText", "footerText", "logoPosition", "bandStyle", "bandColor", "aiPrompt", "qrPosition"],
   };
 
   it("reports nothing when every field is generated", () => {

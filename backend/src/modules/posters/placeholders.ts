@@ -17,7 +17,19 @@ export interface PosterSubject {
   avgRating: number;
   reviewCount: number;
   slug: string;
+  /** The shop's own page on the platform — what its QR points at. */
+  pageUrl: string;
 }
+
+/**
+ * `@business_name` in a prompt, and `{{business_name}}` in poster wording.
+ *
+ * The `@` form needs the lookbehind: without it the address in
+ * `hi@spiceroute.example` reads as a token called `spiceroute`, and an admin
+ * who pastes an email into a prompt gets it mangled.
+ */
+const AT_TOKEN = /(?<![\w@])@([a-z_][a-z0-9_]*)/gi;
+const BRACE_TOKEN = /\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}/g;
 
 export interface PlaceholderInfo {
   token: string;
@@ -38,7 +50,29 @@ export const PLACEHOLDERS: PlaceholderInfo[] = [
   { token: "email", label: "Email", example: "hi@spiceroute.example" },
   { token: "rating", label: "Average rating", example: "4.6" },
   { token: "reviews", label: "Review count", example: "128" },
+  {
+    token: "qr",
+    label: "QR to the shop's page",
+    example: "prints a scannable code",
+  },
 ];
+
+/**
+ * Whether this prompt asks for the QR.
+ *
+ * The prompt is the single description of what the poster carries, so the QR
+ * is switched on by naming it there rather than by a separate checkbox that
+ * could disagree with the words next to it.
+ */
+export function promptWantsQr(prompt: string | null | undefined): boolean {
+  if (!prompt) return false;
+  for (const pattern of [BRACE_TOKEN, AT_TOKEN]) {
+    for (const match of prompt.matchAll(pattern)) {
+      if (canonical(match[1]) === "qr") return true;
+    }
+  }
+  return false;
+}
 
 /**
  * Older spellings kept working. `{{business}}` predates `@business_name`, and
@@ -80,18 +114,11 @@ function values(subject: PosterSubject): Record<string, string> {
     email: subject.email ?? "",
     rating: subject.avgRating > 0 ? subject.avgRating.toFixed(1) : "",
     reviews: subject.reviewCount > 0 ? String(subject.reviewCount) : "",
+    // As text this is the address the code points at, which is what an image
+    // generator needs to be told; the renderer draws the code itself.
+    qr: subject.pageUrl,
   };
 }
-
-/**
- * `@business_name` in a prompt, and `{{business_name}}` in poster wording.
- *
- * The `@` form needs the lookbehind: without it the address in
- * `hi@spiceroute.example` reads as a token called `spiceroute`, and an admin
- * who pastes an email into a prompt gets it mangled.
- */
-const AT_TOKEN = /(?<![\w@])@([a-z_][a-z0-9_]*)/gi;
-const BRACE_TOKEN = /\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}/g;
 
 /**
  * Fills `{{token}}` placeholders. Spacing and case inside the braces are

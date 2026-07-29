@@ -567,7 +567,9 @@ export interface PosterDesign {
   bandStyle: string;
   bandColor: string | null;
   bandTextColor: string | null;
-  showQr: boolean;
+  /** Derived from the prompt, not stored — a poster carries a QR when its
+   *  prompt names `@qr`. */
+  showQr?: boolean;
   qrPosition: string;
   qrScale: number;
   categoryId: string | null;

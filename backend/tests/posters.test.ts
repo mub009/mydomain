@@ -10,6 +10,7 @@ import { inlineImage } from "@/modules/posters/assets";
 import QRCode from "qrcode";
 import { env } from "@/config/env";
 import { businessQrDataUrl, clearQrCache } from "@/modules/posters/qr";
+import { promptWantsQr } from "@/modules/posters/placeholders";
 
 const subject: PosterSubject = {
   name: "Spice Route Kitchen",
@@ -24,6 +25,7 @@ const subject: PosterSubject = {
   avgRating: 4.6,
   reviewCount: 128,
   slug: "spice-route-kitchen",
+  pageUrl: "http://localhost:5173/business/spice-route-kitchen",
 };
 
 describe("fitText", () => {
@@ -691,5 +693,34 @@ describe("businessQrDataUrl", () => {
   it("returns nothing when there is no page to link to", async () => {
     await expect(businessQrDataUrl(null)).resolves.toBeNull();
     await expect(businessQrDataUrl("")).resolves.toBeNull();
+  });
+});
+
+// The prompt is the single description of what a poster carries, so the QR is
+// switched on by naming it there rather than by a checkbox that could
+// disagree with the words beside it.
+describe("promptWantsQr", () => {
+  it("sees @qr anywhere in the prompt", () => {
+    expect(promptWantsQr("Diwali poster for @business_name. Add @qr bottom right.")).toBe(true);
+    expect(promptWantsQr("@qr")).toBe(true);
+    expect(promptWantsQr("{{qr}}")).toBe(true);
+  });
+
+  it("leaves a poster without one alone", () => {
+    expect(promptWantsQr("Diwali poster for @business_name, phone @phone")).toBe(false);
+    expect(promptWantsQr("")).toBe(false);
+    expect(promptWantsQr(null)).toBe(false);
+  });
+
+  // "@qrcode" is a different token, and an email is not a token at all.
+  it("does not fire on a word that merely starts with qr", () => {
+    expect(promptWantsQr("use @qrcode please")).toBe(false);
+    expect(promptWantsQr("mail qr@example.com")).toBe(false);
+  });
+
+  it("resolves to the address the code points at", () => {
+    expect(fillPlaceholders("Add a QR to @qr", subject)).toBe(
+      "Add a QR to http://localhost:5173/business/spice-route-kitchen",
+    );
   });
 });

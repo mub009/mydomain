@@ -16,10 +16,11 @@ import {
   QR_POSITIONS,
 } from "./layouts";
 import { PALETTES, resolvePalette } from "./palettes";
-import { fillPlaceholders, PLACEHOLDERS, PosterSubject, unknownPlaceholders } from "./placeholders";
+import { fillPlaceholders, PLACEHOLDERS, PosterSubject, promptWantsQr, unknownPlaceholders } from "./placeholders";
 import { BandBrief, CopyBrief, claudeConfigured, suggestBands, suggestCopy, TONES } from "./copywriter";
 import { MAX_ARTWORK_BYTES } from "./upload";
 import { businessQrDataUrl } from "./qr";
+import { markkitoLink } from "@/modules/reviewqr/reviewqr.service";
 
 interface Actor {
   sub: string;
@@ -44,6 +45,9 @@ function toSubject(business: BusinessForPoster): PosterSubject {
     avgRating: business.avgRating,
     reviewCount: business.reviewCount,
     slug: business.slug,
+    // Built by the same helper the printed review boards use, so there is one
+    // definition of where a business lives.
+    pageUrl: markkitoLink({ slug: business.slug }) ?? "",
   };
 }
 
@@ -95,7 +99,7 @@ export async function renderForBusiness(design: PosterDesign, business: Business
   const [logoHref, backgroundHref, qrHref] = await Promise.all([
     inlineImage(business.logoUrl),
     inlineImage(design.artworkUrl ?? design.backgroundImageUrl),
-    design.showQr ? businessQrDataUrl(business.slug) : Promise.resolve(null),
+    promptWantsQr(design.aiPrompt) ? businessQrDataUrl(business.slug) : Promise.resolve(null),
   ]);
 
   const copy = {
@@ -170,7 +174,6 @@ export interface DesignInput {
   bandStyle?: string;
   bandColor?: string | null;
   bandTextColor?: string | null;
-  showQr?: boolean;
   qrPosition?: string;
   qrScale?: number;
   categoryId?: string | null;
@@ -233,7 +236,6 @@ export async function listDesigns(query: { page?: number; pageSize?: number; sea
         bandStyle: true,
         bandColor: true,
         bandTextColor: true,
-        showQr: true,
         qrPosition: true,
         qrScale: true,
         categoryId: true,
@@ -271,6 +273,7 @@ export async function listDesigns(query: { page?: number; pageSize?: number; sea
     items: items.map((design) => ({
       ...design,
       hasArtwork: withArtwork.has(design.id),
+      showQr: promptWantsQr(design.aiPrompt),
       businessesUsing: design._count.renders,
       downloads: byDesign.get(design.id) ?? 0,
       warnings: warningsFor(design),
@@ -321,7 +324,6 @@ export async function createDesign(actor: Actor, input: DesignInput) {
       bandStyle: input.bandStyle ?? "gradient",
       bandColor: input.bandColor ?? null,
       bandTextColor: input.bandTextColor ?? null,
-      showQr: input.showQr ?? false,
       qrPosition: input.qrPosition ?? "bottom-right",
       qrScale: input.qrScale ?? 1,
       categoryId: input.categoryId ?? null,
@@ -364,7 +366,6 @@ export async function updateDesign(id: string, input: Partial<DesignInput>) {
       ...(input.bandStyle !== undefined ? { bandStyle: input.bandStyle } : {}),
       ...(input.bandColor !== undefined ? { bandColor: input.bandColor } : {}),
       ...(input.bandTextColor !== undefined ? { bandTextColor: input.bandTextColor } : {}),
-      ...(input.showQr !== undefined ? { showQr: input.showQr } : {}),
       ...(input.qrPosition !== undefined ? { qrPosition: input.qrPosition } : {}),
       ...(input.qrScale !== undefined ? { qrScale: input.qrScale } : {}),
       ...(input.categoryId !== undefined ? { categoryId: input.categoryId } : {}),
@@ -423,7 +424,6 @@ export async function previewDesign(input: DesignInput, businessId?: string): Pr
     bandStyle: input.bandStyle ?? "gradient",
     bandColor: input.bandColor ?? null,
     bandTextColor: input.bandTextColor ?? null,
-    showQr: input.showQr ?? false,
     qrPosition: input.qrPosition ?? "bottom-right",
     qrScale: input.qrScale ?? 1,
   } as PosterDesign;
