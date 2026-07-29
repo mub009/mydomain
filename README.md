@@ -387,10 +387,17 @@ is named back to the admin on upload rather than dropped quietly. SMIL
 animation is removed outright — it can rewrite an attribute after the sanitiser
 has approved it.
 
-**No frame is added to an SVG template.** What comes out is the designer's own
-file with the values in it — no header strip, no footer strip, nothing of the
-platform's laid over the artwork. The strips exist only because a flat image
-cannot be filled, and uploading a PNG now says so in the editor.
+**Nothing is laid over a design, in either format.** What comes out of an SVG
+template is the designer's own file with the values in it. What comes out of a
+flat image is the artwork, with the shop's logo and QR placed on it — and no
+name, no phone number, because there is nowhere in a flat image to put them.
+
+The header and footer strips still exist and can be switched on per design
+(`showHeader` / `showFooter`), but they are **off by default**, and were turned
+off on every existing design built from uploaded artwork. A strip laid across a
+designer's poster frames their work rather than joining it: it covers what they
+drew and leaves whatever they marked showing underneath. That is what the SVG
+path replaces, and the editor says so when a flat image is uploaded.
 
 The upload panel reports the slots it found. Two things there are worth acting
 on: "no slots found", which means the template prints identically for every

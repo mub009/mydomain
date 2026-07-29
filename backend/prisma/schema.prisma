@@ -934,8 +934,10 @@ model PosterDesign {
   // else, so one uploaded design still carries each shop's own details.
   headerText String? @db.Text
   footerText String? @db.Text
-  showHeader Boolean @default(true)
-  showFooter Boolean @default(true)
+  // Off by default: a strip laid across a designer's poster frames their work
+  // rather than joining it. Details belong in the artwork — see svgTemplate.ts.
+  showHeader Boolean @default(false)
+  showFooter Boolean @default(false)
   // Where the shop's own logo sits on the artwork, and how big. "header"
   // keeps it inside the top strip; the corner values float it over the
   // design itself, for artwork that left a space for it.

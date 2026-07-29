@@ -173,7 +173,9 @@ describe("renderPosterSvg", () => {
   it.each(POSTER_LAYOUTS.map((l) => l.id))("renders %s at every size", (layoutId) => {
     for (const size of sizes) {
       const { svg, width, height } = renderPosterSvg(
-        { size, palette: PALETTES[0], copy, subject, logoHref: null, backgroundHref: null },
+        // Bands on: this sweep asserts the shop's details are printed, and on
+        // uploaded artwork that is what the bands are for. They are opt-in.
+        { size, palette: PALETTES[0], copy, subject, logoHref: null, backgroundHref: null, showHeader: true, showFooter: true },
         layoutId,
       );
       expect(svg.startsWith("<svg"), `${layoutId}/${size}`).toBe(true);
@@ -320,7 +322,9 @@ describe("worst-case copy stays inside the poster", () => {
 
   it.each(cases)("%s at %s keeps every line on the canvas", (layoutId, size) => {
     const { svg, width, height } = renderPosterSvg(
-      { size, palette: PALETTES[0], copy, subject: crowded, logoHref: null, backgroundHref: null },
+      // Bands on, so the artwork layout has text to place at all — they are
+      // opt-in, and this suite is about how text is placed when there is some.
+      { size, palette: PALETTES[0], copy, subject: crowded, logoHref: null, backgroundHref: null, showHeader: true, showFooter: true },
       layoutId,
     );
 
@@ -339,7 +343,7 @@ describe("worst-case copy stays inside the poster", () => {
   // may be sacrificed to fit, but never these two.
   it.each(cases)("%s at %s still carries the headline and the number", (layoutId, size) => {
     const { svg } = renderPosterSvg(
-      { size, palette: PALETTES[0], copy, subject: crowded, logoHref: null, backgroundHref: null },
+      { size, palette: PALETTES[0], copy, subject: crowded, logoHref: null, backgroundHref: null, showHeader: true, showFooter: true },
       layoutId,
     );
     expect(svg).toContain("+91 98765 43210");
@@ -405,6 +409,10 @@ describe("uploaded artwork", () => {
         subject,
         logoHref: null,
         backgroundHref: art,
+        // Bands are opt-in now — these cases are about how they draw when
+        // asked for. What happens without them is its own test below.
+        showHeader: true,
+        showFooter: true,
         ...over,
       },
       "artwork",
@@ -422,6 +430,27 @@ describe("uploaded artwork", () => {
     const svg = render({ showHeader: false, showFooter: false, logoPosition: "none" });
     expect(svg).toContain(art);
     expect(svg).not.toContain("<text");
+  });
+
+  // The default, and the reason it changed: a strip laid across a designer's
+  // poster frames their work instead of joining it. Nothing goes over the
+  // artwork unless the design asks for it.
+  it("adds no band unless the design asks for one", () => {
+    const svg = renderPosterSvg(
+      {
+        size: "PORTRAIT",
+        palette: PALETTES[0],
+        copy: { ...copy, headerText: "Spice Route Kitchen", footerText: "Trusted in Kozhikode" },
+        subject,
+        logoHref: null,
+        backgroundHref: art,
+      },
+      "artwork",
+    ).svg;
+
+    expect(svg).toContain(art);
+    expect(svg).not.toContain("Trusted in Kozhikode");
+    expect(svg).not.toContain("+91 98765 43210");
   });
 
   // The corner spots are for artwork that left a space; they must actually
@@ -559,6 +588,8 @@ describe("bands match the artwork", () => {
         subject,
         logoHref: null,
         backgroundHref: art,
+        showHeader: true,
+        showFooter: true,
         ...over,
       } as Parameters<typeof renderPosterSvg>[0],
       "artwork",
@@ -656,7 +687,12 @@ describe("business QR", () => {
 
   it("goes to the corner it was given", () => {
     const corners = ["top-left", "top-right", "bottom-left", "bottom-right", "center"] as const;
-    const spots = corners.map((qrPosition) => JSON.stringify(plate(render({ qrHref: qr, qrPosition }))));
+    // The logo is put out of the way: with no header band it defaults into
+    // the top-left corner, and the QR would rightly step aside from it —
+    // which is its own test below, not this one.
+    const spots = corners.map((qrPosition) =>
+      JSON.stringify(plate(render({ qrHref: qr, qrPosition, logoPosition: "none" }))),
+    );
     expect(new Set(spots).size).toBe(corners.length);
   });
 

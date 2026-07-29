@@ -927,7 +927,7 @@ const minimal: PosterLayout = {
 const artwork: PosterLayout = {
   id: "artwork",
   name: "Uploaded artwork",
-  description: "Your own poster image, with a header and footer band added for each shop's logo and number.",
+  description: "Your own poster image, with the shop's logo and QR placed on it.",
   bestFor: "Designs made outside the platform",
   render(input, dim) {
     const p = input.palette;
@@ -937,12 +937,18 @@ const artwork: PosterLayout = {
     const footerH = H * 0.115;
     const hasArt = Boolean(input.backgroundHref);
 
-    // Both bands are on unless a design says otherwise; an undefined flag
-    // from an older row must not silently strip the shop's number off.
-    const showHeader = input.showHeader ?? true;
-    const showFooter = input.showFooter ?? true;
+    // Off unless a design asks for them. A strip laid across a designer's
+    // poster is a frame around their work, not part of it — it covers what
+    // they drew and leaves whatever they marked showing underneath. Details
+    // belong *in* the artwork, which is what an SVG template does; a flat
+    // image simply cannot be filled, and covering it is not a substitute.
+    const showHeader = input.showHeader ?? false;
+    const showFooter = input.showFooter ?? false;
 
-    const placement = resolveLogoPosition(input.logoPosition);
+    // "In the header" means nothing without a header. Rather than leave the
+    // logo floating in the space a band would have filled, it goes to a corner.
+    const requested = resolveLogoPosition(input.logoPosition);
+    const placement = requested === "header" && !showHeader ? "top-left" : requested;
     const scale = Math.min(2, Math.max(0.5, input.logoScale ?? 1));
 
     // In the strip the logo is sized to the strip; floating over the artwork
