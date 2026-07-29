@@ -387,8 +387,17 @@ is named back to the admin on upload rather than dropped quietly. SMIL
 animation is removed outright — it can rewrite an attribute after the sanitiser
 has approved it.
 
-The upload panel reports the slots it found. "No slots found" is worth acting
-on: without them the template prints the same for every shop.
+**No frame is added to an SVG template.** What comes out is the designer's own
+file with the values in it — no header strip, no footer strip, nothing of the
+platform's laid over the artwork. The strips exist only because a flat image
+cannot be filled, and uploading a PNG now says so in the editor.
+
+The upload panel reports the slots it found. Two things there are worth acting
+on: "no slots found", which means the template prints identically for every
+shop; and a slot nothing fills — a designer's `@DOCTOR_NAME@` or `@TAGLINE@`.
+Those are **blanked** on the poster rather than printed, because a label across
+a hundred shops' posters is worse than a gap, which makes the upload panel the
+only place they can be caught. Rename them in the artwork and re-upload.
 
 **The artwork sets the page.** Its pixel dimensions are read from the file's
 own header (no image library — each format states its size in the first few

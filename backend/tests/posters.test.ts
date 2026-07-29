@@ -481,6 +481,7 @@ describe("readUploadedImage", () => {
     expect(result.type).toBe("image/svg+xml");
     expect(result.dimensions).toEqual({ width: 1080, height: 1350 });
     expect(result.slots).toEqual(["business_name"]);
+    expect(result.unknownSlots).toEqual([]);
     expect(result.removed).toContain("<script>");
     expect(Buffer.from(result.dataUrl.split(",")[1], "base64").toString()).not.toMatch(/script/i);
   });
@@ -1120,7 +1121,8 @@ describe("fillSvgTemplate", () => {
     fillSvgTemplate(template, subject, options);
 
   it("finds every slot, under the names a designer writes", () => {
-    expect(svgSlots(template).sort()).toEqual(["address", "business_name", "logo", "phone", "qr"]);
+    expect(svgSlots(template).known.sort()).toEqual(["address", "business_name", "logo", "phone", "qr"]);
+    expect(svgSlots(template).unknown).toEqual([]);
   });
 
   it("puts the shop's name where the designer put the slot", () => {
@@ -1207,5 +1209,50 @@ describe("an image slot with nothing to put in it", () => {
     const { svg } = empty();
     expect(svg).not.toContain("@QR_CODE@");
     expect((svg.match(/<circle/g) ?? []).length).toBe(1);
+  });
+});
+
+// A designer will write a slot our vocabulary has never heard of. What must
+// not happen is @DOCTOR_NAME@ printing across a hundred shops' posters.
+describe("a slot nothing knows how to fill", () => {
+  const template = `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400">
+    <text x="10" y="40">@CLINIC_NAME@</text>
+    <text x="10" y="80">Ask for @DOCTOR_NAME@ today</text>
+    <text x="10" y="120">@TAGLINE@</text>
+  </svg>`;
+
+  it("names it at upload, where it can still be fixed", () => {
+    const slots = svgSlots(template);
+    expect(slots.known).toContain("business_name");
+    expect(slots.unknown.sort()).toEqual(["DOCTOR_NAME", "TAGLINE"]);
+  });
+
+  it("leaves a gap on the poster instead of the label", () => {
+    const { svg, unfilled } = fillSvgTemplate(template, subject, { logoHref: null, qrHref: null });
+
+    expect(svg).not.toMatch(/@[A-Z_]+@/);
+    expect(svg).toContain("Spice Route Kitchen");
+    // The words around it survive — only the token goes.
+    expect(svg).toContain("Ask for today");
+    expect(unfilled).toEqual(expect.arrayContaining(["doctor_name", "tagline"]));
+  });
+});
+
+// The whole point of an SVG template: what comes out is the designer's file
+// with the values in it. Nothing of ours is painted over the top.
+describe("an SVG template gets no frame of ours", () => {
+  const template = `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="800">
+    <rect width="600" height="800" fill="#ffffff"/>
+    <text x="20" y="60" font-family="Georgia" font-size="44" fill="#123456">@SHOP_NAME@</text>
+  </svg>`;
+
+  it("adds nothing but the values", () => {
+    const { svg } = fillSvgTemplate(template, subject, { logoHref: null, qrHref: null });
+
+    // One rect — the designer's. No band, no strip, no plate of ours.
+    expect((svg.match(/<rect/g) ?? []).length).toBe(1);
+    expect(svg).not.toMatch(/linearGradient|logo-|band/);
+    expect(svg).toMatch(/font-family="Georgia" font-size="44" fill="#123456">Spice Route Kitchen</);
+    expect(svg).toMatch(/width="600" height="800"/);
   });
 });

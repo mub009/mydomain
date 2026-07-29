@@ -195,6 +195,23 @@ export function fillPlaceholders(template: string | null | undefined, subject: P
     .trim();
 }
 
+/**
+ * Removes any placeholder that nothing filled.
+ *
+ * `fillPlaceholders` deliberately leaves an unknown token visible, so a typo
+ * shows up while the design is being written. On a finished poster that is the
+ * wrong trade-off: `@DOCTOR_NAME@` printed across a hundred shops is worse than
+ * a gap where the words would have been. The admin hears about it at upload,
+ * which is where it can still be fixed.
+ */
+export function stripPlaceholders(text: string): string {
+  return TOKEN_PATTERNS.reduce((current, pattern) => current.replace(pattern, ""), text)
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/\s+([,.!?])/g, "$1")
+    .replace(/([·|—–-])\s*$/g, "")
+    .trim();
+}
+
 /** Placeholders in the text that nothing will fill — surfaced in the editor
  *  before the design is published to hundreds of shops. */
 export function unknownPlaceholders(...texts: (string | null | undefined)[]): string[] {

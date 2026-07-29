@@ -3,7 +3,14 @@
 import { Document, DOMParser, Element, Node, XMLSerializer } from "@xmldom/xmldom";
 import { AppError } from "@/common/errors";
 import { escapeXml, initials } from "./text";
-import { fillPlaceholders, IMAGE_TOKENS, PosterSubject, tokenIn } from "./placeholders";
+import {
+  fillPlaceholders,
+  IMAGE_TOKENS,
+  PosterSubject,
+  stripPlaceholders,
+  tokenIn,
+  unknownPlaceholders,
+} from "./placeholders";
 
 /**
  * Filling a designer's own slots.
@@ -197,15 +204,28 @@ function textElements(root: Element): Element[] {
  * @PHONE@ but no @QR_CODE@" is the difference between noticing a mistyped slot
  * now and discovering it on a hundred shops' posters later.
  */
-export function svgSlots(svg: string): string[] {
+export interface TemplateSlots {
+  /** Slots this fills with the shop's own details. */
+  known: string[];
+  /** Slots nothing fills. They are blanked on the poster rather than printed,
+   *  so the only place they can be caught is here. */
+  unknown: string[];
+}
+
+export function svgSlots(svg: string): TemplateSlots {
   const document = new DOMParser({ onError: () => {} }).parseFromString(svg, "image/svg+xml");
   const root = document.documentElement as Element;
-  const slots = new Set<string>();
+  const known = new Set<string>();
+  const unknown = new Set<string>();
+
   for (const element of textElements(root)) {
-    const token = tokenIn(element.textContent ?? "");
-    if (token) slots.add(token);
+    const content = element.textContent ?? "";
+    const token = tokenIn(content);
+    if (!token) continue;
+    for (const name of unknownPlaceholders(content)) unknown.add(name);
+    if (unknownPlaceholders(content).length === 0) known.add(token);
   }
-  return [...slots];
+  return { known: [...known], unknown: [...unknown] };
 }
 
 interface SlotBox {
@@ -337,11 +357,11 @@ export function fillSvgTemplate(svg: string, subject: PosterSubject, options: Fi
       const token = tokenIn(before);
       if (!token) continue;
 
-      const after = fillPlaceholders(before, subject);
-      if (after === before) {
-        unfilled.add(token);
-        continue;
-      }
+      // Anything left over after the fill is a slot nothing knows about, and
+      // it is wiped rather than printed — see `stripPlaceholders`.
+      const after = stripPlaceholders(fillPlaceholders(before, subject));
+      if (unknownPlaceholders(before).length > 0) unfilled.add(token);
+      if (after === before) continue;
       // Replaced rather than assigned: this parser's `nodeValue` setter is a
       // no-op on a text node, so writing to it silently changes nothing.
       element.replaceChild(document.createTextNode(after), child);

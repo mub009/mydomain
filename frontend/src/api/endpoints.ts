@@ -696,6 +696,8 @@ export const postersApi = {
           dimensions: { width: number; height: number } | null;
           /** SVG templates only: the slots found, and what was stripped. */
           slots?: string[];
+          /** Slots nothing fills — blanked on the poster, so flag them here. */
+          unknownSlots?: string[];
           removed?: string[];
         }>
       >("/admin/posters/artwork", body)

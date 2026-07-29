@@ -104,7 +104,12 @@ function PosterEditor({
   const [error, setError] = useState("");
   // What the last upload turned out to be: an SVG template's slots, and
   // anything the sanitiser took out of it.
-  const [uploaded, setUpload] = useState<{ slots: string[]; removed: string[]; isTemplate: boolean } | null>(null);
+  const [uploaded, setUpload] = useState<{
+    slots: string[];
+    unknownSlots: string[];
+    removed: string[];
+    isTemplate: boolean;
+  } | null>(null);
 
   const [businesses, setBusinesses] = useState<PosterPreviewBusiness[]>([]);
   const [previewFor, setPreviewFor] = useState("");
@@ -176,6 +181,7 @@ function PosterEditor({
       patch({ artworkUrl: result.dataUrl });
       setUpload({
         slots: result.slots ?? [],
+        unknownSlots: result.unknownSlots ?? [],
         removed: result.removed ?? [],
         isTemplate: result.type === "image/svg+xml",
       });
@@ -414,12 +420,32 @@ function PosterEditor({
                   @QR_CODE@ — and re-upload, or this prints the same for every shop.
                 </p>
               )}
+              {/* Nothing fills these, so they are wiped off the poster rather
+                  than printed. This is the only place they can be caught. */}
+              {uploaded.unknownSlots.length > 0 && (
+                <p className="mt-1.5 font-semibold text-red-700">
+                  Nothing fills{" "}
+                  <span className="font-mono">{uploaded.unknownSlots.map((slot) => `@${slot}@`).join(", ")}</span> —
+                  these will be left blank. Rename them in the artwork to one of the slots above.
+                </p>
+              )}
               {uploaded.removed.length > 0 && (
                 <p className="mt-1.5 text-ink-600">
                   Stripped on upload: <span className="font-mono">{uploaded.removed.join(", ")}</span>
                 </p>
               )}
             </div>
+          )}
+
+          {/* A flat image has no slots to find, so the shop's details can only
+              go on in strips over the top. Worth saying before a hundred
+              posters go out looking like that. */}
+          {uploaded && !uploaded.isTemplate && (
+            <p className="mt-2 rounded-lg bg-amber-50 p-2.5 text-[11px] text-amber-800">
+              This is a flat image, so each shop's details are added as a header and footer strip over the design. Ask
+              the designer for the same artwork as <span className="font-semibold">SVG</span> and the details go into
+              the design's own slots instead, with nothing laid over it.
+            </p>
           )}
 
           {form.artworkUrl && (

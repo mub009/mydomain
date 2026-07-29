@@ -39,6 +39,9 @@ export interface UploadedArtwork {
   dimensions: { width: number; height: number } | null;
   /** For an SVG template: the slots found, and what was stripped out of it. */
   slots?: string[];
+  /** Slots nothing will fill. Blanked on the poster, so this is the only
+   *  chance to notice a misspelled one. */
+  unknownSlots?: string[];
   removed?: string[];
 }
 
@@ -76,12 +79,14 @@ function looksLikeSvg(buffer: Buffer): boolean {
 
 function readUploadedSvg(buffer: Buffer): UploadedArtwork {
   const { svg, removed } = sanitizeSvg(buffer.toString("utf8"));
+  const slots = svgSlots(svg);
   return {
     dataUrl: svgToDataUri(svg),
     type: "image/svg+xml",
     bytes: Buffer.byteLength(svg, "utf8"),
     dimensions: svgDimensions(svg),
-    slots: svgSlots(svg),
+    slots: slots.known,
+    unknownSlots: slots.unknown,
     // Named rather than dropped quietly: an admin whose file lost something
     // should hear it from us, not find out from the poster.
     removed,

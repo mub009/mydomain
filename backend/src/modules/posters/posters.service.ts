@@ -183,7 +183,7 @@ async function renderSvgTemplate(
 
   const [logoHref, qrHref] = await Promise.all([
     inlineImage(business.logoUrl),
-    slots.includes("qr") || promptWantsQr(design.aiPrompt)
+    slots.known.includes("qr") || promptWantsQr(design.aiPrompt)
       ? businessQrDataUrl(business.slug)
       : Promise.resolve(null),
   ]);
