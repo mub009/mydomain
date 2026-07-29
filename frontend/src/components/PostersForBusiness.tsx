@@ -18,6 +18,7 @@ import { downloadGeneratedPng, downloadGeneratedSvg, isSvgDataUrl } from "@/lib/
 export default function PostersForBusiness({ business }: { business: Business }) {
   const [designs, setDesigns] = useState<BusinessPoster[]>([]);
   const [hasLogo, setHasLogo] = useState(true);
+  const [category, setCategory] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -32,6 +33,7 @@ export default function PostersForBusiness({ business }: { business: Business })
       .then((result) => {
         setDesigns(result.designs);
         setHasLogo(result.business.hasLogo);
+        setCategory(result.business.category);
       })
       .catch((err) => setError(apiErrorMessage(err)))
       .finally(() => setLoading(false));
@@ -97,8 +99,11 @@ export default function PostersForBusiness({ business }: { business: Business })
 
       {!loading && designs.length === 0 && (
         <div className="card p-8 text-center text-sm text-ink-500">
-          No posters have been published for your category yet. Check back — new ones appear around festivals and
-          sale seasons.
+          {/* Naming the category matters: a poster filed under the wrong one
+              is the usual reason this list is empty, and the shop is the
+              only person who can see that it does not match its trade. */}
+          No posters have been published for {category ? <span className="font-semibold">{category}</span> : "your category"}{" "}
+          yet. Check back — new ones appear around festivals and sale seasons.
         </div>
       )}
 

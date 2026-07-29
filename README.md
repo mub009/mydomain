@@ -245,9 +245,16 @@ designed, and the form is exactly that:
 | Field | |
 |---|---|
 | **Design name** | What to call it — "Diwali 2026 — jewellery" |
-| **Category** | Which trade it is for |
+| **Category** | Which trade it is for — or *All categories*, for everyone |
 | **Image file** | The design itself: PNG, JPEG, WebP or GIF, up to 4MB |
 | **AI prompt** | The prompt, written once with `@tokens` for the business data |
+
+Under the category the editor says **how many businesses will see it**, and
+the list repeats that on every row ("Real Estate · reaches 12"). A poster filed
+under the category that reads right in its *name* rather than the one its shops
+are actually filed under is the usual reason a Posters tab comes up empty, and
+that number is the only place the mistake is visible before someone complains.
+A published poster that reaches nobody says so in red.
 
 Save as a draft or publish it. Nothing about layout, colour or wording is
 asked for: a poster is catalogued, not composed. Who filed it is recorded on
@@ -323,7 +330,9 @@ phone number and QR — and it downloads that as PNG, or as SVG when the file is
 a vector one.
 
 The result is **kept once made**, so opening it again is instant and costs
-nothing. "Make a new one" is the only thing that spends the work again, which
+nothing — but a copy made before the admin last edited the design is stale, and
+is remade automatically. Editing a design therefore reaches everyone who
+already opened it, rather than leaving them holding the withdrawn artwork. "Make a new one" is the only thing that spends the work again, which
 matters when an image model is doing the drawing: that is money and seconds per
 poster, and a shop clicking through its list should not trigger either.
 

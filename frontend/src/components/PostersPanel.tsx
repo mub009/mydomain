@@ -183,11 +183,15 @@ function PosterEditor({
   const wantsQr = /(?<![\w@])@qr(?![\w])/i.test(form.aiPrompt) || /\{\{\s*qr\s*\}\}/i.test(form.aiPrompt);
   const qrCorner = readQrCorner(form.aiPrompt);
 
-  const missing = [
-    !form.name.trim() && "a design name",
-    !form.categoryId && "a category",
-    !form.artworkUrl && "the image file",
-  ].filter(Boolean) as string[];
+  const missing = [!form.name.trim() && "a design name", !form.artworkUrl && "the image file"].filter(
+    Boolean,
+  ) as string[];
+
+  // How many listings this poster will actually reach. A category that reads
+  // right in the design's name is not always the one its shops are filed
+  // under, and without this the mistake only shows up as an empty Posters tab
+  // in someone else's dashboard.
+  const reach = form.categoryId ? (options.reach.byCategory[form.categoryId] ?? 0) : options.reach.all;
 
   async function save(publish?: boolean) {
     setSaving(true);
@@ -232,13 +236,18 @@ function PosterEditor({
           <div>
             <label className="mb-1 block text-xs font-semibold text-ink-700">Category</label>
             <select className="input" value={form.categoryId} onChange={(e) => patch({ categoryId: e.target.value })}>
-              <option value="">Choose a category…</option>
+              <option value="">All categories — every business</option>
               {categories.map((category) => (
                 <option key={category.id} value={category.id}>
                   {category.name}
                 </option>
               ))}
             </select>
+            <p className={`mt-1 text-[11px] ${reach === 0 ? "font-semibold text-red-700" : "text-ink-500"}`}>
+              {reach === 0
+                ? "No businesses are filed under this category, so nobody will see this poster."
+                : `${reach} ${reach === 1 ? "business" : "businesses"} will see this in Manage → Posters.`}
+            </p>
           </div>
 
           <div>
@@ -507,9 +516,20 @@ export default function PostersPanel() {
                   )}
                 </div>
                 <p className="mt-0.5 text-[11px] text-ink-500">
-                  {design.category?.name ?? "No category"}
-                  {design.businessesUsing ? ` · ${design.businessesUsing} shops, ${design.downloads} downloads` : ""}
+                  {design.category?.name ?? "All categories"}
+                  {" · "}
+                  <span className={design.reach === 0 ? "font-semibold text-red-700" : ""}>
+                    reaches {design.reach ?? 0}
+                  </span>
+                  {design.businessesUsing ? ` · ${design.businessesUsing} made it, ${design.downloads} downloads` : ""}
                 </p>
+                {/* Published but nobody can see it is the failure this whole
+                    row exists to catch, so it gets said in words. */}
+                {design.isPublished && design.reach === 0 && (
+                  <p className="mt-1 text-[11px] font-semibold text-red-700">
+                    Published, but no business is filed under this category — nobody can see it.
+                  </p>
+                )}
                 {design.aiPrompt && (
                   <p className="mt-1 line-clamp-2 text-xs text-ink-600" title={design.aiPrompt}>
                     <span className="font-semibold text-ink-500">Prompt: </span>

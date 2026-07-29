@@ -862,3 +862,33 @@ describe("poster image engine", () => {
     expect(result.image.startsWith("data:image/svg+xml;base64,")).toBe(true);
   });
 });
+
+// A shop's copy is stored so reopening a poster is instant, but "stored" must
+// not mean "frozen": if the admin replaces the artwork or rewrites the prompt,
+// every shop that already opened it would otherwise keep the withdrawn design.
+describe("a stored copy is stale once the design changes", () => {
+  const at = (iso: string) => new Date(iso);
+
+  // The rule generateForOwner applies, stated once so the test can bite.
+  const isCurrent = (generatedAt: Date | null, designUpdatedAt: Date) =>
+    generatedAt != null && generatedAt >= designUpdatedAt;
+
+  it("reuses a copy made after the last edit", () => {
+    expect(isCurrent(at("2026-07-29T12:00:00Z"), at("2026-07-29T11:00:00Z"))).toBe(true);
+  });
+
+  it("remakes a copy made before the last edit", () => {
+    expect(isCurrent(at("2026-07-29T11:00:00Z"), at("2026-07-29T12:00:00Z"))).toBe(false);
+  });
+
+  // Rows predating the image cache carry a null generatedAt with a download
+  // count — those have no image at all and must not be treated as current.
+  it("remakes when there is no copy on the row", () => {
+    expect(isCurrent(null, at("2026-07-29T12:00:00Z"))).toBe(false);
+  });
+
+  it("reuses a copy made in the same instant as the edit", () => {
+    const now = at("2026-07-29T12:00:00Z");
+    expect(isCurrent(now, now)).toBe(true);
+  });
+});

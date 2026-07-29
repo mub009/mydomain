@@ -583,6 +583,8 @@ export interface PosterDesign {
   warnings?: string[];
   businessesUsing?: number;
   downloads?: number;
+  /** Listings this design's targeting actually reaches — 0 means nobody. */
+  reach?: number;
 }
 
 export interface PosterStudioOptions {
@@ -595,6 +597,9 @@ export interface PosterStudioOptions {
   maxArtworkBytes: number;
   tones: string[];
   ai: { engine: PosterCopyEngine };
+  /** Listings per category, so the editor can show a poster's reach before
+   *  it is saved. `all` is what an untargeted poster reaches. */
+  reach: { all: number; byCategory: Record<string, number> };
 }
 
 export interface PosterBandSuggestion {
@@ -730,7 +735,15 @@ export const businessPostersApi = {
     api
       .get<
         ApiResponse<{
-          business: { id: string; name: string; logoUrl: string | null; hasLogo: boolean };
+          business: {
+            id: string;
+            name: string;
+            logoUrl: string | null;
+            hasLogo: boolean;
+            /** Names the trade an empty list was searched against. */
+            category: string | null;
+            city: string;
+          };
           designs: BusinessPoster[];
         }>
       >(`/businesses/${businessId}/posters`)

@@ -11,7 +11,7 @@ function actor(req: Request) {
 
 // Admin -------------------------------------------------------------------
 export async function studioOptionsHandler(_req: Request, res: Response): Promise<void> {
-  ok(res, postersService.studioOptions());
+  ok(res, await postersService.studioOptions());
 }
 
 export async function listDesignsHandler(req: Request, res: Response): Promise<void> {

@@ -261,6 +261,8 @@ export async function listDesigns(query: { page?: number; pageSize?: number; sea
   });
   const byDesign = new Map(downloads.map((row) => [row.designId, row._sum.downloads ?? 0]));
 
+  const reach = await reachCounts(items);
+
   const withArtwork = new Set(
     (
       await prisma.posterDesign.findMany({
@@ -274,6 +276,7 @@ export async function listDesigns(query: { page?: number; pageSize?: number; sea
     items: items.map((design) => ({
       ...design,
       hasArtwork: withArtwork.has(design.id),
+      reach: reach.get(design.id) ?? 0,
       showQr: promptWantsQr(design.aiPrompt),
       qrCorner: promptWantsQr(design.aiPrompt) ? qrCornerFromPrompt(design.aiPrompt) : null,
       businessesUsing: design._count.renders,
@@ -282,6 +285,42 @@ export async function listDesigns(query: { page?: number; pageSize?: number; sea
     })),
     meta: { page, pageSize, total },
   };
+}
+
+/**
+ * How many listings each design actually reaches.
+ *
+ * Targeting is easy to get wrong — pick the category that reads right in the
+ * design's name rather than the one its shops are filed under, and every
+ * Posters tab it was meant for stays empty with nothing to explain why. This
+ * applies the *same* rule the shop side uses, so the number an admin sees is
+ * the number of shops that can really open it, and a zero is visible at the
+ * moment the poster is filed rather than after a complaint.
+ */
+async function reachCounts(designs: { id: string; categoryId: string | null; city: string | null }[]) {
+  const counts = new Map<string, number>();
+  if (designs.length === 0) return counts;
+
+  // One grouped read rather than a count per row: the number of distinct
+  // category/city pairs is small however many listings there are.
+  const groups = await prisma.business.groupBy({ by: ["categoryId", "city"], _count: { _all: true } });
+
+  for (const design of designs) {
+    let total = 0;
+    for (const group of groups) {
+      if (design.categoryId && group.categoryId !== design.categoryId) continue;
+      if (design.city && group.city !== design.city) continue;
+      total += group._count._all;
+    }
+    counts.set(design.id, total);
+  }
+  return counts;
+}
+
+/** The same count for a design being written, before it is saved. */
+export async function reachFor(categoryId: string | null, city: string | null): Promise<number> {
+  const counts = await reachCounts([{ id: "draft", categoryId, city }]);
+  return counts.get("draft") ?? 0;
 }
 
 export async function getDesign(id: string) {
@@ -474,8 +513,18 @@ export async function aiBands(brief: BandBrief) {
 }
 
 /** Everything the editor needs to build its pickers in one call. */
-export function studioOptions() {
+export async function studioOptions() {
+  // Listings per category, so the editor can say how many shops a poster will
+  // reach while the category is still being chosen.
+  const byCategory = await prisma.business.groupBy({ by: ["categoryId"], _count: { _all: true } });
+
   return {
+    reach: {
+      all: byCategory.reduce((sum, row) => sum + row._count._all, 0),
+      byCategory: Object.fromEntries(
+        byCategory.filter((row) => row.categoryId).map((row) => [row.categoryId as string, row._count._all]),
+      ),
+    },
     layouts: layoutChoices(),
     palettes: PALETTES.map(({ id, name, bg, accent, ink, dark }) => ({ id, name, bg, accent, ink, dark })),
     sizes: sizeChoices(),
@@ -542,7 +591,16 @@ export async function listForBusiness(actor: Actor, businessId: string) {
   const byDesign = new Map(renders.map((r) => [r.designId, r]));
 
   return {
-    business: { id: business.id, name: business.name, logoUrl: business.logoUrl, hasLogo: Boolean(business.logoUrl) },
+    business: {
+      id: business.id,
+      name: business.name,
+      logoUrl: business.logoUrl,
+      hasLogo: Boolean(business.logoUrl),
+      // So an empty list can name the trade it found nothing for, instead of
+      // leaving the shop to guess which of its details decided that.
+      category: business.category?.name ?? null,
+      city: business.city,
+    },
     designs: designs.map((design) => ({
       id: design.id,
       name: design.name,
@@ -596,7 +654,11 @@ export async function generateForOwner(
   const existing = await prisma.posterRender.findUnique({
     where: { designId_businessId: { designId, businessId } },
   });
-  if (existing?.imageUrl && !options.regenerate) {
+  // A copy made before the admin last touched the design is the *old* design.
+  // Without this the artwork could be replaced and every shop that had already
+  // opened the poster would keep the picture it was withdrawn for.
+  const current = existing?.generatedAt != null && existing.generatedAt >= design.updatedAt;
+  if (existing?.imageUrl && current && !options.regenerate) {
     return {
       image: existing.imageUrl,
       engine: (existing.engine ?? "local") as ImageEngineId,
