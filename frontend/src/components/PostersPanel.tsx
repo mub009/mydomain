@@ -28,7 +28,6 @@ interface PosterForm {
   categoryId: string;
   artworkUrl: string;
   aiPrompt: string;
-  qrPosition: string;
   isPublished: boolean;
 }
 
@@ -37,7 +36,6 @@ const BLANK: PosterForm = {
   categoryId: "",
   artworkUrl: "",
   aiPrompt: "",
-  qrPosition: "bottom-right",
   isPublished: false,
 };
 
@@ -47,9 +45,42 @@ function toForm(design: PosterDesign): PosterForm {
     categoryId: design.categoryId ?? "",
     artworkUrl: design.artworkUrl ?? "",
     aiPrompt: design.aiPrompt ?? "",
-    qrPosition: design.qrPosition ?? "bottom-right",
     isPublished: design.isPublished,
   };
+}
+
+const CORNER_LABELS: Record<string, string> = {
+  "top-left": "in the top left",
+  "top-right": "in the top right",
+  "bottom-left": "in the bottom left",
+  "bottom-right": "in the bottom right",
+  center: "in the centre",
+};
+
+/**
+ * Mirrors the server's `qrCornerFromPrompt` so the editor can say where the
+ * code will land as the prompt is typed. The clause containing the token is
+ * what describes it — see the server for why proximity alone is not enough.
+ */
+function readQrCorner(prompt: string): string {
+  const corners: [RegExp, string][] = [
+    [/\b(?:top|upper)[\s-]*left\b/i, "top-left"],
+    [/\b(?:top|upper)[\s-]*right\b/i, "top-right"],
+    [/\b(?:bottom|lower)[\s-]*left\b/i, "bottom-left"],
+    [/\b(?:bottom|lower)[\s-]*right\b/i, "bottom-right"],
+    [/\b(?:cent(?:re|er)|middle)\b/i, "center"],
+  ];
+  const firstIn = (text: string) => {
+    let best: [number, string] | null = null;
+    for (const [pattern, corner] of corners) {
+      const at = text.search(pattern);
+      if (at >= 0 && (!best || at < best[0])) best = [at, corner];
+    }
+    return best?.[1] ?? null;
+  };
+
+  const clause = prompt.split(/[,;.\n]/).find((part) => /(?<![\w@])@qr(?![\w])/i.test(part));
+  return (clause && firstIn(clause)) || firstIn(prompt) || "bottom-right";
 }
 
 // ---------------------------------------------------------------------------
@@ -150,6 +181,7 @@ function PosterEditor({
   // Mirrors the server's `promptWantsQr`: an @qr or {{qr}} token, but not
   // "@qrcode", and not the "@" in an email address.
   const wantsQr = /(?<![\w@])@qr(?![\w])/i.test(form.aiPrompt) || /\{\{\s*qr\s*\}\}/i.test(form.aiPrompt);
+  const qrCorner = readQrCorner(form.aiPrompt);
 
   const missing = [
     !form.name.trim() && "a design name",
@@ -166,7 +198,6 @@ function PosterEditor({
       categoryId: form.categoryId || null,
       artworkUrl: form.artworkUrl || null,
       aiPrompt: form.aiPrompt.trim() || null,
-      qrPosition: form.qrPosition,
       isPublished: publish ?? form.isPublished,
     };
 
@@ -268,30 +299,17 @@ function PosterEditor({
             )}
           </div>
 
-          {/* No checkbox: the prompt says whether there is a QR. This only
-              appears once it does, and asks the one thing the prompt cannot. */}
+          {/* Nothing to set: the prompt decides both whether there is a QR and
+              where it goes. This just reports what it read. */}
           {wantsQr && (
-            <div className="rounded-lg border border-sky-200 bg-sky-50/50 p-3">
-              <p className="flex items-center gap-1.5 text-xs font-semibold text-ink-700">
-                <QrCode size={13} /> This poster carries a business QR
-              </p>
-              <p className="mt-0.5 text-[11px] leading-snug text-ink-500">
-                Because the prompt says <span className="font-mono">@qr</span>. Each shop gets a code to its own
-                Markkito page. Remove the token to drop it.
-              </p>
-              <label className="mt-2 block text-[11px] font-semibold text-ink-600">Where it sits</label>
-              <select
-                className="input mt-1"
-                value={form.qrPosition}
-                onChange={(e) => patch({ qrPosition: e.target.value })}
-              >
-                {options.qrPositions.map((spot) => (
-                  <option key={spot.id} value={spot.id}>
-                    {spot.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <p className="flex items-start gap-1.5 rounded-md bg-sky-50 px-3 py-2 text-[11px] leading-snug text-sky-900">
+              <QrCode size={13} className="mt-px shrink-0" />
+              <span>
+                Each shop gets a QR to its own Markkito page, {CORNER_LABELS[qrCorner] ?? qrCorner}. Say where in the
+                prompt — "leave the top right clear for <span className="font-mono">@qr</span>" — or drop the token to
+                remove it.
+              </span>
+            </p>
           )}
 
           {error && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
@@ -482,7 +500,11 @@ export default function PostersPanel() {
                     {design.isPublished ? "published" : "draft"}
                   </span>
                   {!design.hasArtwork && <span className="badge bg-amber-50 text-amber-800">no artwork</span>}
-                  {design.showQr && <span className="badge bg-sky-50 text-sky-700">QR</span>}
+                  {design.showQr && (
+                    <span className="badge bg-sky-50 text-sky-700">
+                      QR {design.qrCorner ? (CORNER_LABELS[design.qrCorner] ?? "").replace("in the ", "") : ""}
+                    </span>
+                  )}
                 </div>
                 <p className="mt-0.5 text-[11px] text-ink-500">
                   {design.category?.name ?? "No category"}

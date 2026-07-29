@@ -10,7 +10,7 @@ import { inlineImage } from "@/modules/posters/assets";
 import QRCode from "qrcode";
 import { env } from "@/config/env";
 import { businessQrDataUrl, clearQrCache } from "@/modules/posters/qr";
-import { promptWantsQr } from "@/modules/posters/placeholders";
+import { promptWantsQr, qrCornerFromPrompt } from "@/modules/posters/placeholders";
 
 const subject: PosterSubject = {
   name: "Spice Route Kitchen",
@@ -722,5 +722,62 @@ describe("promptWantsQr", () => {
     expect(fillPlaceholders("Add a QR to @qr", subject)).toBe(
       "Add a QR to http://localhost:5173/business/spice-route-kitchen",
     );
+  });
+});
+
+// The prompt describes the poster, so it is where the QR's corner is decided
+// too — a picker beside it would only be a second opinion on one question.
+describe("qrCornerFromPrompt", () => {
+  it("reads the corner the prompt asks for", () => {
+    expect(qrCornerFromPrompt("Leave the bottom right clear for @qr")).toBe("bottom-right");
+    expect(qrCornerFromPrompt("@qr in the top left please")).toBe("top-left");
+    expect(qrCornerFromPrompt("Put @qr bottom-left")).toBe("bottom-left");
+    expect(qrCornerFromPrompt("@qr top-right")).toBe("top-right");
+    expect(qrCornerFromPrompt("A big @qr in the centre")).toBe("center");
+  });
+
+  it("takes the words people actually write", () => {
+    expect(qrCornerFromPrompt("@qr in the upper right")).toBe("top-right");
+    expect(qrCornerFromPrompt("@qr lower left")).toBe("bottom-left");
+    expect(qrCornerFromPrompt("@qr in the middle")).toBe("center");
+    expect(qrCornerFromPrompt("@qr in the center")).toBe("center");
+  });
+
+  // "Logo top left, QR bottom right" means what a reader thinks it means.
+  it("picks the corner nearest the token when a prompt names two", () => {
+    expect(qrCornerFromPrompt("Logo in the top left, @qr in the bottom right")).toBe("bottom-right");
+    expect(qrCornerFromPrompt("@qr top left, and the logo bottom right")).toBe("top-left");
+  });
+
+  it("falls back to the bottom right when the prompt does not say", () => {
+    expect(qrCornerFromPrompt("Diwali poster for @business_name with @qr")).toBe("bottom-right");
+    expect(qrCornerFromPrompt("")).toBe("bottom-right");
+    expect(qrCornerFromPrompt(null)).toBe("bottom-right");
+  });
+
+  // A corner named with no @qr at all still parses, so the same helper can
+  // answer "where would it go" before the token is typed.
+  it("reads a corner even without the token", () => {
+    expect(qrCornerFromPrompt("keep the top right clear")).toBe("top-right");
+  });
+});
+
+// Sentences are read in clauses, and the QR's corner is whichever one sits in
+// the same clause as the token. Raw proximity gets this wrong: in "Logo in the
+// top left, @qr in the bottom right" the comma is nearer than the words after
+// it, so distance alone hands the QR the logo's corner.
+describe("qrCornerFromPrompt — clauses", () => {
+  it.each([
+    ["Logo in the top left, @qr in the bottom right", "bottom-right"],
+    ["@qr top left, and the logo bottom right", "top-left"],
+    ["Diyas bottom left. Put @qr in the top right.", "top-right"],
+    ["Keep the centre clear; @qr goes bottom left", "bottom-left"],
+  ])("%s → %s", (prompt, corner) => {
+    expect(qrCornerFromPrompt(prompt)).toBe(corner);
+  });
+
+  // A corner named in a different clause is still better than ignoring it.
+  it("uses a corner from elsewhere when the token's own clause names none", () => {
+    expect(qrCornerFromPrompt("Leave the top right empty. Add @qr")).toBe("top-right");
   });
 });

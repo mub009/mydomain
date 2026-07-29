@@ -942,13 +942,6 @@ model PosterDesign {
   logoPosition String  @default("header") @db.VarChar(20)
   logoScale    Float   @default(1)
 
-  // A QR to the shop's own Markkito page, printed on the poster so a customer
-  // can scan it off a phone screen or a shop window. Whether to print one is
-  // read from the prompt — `@qr` — rather than stored, so the two cannot
-  // disagree; this is only where it sits.
-  qrPosition String  @default("bottom-right") @db.VarChar(20)
-  qrScale    Float   @default(1)
-
   // How the two strips sit on the artwork, and in what colour. Left null the
   // colours fall back to the palette; the editor fills them by sampling the
   // uploaded image, so the bands belong to the design rather than to a theme

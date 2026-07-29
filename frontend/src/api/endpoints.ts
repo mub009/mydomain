@@ -567,10 +567,10 @@ export interface PosterDesign {
   bandStyle: string;
   bandColor: string | null;
   bandTextColor: string | null;
-  /** Derived from the prompt, not stored — a poster carries a QR when its
-   *  prompt names `@qr`. */
+  /** Both derived from the prompt, not stored: a poster carries a QR when its
+   *  prompt names `@qr`, in whichever corner that clause asks for. */
   showQr?: boolean;
-  qrPosition: string;
+  qrCorner?: string | null;
   qrScale: number;
   categoryId: string | null;
   city: string | null;
@@ -592,7 +592,6 @@ export interface PosterStudioOptions {
   placeholders: { token: string; label: string; example: string }[];
   logoPositions: { id: string; label: string }[];
   bandStyles: { id: string; label: string; hint: string }[];
-  qrPositions: { id: string; label: string }[];
   maxArtworkBytes: number;
   tones: string[];
   ai: { engine: PosterCopyEngine };

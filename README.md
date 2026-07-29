@@ -286,9 +286,17 @@ is told exactly where it leads. The destination comes from the same helper the
 printed review boards use, so the URL is built in one place rather than two
 that drift.
 
-Once the token is there the editor asks the one thing the prompt cannot — which
-corner — and the code sits on a white plate, because a QR needs its quiet zone
-and its contrast and artwork offers neither.
+**The prompt says where it goes, too.** *"Leave the top right clear for `@qr`"*
+puts it in the top right; say nothing and it goes bottom right. When a prompt
+names two corners — *"logo in the top left, `@qr` in the bottom right"* — the
+one in the token's own clause wins, which is what the sentence means to a
+reader. Raw proximity gets that backwards: the comma is nearer than the words
+after it, so distance alone would hand the QR the logo's corner.
+
+Nothing about the QR is stored, then — not whether, not where. The editor
+reports what it read from the prompt as you type, and the code sits on a white
+plate, because a QR needs its quiet zone and its contrast and artwork offers
+neither.
 
 The logo and the QR are both placed by corner, so they can be aimed at the same
 one. Rather than stacking invisibly, the QR walks to the next free corner in a

@@ -11,12 +11,17 @@ import {
   renderPosterSvg,
   resolveBandStyle,
   resolveLogoPosition,
-  resolveQrPosition,
   sizeChoices,
-  QR_POSITIONS,
 } from "./layouts";
 import { PALETTES, resolvePalette } from "./palettes";
-import { fillPlaceholders, PLACEHOLDERS, PosterSubject, promptWantsQr, unknownPlaceholders } from "./placeholders";
+import {
+  fillPlaceholders,
+  PLACEHOLDERS,
+  PosterSubject,
+  promptWantsQr,
+  qrCornerFromPrompt,
+  unknownPlaceholders,
+} from "./placeholders";
 import { BandBrief, CopyBrief, claudeConfigured, suggestBands, suggestCopy, TONES } from "./copywriter";
 import { MAX_ARTWORK_BYTES } from "./upload";
 import { businessQrDataUrl } from "./qr";
@@ -128,8 +133,7 @@ export async function renderForBusiness(design: PosterDesign, business: Business
       bandColor: design.bandColor,
       bandTextColor: design.bandTextColor,
       qrHref,
-      qrPosition: resolveQrPosition(design.qrPosition),
-      qrScale: design.qrScale,
+      qrPosition: qrCornerFromPrompt(design.aiPrompt),
     },
     design.layout,
   );
@@ -174,8 +178,6 @@ export interface DesignInput {
   bandStyle?: string;
   bandColor?: string | null;
   bandTextColor?: string | null;
-  qrPosition?: string;
-  qrScale?: number;
   categoryId?: string | null;
   city?: string | null;
   isPublished?: boolean;
@@ -236,8 +238,6 @@ export async function listDesigns(query: { page?: number; pageSize?: number; sea
         bandStyle: true,
         bandColor: true,
         bandTextColor: true,
-        qrPosition: true,
-        qrScale: true,
         categoryId: true,
         city: true,
         isPublished: true,
@@ -274,6 +274,7 @@ export async function listDesigns(query: { page?: number; pageSize?: number; sea
       ...design,
       hasArtwork: withArtwork.has(design.id),
       showQr: promptWantsQr(design.aiPrompt),
+      qrCorner: promptWantsQr(design.aiPrompt) ? qrCornerFromPrompt(design.aiPrompt) : null,
       businessesUsing: design._count.renders,
       downloads: byDesign.get(design.id) ?? 0,
       warnings: warningsFor(design),
@@ -324,8 +325,6 @@ export async function createDesign(actor: Actor, input: DesignInput) {
       bandStyle: input.bandStyle ?? "gradient",
       bandColor: input.bandColor ?? null,
       bandTextColor: input.bandTextColor ?? null,
-      qrPosition: input.qrPosition ?? "bottom-right",
-      qrScale: input.qrScale ?? 1,
       categoryId: input.categoryId ?? null,
       city: input.city?.trim() || null,
       isPublished: input.isPublished ?? false,
@@ -366,8 +365,6 @@ export async function updateDesign(id: string, input: Partial<DesignInput>) {
       ...(input.bandStyle !== undefined ? { bandStyle: input.bandStyle } : {}),
       ...(input.bandColor !== undefined ? { bandColor: input.bandColor } : {}),
       ...(input.bandTextColor !== undefined ? { bandTextColor: input.bandTextColor } : {}),
-      ...(input.qrPosition !== undefined ? { qrPosition: input.qrPosition } : {}),
-      ...(input.qrScale !== undefined ? { qrScale: input.qrScale } : {}),
       ...(input.categoryId !== undefined ? { categoryId: input.categoryId } : {}),
       ...(input.city !== undefined ? { city: input.city?.trim() || null } : {}),
       ...(input.isPublished !== undefined ? { isPublished: input.isPublished } : {}),
@@ -424,8 +421,6 @@ export async function previewDesign(input: DesignInput, businessId?: string): Pr
     bandStyle: input.bandStyle ?? "gradient",
     bandColor: input.bandColor ?? null,
     bandTextColor: input.bandTextColor ?? null,
-    qrPosition: input.qrPosition ?? "bottom-right",
-    qrScale: input.qrScale ?? 1,
   } as PosterDesign;
 
   return renderForBusiness(draft, business);
@@ -484,7 +479,6 @@ export function studioOptions() {
     palettes: PALETTES.map(({ id, name, bg, accent, ink, dark }) => ({ id, name, bg, accent, ink, dark })),
     sizes: sizeChoices(),
     logoPositions: LOGO_POSITIONS.map(({ id, label }) => ({ id, label })),
-    qrPositions: QR_POSITIONS.map(({ id, label }) => ({ id, label })),
     bandStyles: BAND_STYLES.map(({ id, label, hint }) => ({ id, label, hint })),
     maxArtworkBytes: MAX_ARTWORK_BYTES,
     placeholders: PLACEHOLDERS,

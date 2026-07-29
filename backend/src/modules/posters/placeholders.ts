@@ -160,3 +160,55 @@ export function unknownPlaceholders(...texts: (string | null | undefined)[]): st
   }
   return [...found];
 }
+
+/**
+ * Which corner the prompt asks for the QR in.
+ *
+ * The prompt already describes the poster, so it is the natural place to say
+ * where the code sits — "leave the bottom right clear for @qr". A separate
+ * picker would only be a second opinion on the same question.
+ *
+ * When a prompt mentions more than one corner — "logo top left, QR bottom
+ * right" — the one nearest the `@qr` token wins, which is what the sentence
+ * means to a reader.
+ */
+const CORNER_PHRASES: { pattern: RegExp; corner: QrCorner }[] = [
+  { pattern: /\b(?:top|upper)[\s-]*(?:left|lft)\b/gi, corner: "top-left" },
+  { pattern: /\b(?:top|upper)[\s-]*right\b/gi, corner: "top-right" },
+  { pattern: /\b(?:bottom|lower)[\s-]*(?:left|lft)\b/gi, corner: "bottom-left" },
+  { pattern: /\b(?:bottom|lower)[\s-]*right\b/gi, corner: "bottom-right" },
+  { pattern: /\b(?:cent(?:re|er)|middle)\b/gi, corner: "center" },
+];
+
+export type QrCorner = "top-left" | "top-right" | "bottom-left" | "bottom-right" | "center";
+
+/** Where the poster's QR should sit, read from the prompt. Bottom right when
+ *  the prompt does not say — the least intrusive corner on most artwork. */
+export function qrCornerFromPrompt(prompt: string | null | undefined): QrCorner {
+  const fallback: QrCorner = "bottom-right";
+  if (!prompt) return fallback;
+
+  const cornerIn = (text: string): QrCorner | null => {
+    let best: { corner: QrCorner; at: number } | null = null;
+    for (const { pattern, corner } of CORNER_PHRASES) {
+      for (const match of text.matchAll(pattern)) {
+        if (!best || match.index < best.at) best = { corner, at: match.index };
+      }
+    }
+    return best?.corner ?? null;
+  };
+
+  // "Logo in the top left, @qr in the bottom right" — the clause the token is
+  // in is the one describing it. Measuring raw distance instead would pick
+  // the logo's corner here, because the comma is closer than the words after
+  // it. Sentences are read in clauses, so that is how this reads them.
+  const clause = prompt.split(/[,;.\n]/).find((part) => promptWantsQr(part));
+  if (clause) {
+    const named = cornerIn(clause);
+    if (named) return named;
+  }
+
+  // No corner beside the token: take one named anywhere rather than ignore a
+  // prompt that clearly asked for something.
+  return cornerIn(prompt) ?? fallback;
+}
