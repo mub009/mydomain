@@ -123,8 +123,8 @@ cd backend && npm test
 - **WhatsApp broadcasts** — a shop links its own WhatsApp number by scanning a
   QR code, imports customers from an .xlsx file, saves reusable templates with
   `{{name}}`-style placeholders, and sends a campaign. See below.
-- **Poster Studio** — an admin designs a poster once; every business downloads
-  it with their own logo, name and phone number already in it. See below.
+- **Poster Studio** — admins catalogue posters: name, category, designer, the
+  design file and the prompt it came from. See below.
 
 ## WhatsApp broadcasts
 
