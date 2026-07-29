@@ -246,7 +246,7 @@ designed, and the form is exactly that:
 |---|---|
 | **Design name** | What to call it — "Diwali 2026 — jewellery" |
 | **Category** | Which trade it is for — or *All categories*, for everyone |
-| **Image file** | The design itself: PNG, JPEG, WebP or GIF, up to 4MB. Any shape — the poster takes the artwork's own proportions |
+| **Image file** | The design itself: **SVG**, PNG, JPEG, WebP or GIF, up to 4MB. Any shape — the poster takes the artwork's own proportions |
 | **AI prompt** | The prompt, written once with `@tokens` for the business data |
 
 Under the category the editor says **how many businesses will see it**, and
@@ -344,6 +344,51 @@ poster, and a shop clicking through its list should not trigger either.
 
 Targeting is re-checked here as an entitlement, not just used as a list filter,
 so a guessed design id cannot fetch a poster meant for another trade or town.
+
+### SVG templates — the designer's own slots, filled exactly
+
+A finished poster usually arrives with the variable parts marked in it:
+`@CLINIC_NAME@` where the shop's name goes, a dashed box labelled `@LOGO@`,
+another labelled `@QR_CODE@`. **Upload it as SVG and those marks are filled in
+place** — the shop's name lands in the box drawn for it, in the designer's own
+font, size and colour. Nothing is laid over the top, nothing is redrawn, and
+there is no AI and no per-poster cost.
+
+In a PNG the same marks are pixels. There is no way to find them without
+reading the picture, so a raster template can only have the platform's own
+header and footer strips composited over it — which is why the designer's
+labels stay visible underneath. Same artwork, different file, different result.
+
+Slots are the same vocabulary as the prompt, in whichever spelling the designer
+already used: `@CLINIC_NAME@`, `@SHOP_NAME@`, `@BUSINESS_NAME@` and
+`{{business}}` all mean the shop's name; `@QR_CODE@` and `@qr` the same code.
+The closed `@TOKEN@` form is what designers type, so it is tried first — the
+open form would fill `@PHONE@` and leave the trailing `@` on the end of the
+number.
+
+**Image slots need an area, and a rectangle is how a designer marks one.** Put
+the label inside a group with a rectangle and the image fills that rectangle.
+A **dashed** rectangle is treated as a guide and removed; a solid one is kept,
+because the white plate behind a QR is exactly that and deleting it would take
+a piece of the poster. With no rectangle to go on, the label's own type size
+sets the scale — a guess, and reported as one.
+
+A shop with no logo gets its initials in the logo's slot, in the colour the
+designer gave that label. There is no equivalent for the QR: a monogram where
+a code should be does not scan, it just misleads, so that slot is left empty.
+
+**SVG is a document, not a picture**, and this one ends up served from the
+platform's own origin. Every upload is parsed and stripped before it is stored:
+`<script>`, `<foreignObject>` and the other element-shaped holes; every `on*`
+handler, including one on the root `<svg>`; anything containing `javascript:`;
+`href`s that are not `#fragment` or `data:image/...`; and `url(...)` and
+`@import` in both style attributes and `<style>` blocks. Whatever was taken out
+is named back to the admin on upload rather than dropped quietly. SMIL
+animation is removed outright — it can rewrite an attribute after the sanitiser
+has approved it.
+
+The upload panel reports the slots it found. "No slots found" is worth acting
+on: without them the template prints the same for every shop.
 
 **The artwork sets the page.** Its pixel dimensions are read from the file's
 own header (no image library — each format states its size in the first few

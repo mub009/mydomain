@@ -1,4 +1,6 @@
 import { AppError } from "@/common/errors";
+import { sanitizeSvg, svgDimensions, svgSlots, svgToDataUri } from "./svgTemplate";
+import { imageDimensions } from "./imageSize";
 
 /**
  * Artwork uploaded through the admin panel.
@@ -14,9 +16,10 @@ export const MAX_ARTWORK_BYTES = 4 * 1024 * 1024;
  * The first bytes of the formats we accept. The declared mimetype comes from
  * the browser and is trivially wrong or forged, so the bytes are what decide.
  *
- * SVG is deliberately absent. An SVG is a document — it can carry scripts and
- * external references — and this file is about to be embedded in a document
- * the platform serves from its own origin.
+ * SVG has no signature to match — it is XML, not a container with a magic
+ * number — so it is handled separately, and only after being parsed and
+ * stripped of everything executable. It is worth the trouble because an SVG
+ * template's slots can be filled exactly; see `svgTemplate.ts`.
  */
 const SIGNATURES: { type: string; matches(buffer: Buffer): boolean }[] = [
   { type: "image/png", matches: (b) => b.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) },
@@ -32,6 +35,11 @@ export interface UploadedArtwork {
   dataUrl: string;
   type: string;
   bytes: number;
+  /** The drawing's own size, which becomes the poster's shape. */
+  dimensions: { width: number; height: number } | null;
+  /** For an SVG template: the slots found, and what was stripped out of it. */
+  slots?: string[];
+  removed?: string[];
 }
 
 /** Validates an uploaded file and returns it as a data URI. */
@@ -42,13 +50,40 @@ export function readUploadedImage(file: { buffer: Buffer; originalname?: string 
   }
 
   const signature = SIGNATURES.find((candidate) => candidate.matches(file.buffer));
-  if (!signature) {
-    throw AppError.badRequest("That file is not a PNG, JPEG, WebP or GIF image");
+  if (signature) {
+    return {
+      dataUrl: `data:${signature.type};base64,${file.buffer.toString("base64")}`,
+      type: signature.type,
+      bytes: file.buffer.byteLength,
+      dimensions: imageDimensions(file.buffer),
+    };
   }
 
+  if (looksLikeSvg(file.buffer)) return readUploadedSvg(file.buffer);
+
+  throw AppError.badRequest("That file is not an SVG, PNG, JPEG, WebP or GIF image");
+}
+
+/**
+ * XML has no magic number, so this is a sniff, not a signature — but it only
+ * decides which validator runs. An impostor gets as far as the SVG parser and
+ * no further, and the parser is the thing that actually judges the file.
+ */
+function looksLikeSvg(buffer: Buffer): boolean {
+  const head = buffer.subarray(0, 1024).toString("utf8").trimStart();
+  return head.startsWith("<") && /<svg[\s>]/i.test(buffer.subarray(0, 4096).toString("utf8"));
+}
+
+function readUploadedSvg(buffer: Buffer): UploadedArtwork {
+  const { svg, removed } = sanitizeSvg(buffer.toString("utf8"));
   return {
-    dataUrl: `data:${signature.type};base64,${file.buffer.toString("base64")}`,
-    type: signature.type,
-    bytes: file.buffer.byteLength,
+    dataUrl: svgToDataUri(svg),
+    type: "image/svg+xml",
+    bytes: Buffer.byteLength(svg, "utf8"),
+    dimensions: svgDimensions(svg),
+    slots: svgSlots(svg),
+    // Named rather than dropped quietly: an admin whose file lost something
+    // should hear it from us, not find out from the poster.
+    removed,
   };
 }

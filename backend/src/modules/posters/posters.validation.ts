@@ -36,15 +36,15 @@ const designFields = {
   footnote: z.string().trim().max(160).nullable().optional(),
   backgroundImageUrl: imageUrl.nullable().optional(),
   // Either an http(s) URL or the data URI returned by the upload endpoint.
-  // Only raster types — an SVG here would be a document embedded in a
-  // document the platform serves.
+  // SVG is allowed *because* it came from that endpoint, which parses and
+  // sanitises it — a template's slots can then be filled exactly.
   artworkUrl: z
     .string()
     .trim()
     .max(6_000_000)
     .refine(
-      (value) => /^https?:\/\//i.test(value) || /^data:image\/(png|jpeg|webp|gif);base64,/i.test(value),
-      "Must be an http(s) URL or an uploaded PNG, JPEG, WebP or GIF",
+      (value) => /^https?:\/\//i.test(value) || /^data:image\/(png|jpeg|webp|gif|svg\+xml);base64,/i.test(value),
+      "Must be an http(s) URL or an uploaded SVG, PNG, JPEG, WebP or GIF",
     )
     .nullable()
     .optional(),

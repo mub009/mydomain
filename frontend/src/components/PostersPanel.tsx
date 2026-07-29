@@ -102,6 +102,9 @@ function PosterEditor({
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
+  // What the last upload turned out to be: an SVG template's slots, and
+  // anything the sanitiser took out of it.
+  const [uploaded, setUpload] = useState<{ slots: string[]; removed: string[]; isTemplate: boolean } | null>(null);
 
   const [businesses, setBusinesses] = useState<PosterPreviewBusiness[]>([]);
   const [previewFor, setPreviewFor] = useState("");
@@ -171,6 +174,11 @@ function PosterEditor({
     try {
       const result = await postersApi.uploadArtwork(file);
       patch({ artworkUrl: result.dataUrl });
+      setUpload({
+        slots: result.slots ?? [],
+        removed: result.removed ?? [],
+        isTemplate: result.type === "image/svg+xml",
+      });
     } catch (err) {
       setError(apiErrorMessage(err));
     } finally {
@@ -368,15 +376,50 @@ function PosterEditor({
               {uploading ? <Loader2 size={18} className="animate-spin" /> : <Upload size={18} />}
               {uploading ? "Uploading…" : "Upload the image"}
               <span className="text-[11px] text-ink-400">
-                PNG, JPEG, WebP or GIF · up to {Math.round(options.maxArtworkBytes / 1024 / 1024)}MB
+                SVG, PNG, JPEG, WebP or GIF · up to {Math.round(options.maxArtworkBytes / 1024 / 1024)}MB
+              </span>
+              <span className="text-[11px] text-brand-700">
+                SVG fills the designer's own slots exactly
               </span>
               <input
                 type="file"
-                accept="image/png,image/jpeg,image/webp,image/gif"
+                accept="image/svg+xml,image/png,image/jpeg,image/webp,image/gif"
                 className="hidden"
                 onChange={(e) => upload(e.target.files?.[0])}
               />
             </label>
+          )}
+
+          {/* An SVG template says what it will fill. Finding out now that a
+              slot was mistyped is the difference between fixing one file and
+              recalling a poster from a hundred shops. */}
+          {uploaded?.isTemplate && (
+            <div className="mt-2 rounded-lg border border-brand-200 bg-brand-50 p-2.5 text-[11px]">
+              {uploaded.slots.length > 0 ? (
+                <>
+                  <p className="font-semibold text-brand-800">
+                    Template with {uploaded.slots.length} slot{uploaded.slots.length === 1 ? "" : "s"} — filled per shop:
+                  </p>
+                  <p className="mt-1 flex flex-wrap gap-1">
+                    {uploaded.slots.map((slot) => (
+                      <span key={slot} className="rounded-full bg-white px-2 py-0.5 font-mono text-brand-700">
+                        @{slot}
+                      </span>
+                    ))}
+                  </p>
+                </>
+              ) : (
+                <p className="font-semibold text-amber-800">
+                  No slots found. Mark them in the artwork as text — @CLINIC_NAME@, @PHONE@, @ADDRESS@, @LOGO@,
+                  @QR_CODE@ — and re-upload, or this prints the same for every shop.
+                </p>
+              )}
+              {uploaded.removed.length > 0 && (
+                <p className="mt-1.5 text-ink-600">
+                  Stripped on upload: <span className="font-mono">{uploaded.removed.join(", ")}</span>
+                </p>
+              )}
+            </div>
           )}
 
           {form.artworkUrl && (
@@ -384,7 +427,7 @@ function PosterEditor({
               <Upload size={13} /> Replace image
               <input
                 type="file"
-                accept="image/png,image/jpeg,image/webp,image/gif"
+                accept="image/svg+xml,image/png,image/jpeg,image/webp,image/gif"
                 className="hidden"
                 onChange={(e) => upload(e.target.files?.[0])}
               />

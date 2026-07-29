@@ -688,7 +688,17 @@ export const postersApi = {
     const body = new FormData();
     body.append("file", file);
     return api
-      .post<ApiResponse<{ dataUrl: string; type: string; bytes: number }>>("/admin/posters/artwork", body)
+      .post<
+        ApiResponse<{
+          dataUrl: string;
+          type: string;
+          bytes: number;
+          dimensions: { width: number; height: number } | null;
+          /** SVG templates only: the slots found, and what was stripped. */
+          slots?: string[];
+          removed?: string[];
+        }>
+      >("/admin/posters/artwork", body)
       .then((r) => r.data.data);
   },
   aiSuggest: (brief: Record<string, unknown>) =>

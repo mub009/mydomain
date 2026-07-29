@@ -11,6 +11,8 @@
  * the exception and needs its segments walked).
  */
 
+import { svgDimensions, svgFromDataUri } from "./svgTemplate";
+
 export interface ImageDimensions {
   width: number;
   height: number;
@@ -95,6 +97,8 @@ export function imageDimensions(buffer: Buffer): ImageDimensions | null {
 /** The same, for the data URIs designs are stored as. */
 export function dataUriDimensions(dataUri: string | null): ImageDimensions | null {
   if (!dataUri?.startsWith("data:image/")) return null;
+  // SVG states its size in attributes rather than a binary header.
+  if (dataUri.startsWith("data:image/svg+xml")) return svgDimensions(svgFromDataUri(dataUri));
   const comma = dataUri.indexOf(",");
   if (comma < 0 || !dataUri.slice(0, comma).includes(";base64")) return null;
   // The header is at the front, so a slice of the payload is enough — decoding

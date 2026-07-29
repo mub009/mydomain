@@ -30,6 +30,20 @@ export interface PosterSubject {
  */
 const AT_TOKEN = /(?<![\w@])@([a-z_][a-z0-9_]*)/gi;
 const BRACE_TOKEN = /\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}/g;
+/**
+ * `@PHONE@` — the form designers write inside artwork, closed at both ends.
+ *
+ * It has to be tried before the open `@phone` form or the closing `@` is left
+ * stranded on the end of the number. Being closed also makes it unambiguous
+ * in a line of real words, which is why a designer reaches for it.
+ *
+ * It carries the same lookbehind as the open form: without it two addresses in
+ * a row could have the span between them read as a token.
+ */
+const AT_DELIMITED = /(?<![\w@])@([a-z_][a-z0-9_]*)@/gi;
+
+/** Every spelling, most specific first. Order matters — see above. */
+const TOKEN_PATTERNS = [BRACE_TOKEN, AT_DELIMITED, AT_TOKEN];
 
 export interface PlaceholderInfo {
   token: string;
@@ -55,6 +69,7 @@ export const PLACEHOLDERS: PlaceholderInfo[] = [
     label: "QR to the shop's page",
     example: "prints a scannable code",
   },
+  { token: "logo", label: "The shop's logo", example: "drops the logo into the slot" },
 ];
 
 /**
@@ -66,7 +81,7 @@ export const PLACEHOLDERS: PlaceholderInfo[] = [
  */
 export function promptWantsQr(prompt: string | null | undefined): boolean {
   if (!prompt) return false;
-  for (const pattern of [BRACE_TOKEN, AT_TOKEN]) {
+  for (const pattern of TOKEN_PATTERNS) {
     for (const match of prompt.matchAll(pattern)) {
       if (canonical(match[1]) === "qr") return true;
     }
@@ -85,11 +100,44 @@ const ALIASES: Record<string, string> = {
   businessname: "business_name",
   mobile: "phone",
   contact: "phone",
+  // What a designer actually types into artwork. The slot in a dentist's
+  // template says @CLINIC_NAME@, not @business_name — and the template is
+  // written before anyone reads our documentation, so the vocabulary meets it
+  // where it is rather than the other way round.
+  clinic_name: "business_name",
+  shop_name: "business_name",
+  store_name: "business_name",
+  company_name: "business_name",
+  brand_name: "business_name",
+  phone_number: "phone",
+  mobile_number: "phone",
+  contact_number: "phone",
+  qr_code: "qr",
+  qrcode: "qr",
+  location: "city",
+  web: "website",
+  site: "website",
 };
 
 function canonical(token: string): string {
   const key = token.toLowerCase();
   return ALIASES[key] ?? key;
+}
+
+/**
+ * Tokens that are a picture rather than words — a logo, a QR code. In artwork
+ * these mark an *area*, so they are replaced by an image the size of the slot
+ * instead of by a string.
+ */
+export const IMAGE_TOKENS = new Set(["logo", "qr"]);
+
+/** The canonical name of a token, or null if nothing fills it. */
+export function tokenIn(text: string): string | null {
+  for (const pattern of TOKEN_PATTERNS) {
+    const match = new RegExp(pattern.source, pattern.flags).exec(text.trim());
+    if (match) return canonical(match[1]);
+  }
+  return null;
 }
 
 /** Formats a stored number the way it is printed on a board: +91 98765 43210. */
@@ -117,6 +165,9 @@ function values(subject: PosterSubject): Record<string, string> {
     // As text this is the address the code points at, which is what an image
     // generator needs to be told; the renderer draws the code itself.
     qr: subject.pageUrl,
+    // No text form of a logo, but a prompt naming it should still resolve to
+    // something an image generator can act on rather than print the token.
+    logo: subject.logoUrl ?? "",
   };
 }
 
@@ -137,9 +188,7 @@ export function fillPlaceholders(template: string | null | undefined, subject: P
     return key in table ? table[key] : match;
   };
 
-  return template
-    .replace(BRACE_TOKEN, fill)
-    .replace(AT_TOKEN, fill)
+  return TOKEN_PATTERNS.reduce((text, pattern) => text.replace(pattern, fill), template)
     .replace(/[ \t]{2,}/g, " ")
     .replace(/\s+([,.!?])/g, "$1")
     .replace(/([·|—–-])\s*$/g, "")
@@ -152,7 +201,7 @@ export function unknownPlaceholders(...texts: (string | null | undefined)[]): st
   const known = new Set(PLACEHOLDERS.map((p) => p.token));
   const found = new Set<string>();
   for (const text of texts) {
-    for (const pattern of [BRACE_TOKEN, AT_TOKEN]) {
+    for (const pattern of TOKEN_PATTERNS) {
       for (const match of (text ?? "").matchAll(pattern)) {
         if (!known.has(canonical(match[1]))) found.add(match[1]);
       }

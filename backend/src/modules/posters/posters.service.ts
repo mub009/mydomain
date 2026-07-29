@@ -27,6 +27,7 @@ import { BandBrief, CopyBrief, claudeConfigured, suggestBands, suggestCopy, TONE
 import { MAX_ARTWORK_BYTES } from "./upload";
 import { businessQrDataUrl } from "./qr";
 import { dataUriDimensions } from "./imageSize";
+import { fillSvgTemplate, isSvgDataUri, svgDimensions, svgFromDataUri, svgSlots } from "./svgTemplate";
 import { generatePosterImage, ImageEngineId, openAiConfigured } from "./imageEngine";
 import { markkitoLink } from "@/modules/reviewqr/reviewqr.service";
 
@@ -102,6 +103,12 @@ function fileNameFor(design: { name: string }, subject: PosterSubject): string {
 export async function renderForBusiness(design: PosterDesign, business: BusinessForPoster): Promise<RenderedPoster> {
   const subject = toSubject(business);
 
+  // A template with its own slots is filled in place: the designer decided
+  // where everything goes, so there is nothing for a layout to lay out. This
+  // is the exact path — the shop's name lands in the box marked for it, in the
+  // type the designer chose — and it is why SVG artwork is worth accepting.
+  if (isSvgDataUri(design.artworkUrl)) return renderSvgTemplate(design, business, subject);
+
   // A design with uploaded artwork uses it as the image; anything else falls
   // back to the background field the drawn layouts use.
   const [logoHref, backgroundHref, qrHref] = await Promise.all([
@@ -152,6 +159,46 @@ export async function renderForBusiness(design: PosterDesign, business: Business
     size: design.size,
     width,
     height,
+    svg,
+    fileName: fileNameFor(design, subject),
+    logoEmbedded: logoHref !== null,
+  };
+}
+
+/**
+ * One shop's copy of an SVG template.
+ *
+ * The QR is drawn whenever the template has a slot for it, rather than when
+ * the prompt asks: a slot the designer drew is a stronger statement of intent
+ * than a sentence written next to it, and a template with a `@QR_CODE@` box
+ * and no code in it is a hole in the poster.
+ */
+async function renderSvgTemplate(
+  design: PosterDesign,
+  business: BusinessForPoster,
+  subject: PosterSubject,
+): Promise<RenderedPoster> {
+  const template = svgFromDataUri(design.artworkUrl!);
+  const slots = svgSlots(template);
+
+  const [logoHref, qrHref] = await Promise.all([
+    inlineImage(business.logoUrl),
+    slots.includes("qr") || promptWantsQr(design.aiPrompt)
+      ? businessQrDataUrl(business.slug)
+      : Promise.resolve(null),
+  ]);
+
+  const { svg } = fillSvgTemplate(template, subject, { logoHref, qrHref });
+  const frame = posterFrame(design.size, svgDimensions(template));
+
+  return {
+    designId: design.id,
+    name: design.name,
+    layout: "template",
+    palette: design.palette,
+    size: design.size,
+    width: frame.width,
+    height: frame.height,
     svg,
     fileName: fileNameFor(design, subject),
     logoEmbedded: logoHref !== null,

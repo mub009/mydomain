@@ -13,6 +13,7 @@ import { businessQrDataUrl, clearQrCache } from "@/modules/posters/qr";
 import { promptWantsQr, qrCornerFromPrompt } from "@/modules/posters/placeholders";
 import { generatePosterImage, openAiConfigured } from "@/modules/posters/imageEngine";
 import { dataUriDimensions, imageDimensions } from "@/modules/posters/imageSize";
+import { fillSvgTemplate, sanitizeSvg, svgDimensions, svgSlots } from "@/modules/posters/svgTemplate";
 
 const subject: PosterSubject = {
   name: "Spice Route Kitchen",
@@ -461,14 +462,32 @@ describe("readUploadedImage", () => {
 
   // The browser's declared mimetype is not evidence; the bytes are.
   it("rejects a file that only claims to be an image", () => {
-    expect(() => readUploadedImage({ buffer: Buffer.from("<html>not an image</html>") })).toThrow(/not a PNG/i);
+    expect(() => readUploadedImage({ buffer: Buffer.from("MZ\u0000\u0000not an image") })).toThrow(/not an SVG, PNG/i);
+    // Opens like markup, is not a drawing — the parser is what decides.
+    expect(() => readUploadedImage({ buffer: Buffer.from("<html>not an image</html>") })).toThrow();
   });
 
   // An SVG is a document — it can carry script — and this file is about to be
-  // embedded in a document the platform serves from its own origin.
-  it("rejects SVG, however it is dressed up", () => {
-    const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>');
-    expect(() => readUploadedImage({ buffer: svg })).toThrow(/not a PNG/i);
+  // embedded in a document the platform serves from its own origin. It is
+  // taken anyway, because a template's slots can be filled exactly, but only
+  // after the parser has stripped it.
+  it("accepts an SVG and hands back a stripped one", () => {
+    const svg = Buffer.from(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350">' +
+        '<script>alert(1)</script><text x="10" y="20">@CLINIC_NAME@</text></svg>',
+    );
+    const result = readUploadedImage({ buffer: svg });
+
+    expect(result.type).toBe("image/svg+xml");
+    expect(result.dimensions).toEqual({ width: 1080, height: 1350 });
+    expect(result.slots).toEqual(["business_name"]);
+    expect(result.removed).toContain("<script>");
+    expect(Buffer.from(result.dataUrl.split(",")[1], "base64").toString()).not.toMatch(/script/i);
+  });
+
+  // The sniff only decides which validator runs; the parser is what judges.
+  it("rejects a file that opens like XML but is not a drawing", () => {
+    expect(() => readUploadedImage({ buffer: Buffer.from("<html><body>hi</body></html>") })).toThrow();
   });
 
   it("refuses an empty upload and one over the size cap", () => {
@@ -715,9 +734,20 @@ describe("promptWantsQr", () => {
   });
 
   // "@qrcode" is a different token, and an email is not a token at all.
-  it("does not fire on a word that merely starts with qr", () => {
-    expect(promptWantsQr("use @qrcode please")).toBe(false);
+  // @qrcode and @QR_CODE@ are what designers actually write in artwork, so
+  // both are the QR. A word that merely begins with "qr" is not, and neither
+  // is the "qr" in front of an @ in an address.
+  it("accepts the spellings a designer writes, and nothing else", () => {
+    expect(promptWantsQr("use @qrcode please")).toBe(true);
+    expect(promptWantsQr("slot marked @QR_CODE@")).toBe(true);
     expect(promptWantsQr("mail qr@example.com")).toBe(false);
+    expect(promptWantsQr("@qrious about it")).toBe(false);
+  });
+
+  // Two addresses in a row must not have the span between them read as a
+  // token just because it is bracketed by @ signs.
+  it("does not read a token out of adjacent email addresses", () => {
+    expect(fillPlaceholders("write to a@qr@b about it", subject)).toBe("write to a@qr@b about it");
   });
 
   it("resolves to the address the code points at", () => {
@@ -999,5 +1029,183 @@ describe("artwork is not cropped into a preset", () => {
 
     expect({ width, height }).toEqual(story);
     expect(height / width).not.toBeCloseTo(POSTER_SIZES.PORTRAIT.height / POSTER_SIZES.PORTRAIT.width, 2);
+  });
+});
+
+// An SVG is a document, not a picture. It is accepted because a template's
+// slots can then be filled exactly — and only after everything executable has
+// been taken out of it, because the result is served from our own origin.
+describe("sanitizeSvg", () => {
+  const wrap = (body: string) => `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">${body}</svg>`;
+
+  it("removes a script the file brought with it", () => {
+    const { svg, removed } = sanitizeSvg(wrap(`<script>alert(1)</script><rect width="10" height="10"/>`));
+    expect(svg).not.toMatch(/script/i);
+    expect(svg).toMatch(/<rect/);
+    expect(removed).toContain("<script>");
+  });
+
+  it("removes event handlers, including one on the root element", () => {
+    const source = `<svg xmlns="http://www.w3.org/2000/svg" onload="steal()" width="10" height="10">
+      <rect onclick="x()" onmouseover="y()" width="5" height="5"/></svg>`;
+    const { svg } = sanitizeSvg(source);
+    expect(svg).not.toMatch(/onload|onclick|onmouseover/i);
+    expect(svg).toMatch(/<rect/);
+  });
+
+  // A <foreignObject> is a hole in the SVG through which arbitrary HTML —
+  // and therefore arbitrary script — reaches the page.
+  it("removes foreignObject and the other element-shaped holes", () => {
+    for (const tag of ["foreignObject", "iframe", "object", "embed"]) {
+      const { svg } = sanitizeSvg(wrap(`<${tag}><b>x</b></${tag}>`));
+      expect(svg.toLowerCase(), tag).not.toContain(tag.toLowerCase());
+    }
+  });
+
+  // SMIL can rewrite an attribute after the sanitiser has approved it, which
+  // makes an approved href a moving target.
+  it("removes animation elements that could rewrite a checked attribute", () => {
+    const { svg } = sanitizeSvg(wrap(`<image href="#a"><animate attributeName="href" to="javascript:x"/></image>`));
+    expect(svg).not.toMatch(/animate/i);
+  });
+
+  it("keeps an embedded image but drops one that reaches off the page", () => {
+    const inline = sanitizeSvg(wrap(`<image href="data:image/png;base64,AAAA" width="10" height="10"/>`));
+    expect(inline.svg).toContain("data:image/png;base64,AAAA");
+
+    const remote = sanitizeSvg(wrap(`<image href="https://tracker.example/pixel.png" width="10" height="10"/>`));
+    expect(remote.svg).not.toContain("tracker.example");
+  });
+
+  it("strips javascript: wherever it is hiding", () => {
+    const { svg } = sanitizeSvg(wrap(`<a href="javascript:alert(1)"><rect width="5" height="5"/></a>`));
+    expect(svg).not.toMatch(/javascript:/i);
+    expect(svg).toMatch(/<rect/);
+  });
+
+  it("strips external references out of CSS, in attributes and in style blocks", () => {
+    const styled = sanitizeSvg(
+      wrap(`<style>@import url(https://evil.example/x.css); .a{fill:url(https://evil.example/p.png)}</style>` +
+        `<rect style="fill:url(https://evil.example/q.png)" width="5" height="5"/>`),
+    );
+    expect(styled.svg).not.toContain("evil.example");
+    expect(styled.svg).not.toMatch(/@import/i);
+  });
+
+  it("refuses a file that is not an SVG at all", () => {
+    expect(() => sanitizeSvg("<html><body>hi</body></html>")).toThrow();
+    expect(() => sanitizeSvg("just some text")).toThrow();
+  });
+
+  it("reads the drawing's size from width and height, or the viewBox", () => {
+    expect(svgDimensions(`<svg width="1080" height="1920"></svg>`)).toEqual({ width: 1080, height: 1920 });
+    expect(svgDimensions(`<svg width="1080px" height="1350px"></svg>`)).toEqual({ width: 1080, height: 1350 });
+    expect(svgDimensions(`<svg viewBox="0 0 595 842"></svg>`)).toEqual({ width: 595, height: 842 });
+    expect(svgDimensions(`<svg></svg>`)).toBeNull();
+  });
+});
+
+// The point of the whole exercise: the shop's details land in the boxes the
+// designer drew for them, rather than under strips laid over the top.
+describe("fillSvgTemplate", () => {
+  const template = `<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1920">
+    <g><rect x="40" y="40" width="200" height="200" stroke-dasharray="8"/><text x="60" y="120" font-size="34">@LOGO@</text></g>
+    <text x="600" y="90" font-size="48" fill="#0b3b8f">@CLINIC_NAME@</text>
+    <text x="60" y="1800" font-size="40">Call @PHONE@ today</text>
+    <text x="700" y="1700" font-size="30">@ADDRESS@</text>
+    <g><rect x="820" y="1600" width="200" height="200" stroke-dasharray="8"/><text x="840" y="1700">@QR_CODE@</text></g>
+  </svg>`;
+
+  const filled = (options = { logoHref: "data:image/png;base64,LOGO", qrHref: "data:image/png;base64,QR" }) =>
+    fillSvgTemplate(template, subject, options);
+
+  it("finds every slot, under the names a designer writes", () => {
+    expect(svgSlots(template).sort()).toEqual(["address", "business_name", "logo", "phone", "qr"]);
+  });
+
+  it("puts the shop's name where the designer put the slot", () => {
+    const { svg } = filled();
+    // Same element, same position, same type — only the words changed.
+    expect(svg).toMatch(/<text x="600" y="90" font-size="48" fill="#0b3b8f">Spice Route Kitchen<\/text>/);
+    expect(svg).not.toContain("@CLINIC_NAME@");
+  });
+
+  it("fills a token sitting inside a sentence", () => {
+    expect(filled().svg).toContain("Call +91 98765 43210 today");
+  });
+
+  it("puts an image over the box the designer marked, without distorting it", () => {
+    const { svg } = filled();
+    expect(svg).toMatch(/<image[^>]*href="data:image\/png;base64,LOGO"[^>]*x="40"[^>]*y="40"[^>]*width="200"[^>]*height="200"/);
+    expect(svg).toMatch(/href="data:image\/png;base64,QR"[^>]*x="820"[^>]*y="1600"/);
+    // A stretched logo looks wrong; a stretched QR does not scan.
+    expect(svg.match(/preserveAspectRatio="xMidYMid meet"/g)).toHaveLength(2);
+  });
+
+  // The dashed rectangle is a marker, not part of the design.
+  it("removes the marker box it drew the image into", () => {
+    expect(filled().svg).not.toMatch(/stroke-dasharray/);
+  });
+
+  // A solid rectangle is more likely the white plate a QR needs to scan.
+  it("keeps a solid rectangle behind the slot", () => {
+    const solid = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
+      <g><rect x="10" y="10" width="50" height="50" fill="#ffffff"/><text x="12" y="30">@QR_CODE@</text></g></svg>`;
+    const { svg } = fillSvgTemplate(solid, subject, { logoHref: null, qrHref: "data:image/png;base64,QR" });
+    expect(svg).toMatch(/<rect[^>]*fill="#ffffff"/);
+    expect(svg).toMatch(/<image/);
+  });
+
+  it("reports what it filled and what it could not", () => {
+    const result = fillSvgTemplate(template, subject, { logoHref: null, qrHref: null });
+    expect(result.filled).toContain("business_name");
+    expect(result.unfilled).toEqual(expect.arrayContaining(["logo", "qr"]));
+  });
+
+  // A shop with no logo must not ship a poster reading "@LOGO@".
+  it("leaves a gap rather than the label when there is nothing to fill it with", () => {
+    const { svg } = fillSvgTemplate(template, subject, { logoHref: null, qrHref: null });
+    expect(svg).not.toContain("@LOGO@");
+    expect(svg).not.toContain("@QR_CODE@");
+  });
+
+  it("leaves the artwork's own words alone", () => {
+    expect(filled().svg).toContain('font-size="40"');
+    expect(filled().svg).toMatch(/width="1080" height="1920"/);
+  });
+});
+
+// A guide box is instruction to the designer, not part of the poster.
+describe("an image slot with nothing to put in it", () => {
+  const template = `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400">
+    <g><rect x="10" y="10" width="100" height="100" stroke-dasharray="6" fill="none" stroke="#fff"/>
+       <text x="12" y="60" fill="#ffffff">@LOGO@</text></g>
+    <g><rect x="200" y="200" width="100" height="100" stroke-dasharray="6" fill="none"/>
+       <text x="202" y="250">@QR_CODE@</text></g>
+  </svg>`;
+
+  const empty = () => fillSvgTemplate(template, subject, { logoHref: null, qrHref: null });
+
+  it("takes the guide box away with the label", () => {
+    expect(empty().svg).not.toMatch(/stroke-dasharray/);
+    expect(empty().svg).not.toContain("@LOGO@");
+  });
+
+  // The dashboard tells a shop with no logo that its initials will be used,
+  // so the poster has to actually do that.
+  it("puts the shop's initials in the logo slot", () => {
+    const { svg } = empty();
+    expect(svg).toContain(">SR<");
+    // In the colour the designer chose for that spot — a fixed dark or light
+    // would vanish on half the templates.
+    expect(svg).toMatch(/<text[^>]*fill="#ffffff"[^>]*>SR</);
+    expect(svg).toMatch(/<circle[^>]*cx="60"[^>]*cy="60"/);
+  });
+
+  // A monogram where a code should be does not scan; it just misleads.
+  it("leaves the QR slot empty rather than inventing something", () => {
+    const { svg } = empty();
+    expect(svg).not.toContain("@QR_CODE@");
+    expect((svg.match(/<circle/g) ?? []).length).toBe(1);
   });
 });
