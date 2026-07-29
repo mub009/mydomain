@@ -8,6 +8,7 @@ import {
   layoutChoices,
   LOGO_POSITIONS,
   POSTER_SIZES,
+  posterFrame,
   renderPosterSvg,
   resolveBandStyle,
   resolveLogoPosition,
@@ -25,6 +26,7 @@ import {
 import { BandBrief, CopyBrief, claudeConfigured, suggestBands, suggestCopy, TONES } from "./copywriter";
 import { MAX_ARTWORK_BYTES } from "./upload";
 import { businessQrDataUrl } from "./qr";
+import { dataUriDimensions } from "./imageSize";
 import { generatePosterImage, ImageEngineId, openAiConfigured } from "./imageEngine";
 import { markkitoLink } from "@/modules/reviewqr/reviewqr.service";
 
@@ -121,6 +123,9 @@ export async function renderForBusiness(design: PosterDesign, business: Business
   const { svg, width, height } = renderPosterSvg(
     {
       size: design.size,
+      // The artwork's own shape, so a template that is not one of the three
+      // preset ratios keeps its edges instead of being cropped into one.
+      dimensions: posterFrame(design.size, dataUriDimensions(backgroundHref)),
       palette: resolvePalette(design.palette),
       copy,
       subject,

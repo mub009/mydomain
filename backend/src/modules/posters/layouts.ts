@@ -8,6 +8,30 @@ export interface PosterDimensions {
   height: number;
 }
 
+/**
+ * The page a design is drawn on.
+ *
+ * Uploaded artwork keeps its **own** proportions. The alternative — fitting it
+ * to a preset — either crops it or letterboxes it, and a designer's poster is
+ * finished work: the part that would be cut is the part they put at the edge.
+ * The presets remain the fallback for designs that have no artwork.
+ *
+ * Very large artwork is scaled down, because the frame is also the canvas the
+ * browser rasterises for the PNG; the artwork itself is embedded unscaled, so
+ * nothing is lost from the picture by doing this.
+ */
+export const MAX_FRAME_PX = 2000;
+
+export function posterFrame(size: PosterSize, artwork: PosterDimensions | null): PosterDimensions {
+  if (!artwork) return POSTER_SIZES[size] ?? POSTER_SIZES.PORTRAIT;
+
+  const longest = Math.max(artwork.width, artwork.height);
+  if (longest <= MAX_FRAME_PX) return { width: artwork.width, height: artwork.height };
+
+  const scale = MAX_FRAME_PX / longest;
+  return { width: Math.round(artwork.width * scale), height: Math.round(artwork.height * scale) };
+}
+
 /** The three shapes a shop actually posts: feed square, taller feed post, and
  *  a full-screen status. */
 export const POSTER_SIZES: Record<PosterSize, PosterDimensions & { label: string; hint: string }> = {
@@ -30,6 +54,9 @@ export interface PosterCopy {
 
 export interface RenderInput {
   size: PosterSize;
+  /** The page to draw on. Overrides `size` — uploaded artwork sets its own
+   *  shape rather than being cropped into one of the three presets. */
+  dimensions?: PosterDimensions;
   palette: Palette;
   copy: PosterCopy;
   subject: PosterSubject;
@@ -1116,7 +1143,7 @@ export function sizeChoices() {
  *  are already data URIs — so the file can be saved, mailed, or drawn onto a
  *  canvas and exported as PNG without a network round trip. */
 export function renderPosterSvg(input: RenderInput, layoutId: string): { svg: string; width: number; height: number } {
-  const dim = POSTER_SIZES[input.size] ?? POSTER_SIZES.PORTRAIT;
+  const dim = input.dimensions ?? POSTER_SIZES[input.size] ?? POSTER_SIZES.PORTRAIT;
   const layout = resolveLayout(layoutId);
   const body = layout.render(input, dim);
 

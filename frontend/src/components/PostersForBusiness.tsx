@@ -174,14 +174,24 @@ export default function PostersForBusiness({ business }: { business: Business })
 
           <div className="mt-3 flex items-center justify-between gap-3 text-[11px] text-ink-400">
             <span>Made {new Date(open.poster.generatedAt).toLocaleDateString()}</span>
-            <button
-              onClick={() => generate(open.design, true)}
-              disabled={working !== ""}
-              className="inline-flex items-center gap-1 font-semibold text-brand-700 hover:underline disabled:opacity-50"
-            >
-              {working === "again" ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
-              {working === "again" ? "Making a new one…" : "Make a new one"}
-            </button>
+            {/* Compositing is deterministic: the same design and the same shop
+                give the same poster every time, so "make a new one" could only
+                ever hand back an identical file — a button that looks broken
+                however many times it is pressed. It is offered only when an
+                image model is drawing, where each run really does differ.
+                A design the admin has edited is remade automatically. */}
+            {open.poster.engine === "openai" ? (
+              <button
+                onClick={() => generate(open.design, true)}
+                disabled={working !== ""}
+                className="inline-flex items-center gap-1 font-semibold text-brand-700 hover:underline disabled:opacity-50"
+              >
+                {working === "again" ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+                {working === "again" ? "Making a new one…" : "Make a new one"}
+              </button>
+            ) : (
+              <span>Updates on its own when Markkito changes the design</span>
+            )}
           </div>
 
           <p className="mt-2 text-center text-[11px] text-ink-400">

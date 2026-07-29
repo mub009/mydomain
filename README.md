@@ -246,7 +246,7 @@ designed, and the form is exactly that:
 |---|---|
 | **Design name** | What to call it — "Diwali 2026 — jewellery" |
 | **Category** | Which trade it is for — or *All categories*, for everyone |
-| **Image file** | The design itself: PNG, JPEG, WebP or GIF, up to 4MB |
+| **Image file** | The design itself: PNG, JPEG, WebP or GIF, up to 4MB. Any shape — the poster takes the artwork's own proportions |
 | **AI prompt** | The prompt, written once with `@tokens` for the business data |
 
 Under the category the editor says **how many businesses will see it**, and
@@ -332,12 +332,27 @@ a vector one.
 The result is **kept once made**, so opening it again is instant and costs
 nothing — but a copy made before the admin last edited the design is stale, and
 is remade automatically. Editing a design therefore reaches everyone who
-already opened it, rather than leaving them holding the withdrawn artwork. "Make a new one" is the only thing that spends the work again, which
+already opened it, rather than leaving them holding the withdrawn artwork.
+
+**"Make a new one" appears only under an image model.** Compositing is
+deterministic: the same design and the same shop give the same poster every
+time, so the button could only ever hand back an identical file — one that
+looks broken however many times it is pressed. Under `openai`, where each run
+really does differ, it is offered. "Make a new one" is the only thing that spends the work again, which
 matters when an image model is doing the drawing: that is money and seconds per
 poster, and a shop clicking through its list should not trigger either.
 
 Targeting is re-checked here as an entitlement, not just used as a list filter,
 so a guessed design id cannot fetch a poster meant for another trade or town.
+
+**The artwork sets the page.** Its pixel dimensions are read from the file's
+own header (no image library — each format states its size in the first few
+bytes; JPEG has its segments walked), and the poster is drawn at that shape.
+Fitting a design to a preset frame instead would crop it, and what a designer
+puts at the edge — a logo box, a phone number — is exactly what a shop notices
+missing. Print-resolution files are scaled down to 2000px on the long side,
+since the frame is also the canvas the browser rasterises for the PNG; the
+artwork itself is embedded unscaled, so nothing is lost from the picture.
 
 ### Two image engines
 

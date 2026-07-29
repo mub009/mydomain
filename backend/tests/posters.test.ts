@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { PosterSize } from "@prisma/client";
 import { escapeXml, fitText, initials } from "@/modules/posters/text";
 import { displayPhone, fillPlaceholders, PosterSubject, unknownPlaceholders } from "@/modules/posters/placeholders";
-import { POSTER_LAYOUTS, POSTER_SIZES, renderPosterSvg, resolveLayout } from "@/modules/posters/layouts";
+import { POSTER_LAYOUTS, POSTER_SIZES, posterFrame, renderPosterSvg, resolveLayout } from "@/modules/posters/layouts";
 import { PALETTES, resolvePalette } from "@/modules/posters/palettes";
 import { offlineBands, offlineSuggestions } from "@/modules/posters/copywriter";
 import { MAX_ARTWORK_BYTES, readUploadedImage } from "@/modules/posters/upload";
@@ -12,6 +12,7 @@ import { env } from "@/config/env";
 import { businessQrDataUrl, clearQrCache } from "@/modules/posters/qr";
 import { promptWantsQr, qrCornerFromPrompt } from "@/modules/posters/placeholders";
 import { generatePosterImage, openAiConfigured } from "@/modules/posters/imageEngine";
+import { dataUriDimensions, imageDimensions } from "@/modules/posters/imageSize";
 
 const subject: PosterSubject = {
   name: "Spice Route Kitchen",
@@ -890,5 +891,113 @@ describe("a stored copy is stale once the design changes", () => {
   it("reuses a copy made in the same instant as the edit", () => {
     const now = at("2026-07-29T12:00:00Z");
     expect(isCurrent(now, now)).toBe(true);
+  });
+});
+
+// A designer's artwork is finished work. Fitting it to a preset frame crops
+// whatever does not fit, and what sits at the edge — a logo box, a phone
+// number — is exactly what a shop notices missing. So the frame is read from
+// the file, and these are the bytes it has to read it out of.
+describe("imageDimensions", () => {
+  // Encoders write real headers; hand-written bytes only prove the parser
+  // agrees with whoever wrote the test.
+  const png = (dataUrl: string) => Buffer.from(dataUrl.split(",")[1], "base64");
+
+  it("reads a PNG written by a real encoder", async () => {
+    const qr = await QRCode.toDataURL("https://markkito.test/business/spice-route-kitchen", { width: 640, margin: 1 });
+    expect(imageDimensions(png(qr))).toEqual({ width: 640, height: 640 });
+  });
+
+  it("reads a GIF header", () => {
+    // GIF87a, 1080 x 1350 little-endian.
+    const buffer = Buffer.alloc(16);
+    buffer.write("GIF87a", 0, "ascii");
+    buffer.writeUInt16LE(1080, 6);
+    buffer.writeUInt16LE(1350, 8);
+    expect(imageDimensions(buffer)).toEqual({ width: 1080, height: 1350 });
+  });
+
+  it("walks past JPEG metadata to the frame header", () => {
+    // Two metadata segments of different lengths ahead of the SOF0, which is
+    // the case a fixed offset gets wrong.
+    const parts: Buffer[] = [Buffer.from([0xff, 0xd8])];
+    for (const size of [18, 132]) {
+      const segment = Buffer.alloc(2 + size);
+      segment.writeUInt8(0xff, 0);
+      segment.writeUInt8(0xe1, 1);
+      const body = Buffer.alloc(size);
+      body.writeUInt16BE(size, 0);
+      parts.push(segment.subarray(0, 2), body);
+    }
+    const sof = Buffer.alloc(11);
+    sof.writeUInt8(0xff, 0);
+    sof.writeUInt8(0xc0, 1);
+    sof.writeUInt16BE(9, 2);
+    sof.writeUInt8(8, 4);
+    sof.writeUInt16BE(1920, 5); // height
+    sof.writeUInt16BE(1080, 7); // width
+    parts.push(sof);
+
+    expect(imageDimensions(Buffer.concat(parts))).toEqual({ width: 1080, height: 1920 });
+  });
+
+  it("returns null rather than a guess for bytes it cannot measure", () => {
+    expect(imageDimensions(Buffer.from("not an image at all"))).toBeNull();
+    expect(imageDimensions(Buffer.alloc(4))).toBeNull();
+    // A PNG signature with a zeroed IHDR: a canvas of 0x0 is unusable.
+    const empty = Buffer.alloc(24);
+    Buffer.from("89504e470d0a1a0a", "hex").copy(empty, 0);
+    empty.write("IHDR", 12, "ascii");
+    expect(imageDimensions(empty)).toBeNull();
+  });
+
+  it("reads the size out of a stored data URI without decoding all of it", async () => {
+    const qr = await QRCode.toDataURL("https://markkito.test/a", { width: 320, margin: 1 });
+    expect(dataUriDimensions(qr)).toEqual({ width: 320, height: 320 });
+    expect(dataUriDimensions(null)).toBeNull();
+    expect(dataUriDimensions("https://example.com/a.png")).toBeNull();
+  });
+});
+
+describe("posterFrame", () => {
+  it("keeps the artwork's own shape", () => {
+    expect(posterFrame("PORTRAIT", { width: 1080, height: 1920 })).toEqual({ width: 1080, height: 1920 });
+    expect(posterFrame("PORTRAIT", { width: 2480, height: 3508 })).toEqual({ width: 1414, height: 2000 });
+  });
+
+  it("falls back to the preset when there is no artwork to measure", () => {
+    expect(posterFrame("SQUARE", null)).toEqual(POSTER_SIZES.SQUARE);
+    expect(posterFrame("STORY", null)).toEqual(POSTER_SIZES.STORY);
+  });
+
+  // The frame is also the canvas the browser rasterises, so a print-resolution
+  // template must not turn into a 50-megapixel export.
+  it("scales an oversized template down without changing its proportions", () => {
+    const frame = posterFrame("PORTRAIT", { width: 6000, height: 4000 });
+    expect(Math.max(frame.width, frame.height)).toBe(2000);
+    expect(frame.width / frame.height).toBeCloseTo(1.5, 2);
+  });
+});
+
+// The bug this was written for: a 9:16 template rendered into the 4:5 preset
+// lost a fifth of its width off both edges.
+describe("artwork is not cropped into a preset", () => {
+  it("renders at the artwork's ratio, not the preset's", () => {
+    const story = { width: 1080, height: 1920 };
+    const { width, height } = renderPosterSvg(
+      {
+        size: "PORTRAIT",
+        dimensions: posterFrame("PORTRAIT", story),
+        palette: PALETTES[0],
+        copy: { headline: "", subheadline: "", ctaText: "", badgeText: "", footnote: "", headerText: "", footerText: "" },
+        subject,
+        logoHref: null,
+        backgroundHref: "data:image/png;base64,AAAA",
+      },
+      "artwork",
+    );
+
+    expect({ width, height }).toEqual(story);
+    expect(height / width).not.toBeCloseTo(POSTER_SIZES.PORTRAIT.height / POSTER_SIZES.PORTRAIT.width, 2);
   });
 });
