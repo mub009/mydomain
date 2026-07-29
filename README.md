@@ -123,8 +123,8 @@ cd backend && npm test
 - **WhatsApp broadcasts** — a shop links its own WhatsApp number by scanning a
   QR code, imports customers from an .xlsx file, saves reusable templates with
   `{{name}}`-style placeholders, and sends a campaign. See below.
-- **Poster Studio** — admins catalogue posters: name, category, designer, the
-  design file and the prompt it came from. See below.
+- **Poster Studio** — admins catalogue posters: name, category, the image file
+  and the prompt it came from. See below.
 
 ## WhatsApp broadcasts
 
@@ -238,39 +238,33 @@ number.
 
 ### Admin — cataloguing a poster
 
-Admin console → **Posters** → **New poster**. A poster is a file somebody
-designed, and the admin form is exactly that:
+Admin console → **Posters** → **New poster**. A poster is an image somebody
+designed, and the form is exactly that:
 
 | Field | |
 |---|---|
 | **Design name** | What to call it — "Diwali 2026 — jewellery" |
 | **Category** | Which trade it is for |
-| **Designer** | Pick someone already on file, or type a new name |
-| **Artwork / design file** | The finished poster: PNG, JPEG, WebP or GIF, up to 4MB |
+| **Image file** | The design itself: PNG, JPEG, WebP or GIF, up to 4MB |
 | **AI prompt** | The prompt it came from, kept for reference and for regenerating the design later |
 
-Save as a draft or publish it. Nothing about layout, colour or wording is asked
-for: a poster is catalogued, not composed.
+Save as a draft or publish it. Nothing about layout, colour or wording is
+asked for: a poster is catalogued, not composed. Who filed it is recorded on
+the row automatically, so nobody has to be picked from a list.
 
-**Designers are rows, not free text.** "Select or enter" means the same person
-arrives as an id one day and as a typed name the next; the server looks the
-name up before creating one, so `Ravi Kumar` stays a single designer with a
-poster count rather than a row per upload. The lookup is case-insensitive
-because the column is `utf8mb4_unicode_ci` — "ravi kumar" finds him too.
-
-**The prompt is stored, not executed.** It is the record of what was asked for.
-Regeneration from it is a later step.
+**The prompt is stored, not executed.** It is the record of what was asked
+for. Regeneration from it is a later step.
 
 Uploads are judged on their **bytes**, not the mimetype the browser claims — a
 text file renamed `.png` is refused. SVG is refused outright: it is a document
 that can carry script, and it would be embedded in a document the platform
 serves from its own origin. With no object storage here the image is kept
-inline on the row as a data URI, which is also what the browser needs to export
-a PNG from the rendered poster. The design body therefore outgrows the 1mb JSON
-limit, so the poster routes get a larger parser, registered ahead of the global
-one the way the Stripe webhook already is; and the list query excludes the
-artwork column, because twenty-five rows of inline image is not a list
-response.
+inline on the row as a data URI, which is also what the browser needs to
+export a PNG from the rendered poster. The design body therefore outgrows the
+1mb JSON limit, so the poster routes get a larger parser, registered ahead of
+the global one the way the Stripe webhook already is; and the list query
+excludes the image column, because twenty-five rows of inline image is not a
+list response.
 
 ### Rendering — still to come
 

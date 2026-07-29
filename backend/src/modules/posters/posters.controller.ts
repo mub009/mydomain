@@ -59,15 +59,6 @@ export async function uploadArtworkHandler(req: Request, res: Response): Promise
   ok(res, readUploadedImage(req.file));
 }
 
-export async function listDesignersHandler(_req: Request, res: Response): Promise<void> {
-  ok(res, await postersService.listDesigners());
-}
-
-export async function createDesignerHandler(req: Request, res: Response): Promise<void> {
-  const id = await postersService.resolveDesigner({ designerName: req.body.name });
-  created(res, await postersService.getDesigner(id));
-}
-
 export async function designUsageHandler(req: Request, res: Response): Promise<void> {
   ok(res, await postersService.designUsage(req.params.id));
 }

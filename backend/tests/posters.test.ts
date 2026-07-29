@@ -548,27 +548,3 @@ describe("bands match the artwork", () => {
     }
   });
 });
-
-// "Select or enter the designer" means the same person arrives as an id one
-// day and as a typed name the next. The one thing that must not happen is a
-// designer row per poster.
-describe("designer field", () => {
-  // The service resolves against the database; these cover the pure decision
-  // it makes before it gets there.
-  const decide = (input: { designerId?: string | null; designerName?: string | null }) =>
-    input.designerId ? "by-id" : input.designerName?.trim() ? "by-name" : "none";
-
-  it("prefers the picked designer over anything typed", () => {
-    expect(decide({ designerId: "abc", designerName: "Ravi" })).toBe("by-id");
-  });
-
-  it("falls back to the typed name", () => {
-    expect(decide({ designerName: "Ravi Kumar" })).toBe("by-name");
-  });
-
-  it("treats blank or whitespace as not credited", () => {
-    expect(decide({})).toBe("none");
-    expect(decide({ designerName: "   " })).toBe("none");
-    expect(decide({ designerId: null, designerName: null })).toBe("none");
-  });
-});

@@ -138,68 +138,12 @@ export async function renderForBusiness(design: PosterDesign, business: Business
 }
 
 // ---------------------------------------------------------------------------
-// Designers
-// ---------------------------------------------------------------------------
-
-export async function listDesigners() {
-  return prisma.posterDesigner.findMany({
-    orderBy: { name: "asc" },
-    select: { id: true, name: true, _count: { select: { designs: true } } },
-  });
-}
-
-export async function getDesigner(id: string | null) {
-  if (!id) throw AppError.badRequest("A designer name is required");
-  const designer = await prisma.posterDesigner.findUnique({
-    where: { id },
-    select: { id: true, name: true, _count: { select: { designs: true } } },
-  });
-  if (!designer) throw AppError.notFound("Designer not found");
-  return designer;
-}
-
-/**
- * Turns whatever the admin typed or picked into a designer id.
- *
- * The form is "select or enter", so the same person arrives sometimes as an
- * id and sometimes as a name typed again. Looking the name up first keeps
- * "Ravi Kumar" one designer rather than a row per poster — and because the
- * column is utf8mb4_unicode_ci, "ravi kumar" finds it too.
- */
-export async function resolveDesigner(input: { designerId?: string | null; designerName?: string | null }) {
-  if (input.designerId) {
-    const found = await prisma.posterDesigner.findUnique({ where: { id: input.designerId } });
-    if (!found) throw AppError.badRequest("That designer no longer exists");
-    return found.id;
-  }
-
-  const name = input.designerName?.trim();
-  if (!name) return null;
-
-  const existing = await prisma.posterDesigner.findFirst({ where: { name } });
-  if (existing) return existing.id;
-
-  // Two admins adding the same new designer at once would otherwise collide
-  // on the unique name; the second just gets the row the first created.
-  try {
-    return (await prisma.posterDesigner.create({ data: { name } })).id;
-  } catch {
-    const raced = await prisma.posterDesigner.findFirst({ where: { name } });
-    if (raced) return raced.id;
-    throw AppError.badRequest("That designer could not be saved");
-  }
-}
-
-// ---------------------------------------------------------------------------
 // Admin
 // ---------------------------------------------------------------------------
 
 export interface DesignInput {
   name: string;
   description?: string | null;
-  /** Either of these identifies the designer; see `resolveDesigner`. */
-  designerId?: string | null;
-  designerName?: string | null;
   layout?: string;
   palette?: string;
   size?: PosterSize;
@@ -284,8 +228,6 @@ export async function listDesigns(query: { page?: number; pageSize?: number; sea
         isPublished: true,
         aiPrompt: true,
         aiEngine: true,
-        designerId: true,
-        designer: { select: { id: true, name: true } },
         createdAt: true,
         updatedAt: true,
         category: { select: { id: true, name: true } },
@@ -327,10 +269,7 @@ export async function listDesigns(query: { page?: number; pageSize?: number; sea
 export async function getDesign(id: string) {
   const design = await prisma.posterDesign.findUnique({
     where: { id },
-    include: {
-      category: { select: { id: true, name: true } },
-      designer: { select: { id: true, name: true } },
-    },
+    include: { category: { select: { id: true, name: true } } },
   });
   if (!design) throw AppError.notFound("Poster design not found");
   return { ...design, warnings: warningsFor(design) };
@@ -344,13 +283,10 @@ async function assertCategoryExists(categoryId: string | null | undefined): Prom
 
 export async function createDesign(actor: Actor, input: DesignInput) {
   await assertCategoryExists(input.categoryId);
-  const designerId = await resolveDesigner(input);
-
   const design = await prisma.posterDesign.create({
     data: {
       name: input.name,
       description: input.description ?? null,
-      designerId,
       // An uploaded file is the normal case now; the drawn layouts are only
       // reached by naming one explicitly.
       layout: input.layout ?? "artwork",
@@ -388,14 +324,10 @@ export async function updateDesign(id: string, input: Partial<DesignInput>) {
   if (!existing) throw AppError.notFound("Poster design not found");
   if (input.categoryId !== undefined) await assertCategoryExists(input.categoryId);
 
-  const designerTouched = input.designerId !== undefined || input.designerName !== undefined;
-  const designerId = designerTouched ? await resolveDesigner(input) : undefined;
-
   const design = await prisma.posterDesign.update({
     where: { id },
     data: {
       ...(input.name !== undefined ? { name: input.name } : {}),
-      ...(designerId !== undefined ? { designerId } : {}),
       ...(input.description !== undefined ? { description: input.description } : {}),
       ...(input.layout !== undefined ? { layout: input.layout } : {}),
       ...(input.palette !== undefined ? { palette: input.palette } : {}),
@@ -554,7 +486,7 @@ export async function listForBusiness(actor: Actor, businessId: string) {
       ],
     },
     orderBy: { updatedAt: "desc" },
-    include: { category: { select: { name: true } }, designer: { select: { name: true } } },
+    include: { category: { select: { name: true } } },
   });
 
   const renders = await prisma.posterRender.findMany({
@@ -575,7 +507,6 @@ export async function listForBusiness(actor: Actor, businessId: string) {
       dimensions: POSTER_SIZES[design.size],
       updatedAt: design.updatedAt,
       hasArtwork: Boolean(design.artworkUrl),
-      designer: design.designer?.name ?? null,
       forCategory: design.category?.name ?? null,
       forCity: design.city,
       downloads: byDesign.get(design.id)?.downloads ?? 0,

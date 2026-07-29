@@ -3,7 +3,6 @@ import { Image as ImageIcon, Loader2, Plus, Search, Trash2, Upload } from "lucid
 import {
   categoriesApi,
   PosterDesign,
-  PosterDesigner,
   PosterStudioOptions,
   postersApi,
 } from "@/api/endpoints";
@@ -16,18 +15,16 @@ import Pagination from "@/components/Pagination";
 /**
  * Poster Studio — admin side.
  *
- * A poster is a file somebody designed, filed under a category and credited to
- * its designer, with the prompt it came from kept alongside it. That is the
- * whole of it: five fields. The platform's own rendering — the bands, the
- * logo, the per-business details — is a later step and deliberately not a
- * decision the admin has to make while cataloguing artwork.
+ * A poster is an image file, filed under a category, with the prompt it came
+ * from kept alongside it. That is the whole of it. The platform's own
+ * rendering — the bands, the logo, the per-business details — is a later step
+ * and deliberately not a decision the admin has to make while cataloguing
+ * artwork.
  */
 
 interface PosterForm {
   name: string;
   categoryId: string;
-  designerId: string;
-  designerName: string;
   artworkUrl: string;
   aiPrompt: string;
   isPublished: boolean;
@@ -36,8 +33,6 @@ interface PosterForm {
 const BLANK: PosterForm = {
   name: "",
   categoryId: "",
-  designerId: "",
-  designerName: "",
   artworkUrl: "",
   aiPrompt: "",
   isPublished: false,
@@ -47,8 +42,6 @@ function toForm(design: PosterDesign): PosterForm {
   return {
     name: design.name,
     categoryId: design.categoryId ?? "",
-    designerId: design.designerId ?? "",
-    designerName: "",
     artworkUrl: design.artworkUrl ?? "",
     aiPrompt: design.aiPrompt ?? "",
     isPublished: design.isPublished,
@@ -57,67 +50,15 @@ function toForm(design: PosterDesign): PosterForm {
 
 // ---------------------------------------------------------------------------
 
-/**
- * "Select or enter the designer": a dropdown of the people already on file,
- * plus a text box that appears when none of them is the right answer. The
- * server turns either into a designer row, so a name typed twice is still one
- * designer.
- */
-function DesignerField({
-  designers,
-  form,
-  onChange,
-}: {
-  designers: PosterDesigner[];
-  form: PosterForm;
-  onChange: (patch: Partial<PosterForm>) => void;
-}) {
-  const adding = form.designerId === "__new";
-
-  return (
-    <div>
-      <label className="mb-1 block text-xs font-semibold text-ink-700">Designer</label>
-      <select
-        className="input"
-        value={form.designerId}
-        onChange={(e) => onChange({ designerId: e.target.value, designerName: "" })}
-      >
-        <option value="">Not credited</option>
-        {designers.map((designer) => (
-          <option key={designer.id} value={designer.id}>
-            {designer.name}
-            {designer._count ? ` (${designer._count.designs})` : ""}
-          </option>
-        ))}
-        <option value="__new">+ Add a new designer…</option>
-      </select>
-
-      {adding && (
-        <input
-          autoFocus
-          className="input mt-2"
-          placeholder="Designer's name"
-          value={form.designerName}
-          onChange={(e) => onChange({ designerName: e.target.value })}
-        />
-      )}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-
 function PosterEditor({
   options,
   categories,
-  designers,
   existing,
   onClose,
   onSaved,
 }: {
   options: PosterStudioOptions;
   categories: Category[];
-  designers: PosterDesigner[];
   existing: PosterDesign | null;
   onClose: () => void;
   onSaved: (message: string) => void;
@@ -157,7 +98,7 @@ function PosterEditor({
   const missing = [
     !form.name.trim() && "a design name",
     !form.categoryId && "a category",
-    !form.artworkUrl && "the artwork file",
+    !form.artworkUrl && "the image file",
   ].filter(Boolean) as string[];
 
   async function save(publish?: boolean) {
@@ -167,10 +108,6 @@ function PosterEditor({
     const payload = {
       name: form.name.trim(),
       categoryId: form.categoryId || null,
-      // Only one of these is sent: an id for someone on file, a name for
-      // someone new. "Not credited" clears it.
-      designerId: form.designerId && form.designerId !== "__new" ? form.designerId : null,
-      designerName: form.designerId === "__new" ? form.designerName.trim() || null : null,
       artworkUrl: form.artworkUrl || null,
       aiPrompt: form.aiPrompt.trim() || null,
       isPublished: publish ?? form.isPublished,
@@ -204,24 +141,16 @@ function PosterEditor({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-xs font-semibold text-ink-700">Category</label>
-              <select
-                className="input"
-                value={form.categoryId}
-                onChange={(e) => patch({ categoryId: e.target.value })}
-              >
-                <option value="">Choose a category…</option>
-                {categories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <DesignerField designers={designers} form={form} onChange={patch} />
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-ink-700">Category</label>
+            <select className="input" value={form.categoryId} onChange={(e) => patch({ categoryId: e.target.value })}>
+              <option value="">Choose a category…</option>
+              {categories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div>
@@ -266,7 +195,7 @@ function PosterEditor({
         {/* Artwork */}
         <div>
           <div className="mb-1 flex items-center justify-between">
-            <label className="text-xs font-semibold text-ink-700">Artwork / design file</label>
+            <label className="text-xs font-semibold text-ink-700">Image file</label>
             {form.artworkUrl && (
               <button type="button" onClick={() => patch({ artworkUrl: "" })} className="text-xs text-red-700 hover:underline">
                 Remove
@@ -283,7 +212,7 @@ function PosterEditor({
           ) : (
             <label className="flex h-56 cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 px-3 text-center text-sm text-ink-500 hover:border-brand-500 hover:text-brand-700">
               {uploading ? <Loader2 size={18} className="animate-spin" /> : <Upload size={18} />}
-              {uploading ? "Uploading…" : "Upload the design"}
+              {uploading ? "Uploading…" : "Upload the image"}
               <span className="text-[11px] text-ink-400">
                 PNG, JPEG, WebP or GIF · up to {Math.round(options.maxArtworkBytes / 1024 / 1024)}MB
               </span>
@@ -298,7 +227,7 @@ function PosterEditor({
 
           {form.artworkUrl && (
             <label className="mt-2 flex cursor-pointer items-center justify-center gap-1.5 rounded-md border border-gray-200 py-1.5 text-xs text-ink-600 hover:border-brand-500 hover:text-brand-700">
-              <Upload size={13} /> Replace file
+              <Upload size={13} /> Replace image
               <input
                 type="file"
                 accept="image/png,image/jpeg,image/webp,image/gif"
@@ -318,7 +247,6 @@ function PosterEditor({
 export default function PostersPanel() {
   const [options, setOptions] = useState<PosterStudioOptions | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [designers, setDesigners] = useState<PosterDesigner[]>([]);
   const [designs, setDesigns] = useState<PosterDesign[]>([]);
   const [search, setSearch] = useState("");
   const [publishedFilter, setPublishedFilter] = useState("");
@@ -342,14 +270,9 @@ export default function PostersPanel() {
       .finally(() => setLoading(false));
   }
 
-  function loadDesigners() {
-    postersApi.designers().then(setDesigners).catch(() => setDesigners([]));
-  }
-
   useEffect(() => {
     postersApi.options().then(setOptions).catch(() => setOptions(null));
     categoriesApi.list().then(setCategories).catch(() => setCategories([]));
-    loadDesigners();
   }, []);
 
   useEffect(() => {
@@ -435,8 +358,6 @@ export default function PostersPanel() {
                 </div>
                 <p className="mt-0.5 text-[11px] text-ink-500">
                   {design.category?.name ?? "No category"}
-                  {" · "}
-                  {design.designer?.name ?? "Not credited"}
                   {design.businessesUsing ? ` · ${design.businessesUsing} shops, ${design.downloads} downloads` : ""}
                 </p>
                 {design.aiPrompt && (
@@ -462,7 +383,7 @@ export default function PostersPanel() {
           {designs.length === 0 && (
             <div className="p-8 text-center text-sm text-ink-500">
               <ImageIcon size={20} className="mx-auto mb-2 text-ink-300" />
-              No posters yet. Add one — name it, file it under a category, credit the designer and upload the design.
+              No posters yet. Add one — name it, file it under a category and upload the image.
             </div>
           )}
         </div>
@@ -473,13 +394,11 @@ export default function PostersPanel() {
         <PosterEditor
           options={options}
           categories={categories}
-          designers={designers}
           existing={editing}
           onClose={close}
           onSaved={(message) => {
             setNotice(message);
             close();
-            loadDesigners();
             load();
           }}
         />

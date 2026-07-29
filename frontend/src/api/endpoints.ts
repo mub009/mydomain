@@ -570,8 +570,6 @@ export interface PosterDesign {
   categoryId: string | null;
   city: string | null;
   isPublished: boolean;
-  designerId: string | null;
-  designer?: { id: string; name: string } | null;
   aiPrompt: string | null;
   aiEngine: string | null;
   updatedAt: string;
@@ -622,12 +620,6 @@ export interface RenderedPoster {
   logoEmbedded: boolean;
 }
 
-export interface PosterDesigner {
-  id: string;
-  name: string;
-  _count?: { designs: number };
-}
-
 export interface PosterPreviewBusiness {
   id: string;
   name: string;
@@ -640,9 +632,6 @@ export const postersApi = {
   options: () => api.get<ApiResponse<PosterStudioOptions>>("/admin/posters/options").then((r) => r.data.data),
   list: (params: Record<string, unknown> = {}) =>
     api.get<PaginatedResponse<PosterDesign>>("/admin/posters", { params }).then((r) => r.data),
-  designers: () => api.get<ApiResponse<PosterDesigner[]>>("/admin/posters/designers").then((r) => r.data.data),
-  createDesigner: (name: string) =>
-    api.post<ApiResponse<PosterDesigner>>("/admin/posters/designers", { name }).then((r) => r.data.data),
   // The only call that returns the uploaded artwork itself.
   get: (id: string) => api.get<ApiResponse<PosterDesign>>(`/admin/posters/${id}`).then((r) => r.data.data),
   create: (payload: Record<string, unknown>) =>

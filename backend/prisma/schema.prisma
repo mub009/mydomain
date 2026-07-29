@@ -913,11 +913,6 @@ model PosterDesign {
   palette     String     @default("crimson") @db.VarChar(50)
   size        PosterSize @default(PORTRAIT)
 
-  // Who drew it. A poster is somebody's work and the credit is worth keeping
-  // — for attribution, and so an admin can find everything one designer made.
-  designerId String?        @db.VarChar(36)
-  designer   PosterDesigner? @relation(fields: [designerId], references: [id], onDelete: SetNull)
-
   // Wording. May contain {{business}}, {{phone}}, {{city}} … placeholders,
   // which are filled per business at render time. Optional: a poster whose
   // artwork already carries its message needs none of it.
@@ -976,24 +971,10 @@ model PosterDesign {
   renders PosterRender[]
 
   @@index([isPublished, categoryId])
-  @@index([designerId])
   @@map("poster_designs")
 }
 
 // One row per (design, business) that has actually been downloaded — the
-// Whoever made the artwork. Kept as a row rather than a free-text column so
-// the same person is one designer however many posters they supply, and so
-// the admin form can offer the people already on file.
-model PosterDesigner {
-  id        String   @id @default(uuid()) @db.VarChar(36)
-  name      String   @unique @db.VarChar(120)
-  createdAt DateTime @default(now())
-
-  designs PosterDesign[]
-
-  @@map("poster_designers")
-}
-
 // One row per (design, business) that has actually been downloaded — the
 // usage report, not a cache of the artwork.
 model PosterRender {

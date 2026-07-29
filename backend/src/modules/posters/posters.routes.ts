@@ -7,7 +7,6 @@ import {
   aiBriefSchema,
   bandBriefSchema,
   createDesignSchema,
-  designerSchema,
   listDesignsQuerySchema,
   previewBusinessQuerySchema,
   previewSchema,
@@ -18,11 +17,9 @@ import {
   aiSuggestHandler,
   businessPostersHandler,
   createDesignHandler,
-  createDesignerHandler,
   deleteDesignHandler,
   designUsageHandler,
   getDesignHandler,
-  listDesignersHandler,
   listDesignsHandler,
   previewBusinessesHandler,
   previewHandler,
@@ -55,10 +52,6 @@ adminPostersRouter.post("/posters/preview", validate({ body: previewSchema }), a
 adminPostersRouter.post("/posters/ai-suggest", validate({ body: aiBriefSchema }), asyncHandler(aiSuggestHandler));
 adminPostersRouter.post("/posters/ai-bands", validate({ body: bandBriefSchema }), asyncHandler(aiBandsHandler));
 adminPostersRouter.post("/posters/artwork", artwork.single("file"), asyncHandler(uploadArtworkHandler));
-
-// Designers — the "select or enter" list on the poster form.
-adminPostersRouter.get("/posters/designers", asyncHandler(listDesignersHandler));
-adminPostersRouter.post("/posters/designers", validate({ body: designerSchema }), asyncHandler(createDesignerHandler));
 
 adminPostersRouter.get("/posters", validate({ query: listDesignsQuerySchema }), asyncHandler(listDesignsHandler));
 adminPostersRouter.post("/posters", validate({ body: createDesignSchema }), asyncHandler(createDesignHandler));
