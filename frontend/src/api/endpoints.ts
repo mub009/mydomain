@@ -632,6 +632,18 @@ export const postersApi = {
   options: () => api.get<ApiResponse<PosterStudioOptions>>("/admin/posters/options").then((r) => r.data.data),
   list: (params: Record<string, unknown> = {}) =>
     api.get<PaginatedResponse<PosterDesign>>("/admin/posters", { params }).then((r) => r.data),
+  // The stored prompt with one business's details filled in.
+  resolvePrompt: (prompt: string, businessId?: string) =>
+    api
+      .post<
+        ApiResponse<{
+          business: { id: string; name: string; city: string };
+          prompt: string;
+          resolved: string;
+          unknown: string[];
+        }>
+      >("/admin/posters/resolve-prompt", { prompt, businessId })
+      .then((r) => r.data.data),
   // The only call that returns the uploaded artwork itself.
   get: (id: string) => api.get<ApiResponse<PosterDesign>>(`/admin/posters/${id}`).then((r) => r.data.data),
   create: (payload: Record<string, unknown>) =>

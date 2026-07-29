@@ -10,6 +10,7 @@ import {
   listDesignsQuerySchema,
   previewBusinessQuerySchema,
   previewSchema,
+  resolvePromptSchema,
   updateDesignSchema,
 } from "./posters.validation";
 import {
@@ -25,6 +26,7 @@ import {
   previewHandler,
   recordDownloadHandler,
   renderPosterHandler,
+  resolvePromptHandler,
   studioOptionsHandler,
   updateDesignHandler,
   uploadArtworkHandler,
@@ -52,6 +54,12 @@ adminPostersRouter.post("/posters/preview", validate({ body: previewSchema }), a
 adminPostersRouter.post("/posters/ai-suggest", validate({ body: aiBriefSchema }), asyncHandler(aiSuggestHandler));
 adminPostersRouter.post("/posters/ai-bands", validate({ body: bandBriefSchema }), asyncHandler(aiBandsHandler));
 adminPostersRouter.post("/posters/artwork", artwork.single("file"), asyncHandler(uploadArtworkHandler));
+// The stored prompt with one business's details filled in.
+adminPostersRouter.post(
+  "/posters/resolve-prompt",
+  validate({ body: resolvePromptSchema }),
+  asyncHandler(resolvePromptHandler),
+);
 
 adminPostersRouter.get("/posters", validate({ query: listDesignsQuerySchema }), asyncHandler(listDesignsHandler));
 adminPostersRouter.post("/posters", validate({ body: createDesignSchema }), asyncHandler(createDesignHandler));

@@ -28,15 +28,35 @@ export interface PlaceholderInfo {
 /** What the admin can drop into a headline, and what it turns into. Shown as
  *  clickable chips in the poster editor. */
 export const PLACEHOLDERS: PlaceholderInfo[] = [
-  { token: "business", label: "Business name", example: "Spice Route Kitchen" },
+  { token: "business_name", label: "Business name", example: "Spice Route Kitchen" },
   { token: "phone", label: "Phone number", example: "+91 98765 43210" },
   { token: "city", label: "City", example: "Kozhikode" },
+  { token: "state", label: "State", example: "Kerala" },
   { token: "category", label: "Category", example: "Restaurants" },
   { token: "address", label: "Street address", example: "12 Beach Road" },
   { token: "website", label: "Website", example: "spiceroute.example" },
+  { token: "email", label: "Email", example: "hi@spiceroute.example" },
   { token: "rating", label: "Average rating", example: "4.6" },
   { token: "reviews", label: "Review count", example: "128" },
 ];
+
+/**
+ * Older spellings kept working. `{{business}}` predates `@business_name`, and
+ * a design saved with it must not start printing the token instead of the
+ * shop's name.
+ */
+const ALIASES: Record<string, string> = {
+  business: "business_name",
+  name: "business_name",
+  businessname: "business_name",
+  mobile: "phone",
+  contact: "phone",
+};
+
+function canonical(token: string): string {
+  const key = token.toLowerCase();
+  return ALIASES[key] ?? key;
+}
 
 /** Formats a stored number the way it is printed on a board: +91 98765 43210. */
 export function displayPhone(raw: string): string {
@@ -50,16 +70,28 @@ export function displayPhone(raw: string): string {
 
 function values(subject: PosterSubject): Record<string, string> {
   return {
-    business: subject.name,
+    business_name: subject.name,
     phone: displayPhone(subject.phone),
     city: subject.city,
+    state: subject.state,
     category: subject.category,
     address: subject.address,
     website: (subject.website ?? "").replace(/^https?:\/\//, "").replace(/\/$/, ""),
+    email: subject.email ?? "",
     rating: subject.avgRating > 0 ? subject.avgRating.toFixed(1) : "",
     reviews: subject.reviewCount > 0 ? String(subject.reviewCount) : "",
   };
 }
+
+/**
+ * `@business_name` in a prompt, and `{{business_name}}` in poster wording.
+ *
+ * The `@` form needs the lookbehind: without it the address in
+ * `hi@spiceroute.example` reads as a token called `spiceroute`, and an admin
+ * who pastes an email into a prompt gets it mangled.
+ */
+const AT_TOKEN = /(?<![\w@])@([a-z_][a-z0-9_]*)/gi;
+const BRACE_TOKEN = /\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}/g;
 
 /**
  * Fills `{{token}}` placeholders. Spacing and case inside the braces are
@@ -73,12 +105,14 @@ function values(subject: PosterSubject): Record<string, string> {
 export function fillPlaceholders(template: string | null | undefined, subject: PosterSubject): string {
   if (!template) return "";
   const table = values(subject);
+  const fill = (match: string, token: string) => {
+    const key = canonical(token);
+    return key in table ? table[key] : match;
+  };
 
   return template
-    .replace(/\{\{\s*([a-zA-Z]+)\s*\}\}/g, (match, token: string) => {
-      const key = token.toLowerCase();
-      return key in table ? table[key] : match;
-    })
+    .replace(BRACE_TOKEN, fill)
+    .replace(AT_TOKEN, fill)
     .replace(/[ \t]{2,}/g, " ")
     .replace(/\s+([,.!?])/g, "$1")
     .replace(/([·|—–-])\s*$/g, "")
@@ -91,9 +125,10 @@ export function unknownPlaceholders(...texts: (string | null | undefined)[]): st
   const known = new Set(PLACEHOLDERS.map((p) => p.token));
   const found = new Set<string>();
   for (const text of texts) {
-    for (const match of (text ?? "").matchAll(/\{\{\s*([a-zA-Z]+)\s*\}\}/g)) {
-      const token = match[1].toLowerCase();
-      if (!known.has(token)) found.add(match[1]);
+    for (const pattern of [BRACE_TOKEN, AT_TOKEN]) {
+      for (const match of (text ?? "").matchAll(pattern)) {
+        if (!known.has(canonical(match[1]))) found.add(match[1]);
+      }
     }
   }
   return [...found];

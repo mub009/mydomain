@@ -75,13 +75,45 @@ describe("initials", () => {
 
 describe("placeholders", () => {
   it("fills the tokens a design is written with", () => {
-    expect(fillPlaceholders("{{business}} in {{city}} — call {{phone}}", subject)).toBe(
+    expect(fillPlaceholders("{{business_name}} in {{city}} — call {{phone}}", subject)).toBe(
       "Spice Route Kitchen in Kozhikode — call +91 98765 43210",
     );
   });
 
+  // The prompt carries business details as @tokens, so the same data can be
+  // handed to whatever generates the image.
+  it("fills @tokens the same way", () => {
+    expect(fillPlaceholders("Poster for @business_name in @city, phone @phone", subject)).toBe(
+      "Poster for Spice Route Kitchen in Kozhikode, phone +91 98765 43210",
+    );
+  });
+
+  it("mixes both syntaxes without complaint", () => {
+    expect(fillPlaceholders("@business_name — {{city}}", subject)).toBe("Spice Route Kitchen — Kozhikode");
+  });
+
+  // An admin pasting an email into a prompt must not have it eaten: the "@"
+  // there is an address, not a token.
+  it("leaves an email address alone", () => {
+    expect(fillPlaceholders("Write to hi@spiceroute.example about @city", subject)).toBe(
+      "Write to hi@spiceroute.example about Kozhikode",
+    );
+    expect(unknownPlaceholders("mail me at anil@example.com")).toEqual([]);
+  });
+
+  it("keeps the older {{business}} spelling working", () => {
+    expect(fillPlaceholders("{{business}}", subject)).toBe("Spice Route Kitchen");
+    expect(fillPlaceholders("@business", subject)).toBe("Spice Route Kitchen");
+    expect(unknownPlaceholders("{{business}} @mobile")).toEqual([]);
+  });
+
+  it("reports an @token nothing will fill", () => {
+    expect(unknownPlaceholders("@bussiness_name and @phone")).toEqual(["bussiness_name"]);
+    expect(fillPlaceholders("@bussiness_name", subject)).toBe("@bussiness_name");
+  });
+
   it("is forgiving about spacing and case", () => {
-    expect(fillPlaceholders("{{ Business }}", subject)).toBe("Spice Route Kitchen");
+    expect(fillPlaceholders("{{ Business_Name }}", subject)).toBe("Spice Route Kitchen");
   });
 
   // Blanking a typo would silently eat words; leaving it makes it visible in
@@ -350,7 +382,7 @@ describe("uploaded artwork", () => {
     ctaText: "",
     badgeText: "",
     footnote: "",
-    headerText: "{{business}}",
+    headerText: "{{business_name}}",
     footerText: "Trusted in {{city}}",
   };
 

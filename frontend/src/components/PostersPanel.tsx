@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Image as ImageIcon, Loader2, Plus, Search, Trash2, Upload } from "lucide-react";
 import {
   categoriesApi,
   PosterDesign,
+  PosterPreviewBusiness,
   PosterStudioOptions,
   postersApi,
 } from "@/api/endpoints";
@@ -68,6 +69,11 @@ function PosterEditor({
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
 
+  const [businesses, setBusinesses] = useState<PosterPreviewBusiness[]>([]);
+  const [previewFor, setPreviewFor] = useState("");
+  const [resolved, setResolved] = useState<{ resolved: string; unknown: string[] } | null>(null);
+  const promptRef = useRef<HTMLTextAreaElement>(null);
+
   const patch = (values: Partial<PosterForm>) => setForm((f) => ({ ...f, ...values }));
 
   // The list omits the uploaded file, so editing has to fetch the poster in
@@ -80,6 +86,49 @@ function PosterEditor({
       .catch(() => setError("The artwork on file could not be loaded — re-upload before saving."));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [existing]);
+
+  useEffect(() => {
+    postersApi
+      .previewBusinesses()
+      .then((rows) => {
+        setBusinesses(rows);
+        setPreviewFor((current) => current || rows[0]?.id || "");
+      })
+      .catch(() => setBusinesses([]));
+  }, []);
+
+  // Show the prompt as one real shop would receive it, so the tokens can be
+  // seen resolving before the poster is saved.
+  useEffect(() => {
+    if (!form.aiPrompt.trim()) {
+      setResolved(null);
+      return;
+    }
+    const id = setTimeout(() => {
+      postersApi
+        .resolvePrompt(form.aiPrompt, previewFor || undefined)
+        .then((result) => setResolved({ resolved: result.resolved, unknown: result.unknown }))
+        .catch(() => setResolved(null));
+    }, 400);
+    return () => clearTimeout(id);
+  }, [form.aiPrompt, previewFor]);
+
+  /** Drops a token in at the cursor rather than always at the end. */
+  function insertToken(token: string) {
+    const field = promptRef.current;
+    const snippet = `@${token}`;
+    if (!field) {
+      patch({ aiPrompt: `${form.aiPrompt} ${snippet}`.trim() });
+      return;
+    }
+    const { selectionStart, selectionEnd, value } = field;
+    const next = `${value.slice(0, selectionStart)}${snippet}${value.slice(selectionEnd)}`;
+    patch({ aiPrompt: next });
+    requestAnimationFrame(() => {
+      field.focus();
+      field.setSelectionRange(selectionStart + snippet.length, selectionStart + snippet.length);
+    });
+  }
 
   async function upload(file: File | undefined) {
     if (!file) return;
@@ -156,15 +205,59 @@ function PosterEditor({
           <div>
             <label className="mb-1 block text-xs font-semibold text-ink-700">AI prompt</label>
             <textarea
+              ref={promptRef}
               className="input h-28 resize-none"
-              placeholder="Diwali poster for jewellery shops — deep red and gold, diyas along the bottom, space kept clear top-right for a logo."
+              placeholder="Diwali poster for @business_name, a @category in @city. Deep red and gold, diyas along the bottom. Show the phone number @phone."
               value={form.aiPrompt}
               onChange={(e) => patch({ aiPrompt: e.target.value })}
             />
-            <p className="mt-1 text-[11px] leading-snug text-ink-500">
-              The prompt this design came from. Kept with the poster so it can be looked up later, or used as the
-              starting point when the design is regenerated.
+
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+              <span className="text-[11px] text-ink-500">Insert business data:</span>
+              {options.placeholders.map((placeholder) => (
+                <button
+                  key={placeholder.token}
+                  type="button"
+                  title={`${placeholder.label} — e.g. ${placeholder.example}`}
+                  onClick={() => insertToken(placeholder.token)}
+                  className="rounded-full bg-gray-100 px-2 py-0.5 font-mono text-[11px] text-ink-700 hover:bg-brand-50 hover:text-brand-700"
+                >
+                  @{placeholder.token}
+                </button>
+              ))}
+            </div>
+
+            <p className="mt-1.5 text-[11px] leading-snug text-ink-500">
+              Write it once with <span className="font-mono">@tokens</span> and each business's own details are filled
+              in when the image is made. The prompt is kept with the poster for reference and for regenerating it later.
             </p>
+
+            {form.aiPrompt.trim() && (
+              <div className="mt-2 rounded-lg border border-gray-200 bg-gray-50 p-2.5">
+                <div className="mb-1 flex items-center justify-between gap-2">
+                  <span className="text-[11px] font-semibold text-ink-600">Filled in for</span>
+                  <select
+                    className="max-w-[60%] truncate rounded border border-gray-200 bg-white px-1.5 py-0.5 text-[11px]"
+                    value={previewFor}
+                    onChange={(e) => setPreviewFor(e.target.value)}
+                  >
+                    {businesses.map((business) => (
+                      <option key={business.id} value={business.id}>
+                        {business.name} — {business.city}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <p className="whitespace-pre-wrap text-xs leading-snug text-ink-700">
+                  {resolved?.resolved ?? "…"}
+                </p>
+                {resolved?.unknown.length ? (
+                  <p className="mt-1.5 text-[11px] text-amber-700">
+                    Nothing will fill {resolved.unknown.map((t) => `@${t}`).join(", ")} — it stays as written.
+                  </p>
+                ) : null}
+              </div>
+            )}
           </div>
 
           {error && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}

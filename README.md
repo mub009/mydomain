@@ -246,14 +246,36 @@ designed, and the form is exactly that:
 | **Design name** | What to call it — "Diwali 2026 — jewellery" |
 | **Category** | Which trade it is for |
 | **Image file** | The design itself: PNG, JPEG, WebP or GIF, up to 4MB |
-| **AI prompt** | The prompt it came from, kept for reference and for regenerating the design later |
+| **AI prompt** | The prompt, written once with `@tokens` for the business data |
 
 Save as a draft or publish it. Nothing about layout, colour or wording is
 asked for: a poster is catalogued, not composed. Who filed it is recorded on
 the row automatically, so nobody has to be picked from a list.
 
-**The prompt is stored, not executed.** It is the record of what was asked
-for. Regeneration from it is a later step.
+#### Business data in the prompt
+
+The prompt is written once and used for every shop, so business details go in
+as `@tokens` and are filled in when the image is made:
+
+`@business_name` `@phone` `@city` `@state` `@category` `@address` `@website`
+`@email` `@rating` `@reviews`
+
+> Diwali poster for **@business_name**, a **@category** in **@city**. Deep red
+> and gold, diyas along the bottom. Show the phone **@phone**.
+
+Click a token to drop it in at the cursor, and the editor shows the prompt
+filled in for a real listing underneath, so the substitution can be seen before
+the poster is saved. A token nothing will fill is left as written and flagged
+rather than silently blanked.
+
+An `@` that is part of an email address is left alone — `hi@shop.example` does
+not become a token called `shop`. `{{business_name}}` still works too, and the
+older `{{business}}` spelling resolves to the same value, so designs saved
+before this change are unaffected.
+
+**The prompt is stored, not executed.** It is the record of what was asked for
+and the input for whatever generates the image; generating from it is a later
+step.
 
 Uploads are judged on their **bytes**, not the mimetype the browser claims — a
 text file renamed `.png` is refused. SVG is refused outright: it is a document

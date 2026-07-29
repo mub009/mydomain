@@ -420,6 +420,33 @@ export async function previewBusinesses(search?: string) {
   });
 }
 
+/**
+ * The prompt with a real shop's details filled in.
+ *
+ * The stored prompt is the template — "@business_name in @city, phone
+ * @phone" — and this is what it becomes for one business. It is what an image
+ * generator would be sent, and what the editor previews so the admin can see
+ * the tokens resolve before saving.
+ */
+export async function resolvePrompt(prompt: string, businessId?: string) {
+  const business = businessId
+    ? await prisma.business.findUnique({ where: { id: businessId }, ...BUSINESS_SELECT })
+    : await prisma.business.findFirst({
+        where: { status: "PUBLISHED" },
+        orderBy: { reviewCount: "desc" },
+        ...BUSINESS_SELECT,
+      });
+
+  if (!business) throw AppError.badRequest("No business available to resolve against");
+
+  return {
+    business: { id: business.id, name: business.name, city: business.city },
+    prompt,
+    resolved: fillPlaceholders(prompt, toSubject(business)),
+    unknown: unknownPlaceholders(prompt),
+  };
+}
+
 export async function aiSuggest(brief: CopyBrief) {
   return suggestCopy(brief);
 }

@@ -104,6 +104,11 @@ export const bandBriefSchema = z.object({
   count: z.coerce.number().int().min(1).max(5).default(3),
 });
 
+export const resolvePromptSchema = z.object({
+  prompt: z.string().max(4000),
+  businessId: z.string().uuid().optional(),
+});
+
 export const previewBusinessQuerySchema = z.object({
   search: z.string().max(100).optional(),
 });

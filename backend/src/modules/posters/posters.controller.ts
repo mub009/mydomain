@@ -46,6 +46,10 @@ export async function previewBusinessesHandler(req: Request, res: Response): Pro
   ok(res, await postersService.previewBusinesses(search));
 }
 
+export async function resolvePromptHandler(req: Request, res: Response): Promise<void> {
+  ok(res, await postersService.resolvePrompt(req.body.prompt, req.body.businessId));
+}
+
 export async function aiSuggestHandler(req: Request, res: Response): Promise<void> {
   ok(res, await postersService.aiSuggest(req.body));
 }
