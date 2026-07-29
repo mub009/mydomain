@@ -47,6 +47,10 @@ export interface RenderInput {
   bandStyle?: BandStyle;
   bandColor?: string | null;
   bandTextColor?: string | null;
+  /** Data URI for a QR to the shop's own page, or null when it is off. */
+  qrHref?: string | null;
+  qrPosition?: QrPosition;
+  qrScale?: number;
 }
 
 /**
@@ -99,6 +103,17 @@ export type LogoPosition = (typeof LOGO_POSITIONS)[number]["id"];
 
 export function resolveLogoPosition(value?: string | null): LogoPosition {
   return (LOGO_POSITIONS.find((p) => p.id === value)?.id ?? "header") as LogoPosition;
+}
+
+/** The corners a QR can take. It has no header slot, and defaulting it to one
+ *  would make an unset position mean "draw nothing" — which is how a QR turned
+ *  on by a design silently failed to appear. */
+export const QR_POSITIONS = LOGO_POSITIONS.filter((p) => p.id !== "header" && p.id !== "none");
+
+export type QrPosition = "top-left" | "top-right" | "bottom-left" | "bottom-right" | "center";
+
+export function resolveQrPosition(value?: string | null): QrPosition {
+  return (QR_POSITIONS.find((p) => p.id === value)?.id ?? "bottom-right") as QrPosition;
 }
 
 export interface PosterLayout {
@@ -944,6 +959,56 @@ const artwork: PosterLayout = {
           logoMark(input, spot.cx, spot.cy, logoR, p.accent, p.bgAlt, p.ink)
         : "";
 
+    // The QR is a square, so it is placed by its own box rather than by the
+    // logo's radius. It shares the corner vocabulary with the logo, which
+    // means the two can be pointed at the same place — see below.
+    const qrSize = W * 0.17 * Math.min(2, Math.max(0.5, input.qrScale ?? 1));
+    const qrPad = qrSize * 0.08;
+    const qrBox = qrSize + qrPad * 2;
+
+    const qrCorner = (corner: string): { x: number; y: number } | null => {
+      const top = (showHeader ? headerH * 1.35 : 0) + M;
+      const bottom = H - (showFooter ? footerH : 0) - M - qrBox;
+      switch (corner) {
+        case "top-left":
+          return { x: M, y: top };
+        case "top-right":
+          return { x: W - M - qrBox, y: top };
+        case "bottom-left":
+          return { x: M, y: bottom };
+        case "bottom-right":
+          return { x: W - M - qrBox, y: bottom };
+        case "center":
+          return { x: (W - qrBox) / 2, y: (H - qrBox) / 2 };
+        default:
+          return null;
+      }
+    };
+
+    /**
+     * Both the logo and the QR are placed by corner, so an admin can aim them
+     * at the same one. Rather than stacking them invisibly, the QR walks to
+     * the next corner — in a fixed order, so the result is predictable and the
+     * admin can see where it went instead of wondering where it is.
+     */
+    const qrPlacement = (() => {
+      if (!input.qrHref) return null;
+      const wanted = resolveQrPosition(input.qrPosition);
+
+      const taken = placement !== "header" && placement !== "none" ? placement : null;
+      const order = [wanted, "bottom-right", "bottom-left", "top-right", "top-left", "center"];
+      const free = order.find((corner) => corner !== taken) ?? wanted;
+      return qrCorner(free);
+    })();
+
+    const qr = qrPlacement
+      ? // A white plate: a QR needs its quiet zone and its contrast, and the
+        // artwork underneath offers neither.
+        `<rect x="${qrPlacement.x}" y="${qrPlacement.y}" width="${qrBox}" height="${qrBox}" rx="${qrBox * 0.08}" fill="#ffffff"/>` +
+        `<image href="${escapeXml(input.qrHref!)}" x="${qrPlacement.x + qrPad}" y="${qrPlacement.y + qrPad}" ` +
+        `width="${qrSize}" height="${qrSize}"/>`
+      : "";
+
     const footerLine = input.copy.footerText.trim();
 
     // The band belongs to the artwork, not to a palette chosen beside it. The
@@ -1007,6 +1072,7 @@ const artwork: PosterLayout = {
         : "",
 
       floatingLogo,
+      qr,
 
       showFooter
         ? band("foot", H - footerH * (style === "gradient" ? 1.6 : 1), footerH * (style === "gradient" ? 1.6 : 1), true) +

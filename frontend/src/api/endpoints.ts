@@ -567,6 +567,9 @@ export interface PosterDesign {
   bandStyle: string;
   bandColor: string | null;
   bandTextColor: string | null;
+  showQr: boolean;
+  qrPosition: string;
+  qrScale: number;
   categoryId: string | null;
   city: string | null;
   isPublished: boolean;
@@ -587,6 +590,7 @@ export interface PosterStudioOptions {
   placeholders: { token: string; label: string; example: string }[];
   logoPositions: { id: string; label: string }[];
   bandStyles: { id: string; label: string; hint: string }[];
+  qrPositions: { id: string; label: string }[];
   maxArtworkBytes: number;
   tones: string[];
   ai: { engine: PosterCopyEngine };

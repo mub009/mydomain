@@ -50,7 +50,7 @@ const REQUIRED_FIELDS: Record<string, string[]> = {
   BusinessSite: ["siteType", "templateId"],
   Business: ["preferredReviewChannel"],
   WhatsappSession: ["dailyLimit", "sendDelayMs", "windowStartHour", "autoOptOut"],
-  PosterDesign: ["artworkUrl", "headerText", "footerText", "logoPosition", "bandStyle", "bandColor", "aiPrompt"],
+  PosterDesign: ["artworkUrl", "headerText", "footerText", "logoPosition", "bandStyle", "bandColor", "aiPrompt", "showQr"],
 };
 
 export class StalePrismaClientError extends Error {

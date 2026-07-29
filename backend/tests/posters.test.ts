@@ -7,6 +7,9 @@ import { PALETTES, resolvePalette } from "@/modules/posters/palettes";
 import { offlineBands, offlineSuggestions } from "@/modules/posters/copywriter";
 import { MAX_ARTWORK_BYTES, readUploadedImage } from "@/modules/posters/upload";
 import { inlineImage } from "@/modules/posters/assets";
+import QRCode from "qrcode";
+import { env } from "@/config/env";
+import { businessQrDataUrl, clearQrCache } from "@/modules/posters/qr";
 
 const subject: PosterSubject = {
   name: "Spice Route Kitchen",
@@ -578,5 +581,115 @@ describe("bands match the artwork", () => {
       expect(svg, bad).not.toContain(bad);
       expect(svg).toContain(PALETTES[0].accent);
     }
+  });
+});
+
+// A QR to the shop's own page, printed on the poster so it can be scanned off
+// a phone screen or a shop window.
+describe("business QR", () => {
+  const art = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==";
+  const qr = "data:image/png;base64,UVJDT0RF";
+  const copy = {
+    headline: "",
+    subheadline: "",
+    ctaText: "",
+    badgeText: "",
+    footnote: "",
+    headerText: "Spice Route Kitchen",
+    footerText: "",
+  };
+
+  const render = (over: Record<string, unknown> = {}) =>
+    renderPosterSvg(
+      {
+        size: "PORTRAIT",
+        palette: PALETTES[0],
+        copy,
+        subject,
+        logoHref: null,
+        backgroundHref: art,
+        ...over,
+      } as Parameters<typeof renderPosterSvg>[0],
+      "artwork",
+    ).svg;
+
+  /** Where the QR's white plate ended up, or null when none was drawn. */
+  const plate = (svg: string) => {
+    const match = svg.match(/<rect x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="[\d.]+" rx="[\d.]+" fill="#ffffff"\/>/);
+    return match ? { x: Number(match[1]), y: Number(match[2]), size: Number(match[3]) } : null;
+  };
+
+  it("is absent until a design asks for it", () => {
+    expect(render()).not.toContain(qr);
+    expect(plate(render())).toBeNull();
+  });
+
+  it("prints on a white plate, because a QR needs its quiet zone", () => {
+    const svg = render({ qrHref: qr, qrPosition: "bottom-right" });
+    expect(svg).toContain(qr);
+    expect(plate(svg)).not.toBeNull();
+  });
+
+  it("goes to the corner it was given", () => {
+    const corners = ["top-left", "top-right", "bottom-left", "bottom-right", "center"] as const;
+    const spots = corners.map((qrPosition) => JSON.stringify(plate(render({ qrHref: qr, qrPosition }))));
+    expect(new Set(spots).size).toBe(corners.length);
+  });
+
+  it("scales with the setting", () => {
+    const small = plate(render({ qrHref: qr, qrScale: 0.5 }))!.size;
+    const large = plate(render({ qrHref: qr, qrScale: 2 }))!.size;
+    expect(large).toBeGreaterThan(small);
+  });
+
+  // Both are placed by corner, so an admin can aim them at the same one.
+  // Stacking them invisibly would be the worst outcome.
+  it("steps aside when the logo already has that corner", () => {
+    const clash = plate(render({ qrHref: qr, qrPosition: "bottom-right", logoPosition: "bottom-right" }))!;
+    const clear = plate(render({ qrHref: qr, qrPosition: "bottom-right", logoPosition: "header" }))!;
+    expect(clash.x).not.toBe(clear.x);
+  });
+
+  it("stays inside the poster wherever it is put, at any scale", () => {
+    for (const qrPosition of ["top-left", "top-right", "bottom-left", "bottom-right", "center"]) {
+      for (const qrScale of [0.5, 1, 2]) {
+        const box = plate(render({ qrHref: qr, qrPosition, qrScale }))!;
+        expect(box.x, `${qrPosition}@${qrScale}`).toBeGreaterThanOrEqual(0);
+        expect(box.y).toBeGreaterThanOrEqual(0);
+        expect(box.x + box.size).toBeLessThanOrEqual(1080);
+        expect(box.y + box.size).toBeLessThanOrEqual(1350);
+      }
+    }
+  });
+});
+
+// The QR is only useful if it points where it claims to. Regenerating the
+// expected code and comparing bytes proves the content, which eyeballing a
+// picture of a QR cannot.
+describe("businessQrDataUrl", () => {
+  const opts = {
+    margin: 1,
+    width: 640,
+    errorCorrectionLevel: "M" as const,
+    color: { dark: "#000000ff", light: "#ffffffff" },
+  };
+
+  it("encodes the shop's own Markkito page", async () => {
+    clearQrCache();
+    const expected = await QRCode.toDataURL(`${env.CLIENT_ORIGIN}/business/spice-route-kitchen`, opts);
+    await expect(businessQrDataUrl("spice-route-kitchen")).resolves.toBe(expected);
+  });
+
+  it("is a different code for a different shop", async () => {
+    clearQrCache();
+    const [a, b] = await Promise.all([businessQrDataUrl("shop-one"), businessQrDataUrl("shop-two")]);
+    expect(a).not.toBe(b);
+  });
+
+  // A listing with no slug has no page to point at; a QR to a 404 is worse
+  // than no QR.
+  it("returns nothing when there is no page to link to", async () => {
+    await expect(businessQrDataUrl(null)).resolves.toBeNull();
+    await expect(businessQrDataUrl("")).resolves.toBeNull();
   });
 });

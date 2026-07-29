@@ -247,6 +247,7 @@ designed, and the form is exactly that:
 | **Category** | Which trade it is for |
 | **Image file** | The design itself: PNG, JPEG, WebP or GIF, up to 4MB |
 | **AI prompt** | The prompt, written once with `@tokens` for the business data |
+| **Business QR** | Optional. Prints a QR to each shop's own Markkito page, in the corner you pick |
 
 Save as a draft or publish it. Nothing about layout, colour or wording is
 asked for: a poster is catalogued, not composed. Who filed it is recorded on
@@ -272,6 +273,19 @@ An `@` that is part of an email address is left alone — `hi@shop.example` does
 not become a token called `shop`. `{{business_name}}` still works too, and the
 older `{{business}}` spelling resolves to the same value, so designs saved
 before this change are unaffected.
+
+#### The business QR
+
+Switch it on and every shop's poster carries a QR to **its own** Markkito page
+(`/business/<slug>`) — the same destination the printed review boards use, so
+the URL is built in one place rather than two that can drift apart. It sits on
+a white plate, because a QR needs its quiet zone and its contrast and the
+artwork underneath offers neither.
+
+The logo and the QR are both placed by corner, so they can be aimed at the same
+one. Rather than stacking invisibly, the QR walks to the next free corner in a
+fixed order — predictable, and visible, instead of leaving the admin wondering
+where it went.
 
 **The prompt is stored, not executed.** It is the record of what was asked for
 and the input for whatever generates the image; generating from it is a later

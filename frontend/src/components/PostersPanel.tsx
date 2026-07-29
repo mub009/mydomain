@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Image as ImageIcon, Loader2, Plus, Search, Trash2, Upload } from "lucide-react";
+import { Image as ImageIcon, Loader2, Plus, QrCode, Search, Trash2, Upload } from "lucide-react";
 import {
   categoriesApi,
   PosterDesign,
@@ -28,6 +28,8 @@ interface PosterForm {
   categoryId: string;
   artworkUrl: string;
   aiPrompt: string;
+  showQr: boolean;
+  qrPosition: string;
   isPublished: boolean;
 }
 
@@ -36,6 +38,8 @@ const BLANK: PosterForm = {
   categoryId: "",
   artworkUrl: "",
   aiPrompt: "",
+  showQr: true,
+  qrPosition: "bottom-right",
   isPublished: false,
 };
 
@@ -45,6 +49,8 @@ function toForm(design: PosterDesign): PosterForm {
     categoryId: design.categoryId ?? "",
     artworkUrl: design.artworkUrl ?? "",
     aiPrompt: design.aiPrompt ?? "",
+    showQr: design.showQr ?? false,
+    qrPosition: design.qrPosition ?? "bottom-right",
     isPublished: design.isPublished,
   };
 }
@@ -159,6 +165,8 @@ function PosterEditor({
       categoryId: form.categoryId || null,
       artworkUrl: form.artworkUrl || null,
       aiPrompt: form.aiPrompt.trim() || null,
+      showQr: form.showQr,
+      qrPosition: form.qrPosition,
       isPublished: publish ?? form.isPublished,
     };
 
@@ -256,6 +264,43 @@ function PosterEditor({
                     Nothing will fill {resolved.unknown.map((t) => `@${t}`).join(", ")} — it stays as written.
                   </p>
                 ) : null}
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-lg border border-gray-200 p-3">
+            <label className="flex cursor-pointer items-start gap-2">
+              <input
+                type="checkbox"
+                className="mt-0.5"
+                checked={form.showQr}
+                onChange={(e) => patch({ showQr: e.target.checked })}
+              />
+              <span>
+                <span className="flex items-center gap-1.5 text-xs font-semibold text-ink-700">
+                  <QrCode size={13} /> Print the business QR on this poster
+                </span>
+                <span className="mt-0.5 block text-[11px] leading-snug text-ink-500">
+                  Each shop gets a QR to its own Markkito page, so a customer can scan the poster off a screen or a
+                  window.
+                </span>
+              </span>
+            </label>
+
+            {form.showQr && (
+              <div className="mt-2 pl-6">
+                <label className="mb-1 block text-[11px] font-semibold text-ink-600">Where it sits</label>
+                <select
+                  className="input"
+                  value={form.qrPosition}
+                  onChange={(e) => patch({ qrPosition: e.target.value })}
+                >
+                  {options.qrPositions.map((spot) => (
+                    <option key={spot.id} value={spot.id}>
+                      {spot.label}
+                    </option>
+                  ))}
+                </select>
               </div>
             )}
           </div>
@@ -448,6 +493,7 @@ export default function PostersPanel() {
                     {design.isPublished ? "published" : "draft"}
                   </span>
                   {!design.hasArtwork && <span className="badge bg-amber-50 text-amber-800">no artwork</span>}
+                  {design.showQr && <span className="badge bg-sky-50 text-sky-700">QR</span>}
                 </div>
                 <p className="mt-0.5 text-[11px] text-ink-500">
                   {design.category?.name ?? "No category"}

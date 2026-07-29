@@ -58,6 +58,9 @@ const designFields = {
   // Hex only — these values go straight into an SVG fill attribute.
   bandColor: hexColor.nullable().optional(),
   bandTextColor: hexColor.nullable().optional(),
+  showQr: z.boolean().optional(),
+  qrPosition: z.enum(["top-left", "top-right", "bottom-left", "bottom-right", "center"]).optional(),
+  qrScale: z.coerce.number().min(0.5).max(2).optional(),
   categoryId: z.string().uuid().nullable().optional(),
   city: z.string().trim().max(100).nullable().optional(),
   isPublished: z.boolean().optional(),
