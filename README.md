@@ -236,127 +236,50 @@ number.
 
 ## Poster Studio
 
-Admin console → **Posters**. One design serves every shop: the admin writes it
-once, and each business renders it with **their own** logo, name, phone, city
-and address substituted in. Nothing is stored per business — the artwork is
-generated on demand from the design plus the listing, so a shop that changes
-its number gets a corrected poster the next time it downloads one.
+### Admin — cataloguing a poster
 
-Wording is written with `{{business}}`-style placeholders (`business`, `phone`,
-`city`, `category`, `address`, `website`, `rating`, `reviews`). An unknown
-placeholder is left visible rather than blanked — a typo shows up in the
-preview instead of quietly deleting words, and the editor warns before the
-design is published. A known-but-empty value (a shop with no website) is
-removed along with its leftover punctuation.
+Admin console → **Posters** → **New poster**. A poster is a file somebody
+designed, and the admin form is exactly that:
 
-Five layouts — **Spotlight** (announcements), **Offer** (discounts),
-**Festival** (seasonal greetings), **Minimal** (clinics, consultants) and
-**Uploaded artwork** (a design made elsewhere, see below) — in six palettes and
-three sizes: square, portrait and story. A design can be
-targeted at one category, one city, both or neither; targeting is enforced when
-the poster is fetched, not only when the list is built, so a guessed id cannot
-pull a poster meant for another trade or town.
-
-The editor previews against a **real listing** — its actual logo and number —
-so an admin sees what a shop will get before publishing. Shops find their
-posters under **Manage → Posters** and save them as PNG or SVG.
-
-### Bringing your own artwork
-
-A design does not have to be composed by the platform. Pick the **Uploaded
-artwork** layout, upload a finished poster a designer made elsewhere (PNG,
-JPEG, WebP or GIF, up to 4MB), and the platform adds only three things:
-
-| Element | What it carries |
+| Field | |
 |---|---|
-| Header strip | A line of copy — usually the shop's name |
-| Footer strip | A second line, with the shop's phone number and city beneath it |
-| Logo | The shop's own logo, in the header or floated into any corner |
+| **Design name** | What to call it — "Diwali 2026 — jewellery" |
+| **Category** | Which trade it is for |
+| **Designer** | Pick someone already on file, or type a new name |
+| **Artwork / design file** | The finished poster: PNG, JPEG, WebP or GIF, up to 4MB |
+| **AI prompt** | The prompt it came from, kept for reference and for regenerating the design later |
 
-**The strips take their colour from the artwork, not from a palette.** On
-upload the editor samples the image's bottom edge and sets the panel and text
-colours from it — a red bar across a gold-and-red Diwali poster reads as
-something pasted on afterwards. Both are overridable, and **Re-match to
-artwork** re-samples at any time.
+Save as a draft or publish it. Nothing about layout, colour or wording is asked
+for: a poster is catalogued, not composed.
 
-How hard the edge between strip and design should be is a separate choice:
+**Designers are rows, not free text.** "Select or enter" means the same person
+arrives as an id one day and as a typed name the next; the server looks the
+name up before creating one, so `Ravi Kumar` stays a single designer with a
+poster count rather than a row per upload. The lookup is case-insensitive
+because the column is `utf8mb4_unicode_ci` — "ravi kumar" finds him too.
 
-| Style | When |
-|---|---|
-| **Faded** (default) | Melts into the artwork. The only style that cannot leave a visible seam, whatever the design has at its edges. |
-| **Solid bar** | A clean edge — for artwork with a plain border or empty space top and bottom. |
-| **Frosted** | Translucent; the design shows through. |
-| **No panel** | Type straight on the artwork, with a drop shadow so it stays readable. The shadow is applied to the type only — a logo carries its own plate. |
+**The prompt is stored, not executed.** It is the record of what was asked for.
+Regeneration from it is a later step.
 
-Everything else is left exactly as drawn. Both strips can be switched off
-individually, and the logo can be placed in the header, any of the four
-corners, the centre, or omitted entirely for artwork that is already branded —
-with a size slider, because a corner mark and a header mark want different
-weights. A logo floated over the artwork gets a plate behind it, or a dark
-logo on a dark design would simply vanish.
+Uploads are judged on their **bytes**, not the mimetype the browser claims — a
+text file renamed `.png` is refused. SVG is refused outright: it is a document
+that can carry script, and it would be embedded in a document the platform
+serves from its own origin. With no object storage here the image is kept
+inline on the row as a data URI, which is also what the browser needs to export
+a PNG from the rendered poster. The design body therefore outgrows the 1mb JSON
+limit, so the poster routes get a larger parser, registered ahead of the global
+one the way the Stripe webhook already is; and the list query excludes the
+artwork column, because twenty-five rows of inline image is not a list
+response.
 
-Click **Write it for me** on that panel, describe the artwork in a sentence
-("Diwali artwork, deep red and gold, top-right corner is clear, for jewellery
-shops"), and the header line, the footer line, the logo placement **and** the
-band style come back together. The placement and the style matter as much as
-the wording: only the brief knows which corner the design left free, or whether
-its edges are calm enough to set type straight onto.
+### Rendering — still to come
 
-The upload is validated on its **bytes**, not on the mimetype the browser
-claims, and SVG is refused outright: an SVG is a document that can carry
-script, and this file is about to be embedded in a document the platform
-serves from its own origin. Since there is no object storage here, the image is
-kept inline on the design row as a data URI — which is also what the renderer
-needs for the PNG export to work.
-
-### How the artwork is made
-
-Posters are SVG, generated server-side. There is no headless browser and no
-image library: each layout is drawn from the palette, the fitted text and the
-business's own details.
-
-SVG has no automatic line wrapping, so `modules/posters/text.ts` decides the
-breaks itself, estimating character widths from the font size, weight,
-letter-spacing and whether the line is uppercase. Text that will not fit is
-wrapped, then shrunk, then truncated — and each layout measures its stack
-before placing it, so a headline two lines longer than the design assumed
-pushes the rest around rather than through it. When the space runs out
-entirely, the poster gives things up in order of least value: gaps close first,
-then the subheadline sheds lines, then the button goes. The headline and the
-phone number are never sacrificed. `backend/tests/posters.test.ts` renders
-deliberately overlong copy at every layout and size and asserts nothing leaves
-the safe area.
-
-The shop's logo is fetched and **embedded as a data URI** rather than linked.
-That makes the file self-contained when it is re-shared, and it is what allows
-the browser to export a PNG: a canvas that has drawn a cross-origin image
-refuses to produce one. A logo that cannot be loaded falls back to a monogram,
-and the shop is told so rather than being handed initials silently.
-
-### Who writes the wording
-
-Click **Write it for me**, describe the poster ("Onam, warm tone, 20% off") and
-pick from three finished options. Two engines sit behind one interface, the
-same arrangement the WhatsApp transport uses:
-
-| `POSTER_AI_PROVIDER` | What it does |
-|---|---|
-| `offline` (default) | A built-in phrase bank. No account, no network, deterministic — the same brief gives the same three options. |
-| `claude` | Calls the Anthropic API. Falls back to the phrase bank if the key is missing or the call fails, and says which engine actually ran. |
-
-```bash
-# backend/.env
-POSTER_AI_PROVIDER=claude
-ANTHROPIC_API_KEY=sk-ant-…
-POSTER_AI_MODEL=claude-opus-5
-```
-
-**AI writes the copy and the placement, not the artwork.** The four drawn
-layouts are code — deterministic, instant, and free to render for a thousand
-shops; for anything beyond them a designer supplies the image and the assistant
-decides what goes over it. Generating the artwork itself with a model would
-need an image-generation provider this project has no account for, and would
-produce something different for every shop rather than one consistent design.
+The per-business side is built but is **not** part of the admin flow above: a
+shop opens **Manage → Posters** and downloads a published design with its own
+logo, name and phone number composited on, as SVG or PNG. How that should work
+is the next thing to settle — the machinery in `modules/posters/layouts.ts`
+(header/footer bands sampled from the artwork, logo placement, four drawn
+layouts) is what exists today, not a decision that has been signed off.
 
 ## API shape
 

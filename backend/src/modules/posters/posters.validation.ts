@@ -24,10 +24,16 @@ const hexColor = z
 const designFields = {
   name: z.string().trim().min(2).max(120),
   description: z.string().trim().max(500).nullable().optional(),
-  layout: z.enum(layoutIds),
-  palette: z.enum(paletteIds),
-  size: z.nativeEnum(PosterSize),
-  headline: z.string().trim().min(2).max(200),
+  // Pick one from the list or type a new one; the service turns either into
+  // a designer row.
+  designerId: z.string().uuid().nullable().optional(),
+  designerName: z.string().trim().max(120).nullable().optional(),
+  // Presentation now has defaults, so the admin form does not have to carry
+  // any of it: a Phase 1 poster is a name, a category, a designer and a file.
+  layout: z.enum(layoutIds).optional(),
+  palette: z.enum(paletteIds).optional(),
+  size: z.nativeEnum(PosterSize).optional(),
+  headline: z.string().trim().max(200).nullable().optional(),
   subheadline: z.string().trim().max(300).nullable().optional(),
   ctaText: z.string().trim().max(60).nullable().optional(),
   badgeText: z.string().trim().max(40).nullable().optional(),
@@ -59,19 +65,19 @@ const designFields = {
   categoryId: z.string().uuid().nullable().optional(),
   city: z.string().trim().max(100).nullable().optional(),
   isPublished: z.boolean().optional(),
-  aiBrief: z.string().trim().max(1000).nullable().optional(),
+  // Kept with the poster for reference and for regenerating it later, so it
+  // has room for a real brief rather than a phrase.
+  aiPrompt: z.string().trim().max(4000).nullable().optional(),
   aiEngine: z.enum(["offline", "claude"]).nullable().optional(),
 };
 
 export const createDesignSchema = z.object(designFields);
 
+export const designerSchema = z.object({ name: z.string().trim().min(2).max(120) });
+
 export const updateDesignSchema = z.object({
   ...designFields,
   name: designFields.name.optional(),
-  layout: designFields.layout.optional(),
-  palette: designFields.palette.optional(),
-  size: designFields.size.optional(),
-  headline: designFields.headline.optional(),
 });
 
 export const listDesignsQuerySchema = z.object({
