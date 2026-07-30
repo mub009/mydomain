@@ -31,6 +31,7 @@ from config import Config, load_config
 from detect import Detection, build_detector
 from inpaint import build_inpainter
 from overlay import LogoOverlay, Placement
+from palette import accent_colour, brand_colour, describe_palettes, extract_palette, retint
 from utils import (
     LogoReplaceError,
     build_mask,
@@ -93,6 +94,42 @@ class ImageResult:
         return f"  {icon} {self.source.name:<32} {detail}  [{self.seconds:.1f}s]"
 
 
+@dataclass
+class ColourOptions:
+    """What to do about colour, gathered from the CLI."""
+
+    report: bool = False
+    match_poster: bool = False
+    tint_logo: bool = False
+    accent: tuple[int, int, int] | None = None
+    brand: tuple[int, int, int] | None = None
+    tolerance: float = 35.0
+
+    @classmethod
+    def from_args(cls, args: argparse.Namespace) -> "ColourOptions":
+        return cls(
+            report=args.palette,
+            match_poster=args.match_poster,
+            tint_logo=args.tint_logo,
+            accent=_parse_hex(args.accent, "--accent"),
+            brand=_parse_hex(args.brand, "--brand"),
+            tolerance=args.hue_tolerance if args.hue_tolerance is not None else 35.0,
+        )
+
+
+def _parse_hex(value: str | None, flag: str) -> tuple[int, int, int] | None:
+    """Parse ``#rrggbb`` or ``rrggbb``."""
+    if not value:
+        return None
+    text = value.strip().lstrip("#")
+    if len(text) != 6:
+        raise ValueError(f"{flag} must be a 6-digit hex colour, got {value!r}")
+    try:
+        return tuple(int(text[index : index + 2], 16) for index in (0, 2, 4))  # type: ignore[return-value]
+    except ValueError as exc:
+        raise ValueError(f"{flag} must be a 6-digit hex colour, got {value!r}") from exc
+
+
 # --------------------------------------------------------------------------
 # pipeline
 # --------------------------------------------------------------------------
@@ -108,6 +145,7 @@ class LogoReplacePipeline:
         auto: bool = False,
         slots: bool = False,
         export_dir: Path | None = None,
+        colour: "ColourOptions | None" = None,
     ) -> None:
         config.validate()
         self.config = config
@@ -117,6 +155,7 @@ class LogoReplacePipeline:
         self.overlay = LogoOverlay(config, logo)
         self.skip_overlay = skip_overlay
         self.export_dir = export_dir
+        self.colour = colour or ColourOptions()
 
     # -- single image -----------------------------------------------------
     def process_image(self, source: Path, output: Path) -> ImageResult:
@@ -165,14 +204,20 @@ class LogoReplacePipeline:
             result.output = output
             result.seconds = time.perf_counter() - started
             self.log.info("Dry run — would write %s", output)
+            # Report on the original: nothing was cleaned, so say so rather
+            # than pretending the numbers come from a finished poster.
+            if self.colour.report:
+                self._apply_colour(image)
             self._dump_debug(source, image=image, mask=mask, detections=detections)
             return result
 
         cleaned = self.inpainter.fill(image, mask, boxes)
+        cleaned = self._apply_colour(cleaned)
 
         composed = cleaned
         placements: list[Placement] = []
         if not self.skip_overlay:
+            self._tinted_logo(cleaned)
             for box in boxes:
                 composed, placement = self.overlay.place(composed, box)
                 placements.append(placement)
@@ -184,6 +229,75 @@ class LogoReplacePipeline:
         self._dump_debug(source, image=image, mask=mask, detections=detections, cleaned=cleaned)
         self.log.info("Wrote %s in %.1fs", output, result.seconds)
         return result
+
+    # -- colour -----------------------------------------------------------
+    def _apply_colour(self, poster: Image.Image) -> Image.Image:
+        """Report the two palettes, and tie them together if asked.
+
+        Runs on the *cleaned* plate, after the old logo is gone: the colours
+        of a mark that is about to be removed are not the poster's palette.
+        """
+        options = self.colour
+        if not (options.report or options.match_poster or options.tint_logo):
+            return poster
+        if options.match_poster:
+            self.log.warning(
+                "Retinting moves every pixel near the accent hue — including any third-party mark that "
+                "happens to share it (a Google badge, a payment logo, a map pin). Check those before publishing."
+            )
+
+        logo = None if self.skip_overlay else self.overlay.load()
+        if options.report:
+            print(
+                describe_palettes(
+                    extract_palette(poster, count=4, alpha_threshold=0),
+                    extract_palette(logo, count=4) if logo is not None else [],
+                )
+            )
+
+        if not options.match_poster:
+            return poster
+
+        source = options.accent or self._swatch_rgb(accent_colour(poster), "poster accent")
+        target = options.brand or self._swatch_rgb(brand_colour(logo) if logo else None, "logo brand colour")
+        if source is None or target is None:
+            self.log.warning("--match-poster needs a detectable accent in both images; leaving colours alone")
+            return poster
+
+        self.log.info(
+            "Retinting poster #%02x%02x%02x → #%02x%02x%02x", *source, *target
+        )
+        return retint(poster, source, target, tolerance=options.tolerance).convert("RGB")
+
+    def _swatch_rgb(self, swatch, label: str) -> tuple[int, int, int] | None:
+        if swatch is None:
+            self.log.debug("no %s found", label)
+            return None
+        return swatch.rgb
+
+    def _tinted_logo(self, poster: Image.Image) -> None:
+        """Recolour the logo towards the poster's accent, if asked.
+
+        Separate from ``_apply_colour`` because it mutates the loaded logo and
+        must happen once, before any placement.
+        """
+        options = self.colour
+        if not options.tint_logo or self.skip_overlay:
+            return
+        logo = self.overlay.load()
+        source = options.brand or self._swatch_rgb(brand_colour(logo), "logo brand colour")
+        target = options.accent or self._swatch_rgb(accent_colour(poster), "poster accent")
+        if source is None or target is None:
+            self.log.warning("--tint-logo needs a detectable colour in both images; leaving the logo alone")
+            return
+        self.log.warning(
+            "Recolouring the logo #%02x%02x%02x → #%02x%02x%02x. This changes someone's brand colours — "
+            "fine for a single-colour ornament, wrong for a real identity. --match-poster is usually the "
+            "right direction instead.",
+            *source,
+            *target,
+        )
+        self.overlay.replace_logo(retint(logo, source, target, tolerance=options.tolerance))
 
     # -- dataset export ---------------------------------------------------
     def _export_label(
@@ -370,6 +484,26 @@ def build_parser() -> argparse.ArgumentParser:
     ov_group.add_argument("--no-sharpen", action="store_true", help="do not sharpen a logo that had to be enlarged")
     ov_group.add_argument("--max-upscale", type=float, help="never enlarge the logo beyond this multiple")
 
+    col_group = parser.add_argument_group("colour")
+    col_group.add_argument(
+        "--palette",
+        action="store_true",
+        help="report the poster's and the logo's dominant colours, and whether they clash",
+    )
+    col_group.add_argument(
+        "--match-poster",
+        action="store_true",
+        help="retint the poster's accent colour to the logo's brand colour",
+    )
+    col_group.add_argument(
+        "--tint-logo",
+        action="store_true",
+        help="recolour the logo to the poster's accent — alters brand colours, use with care",
+    )
+    col_group.add_argument("--accent", help="source colour to retint from, e.g. 0a46c8 (default: detected)")
+    col_group.add_argument("--brand", help="target colour to retint to, e.g. 10847a (default: the logo's)")
+    col_group.add_argument("--hue-tolerance", type=float, help="degrees of hue either side of the accent to move")
+
     rt_group = parser.add_argument_group("runtime")
     rt_group.add_argument("--device", help="auto, cpu, cuda, cuda:0 or mps")
     rt_group.add_argument("--dtype", choices=("auto", "fp16", "bf16", "fp32"), help="model precision")
@@ -535,6 +669,9 @@ def main(argv: list[str] | None = None) -> int:
     try:
         config = apply_args(load_config(), args)
         config.validate()
+        # Parsed here, with the rest of the argument checking, so a typo'd
+        # hex colour is a usage error rather than a traceback mid-run.
+        colour = ColourOptions.from_args(args)
     except (ValueError, OSError) as exc:
         logger.error("%s", exc)
         return EXIT_USAGE
@@ -556,6 +693,7 @@ def main(argv: list[str] | None = None) -> int:
             auto=args.auto,
             slots=args.slots,
             export_dir=args.export_labels,
+            colour=colour,
         )
         if not args.no_overlay and not config.runtime.dry_run and not args.export_labels:
             pipeline.overlay.load()  # fail before loading a multi-GB model

@@ -87,6 +87,10 @@ class LogoOverlay:
         self._logo = logo
         return logo
 
+    def replace_logo(self, logo: Image.Image) -> None:
+        """Swap in a processed logo, reused for every placement afterwards."""
+        self._logo = logo.convert("RGBA")
+
     # -- placement --------------------------------------------------------
     def place(self, background: Image.Image, box: BBox) -> tuple[Image.Image, Placement]:
         """Composite the logo into ``box`` and return the result plus placement."""

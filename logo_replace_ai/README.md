@@ -206,6 +206,72 @@ In order of what actually fixes a poor logo:
 `--max-upscale` (default 4.0) caps enlargement; when it bites, the logo will
 not fill its slot and you get told that too.
 
+## Colour
+
+A logo dropped onto a poster whose colours fight it looks wrong however well
+it is placed. Start by looking at both palettes:
+
+```bash
+python app.py --input poster.png --slots --logo brand.png --palette --dry-run
+```
+
+```
+Colour
+------
+  poster: #4678be (23%), #0a46c8 (21%), #d2aa96 (8%), #0c2878 (5%)
+  logo:   #10847a (40%), #122a60 (33%), #5a6e8c (8%)
+  closest logo-to-poster distance: ΔE 53 — different families; --match-poster would tie them together
+```
+
+Neutrals are deliberately excluded. A poster is mostly white paper and black
+type; the accent covering 6% of the page is the colour that matters. ΔE is
+CIE76 perceptual distance — under 12 the colours are the same, over 60 they
+clash.
+
+### Changing the combination
+
+**Retint the poster to the brand** — almost always the right direction. The
+brand colour is fixed; the template is yours:
+
+```bash
+python app.py --input poster.png --slots --logo brand.png --match-poster
+```
+
+Hue rotates, **lightness does not**, which is what keeps gradients, shading,
+white paper and black type intact through the change. Only pixels near the
+accent hue move (`--hue-tolerance`, default 35°), weighted smoothly by hue
+distance and saturation so there are no hard edges or fringes. On the dental
+template this takes every blue — panels, headline, pills, icon outlines,
+bottom band — to the logo's teal, and leaves the skin tones in the photograph
+alone: measured (210,170,150) before, (210,169,151) after.
+
+Override either end when the detection is not what you want:
+
+```bash
+python app.py --match-poster --accent 0a46c8 --brand c2185b   # blue → pink
+```
+
+**Two things to watch.** A retint moves *every* pixel near the accent hue,
+including third-party marks that share it — a Google badge, a payment logo, a
+map pin. The tool warns; check those before publishing. And if the accent hue
+is orange or red, skin tones sit in the same part of the wheel and a photo
+will shift with it. Lower `--hue-tolerance` or set an explicit `--accent`.
+
+**Retint the logo to the poster** (`--tint-logo`) goes the other way. It
+alters someone's brand colours, so it warns every time. Defensible for a
+single-colour mark used as an ornament, wrong for a real identity.
+
+### Doing this in the Markkito backend instead
+
+`backend/src/modules/posters/palettes.ts` already drives poster colour through
+named palettes with roles (`bg`, `bgAlt`, `ink`, `muted`, `accent`,
+`onAccent`). For per-shop brand colour the clean move is to derive a `Palette`
+from the shop's logo — take the brand colour as `accent`, pick `bg`/`ink` for
+contrast against it — and hand that to the existing layout machinery. That
+recolours the poster at design time, in vector, with no hue rotation and no
+risk to photographs. `--match-poster` here is for flattened images, where that
+option is gone.
+
 ### Inpainting backends
 
 | `--inpaint` | Needs | Speed | Use it when |
@@ -253,6 +319,11 @@ visibly on a hole more than ~100 px wide. Tune with `--classical-max-span`.
 --opacity 1.0 --no-shadow  --shadow-opacity 0.35  --no-overlay
 --no-realistic             skip grain matching and the contrast halo
 --min-contrast 2.0         contrast ratio below which a halo is added
+
+--palette                  report both palettes and their ΔE distance
+--match-poster             retint the poster to the logo's brand colour
+--tint-logo                recolour the logo to the poster's accent
+--accent RRGGBB  --brand RRGGBB  --hue-tolerance 35
 
 --device auto|cpu|cuda|cuda:0|mps   --dtype auto|fp16|bf16|fp32
 --dry-run   --fail-fast   -v
@@ -308,6 +379,8 @@ had no detection, `2` for bad usage or configuration.
 | Poster is a template with an empty box | use `--slots`, not `--auto` |
 | Logo barely visible on the page | heed the contrast warning — supply a light/dark logo variant |
 | Logo looks soft or blocky | it is being enlarged; supply it at the px width the warning names |
+| Logo clashes with the poster | `--palette` to see the numbers, `--match-poster` to fix |
+| Retint changed a photo or a third-party badge | lower `--hue-tolerance`, or set `--accent` explicitly |
 
 `--debug-dir` writes three files per image: the detections drawn on the
 input, the mask, and the cleaned plate before the new logo goes on. That is
@@ -323,6 +396,7 @@ logo_replace_ai/
 ├── detect.py         YOLO wrapper + manual-box detector
 ├── inpaint.py        SDXL / OpenCV / no-op backends
 ├── overlay.py        fit, align, shadow, alpha composite
+├── palette.py        palette extraction, ΔE distance, retinting
 ├── utils.py          errors, logging, geometry, masks, image IO
 ├── config.py         every setting, with env overrides and validation
 ├── requirements.txt
