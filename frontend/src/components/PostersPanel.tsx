@@ -442,10 +442,11 @@ function PosterEditor({
               posters go out looking like that. */}
           {uploaded && !uploaded.isTemplate && (
             <p className="mt-2 rounded-lg bg-amber-50 p-2.5 text-[11px] text-amber-800">
-              A flat image has no slots to fill, so this prints as your artwork with the shop's logo and QR placed on
-              it — no name, no phone number, and nothing laid over the design. For those to appear{" "}
+              A flat image has no slots to fill, so every shop gets this artwork exactly as it is — no name, no logo,
+              no phone number, and nothing placed over your design. For the shop's details to appear{" "}
               <span className="font-semibold">inside</span> the artwork, ask the designer for the same file as{" "}
-              <span className="font-semibold">SVG</span>.
+              <span className="font-semibold">SVG</span>. (A QR is the exception: write{" "}
+              <span className="font-mono">@qr</span> in the prompt and name a corner, and one is printed there.)
             </p>
           )}
 

@@ -687,9 +687,8 @@ describe("business QR", () => {
 
   it("goes to the corner it was given", () => {
     const corners = ["top-left", "top-right", "bottom-left", "bottom-right", "center"] as const;
-    // The logo is put out of the way: with no header band it defaults into
-    // the top-left corner, and the QR would rightly step aside from it —
-    // which is its own test below, not this one.
+    // The logo is put out of the way explicitly: the corner-avoidance rule is
+    // its own test below, not this one.
     const spots = corners.map((qrPosition) =>
       JSON.stringify(plate(render({ qrHref: qr, qrPosition, logoPosition: "none" }))),
     );
@@ -1290,5 +1289,56 @@ describe("an SVG template gets no frame of ours", () => {
     expect(svg).not.toMatch(/linearGradient|logo-|band/);
     expect(svg).toMatch(/font-family="Georgia" font-size="44" fill="#123456">Spice Route Kitchen</);
     expect(svg).toMatch(/width="600" height="800"/);
+  });
+});
+
+// The reported overlap: a logo landed on the box the designer had drawn for
+// it, because nothing was chosen and the renderer picked a corner anyway.
+describe("nothing is placed on flat artwork by choice of ours", () => {
+  const art = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==";
+  const copy = {
+    headline: "",
+    subheadline: "",
+    ctaText: "",
+    badgeText: "",
+    footnote: "",
+    headerText: "Spice Route Kitchen",
+    footerText: "Trusted in Kozhikode",
+  };
+
+  const render = (over: Record<string, unknown> = {}) =>
+    renderPosterSvg(
+      {
+        size: "PORTRAIT",
+        palette: PALETTES[0],
+        copy,
+        subject,
+        logoHref: "data:image/png;base64,LOGO",
+        backgroundHref: art,
+        ...over,
+      } as Parameters<typeof renderPosterSvg>[0],
+      "artwork",
+    ).svg;
+
+  // "header" is what a design gets when nobody picked a position, so with no
+  // header band it cannot be read as a request to draw the logo somewhere.
+  it("draws no logo when no position was chosen", () => {
+    const svg = render();
+    expect(svg).not.toContain("data:image/png;base64,LOGO");
+    expect(svg).not.toContain(">SR</text>");
+    // Just the artwork and the backdrop behind it.
+    expect((svg.match(/<image/g) ?? []).length).toBe(1);
+    expect(svg).not.toContain("<circle");
+  });
+
+  it("still draws it in the corner a design actually asks for", () => {
+    const svg = render({ logoPosition: "bottom-left" });
+    expect(svg).toContain("data:image/png;base64,LOGO");
+  });
+
+  // With a band, "header" is a real place, and the logo belongs in it.
+  it("draws it in the header when there is a header", () => {
+    const svg = render({ showHeader: true });
+    expect(svg).toContain("data:image/png;base64,LOGO");
   });
 });

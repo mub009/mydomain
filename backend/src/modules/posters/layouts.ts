@@ -945,10 +945,15 @@ const artwork: PosterLayout = {
     const showHeader = input.showHeader ?? false;
     const showFooter = input.showFooter ?? false;
 
-    // "In the header" means nothing without a header. Rather than leave the
-    // logo floating in the space a band would have filled, it goes to a corner.
+    // "In the header" means nothing without a header — and it is also the value
+    // a design lands on when nobody chose one, so it cannot be read as a
+    // request for the logo. Moving it to a corner instead would drop it
+    // wherever the design happens to have something already: over the box the
+    // designer drew for it, over their headline, over a face. Placement on
+    // artwork nobody can see is guesswork, and the poster is not the place to
+    // guess, so it is left off unless a corner was actually asked for.
     const requested = resolveLogoPosition(input.logoPosition);
-    const placement = requested === "header" && !showHeader ? "top-left" : requested;
+    const placement = requested === "header" && !showHeader ? "none" : requested;
     const scale = Math.min(2, Math.max(0.5, input.logoScale ?? 1));
 
     // In the strip the logo is sized to the strip; floating over the artwork

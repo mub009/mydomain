@@ -389,8 +389,17 @@ has approved it.
 
 **Nothing is laid over a design, in either format.** What comes out of an SVG
 template is the designer's own file with the values in it. What comes out of a
-flat image is the artwork, with the shop's logo and QR placed on it — and no
-name, no phone number, because there is nowhere in a flat image to put them.
+flat image is the artwork, exactly as uploaded — no name, no logo, no phone
+number, because there is nowhere in a flat image to put them.
+
+**Nothing is placed by a guess.** A design that never chose a logo position
+lands on `"header"` by default, and with no header band there is no header to
+put it in; dropping it into a corner instead puts it wherever that corner
+already has something — over the box the designer drew for it, over their
+headline, over a face. Artwork we cannot read is not somewhere to guess, so the
+logo is simply left off unless a corner was actually asked for. A QR is
+different: writing `@qr` in the prompt *is* the request, and the prompt names
+the corner, so that is a choice rather than a guess and it is drawn.
 
 The header and footer strips still exist and can be switched on per design
 (`showHeader` / `showFooter`), but they are **off by default**, and were turned
