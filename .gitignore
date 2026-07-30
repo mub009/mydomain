@@ -30,3 +30,15 @@ Thumbs.db
 
 ## Docker
 docker-compose.override.yml
+
+## Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+## logo_replace_ai — generated results and model weights stay out of git
+logo_replace_ai/output/*
+!logo_replace_ai/output/.gitkeep
+logo_replace_ai/models/*
+!logo_replace_ai/models/.gitkeep
