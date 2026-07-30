@@ -10,6 +10,13 @@ numpy>=1.26,<3
 # Visual C++ runtime is absent — which is why it is not a hard requirement.
 # opencv-python>=4.9,<5
 
+# --- optional: text detection and replacement ------------------------------
+# --find-text / --set-text. pytesseract is only a wrapper — the Tesseract
+# engine is a separate program you must install yourself:
+#   Windows: https://github.com/UB-Mannheim/tesseract/wiki (tick "Add to PATH")
+#   Debian/Ubuntu: sudo apt install tesseract-ocr
+# pytesseract>=0.3.10
+
 # --- YOLO detection --------------------------------------------------------
 # Needed for automatic logo detection (anything except --boxes).
 # ultralytics pulls in torch; on Windows/Linux with an NVIDIA GPU install the

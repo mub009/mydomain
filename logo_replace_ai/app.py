@@ -32,6 +32,13 @@ from detect import Detection, build_detector
 from inpaint import build_inpainter
 from overlay import LogoOverlay, Placement
 from palette import accent_colour, brand_colour, describe_palettes, extract_palette, retint
+from text import (
+    describe_lines,
+    draw_replacement,
+    find_text_lines,
+    match_line,
+    parse_assignment,
+)
 from utils import (
     LogoReplaceError,
     build_mask,
@@ -130,6 +137,33 @@ def _parse_hex(value: str | None, flag: str) -> tuple[int, int, int] | None:
         raise ValueError(f"{flag} must be a 6-digit hex colour, got {value!r}") from exc
 
 
+@dataclass
+class TextOptions:
+    """What to do about text, gathered from the CLI."""
+
+    report: bool = False
+    replacements: dict[str, str] = field(default_factory=dict)
+    font: str | None = None
+    align: str = "auto"
+
+    @classmethod
+    def from_args(cls, args: argparse.Namespace) -> "TextOptions":
+        replacements: dict[str, str] = {}
+        for raw in args.set_text or []:
+            key, value = parse_assignment(raw)
+            replacements[key] = value
+        return cls(
+            report=args.find_text,
+            replacements=replacements,
+            font=args.font,
+            align=args.text_align or "auto",
+        )
+
+    @property
+    def active(self) -> bool:
+        return self.report or bool(self.replacements)
+
+
 # --------------------------------------------------------------------------
 # pipeline
 # --------------------------------------------------------------------------
@@ -146,6 +180,7 @@ class LogoReplacePipeline:
         slots: bool = False,
         export_dir: Path | None = None,
         colour: "ColourOptions | None" = None,
+        text: "TextOptions | None" = None,
     ) -> None:
         config.validate()
         self.config = config
@@ -156,6 +191,7 @@ class LogoReplacePipeline:
         self.skip_overlay = skip_overlay
         self.export_dir = export_dir
         self.colour = colour or ColourOptions()
+        self.text = text or TextOptions()
 
     # -- single image -----------------------------------------------------
     def process_image(self, source: Path, output: Path) -> ImageResult:
@@ -178,25 +214,31 @@ class LogoReplacePipeline:
         if self.export_dir is not None:
             return self._export_label(source, image, detections, result, started)
 
-        if not detections:
+        if not detections and not self.text.active:
             result.status = "no-detection"
             result.seconds = time.perf_counter() - started
             self.log.warning("No logo detected in %s — nothing to replace", source.name)
             self._dump_debug(source, image=image)
             return result
+        if not detections:
+            # Text-only work is a legitimate job: a template whose logo slot
+            # is already filled still has @CLINIC_NAME@ in it.
+            self.log.info("No logo region found — doing text work only")
 
-        self.log.info(
-            "Found %d logo region(s): %s",
-            len(detections),
-            ", ".join(f"{d.box.width}x{d.box.height}@({d.box.x1},{d.box.y1}) {d.confidence:.2f}" for d in detections),
-        )
+        if detections:
+            self.log.info(
+                "Found %d logo region(s): %s",
+                len(detections),
+                ", ".join(
+                    f"{d.box.width}x{d.box.height}@({d.box.x1},{d.box.y1}) {d.confidence:.2f}" for d in detections
+                ),
+            )
 
         boxes = [d.box for d in detections]
-        mask = build_mask(
-            image.size,
-            boxes,
-            dilate=cfg.inpaint.mask_dilate,
-            feather=cfg.inpaint.mask_feather,
+        mask = (
+            build_mask(image.size, boxes, dilate=cfg.inpaint.mask_dilate, feather=cfg.inpaint.mask_feather)
+            if boxes
+            else None
         )
 
         if cfg.runtime.dry_run:
@@ -207,15 +249,17 @@ class LogoReplacePipeline:
             # Report on the original: nothing was cleaned, so say so rather
             # than pretending the numbers come from a finished poster.
             self._apply_colour(image)
+            self._apply_text(image)
             self._dump_debug(source, image=image, mask=mask, detections=detections)
             return result
 
-        cleaned = self.inpainter.fill(image, mask, boxes)
+        cleaned = self.inpainter.fill(image, mask, boxes) if mask is not None else image
         cleaned = self._apply_colour(cleaned)
+        cleaned = self._apply_text(cleaned)
 
         composed = cleaned
         placements: list[Placement] = []
-        if not self.skip_overlay:
+        if boxes and not self.skip_overlay:
             self._tinted_logo(cleaned)
             for box in boxes:
                 composed, placement = self.overlay.place(composed, box)
@@ -227,6 +271,55 @@ class LogoReplacePipeline:
         result.seconds = time.perf_counter() - started
         self._dump_debug(source, image=image, mask=mask, detections=detections, cleaned=cleaned)
         self.log.info("Wrote %s in %.1fs", output, result.seconds)
+        return result
+
+    # -- text -------------------------------------------------------------
+    def _apply_text(self, poster: Image.Image) -> Image.Image:
+        """Report the text found, and swap in whatever was asked for.
+
+        Each replaced line is erased with the same fill used for the logo —
+        on a template's flat page that reproduces the paper exactly — then the
+        new words are drawn at the size and colour of the words they replace.
+        """
+        options = self.text
+        if not options.active:
+            return poster
+
+        lines = find_text_lines(poster)
+        if options.report:
+            print(describe_lines(lines))
+        if not options.replacements:
+            return poster
+
+        chosen: list[tuple[object, str]] = []
+        for key, value in options.replacements.items():
+            line = match_line(lines, key)
+            if line is None:
+                self.log.warning(
+                    "--set-text %s=… matched no text; run --find-text to see the keys that were read", key
+                )
+                continue
+            chosen.append((line, value))
+
+        if not chosen:
+            return poster
+        if self.config.runtime.dry_run:
+            for line, value in chosen:
+                self.log.info("Dry run — would replace %r with %r", line.text, value)  # type: ignore[attr-defined]
+            return poster
+
+        boxes = [line.box for line, _ in chosen]  # type: ignore[attr-defined]
+        # Padding scaled to the line, not the logo default. Lines of type sit
+        # a few pixels apart, so a logo's 10px dilation plus 6px feather
+        # reaches into the line below and washes it out.
+        smallest = min(box.height for box in boxes)
+        dilate = max(1, min(self.config.inpaint.mask_dilate, int(round(smallest * 0.10))))
+        feather = max(0, min(self.config.inpaint.mask_feather, int(round(smallest * 0.06))))
+        mask = build_mask(poster.size, boxes, dilate=dilate, feather=feather)
+        result = self.inpainter.fill(poster, mask, boxes)
+        for line, value in chosen:
+            self.log.info("Replacing %r with %r", line.text, value)  # type: ignore[attr-defined]
+            result = draw_replacement(result, line, value, options.font, options.align)  # type: ignore[arg-type]
         return result
 
     # -- colour -----------------------------------------------------------
@@ -489,6 +582,25 @@ def build_parser() -> argparse.ArgumentParser:
     ov_group.add_argument("--no-sharpen", action="store_true", help="do not sharpen a logo that had to be enlarged")
     ov_group.add_argument("--max-upscale", type=float, help="never enlarge the logo beyond this multiple")
 
+    txt_group = parser.add_argument_group("text")
+    txt_group.add_argument(
+        "--find-text",
+        action="store_true",
+        help="OCR the poster and list every line of text with its box, colour and key",
+    )
+    txt_group.add_argument(
+        "--set-text",
+        action="append",
+        metavar="KEY=VALUE",
+        help='replace a line: --set-text "CLINICNAME=Smile Dental Care" (repeatable)',
+    )
+    txt_group.add_argument("--font", help="TrueType font for replacement text — ideally the template's own")
+    txt_group.add_argument(
+        "--text-align",
+        choices=("auto", "left", "center", "right"),
+        help="how replacement text sits in the space the original occupied",
+    )
+
     col_group = parser.add_argument_group("colour")
     col_group.add_argument(
         "--palette",
@@ -677,6 +789,7 @@ def main(argv: list[str] | None = None) -> int:
         # Parsed here, with the rest of the argument checking, so a typo'd
         # hex colour is a usage error rather than a traceback mid-run.
         colour = ColourOptions.from_args(args)
+        text = TextOptions.from_args(args)
     except (ValueError, OSError) as exc:
         logger.error("%s", exc)
         return EXIT_USAGE
@@ -699,6 +812,7 @@ def main(argv: list[str] | None = None) -> int:
             slots=args.slots,
             export_dir=args.export_labels,
             colour=colour,
+            text=text,
         )
         if not args.no_overlay and not config.runtime.dry_run and not args.export_labels:
             pipeline.overlay.load()  # fail before loading a multi-GB model

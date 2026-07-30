@@ -206,6 +206,67 @@ In order of what actually fixes a poor logo:
 `--max-upscale` (default 4.0) caps enlargement; when it bites, the logo will
 not fill its slot and you get told that too.
 
+## Text
+
+The same problem as the logo: a template carries `@CLINIC_NAME@` where a
+shop's own name belongs, and once it is exported to PNG that placeholder is
+just pixels. See what is there:
+
+```bash
+python app.py --input poster.png --slots --find-text --dry-run
+```
+
+```
+Text
+----
+  [1] token '@CLINIC NAME@'
+        box=411x43@(41,276)  colour=#0c2878  conf=59  key=CLINICNAME
+  [2] text  'Your Smile, Our Priority'
+        box=277x23@(44,327)  colour=#2359ce  conf=96  key=YOURSMILEOURPRIORITY
+
+  2 line(s), 1 placeholder token(s).
+```
+
+Then replace by key or by index:
+
+```bash
+python app.py --input poster.png --slots --inpaint classical \
+  --set-text "CLINICNAME=Smile Dental Care" \
+  --set-text "2=Gentle care, every visit" \
+  --font "C:/Windows/Fonts/Montserrat-Bold.ttf"
+```
+
+Each replaced line is erased with the same fill the logo uses — on a
+template's flat page that reproduces the paper exactly — and the new words are
+drawn at the size and colour of the words they replace. Padding around the
+erase is scaled to the line height, not the logo default, because lines of
+type sit a few pixels apart and a logo-sized mask washes out the line below.
+
+`--find-text` and `--set-text` need **Tesseract**, which is a separate program,
+not a Python package:
+
+* Windows: <https://github.com/UB-Mannheim/tesseract/wiki> — tick "Add to PATH"
+* Debian/Ubuntu: `sudo apt install tesseract-ocr`
+* then `python -m pip install pytesseract`
+
+### What this cannot do
+
+* **Match the font.** Pixels do not record which typeface drew them. The
+  replacement is rendered in the font *you* pass with `--font`; give it the
+  template's own font and the result is convincing, give it anything else and
+  the poster looks subtly wrong.
+* **Read perfectly.** Tesseract reads `@CLINIC_NAME@` as `@CLINIC` + `NAME@` —
+  the underscore is lost — so keys are matched on letters and digits only,
+  case-insensitively. Check `--find-text` before running a batch.
+* **Read every script.** Malayalam, Arabic and similar need their language
+  pack installed (`tesseract-ocr-mal`, `tesseract-ocr-ara`). Latin placeholder
+  tokens read fine without them.
+
+**With the SVG template, do it there.** `fillSvgTemplate` in the posters module
+already substitutes tokens in the designer's own font, at the right size, in
+the right colour. Nothing is guessed and nothing is erased. This is only for
+flattened exports.
+
 ## Colour
 
 A logo dropped onto a poster whose colours fight it looks wrong however well
@@ -320,6 +381,10 @@ visibly on a hole more than ~100 px wide. Tune with `--classical-max-span`.
 --no-realistic             skip grain matching and the contrast halo
 --min-contrast 2.0         contrast ratio below which a halo is added
 
+--find-text                list every line of text with box, colour and key
+--set-text "KEY=words"     replace a line (repeatable)
+--font path.ttf            font for replacement text  --text-align auto
+
 --palette                  report both palettes and their ΔE distance
 --match-poster             retint the poster to the logo's brand colour
 --tint-logo                recolour the logo to the poster's accent
@@ -397,6 +462,7 @@ logo_replace_ai/
 ├── inpaint.py        SDXL / OpenCV / no-op backends
 ├── overlay.py        fit, align, shadow, alpha composite
 ├── palette.py        palette extraction, ΔE distance, retinting
+├── text.py           OCR, line grouping, text replacement
 ├── utils.py          errors, logging, geometry, masks, image IO
 ├── config.py         every setting, with env overrides and validation
 ├── requirements.txt
