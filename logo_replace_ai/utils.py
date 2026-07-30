@@ -518,6 +518,62 @@ def draw_debug_boxes(image: Image.Image, boxes: Iterable[BBox], labels: Iterable
     return annotated
 
 
+def relative_luminance(colour: np.ndarray) -> float:
+    """WCAG relative luminance of an sRGB colour, 0-1."""
+    channels = np.asarray(colour, dtype=np.float64) / 255.0
+    linear = np.where(channels <= 0.04045, channels / 12.92, ((channels + 0.055) / 1.055) ** 2.4)
+    return float(0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2])
+
+
+def luminance_map(colours: np.ndarray) -> np.ndarray:
+    """WCAG relative luminance for an array of sRGB colours, shape (..., 3)."""
+    channels = np.asarray(colours, dtype=np.float32) / 255.0
+    linear = np.where(channels <= 0.04045, channels / 12.92, ((channels + 0.055) / 1.055) ** 2.4)
+    return 0.2126 * linear[..., 0] + 0.7152 * linear[..., 1] + 0.0722 * linear[..., 2]
+
+
+def contrast_ratio(first: float, second: float) -> float:
+    """WCAG contrast ratio between two relative luminances, 1.0 to 21.0."""
+    lighter, darker = max(first, second), min(first, second)
+    return (lighter + 0.05) / (darker + 0.05)
+
+
+def estimate_grain(image: Image.Image) -> float:
+    """Standard deviation of an image's fine detail, in 0-255 units.
+
+    Near zero for flat vector artwork, a few units for print scans, more for
+    photographs. Used to give a pasted logo the same texture as the page it
+    lands on.
+    """
+    gray = image.convert("L")
+    if min(gray.size) < 4:
+        return 0.0
+    smooth = gray.filter(ImageFilter.GaussianBlur(1.5))
+    detail = np.asarray(gray, dtype=np.float32) - np.asarray(smooth, dtype=np.float32)
+    return float(detail.std())
+
+
+def add_grain(image: Image.Image, sigma: float, seed: int = 0) -> Image.Image:
+    """Add Gaussian noise to an RGBA image's colour channels only."""
+    if sigma <= 0.35:  # below this it is invisible and just costs time
+        return image
+    rgba = image.convert("RGBA")
+    array = np.asarray(rgba, dtype=np.float32).copy()
+    noise = np.random.default_rng(seed).normal(0.0, sigma, array.shape[:2] + (1,))
+    array[..., :3] = np.clip(array[..., :3] + noise, 0, 255)
+    return Image.fromarray(array.astype(np.uint8), mode="RGBA")
+
+
+def alpha_weighted_colour(image: Image.Image) -> np.ndarray | None:
+    """Mean colour of an RGBA image weighted by its alpha — its visible ink."""
+    rgba = np.asarray(image.convert("RGBA"), dtype=np.float32)
+    alpha = rgba[..., 3:4] / 255.0
+    total = float(alpha.sum())
+    if total < 1.0:
+        return None
+    return (rgba[..., :3] * alpha).sum(axis=(0, 1)) / total
+
+
 def human_size(size: tuple[int, int]) -> str:
     return f"{size[0]}x{size[1]}"
 

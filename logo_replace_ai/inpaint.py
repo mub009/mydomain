@@ -140,7 +140,74 @@ def _pull_push_fill(rgb: np.ndarray, known: np.ndarray, eps: float = 1e-6) -> np
         here = image_level / np.maximum(weight_level, eps)
         coarse = alpha * here + (1.0 - alpha) * parent
 
-    return np.clip(coarse, 0.0, 255.0)
+    return _relax(np.clip(coarse, 0.0, 255.0), rgb.astype(np.float32), known)
+
+
+def _flat_backdrop(image: Image.Image, hard: Image.Image, tolerance: float = 14.0) -> np.ndarray | None:
+    """The single colour surrounding the hole, or ``None`` if it is not plain.
+
+    Samples a ring just outside the masked area. When nearly all of that ring
+    is one colour — a white page margin, a solid panel — that colour *is* the
+    answer, and filling with it is exact rather than approximate.
+    """
+    mask = np.asarray(hard.convert("L")) > 127
+    if not mask.any():
+        return None
+    margin = max(3, int(round(min(image.size) * 0.03)) | 1)
+    grown = np.asarray(hard.convert("L").filter(ImageFilter.MaxFilter(margin))) > 127
+    ring = grown & ~mask
+    if ring.sum() < 40:
+        return None
+
+    rgb = np.asarray(image.convert("RGB"), dtype=np.float32)
+    samples = rgb[ring]
+    median = np.median(samples, axis=0)
+    close = np.linalg.norm(samples - median, axis=1) <= tolerance
+    if close.mean() < 0.85:
+        return None
+    return median
+
+
+def _relax(filled: np.ndarray, original: np.ndarray, known: np.ndarray, passes: int = 2) -> np.ndarray:
+    """Settle the fill against the pixels immediately around the hole.
+
+    The pyramid's coarse levels average colour from far away, so a hole in a
+    white margin next to a blue panel comes back faintly blue. Repeatedly
+    blurring and re-imposing the known pixels is a discrete Laplace solve: the
+    inside of the hole converges on the colours at its own edge instead.
+
+    Each blur moves colour about its own radius, so the radii have to start
+    at the scale of the hole itself and halve from there — fixed constants
+    leave the middle of a wide hole holding whatever the pyramid guessed
+    (measured: 222,227,237 in a hole that should have come back white).
+    """
+    weight = known[..., None].astype(np.float32)
+    out = filled
+
+    hole = known < 0.5
+    if not hole.any():
+        return filled
+    rows = np.flatnonzero(hole.any(axis=1))
+    cols = np.flatnonzero(hole.any(axis=0))
+    span = float(max(rows[-1] - rows[0], cols[-1] - cols[0]) + 1)
+
+    radii: list[float] = []
+    radius = max(2.0, span / 2.0)
+    while radius >= 1.0:
+        radii.append(radius)
+        radius /= 2.0
+    radii.append(1.0)
+
+    for radius in radii:
+        for _ in range(passes):
+            blurred = np.asarray(
+                Image.fromarray(np.clip(out, 0, 255).astype(np.uint8)).filter(
+                    ImageFilter.GaussianBlur(radius)
+                ),
+                dtype=np.float32,
+            )
+            out = weight * original + (1.0 - weight) * blurred
+    return np.clip(out, 0.0, 255.0)
 
 
 class ClassicalInpainter:
@@ -194,6 +261,15 @@ class ClassicalInpainter:
 
     # -- implementations --------------------------------------------------
     def _fill_patch(self, image: Image.Image, hard: Image.Image, factor: float) -> Image.Image:
+        flat = _flat_backdrop(image, hard)
+        if flat is not None:
+            # The hole sits on plain paper — a template's white margin, a solid
+            # panel. Any diffusion here is strictly worse than the right
+            # answer: it drags in the nearest headline and leaves a faint grey
+            # rectangle (measured 239,241,247 where the page is pure white).
+            get_logger().debug("classical fill: flat backdrop rgb%s", tuple(int(v) for v in flat))
+            return Image.new("RGB", image.size, tuple(int(v) for v in flat))
+
         method = self._config.inpaint.classical_method
         if method in {"telea", "ns"}:
             cv2 = self._try_opencv()

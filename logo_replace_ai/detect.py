@@ -74,8 +74,9 @@ class YoloLogoDetector:
             raise ModelLoadError(
                 f"YOLO weights not found at {weights}.\n"
                 "  Put your trained logo model there (models/best.pt), or pass --weights /path/to/best.pt.\n"
-                "  No trained model yet? Use --auto to find logos by image analysis,\n"
-                "  or --boxes x,y,w,h to place them manually."
+                "  No trained model yet? Use --slots if the poster is a template with an\n"
+                "  empty logo box, --auto to find logos by image analysis, or --boxes\n"
+                "  x,y,w,h to place them manually."
             )
         ultralytics = require_module(
             "ultralytics",
@@ -328,6 +329,46 @@ class HeuristicLogoDetector:
         }
 
 
+def _tighten(box: BBox, ink: np.ndarray) -> BBox:
+    """Shrink a box back onto the ink inside it.
+
+    Closing the dashes fattens the outline, so the blob's bounding box sits a
+    few pixels outside the drawn frame. Re-measuring against the raw ink puts
+    the slot back where the designer drew it.
+    """
+    patch = ink[box.y1 : box.y2, box.x1 : box.x2]
+    if patch.size == 0 or not patch.any():
+        return box
+    rows = np.flatnonzero(patch.any(axis=1))
+    cols = np.flatnonzero(patch.any(axis=0))
+    return BBox(
+        box.x1 + int(cols[0]),
+        box.y1 + int(rows[0]),
+        box.x1 + int(cols[-1]) + 1,
+        box.y1 + int(rows[-1]) + 1,
+    )
+
+
+def _page_colour(rgb: np.ndarray, ink: np.ndarray, box: BBox, hole: BBox | None = None) -> np.ndarray | None:
+    """Median colour of the un-inked pixels in ``box``, ignoring ``hole``.
+
+    Skipping inked pixels means the answer is the paper behind the artwork
+    rather than the artwork itself, so a caption or an icon inside the region
+    does not shift it.
+    """
+    if box.area <= 0:
+        return None
+    region = np.zeros(ink.shape, dtype=bool)
+    region[box.y1 : box.y2, box.x1 : box.x2] = True
+    if hole is not None:
+        clipped = hole.clamp(ink.shape[1], ink.shape[0])
+        region[clipped.y1 : clipped.y2, clipped.x1 : clipped.x2] = False
+    region &= ~ink
+    if region.sum() < 12:
+        return None
+    return np.median(rgb[region], axis=0)
+
+
 def _chroma(image: Image.Image) -> np.ndarray:
     """Per-pixel colourfulness: how far a pixel is from neutral grey, 0-1."""
     rgb = np.asarray(image.convert("RGB"), dtype=np.float32)
@@ -355,6 +396,165 @@ def _normalise(array: np.ndarray) -> np.ndarray:
     if peak <= 1e-6:
         return np.zeros_like(array)
     return np.clip(array / peak, 0.0, 1.0)
+
+
+class PlaceholderSlotDetector:
+    """Finds the empty logo slot a designer left in a template.
+
+    Poster templates mark where the logo goes with a guide box — usually a
+    dashed rectangle, often labelled ``@LOGO@`` — and the job is to fill that
+    box and erase the guide. That is a far easier target than "find the logo":
+    a slot has a specific geometry, an outline all the way round a mostly
+    empty middle, and it can be found without a model or a saliency guess.
+
+    Detection is pure geometry, so it does not care about the poster's colour
+    scheme, language, or where the slot sits:
+
+    1. mark ink — pixels that differ from a heavily blurred version of the page;
+    2. close small gaps, which turns a dashed outline into a solid one;
+    3. label blobs, and keep those whose four sides are inked and whose middle
+       is mostly empty.
+
+    Filled cards, pills and photos fail the empty-middle test; circular badges
+    fail the four-sides test, because a circle only touches its bounding box
+    at four points.
+
+    If you still have the template as SVG, prefer filling the slot there —
+    the coordinates are exact and there is nothing to erase. This is for
+    flattened PNGs and JPEGs, where that information is gone.
+    """
+
+    #: Analysis resolution, applied to the *shorter* side. Capping the longer
+    #: side instead left a tall poster only 460 px wide, where a 3 px dashed
+    #: line is barely one pixel and the closing step cannot bridge it.
+    ANALYSIS_SIZE = 900
+
+    def __init__(self, config: Config) -> None:
+        self._config = config
+
+    def detect(self, image: Image.Image) -> list[Detection]:
+        cfg = self._config.detect
+        small, scale = self._downscale(image)
+        ink = self._ink(small)
+        closed = self._close_dashes(ink)
+
+        height, width = ink.shape
+        min_pixels = max(16, int(ink.size * cfg.min_area_ratio))
+        candidates: list[Detection] = []
+        rgb = np.asarray(small, dtype=np.float32)
+        for box, _pixels in connected_components(closed, min_pixels=min_pixels):
+            score = self._frame_score(box, rgb, ink, closed, (height, width))
+            if score <= 0:
+                continue
+            tight = _tighten(box, ink)
+            full = BBox.from_floats(tight.x1 / scale, tight.y1 / scale, tight.x2 / scale, tight.y2 / scale)
+            candidates.append(
+                Detection(box=full.clamp(*image.size), confidence=score, class_name="slot")
+            )
+
+        candidates.sort(key=lambda d: d.confidence, reverse=True)
+        get_logger().debug(
+            "slot detector: %d frame(s), scores %s",
+            len(candidates),
+            [round(d.confidence, 2) for d in candidates[:5]],
+        )
+        kept = [d for d in candidates if d.confidence >= cfg.confidence][: cfg.max_detections]
+        return postprocess(kept, image.size, self._config)
+
+    # -- steps ------------------------------------------------------------
+    def _downscale(self, image: Image.Image) -> tuple[Image.Image, float]:
+        shortest = min(image.size)
+        if shortest <= self.ANALYSIS_SIZE:
+            return image.convert("RGB"), 1.0
+        scale = self.ANALYSIS_SIZE / shortest
+        size = (max(32, int(round(image.width * scale))), max(32, int(round(image.height * scale))))
+        return image.convert("RGB").resize(size, Image.LANCZOS), size[0] / image.width
+
+    def _ink(self, image: Image.Image) -> np.ndarray:
+        """Thin strokes: guide lines, type and icon outlines.
+
+        Comparing against a *narrow* blur rather than a wide one is what makes
+        this work on real artwork. A wide blur bleeds across every boundary,
+        so a poster with big colour panels comes back almost entirely "ink"
+        (measured: 78% of the page). A narrow blur only erases detail thinner
+        than its radius, so the difference lights up hairlines and text and
+        stays dark inside flat shapes — which is precisely a dashed guide box.
+        """
+        rgb = np.asarray(image, dtype=np.float32)
+        smooth = np.asarray(
+            image.filter(ImageFilter.GaussianBlur(max(1.2, min(image.size) * 0.004))),
+            dtype=np.float32,
+        )
+        detail = np.sqrt(((rgb - smooth) ** 2).sum(axis=2))
+        return detail > 12.0
+
+    def _close_dashes(self, ink: np.ndarray) -> np.ndarray:
+        """Bridge the gaps in a dashed line so the outline becomes continuous."""
+        mask = Image.fromarray((ink * 255).astype(np.uint8), mode="L")
+        radius = max(3, int(round(min(mask.size) * 0.011)) | 1)
+        closed = mask.filter(ImageFilter.MaxFilter(radius)).filter(ImageFilter.MinFilter(radius))
+        return np.asarray(closed) > 127
+
+    def _frame_score(
+        self,
+        box: BBox,
+        rgb: np.ndarray,
+        ink: np.ndarray,
+        closed: np.ndarray,
+        shape: tuple[int, int],
+    ) -> float:
+        """How much this blob looks like an outline around empty space."""
+        height, width = shape
+        cfg = self._config.detect
+        area_ratio = box.area / float(width * height)
+        # A slot is small. Without this cap the outline of a full-width colour
+        # panel is a perfectly good "frame around empty space".
+        if area_ratio < max(cfg.min_area_ratio, 0.002) or area_ratio > min(cfg.max_area_ratio, 0.15):
+            return 0.0
+        if box.width < 12 or box.height < 12:
+            return 0.0
+        aspect = box.width / max(1, box.height)
+        if not 0.15 <= aspect <= 7.0:
+            return 0.0
+
+        band = max(2, int(round(min(box.width, box.height) * 0.06)))
+        top = closed[box.y1 : box.y1 + band, box.x1 : box.x2].any(axis=0).mean()
+        bottom = closed[box.y2 - band : box.y2, box.x1 : box.x2].any(axis=0).mean()
+        left = closed[box.y1 : box.y2, box.x1 : box.x1 + band].any(axis=1).mean()
+        right = closed[box.y1 : box.y2, box.x2 - band : box.x2].any(axis=1).mean()
+        sides = (float(top), float(bottom), float(left), float(right))
+        if min(sides) < 0.55:  # not a closed outline
+            return 0.0
+
+        # A guide frame is drawn *on* the page: the paper continues underneath
+        # it, so the colour inside matches the colour outside. A filled card,
+        # a photo or a colour panel has its own fill and fails here. This is
+        # the test that actually separates them — an empty middle does not,
+        # because the slot legitimately holds a placeholder icon and label
+        # (measured at 63% ink), which is denser than many a real card.
+        inset = band * 2
+        inner = box.expand(-inset).clamp(width, height)
+        outer = box.expand(inset).clamp(width, height)
+        inside_colour = _page_colour(rgb, ink, inner)
+        outside_colour = _page_colour(rgb, ink, outer, hole=box.expand(inset // 2))
+        if inside_colour is None or outside_colour is None:
+            return 0.0
+        difference = float(np.linalg.norm(inside_colour - outside_colour))
+        if difference > 40.0:
+            return 0.0
+        continuity = float(np.clip(1.0 - difference / 40.0, 0.0, 1.0))
+
+        # Loose sanity check: a slot holds a mark and a caption, not a photo.
+        middle = ink[inner.y1 : inner.y2, inner.x1 : inner.x2]
+        if middle.size == 0:
+            return 0.0
+        occupancy = float(middle.mean())
+        if occupancy > 0.80:
+            return 0.0
+
+        evenness = float(np.mean(sides))
+        emptiness = float(np.clip(1.0 - occupancy / 0.80, 0.0, 1.0))
+        return float(np.clip(0.45 * evenness + 0.40 * continuity + 0.15 * emptiness, 0.0, 1.0))
 
 
 class ManualDetector:
@@ -420,14 +620,21 @@ def _contains(outer: BBox, inner: BBox) -> bool:
     return outer.x1 <= inner.x1 and outer.y1 <= inner.y1 and outer.x2 >= inner.x2 and outer.y2 >= inner.y2
 
 
-def build_detector(config: Config, manual_boxes: str | None = None, auto: bool = False) -> Detector:
+def build_detector(
+    config: Config,
+    manual_boxes: str | None = None,
+    auto: bool = False,
+    slots: bool = False,
+) -> Detector:
     """Pick the detector implied by the configuration.
 
-    Explicit boxes win over everything, then the heuristic if it was asked
-    for, then YOLO.
+    Explicit boxes win over everything, then slot detection, then the
+    saliency heuristic, then YOLO.
     """
     if manual_boxes:
         return ManualDetector(manual_boxes)
+    if slots:
+        return PlaceholderSlotDetector(config)
     if auto:
         return HeuristicLogoDetector(config)
     return YoloLogoDetector(config)

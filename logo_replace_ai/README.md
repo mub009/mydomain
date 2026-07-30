@@ -68,7 +68,31 @@ python app.py --logo brand/acme.png --debug-dir output/_debug -v
 
 ## Getting a detector
 
-Three ways to locate the old logo, in increasing order of effort and accuracy.
+Four ways to locate the old logo, in increasing order of effort and accuracy.
+
+* **`--slots` — for templates with an empty logo box.** If the poster is a
+  designer's template that marks the logo position with a guide frame, often
+  labelled `@LOGO@`, this finds that box directly:
+
+  ```bash
+  python app.py --input input/poster.png --slots --inpaint classical
+  ```
+
+  It is pure geometry — mark the thin strokes, close the dashes into a solid
+  outline, then keep blobs whose four sides are inked and, crucially, whose
+  *inside is the same colour as the page outside*. That last test is what
+  separates a guide frame from a filled card: paper shows through a frame.
+  An empty middle does **not** work as a test, because the slot legitimately
+  holds a placeholder icon and caption.
+
+  On replica templates it locates the slot every time at 0.94 confidence with
+  no false positives — the review card, the pills and the circular badges are
+  all correctly rejected. Far more reliable than `--auto`, because a slot has
+  a definite shape whereas a logo does not.
+
+  **If you still have the template as SVG, do it there instead.** Slot
+  coordinates are exact and there is no guide frame to erase. This is for
+  flattened PNG and JPEG exports, where that information is gone.
 
 * **`--auto` — no model at all.** Finds logo-like regions by image analysis:
 
@@ -131,6 +155,26 @@ python app.py --boxes "80,90,300,150; 700,1200,220,90"    # two logos
 | Inpaint | `inpaint.py` | SDXL fills a square crop around each region at 1024 px and the patch is composited back — pixels outside the mask stay bit-for-bit identical. |
 | Overlay | `overlay.py` | Transparent margins are trimmed, the logo is scaled to fit the box (aspect preserved, `--scale` leaves breathing room), aligned, shadowed and alpha-composited. |
 
+### Making the result look real
+
+Two things give away a pasted logo, and both are handled automatically
+(`--no-realistic` turns them off):
+
+* **It is too clean.** A vector logo has no grain; a photograph or a scanned
+  print does. The backdrop's fine-detail level is measured inside the landing
+  area and matched onto the logo. On flat artwork the measurement is zero and
+  nothing is added.
+* **It disappears.** A white logo on a white page is the least realistic
+  outcome there is. The contrast of every visible logo pixel is measured
+  against the surface behind it, and if more than 15% of them fall below
+  `--min-contrast` (default 2.0:1) the logo is lifted off the page with a halo
+  toned against the *page* — dark on light, light on dark — and a warning
+  tells you a proper logo variant would look better.
+
+  Measuring the logo's *average* colour is not enough: a mark with a dark
+  symbol and white type averages to mid-grey and passes while its wordmark is
+  invisible.
+
 ### Inpainting backends
 
 | `--inpaint` | Needs | Speed | Use it when |
@@ -164,6 +208,7 @@ visibly on a hole more than ~100 px wide. Tune with `--classical-max-span`.
 --logo PATH             transparent PNG            --debug-dir DIR
 
 --weights models/best.pt   --conf 0.35   --max-det 8   --classes 0,2
+--slots                    find a template's empty logo box
 --auto                     heuristic detection, no model needed
 --auto-max 1               how many regions --auto may return
 --boxes "x,y,w,h; …"       bypass detection entirely
@@ -175,6 +220,8 @@ visibly on a hole more than ~100 px wide. Tune with `--classical-max-span`.
 
 --scale 0.92  --align-x center  --align-y center
 --opacity 1.0 --no-shadow  --shadow-opacity 0.35  --no-overlay
+--no-realistic             skip grain matching and the contrast halo
+--min-contrast 2.0         contrast ratio below which a halo is added
 
 --device auto|cpu|cuda|cuda:0|mps   --dtype auto|fp16|bf16|fp32
 --dry-run   --fail-fast   -v
@@ -227,6 +274,8 @@ had no detection, `2` for bad usage or configuration.
 | Logo looks pasted on | keep the shadow, or `--shadow-opacity 0.2` for flat art |
 | Nothing detected | lower `--conf 0.2`, check `--debug-dir` output |
 | `--auto` picks the wrong thing | use `--boxes` for that poster, or raise `--auto-max` and pick |
+| Poster is a template with an empty box | use `--slots`, not `--auto` |
+| Logo barely visible on the page | heed the contrast warning — supply a light/dark logo variant |
 
 `--debug-dir` writes three files per image: the detections drawn on the
 input, the mask, and the cleaned plate before the new logo goes on. That is

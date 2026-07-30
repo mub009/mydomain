@@ -106,12 +106,13 @@ class LogoReplacePipeline:
         logo: Path | None = None,
         skip_overlay: bool = False,
         auto: bool = False,
+        slots: bool = False,
         export_dir: Path | None = None,
     ) -> None:
         config.validate()
         self.config = config
         self.log = get_logger()
-        self.detector = build_detector(config, manual_boxes, auto=auto)
+        self.detector = build_detector(config, manual_boxes, auto=auto, slots=slots)
         self.inpainter = build_inpainter(config)
         self.overlay = LogoOverlay(config, logo)
         self.skip_overlay = skip_overlay
@@ -314,6 +315,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="find logos by image analysis instead of YOLO — no weights needed",
     )
     det_group.add_argument(
+        "--slots",
+        action="store_true",
+        help="find the empty logo box in a template (dashed guide frame) — no model needed",
+    )
+    det_group.add_argument(
         "--export-labels",
         type=Path,
         metavar="DIR",
@@ -355,6 +361,12 @@ def build_parser() -> argparse.ArgumentParser:
     ov_group.add_argument("--no-shadow", action="store_true", help="disable the drop shadow")
     ov_group.add_argument("--shadow-opacity", type=float, help="drop shadow opacity, 0-1")
     ov_group.add_argument("--no-overlay", action="store_true", help="only erase the old logo, do not add a new one")
+    ov_group.add_argument(
+        "--no-realistic",
+        action="store_true",
+        help="paste the logo flat: no grain matching, no contrast halo",
+    )
+    ov_group.add_argument("--min-contrast", type=float, help="contrast ratio below which a halo is added")
 
     rt_group = parser.add_argument_group("runtime")
     rt_group.add_argument("--device", help="auto, cpu, cuda, cuda:0 or mps")
@@ -441,6 +453,10 @@ def apply_args(config: Config, args: argparse.Namespace) -> Config:
         overlay.shadow = False
     if args.shadow_opacity is not None:
         overlay.shadow_opacity = args.shadow_opacity
+    if args.no_realistic:
+        overlay.realistic = False
+    if args.min_contrast is not None:
+        overlay.min_contrast = args.min_contrast
 
     if args.device:
         runtime.device = args.device
@@ -467,6 +483,16 @@ def print_summary(results: list[ImageResult], elapsed: float) -> None:
         print(result.summary_line())
     tally = ", ".join(f"{count} {status}" for status, count in sorted(counts.items()))
     print(f"\n{len(results)} image(s) in {elapsed:.1f}s — {tally or 'nothing to do'}")
+
+
+def _detector_name(args: argparse.Namespace, config: Config) -> str:
+    if args.boxes:
+        return "manual boxes"
+    if args.slots:
+        return "template slots (--slots)"
+    if args.auto:
+        return "heuristic (--auto)"
+    return config.detect.weights.name
 
 
 def write_dataset_yaml(root: Path, results: list[ImageResult]) -> None:
@@ -522,6 +548,7 @@ def main(argv: list[str] | None = None) -> int:
             logo=config.paths.logo,
             skip_overlay=args.no_overlay,
             auto=args.auto,
+            slots=args.slots,
             export_dir=args.export_labels,
         )
         if not args.no_overlay and not config.runtime.dry_run and not args.export_labels:
@@ -537,7 +564,7 @@ def main(argv: list[str] | None = None) -> int:
         logger.info(
             "%d image(s) · detector: %s · inpaint: %s · logo: %s",
             len(sources),
-            "manual boxes" if args.boxes else ("heuristic (--auto)" if args.auto else config.detect.weights.name),
+            _detector_name(args, config),
             config.inpaint.backend,
             "none" if args.no_overlay else config.paths.logo.name,
         )

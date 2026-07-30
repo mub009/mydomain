@@ -194,6 +194,13 @@ class OverlayConfig:
     shadow_blur: float = field(default_factory=lambda: _env_float("SHADOW_BLUR", 0.035))
     shadow_offset: float = field(default_factory=lambda: _env_float("SHADOW_OFFSET", 0.018))
     shadow_color: str = field(default_factory=lambda: _env_str("SHADOW_COLOR", "#000000"))
+    #: Blend the logo into the page: match its grain, and keep it legible
+    #: against whatever it lands on.
+    realistic: bool = field(default_factory=lambda: _env_bool("REALISTIC", True))
+    #: Add the backdrop's measured film grain to the logo. Zero on flat art.
+    match_grain: bool = field(default_factory=lambda: _env_bool("MATCH_GRAIN", True))
+    #: WCAG contrast ratio below which the logo gets a separating halo.
+    min_contrast: float = field(default_factory=lambda: _env_float("MIN_CONTRAST", 2.0))
 
 
 @dataclass
@@ -269,6 +276,8 @@ class Config:
             errors.append("overlay.align_y must be top, center or bottom")
         if self.overlay.max_upscale < 1.0:
             errors.append("overlay.max_upscale must be at least 1.0")
+        if not 1.0 <= self.overlay.min_contrast <= 21.0:
+            errors.append("overlay.min_contrast must be in [1, 21] (WCAG contrast ratio)")
 
         if self.runtime.device not in {"auto", "cpu", "cuda", "mps"} and not self.runtime.device.startswith("cuda:"):
             errors.append("runtime.device must be auto, cpu, mps, cuda or cuda:N")
