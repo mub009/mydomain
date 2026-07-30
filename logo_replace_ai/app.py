@@ -44,6 +44,8 @@ from utils import (
     resolve_device,
     save_image,
     setup_logging,
+    split_for,
+    to_yolo_label,
 )
 
 EXIT_OK = 0
@@ -63,7 +65,7 @@ class ImageResult:
     """What happened to a single input image."""
 
     source: Path
-    status: str = "pending"  # ok | skipped | no-detection | failed
+    status: str = "pending"  # ok | labelled | skipped | no-detection | failed
     output: Path | None = None
     detections: list[Detection] = field(default_factory=list)
     placements: list[Placement] = field(default_factory=list)
@@ -72,12 +74,14 @@ class ImageResult:
 
     @property
     def ok(self) -> bool:
-        return self.status in {"ok", "skipped"}
+        return self.status in {"ok", "labelled", "skipped"}
 
     def summary_line(self) -> str:
-        icon = {"ok": "✓", "skipped": "·", "no-detection": "!", "failed": "✗"}.get(self.status, "?")
+        icon = {"ok": "✓", "labelled": "✓", "skipped": "·", "no-detection": "!", "failed": "✗"}.get(self.status, "?")
         detail = ""
-        if self.status == "ok":
+        if self.status == "labelled":
+            detail = f"{len(self.detections)} box → {self.output}"
+        elif self.status == "ok":
             detail = f"{len(self.placements)} logo(s) → {self.output}"
         elif self.status == "skipped":
             detail = "output exists (use --overwrite)"
@@ -102,6 +106,7 @@ class LogoReplacePipeline:
         logo: Path | None = None,
         skip_overlay: bool = False,
         auto: bool = False,
+        export_dir: Path | None = None,
     ) -> None:
         config.validate()
         self.config = config
@@ -110,6 +115,7 @@ class LogoReplacePipeline:
         self.inpainter = build_inpainter(config)
         self.overlay = LogoOverlay(config, logo)
         self.skip_overlay = skip_overlay
+        self.export_dir = export_dir
 
     # -- single image -----------------------------------------------------
     def process_image(self, source: Path, output: Path) -> ImageResult:
@@ -128,6 +134,10 @@ class LogoReplacePipeline:
 
         detections = self.detector.detect(image)
         result.detections = detections
+
+        if self.export_dir is not None:
+            return self._export_label(source, image, detections, result, started)
+
         if not detections:
             result.status = "no-detection"
             result.seconds = time.perf_counter() - started
@@ -172,6 +182,41 @@ class LogoReplacePipeline:
         result.seconds = time.perf_counter() - started
         self._dump_debug(source, image=image, mask=mask, detections=detections, cleaned=cleaned)
         self.log.info("Wrote %s in %.1fs", output, result.seconds)
+        return result
+
+    # -- dataset export ---------------------------------------------------
+    def _export_label(
+        self,
+        source: Path,
+        image: Image.Image,
+        detections: list[Detection],
+        result: ImageResult,
+        started: float,
+    ) -> ImageResult:
+        """Write one image + YOLO label into the dataset tree.
+
+        The point is to bootstrap a training set: run this over your posters,
+        correct the boxes in a labelling tool, then train. Correcting a
+        roughly-right box is far quicker than drawing every one by hand.
+
+        Images with no detection still get an empty label file — YOLO reads
+        that as "nothing here", which is a genuinely useful negative example,
+        not a gap in the dataset.
+        """
+        assert self.export_dir is not None
+        split = split_for(source.name)
+        images_dir = ensure_dir(self.export_dir / "images" / split)
+        labels_dir = ensure_dir(self.export_dir / "labels" / split)
+
+        save_image(image, images_dir / f"{source.stem}.png")
+        lines = [to_yolo_label(d.box, image.size) for d in detections]
+        (labels_dir / f"{source.stem}.txt").write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
+
+        result.status = "labelled"
+        result.output = labels_dir / f"{source.stem}.txt"
+        result.seconds = time.perf_counter() - started
+        self.log.info("Labelled %s → %s/%s (%d box)", source.name, split, source.stem, len(lines))
+        self._dump_debug(source, image=image, detections=detections)
         return result
 
     # -- batch ------------------------------------------------------------
@@ -267,6 +312,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--auto",
         action="store_true",
         help="find logos by image analysis instead of YOLO — no weights needed",
+    )
+    det_group.add_argument(
+        "--export-labels",
+        type=Path,
+        metavar="DIR",
+        help="write a YOLO training dataset here instead of replacing logos",
     )
     det_group.add_argument(
         "--boxes",
@@ -418,6 +469,33 @@ def print_summary(results: list[ImageResult], elapsed: float) -> None:
     print(f"\n{len(results)} image(s) in {elapsed:.1f}s — {tally or 'nothing to do'}")
 
 
+def write_dataset_yaml(root: Path, results: list[ImageResult]) -> None:
+    """Write the data.yaml ultralytics needs, and say what to do next."""
+    root = root.resolve()
+    (root / "data.yaml").write_text(
+        "\n".join(
+            [
+                f"path: {root.as_posix()}",
+                "train: images/train",
+                "val: images/val",
+                "",
+                "names:",
+                "  0: logo",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    labelled = sum(1 for r in results if r.status == "labelled")
+    boxes = sum(len(r.detections) for r in results if r.status == "labelled")
+    print(
+        f"\nDataset: {labelled} image(s), {boxes} box(es) → {root}\n"
+        "  1. Correct the boxes (labelImg, Label Studio, or import the folder into Roboflow).\n"
+        f"  2. yolo detect train model=yolov8s.pt data={(root / 'data.yaml').as_posix()} epochs=100 imgsz=960\n"
+        "  3. Copy runs/detect/train/weights/best.pt to models/best.pt, then drop --auto."
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     logger = setup_logging(args.verbose)
@@ -444,8 +522,9 @@ def main(argv: list[str] | None = None) -> int:
             logo=config.paths.logo,
             skip_overlay=args.no_overlay,
             auto=args.auto,
+            export_dir=args.export_labels,
         )
-        if not args.no_overlay and not config.runtime.dry_run:
+        if not args.no_overlay and not config.runtime.dry_run and not args.export_labels:
             pipeline.overlay.load()  # fail before loading a multi-GB model
 
         if config.inpaint.backend == "sdxl" and not config.runtime.dry_run:
@@ -472,6 +551,8 @@ def main(argv: list[str] | None = None) -> int:
         started = time.perf_counter()
         results = pipeline.run(sources, config.paths.output_dir, source_root)
         print_summary(results, time.perf_counter() - started)
+        if args.export_labels:
+            write_dataset_yaml(args.export_labels, results)
     except LogoReplaceError as exc:
         logger.error("%s", exc)
         return EXIT_FAILED

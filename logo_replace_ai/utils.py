@@ -7,6 +7,7 @@ config validation and the classical pipeline all work on a bare install.
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import sys
 import time
@@ -257,6 +258,28 @@ def connected_components(binary: np.ndarray, min_pixels: int = 1) -> list[tuple[
         box = BBox(int(cols[0]), int(rows[0]), int(cols[-1]) + 1, int(rows[-1]) + 1)
         components.append((box, int(counts[label])))
     return components
+
+
+def to_yolo_label(box: BBox, size: tuple[int, int], class_id: int = 0) -> str:
+    """One YOLO label line: ``class cx cy w h``, all normalised to 0-1."""
+    width, height = size
+    box = box.clamp(width, height)
+    cx, cy = box.center
+    return (
+        f"{class_id} {cx / width:.6f} {cy / height:.6f} "
+        f"{box.width / width:.6f} {box.height / height:.6f}"
+    )
+
+
+def split_for(name: str, val_fraction: float = 0.2) -> str:
+    """Assign a file to ``train`` or ``val`` deterministically by name.
+
+    Hashing the name rather than shuffling means re-running the export keeps
+    every image in the split it was already in, so a growing dataset never
+    leaks validation images into training.
+    """
+    digest = hashlib.sha1(name.encode("utf-8")).digest()
+    return "val" if (digest[0] / 255.0) < val_fraction else "train"
 
 
 def parse_boxes(spec: str, width: int, height: int) -> list[BBox]:
