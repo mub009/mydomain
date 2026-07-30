@@ -115,6 +115,10 @@ class DetectConfig:
     classes: tuple[int, ...] = ()
     #: Boxes overlapping by more than this are merged into one region.
     merge_iou: float = field(default_factory=lambda: _env_float("MERGE_IOU", 0.3))
+    #: How many regions ``--auto`` may return. Deliberately 1: the heuristic
+    #: ranks well but cannot tell a logo from any other isolated graphic, and
+    #: a false positive does not just add a logo — it erases real artwork.
+    auto_max_detections: int = field(default_factory=lambda: _env_int("AUTO_MAX_DETECTIONS", 1))
 
 
 @dataclass
@@ -233,6 +237,8 @@ class Config:
             errors.append("detect.image_size must be at least 64")
         if self.detect.max_detections < 1:
             errors.append("detect.max_detections must be at least 1")
+        if self.detect.auto_max_detections < 1:
+            errors.append("detect.auto_max_detections must be at least 1")
         if not 0.0 <= self.detect.min_area_ratio < self.detect.max_area_ratio <= 1.0:
             errors.append("detect.min_area_ratio must be below max_area_ratio, both within [0, 1]")
 

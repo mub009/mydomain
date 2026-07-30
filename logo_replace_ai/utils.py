@@ -197,6 +197,68 @@ def merge_boxes(boxes: Iterable[BBox], iou_threshold: float) -> list[BBox]:
     return merged
 
 
+def connected_components(binary: np.ndarray, min_pixels: int = 1) -> list[tuple[BBox, int]]:
+    """Label 8-connected blobs in a boolean array; return ``(box, pixels)``.
+
+    Two-pass union-find, written out because neither Pillow nor NumPy ships a
+    labeller and this project refuses to require SciPy or OpenCV for it. Only
+    ever called on a downscaled analysis image, where the Python loop over set
+    pixels costs milliseconds.
+    """
+    height, width = binary.shape
+    labels = np.zeros((height, width), dtype=np.int32)
+    parent: list[int] = [0]
+
+    def find(node: int) -> int:
+        while parent[node] != node:
+            parent[node] = parent[parent[node]]  # path compression
+            node = parent[node]
+        return node
+
+    def union(left: int, right: int) -> None:
+        root_a, root_b = find(left), find(right)
+        if root_a != root_b:
+            parent[max(root_a, root_b)] = min(root_a, root_b)
+
+    next_label = 1
+    for y in range(height):
+        for x in np.flatnonzero(binary[y]):
+            neighbours = []
+            if y > 0:
+                for dx in (-1, 0, 1):
+                    nx = x + dx
+                    if 0 <= nx < width and labels[y - 1, nx]:
+                        neighbours.append(int(labels[y - 1, nx]))
+            if x > 0 and labels[y, x - 1]:
+                neighbours.append(int(labels[y, x - 1]))
+            if neighbours:
+                smallest = min(neighbours)
+                labels[y, x] = smallest
+                for other in neighbours:
+                    union(smallest, other)
+            else:
+                parent.append(next_label)
+                labels[y, x] = next_label
+                next_label += 1
+
+    if next_label == 1:
+        return []
+
+    roots = np.array([find(index) for index in range(next_label)], dtype=np.int32)
+    resolved = roots[labels]
+    counts = np.bincount(resolved.ravel())
+
+    components: list[tuple[BBox, int]] = []
+    for label in np.flatnonzero(counts):
+        if label == 0 or counts[label] < min_pixels:
+            continue
+        rows = np.flatnonzero((resolved == label).any(axis=1))
+        cols = np.flatnonzero((resolved == label).any(axis=0))
+        box = BBox(int(cols[0]), int(rows[0]), int(cols[-1]) + 1, int(rows[-1]) + 1)
+        components.append((box, int(counts[label])))
+    return components
+
+
 def parse_boxes(spec: str, width: int, height: int) -> list[BBox]:
     """Parse ``"x,y,w,h; x,y,w,h"`` into boxes.
 

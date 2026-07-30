@@ -68,8 +68,40 @@ python app.py --logo brand/acme.png --debug-dir output/_debug -v
 
 ## Getting a detector
 
-`models/best.pt` is **not** included — logo detection is dataset-specific and
-a generic COCO model has no "logo" class.
+Three ways to locate the old logo, in increasing order of effort and accuracy.
+
+* **`--auto` — no model at all.** Finds logo-like regions by image analysis:
+
+  ```bash
+  python app.py --input input/poster.png --auto --inpaint classical
+  ```
+
+  It scores every isolated, busy, colour-distinct region on six signals
+  (saliency, isolation from its surroundings, size, aspect, colourfulness,
+  corner placement) and returns the best one. On a synthetic benchmark of
+  posters with known logo positions — varied backgrounds, seven placements,
+  with and without a card behind the logo — it gets **71% top-1 hits, 15%
+  partial, 15% misses** on held-out seeds.
+
+  That is useful for driving a batch you intend to review, and not safe to
+  trust blind: a miss does not merely skip the logo, it erases the wrong part
+  of the poster. It returns **one** region by default (`--auto-max N` for
+  more) precisely because a false positive is destructive. Always check
+  `--debug-dir` output on a new kind of poster before running a batch.
+
+  It cannot tell a logo from any other isolated graphic — QR codes, badges
+  and stylised headlines all look logo-like to it.
+
+* **`--boxes` — exact, when the layout is fixed.** If the logo always sits in
+  the same slot, this is more accurate than any detector and costs nothing:
+
+  ```bash
+  python app.py --boxes 0.08,0.05,0.24,0.12      # x,y,w,h as fractions
+  ```
+
+* **A trained YOLO model — the accurate option.** `models/best.pt` is **not**
+  included; logo detection is dataset-specific and a generic COCO model has
+  no "logo" class.
 
 * **Train one.** Label a few hundred posters (Roboflow, CVAT, Label Studio),
   export in YOLO format, then:
@@ -79,17 +111,14 @@ a generic COCO model has no "logo" class.
   cp runs/detect/train/weights/best.pt models/best.pt
   ```
 
-* **Or skip detection.** If the logo always sits in the same slot — which is
-  the normal case for a poster template — pass the box directly:
+Box syntax, for `--boxes`: `x,y,w,h` from the top-left corner, semicolons
+between boxes. Values ≤ 1 are read as fractions of the image, so one spec
+works across poster sizes.
 
-  ```bash
-  python app.py --boxes 0.08,0.05,0.24,0.12      # x,y,w,h as fractions
-  python app.py --boxes 80,90,300,150            # …or pixels
-  python app.py --boxes "80,90,300,150; 700,1200,220,90"   # two logos
-  ```
-
-  Values ≤ 1 are read as fractions of the image, so one spec works across
-  poster sizes.
+```bash
+python app.py --boxes 80,90,300,150                       # pixels
+python app.py --boxes "80,90,300,150; 700,1200,220,90"    # two logos
+```
 
 ---
 
@@ -97,7 +126,7 @@ a generic COCO model has no "logo" class.
 
 | Step | File | What happens |
 |------|------|--------------|
-| Detect | `detect.py` | YOLO runs, boxes below `--conf` are dropped, absurdly small/large ones too, overlapping boxes are merged so one logo is filled once. |
+| Detect | `detect.py` | YOLO, the `--auto` heuristic, or `--boxes`. Boxes below `--conf` are dropped, absurdly small/large ones too, and overlapping boxes are merged so one logo is filled once. |
 | Mask | `utils.py` | Each box is grown by `--dilate` (swallows anti-aliased edges) and feathered *outward* by `--feather`, so the core is fully repainted and the border fades. |
 | Inpaint | `inpaint.py` | SDXL fills a square crop around each region at 1024 px and the patch is composited back — pixels outside the mask stay bit-for-bit identical. |
 | Overlay | `overlay.py` | Transparent margins are trimmed, the logo is scaled to fit the box (aspect preserved, `--scale` leaves breathing room), aligned, shadowed and alpha-composited. |
@@ -135,7 +164,9 @@ visibly on a hole more than ~100 px wide. Tune with `--classical-max-span`.
 --logo PATH             transparent PNG            --debug-dir DIR
 
 --weights models/best.pt   --conf 0.35   --max-det 8   --classes 0,2
---boxes "x,y,w,h; …"       bypass YOLO entirely
+--auto                     heuristic detection, no model needed
+--auto-max 1               how many regions --auto may return
+--boxes "x,y,w,h; …"       bypass detection entirely
 
 --inpaint sdxl|classical|none    --steps 30   --guidance 7.0
 --classical-method pillow|telea|ns   --classical-max-span 96
@@ -195,6 +226,7 @@ had no detection, `2` for bad usage or configuration.
 | CUDA out of memory | `--cpu-offload`, or `--work-size 768` |
 | Logo looks pasted on | keep the shadow, or `--shadow-opacity 0.2` for flat art |
 | Nothing detected | lower `--conf 0.2`, check `--debug-dir` output |
+| `--auto` picks the wrong thing | use `--boxes` for that poster, or raise `--auto-max` and pick |
 
 `--debug-dir` writes three files per image: the detections drawn on the
 input, the mask, and the cleaned plate before the new logo goes on. That is

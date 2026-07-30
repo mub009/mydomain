@@ -101,11 +101,12 @@ class LogoReplacePipeline:
         manual_boxes: str | None = None,
         logo: Path | None = None,
         skip_overlay: bool = False,
+        auto: bool = False,
     ) -> None:
         config.validate()
         self.config = config
         self.log = get_logger()
-        self.detector = build_detector(config, manual_boxes)
+        self.detector = build_detector(config, manual_boxes, auto=auto)
         self.inpainter = build_inpainter(config)
         self.overlay = LogoOverlay(config, logo)
         self.skip_overlay = skip_overlay
@@ -256,7 +257,17 @@ def build_parser() -> argparse.ArgumentParser:
     det_group.add_argument("--iou", type=float, help="NMS IoU threshold")
     det_group.add_argument("--imgsz", type=int, help="YOLO inference size")
     det_group.add_argument("--max-det", type=int, help="maximum logos per image")
+    det_group.add_argument(
+        "--auto-max",
+        type=int,
+        help="how many regions --auto may return (default 1 — see README)",
+    )
     det_group.add_argument("--classes", help="comma-separated class ids to keep, e.g. 0,2")
+    det_group.add_argument(
+        "--auto",
+        action="store_true",
+        help="find logos by image analysis instead of YOLO — no weights needed",
+    )
     det_group.add_argument(
         "--boxes",
         help="skip YOLO and use these boxes: 'x,y,w,h' in pixels or 0-1 fractions, ';' separated",
@@ -335,6 +346,8 @@ def apply_args(config: Config, args: argparse.Namespace) -> Config:
         detect.image_size = args.imgsz
     if args.max_det is not None:
         detect.max_detections = args.max_det
+    if args.auto_max is not None:
+        detect.auto_max_detections = args.auto_max
     if args.classes:
         detect.classes = tuple(int(p) for p in args.classes.replace(" ", "").split(",") if p)
 
@@ -430,6 +443,7 @@ def main(argv: list[str] | None = None) -> int:
             manual_boxes=args.boxes,
             logo=config.paths.logo,
             skip_overlay=args.no_overlay,
+            auto=args.auto,
         )
         if not args.no_overlay and not config.runtime.dry_run:
             pipeline.overlay.load()  # fail before loading a multi-GB model
@@ -444,10 +458,16 @@ def main(argv: list[str] | None = None) -> int:
         logger.info(
             "%d image(s) · detector: %s · inpaint: %s · logo: %s",
             len(sources),
-            "manual boxes" if args.boxes else config.detect.weights.name,
+            "manual boxes" if args.boxes else ("heuristic (--auto)" if args.auto else config.detect.weights.name),
             config.inpaint.backend,
             "none" if args.no_overlay else config.paths.logo.name,
         )
+
+        if args.auto:
+            logger.info(
+                "Heuristic detection is best-effort (~71%% top-1 on a synthetic benchmark) — "
+                "review the results, or add --debug-dir to see what it picked."
+            )
 
         started = time.perf_counter()
         results = pipeline.run(sources, config.paths.output_dir, source_root)
