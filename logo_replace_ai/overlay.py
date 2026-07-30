@@ -29,6 +29,8 @@ from utils import (
     luminance_map,
     paste_rgba,
     relative_luminance,
+    sharpen_rgba,
+    steepen_alpha,
     trim_transparent,
 )
 
@@ -97,7 +99,7 @@ class LogoOverlay:
             raise AssetError(f"target box {box.as_tuple()} is too small to hold a logo")
 
         size = fit_within(logo.size, (target.width, target.height), cfg.scale, cfg.max_upscale)
-        resized = logo.resize(size, Image.LANCZOS)
+        resized = self._resample(logo, size, target)
         resized = apply_opacity(resized, cfg.opacity)
 
         x = _align(target.x1, target.width, size[0], cfg.align_x, ("left", "center", "right"))
@@ -124,6 +126,50 @@ class LogoOverlay:
         )
         get_logger().debug("placed logo %s (scale %.2fx)", placement.describe(), placement.scale)
         return result.convert("RGB"), placement
+
+    # -- resampling -------------------------------------------------------
+    def _resample(self, logo: Image.Image, size: tuple[int, int], target: BBox) -> Image.Image:
+        """Resize the logo to ``size``, and say something when it is too small.
+
+        Enlarging cannot invent detail. Sharpening recovers some of the
+        crispness that interpolation costs, and that is the whole of what is
+        available — the fix for a small logo is a bigger logo.
+        """
+        cfg = self._config.overlay
+        factor = size[0] / logo.width
+        resized = logo.resize(size, Image.LANCZOS)
+
+        if factor <= 1.0:
+            return resized  # downscaling: LANCZOS is already the right answer
+
+        if factor >= cfg.warn_upscale:
+            needed = int(round(target.width * cfg.scale))
+            get_logger().warning(
+                "%s is only %dx%d and this slot needs %dx%d — enlarging %.1fx, so it will look soft. "
+                "Supply the logo at %d px wide or more (an SVG or the vector original is better still).",
+                self._path.name,
+                logo.width,
+                logo.height,
+                size[0],
+                size[1],
+                factor,
+                needed,
+            )
+        if size[0] < int(round(target.width * cfg.scale)) - 1:
+            get_logger().warning(
+                "Enlargement was capped at %.1fx (--max-upscale), so the logo will not fill its slot.",
+                cfg.max_upscale,
+            )
+        if not cfg.sharpen_upscale:
+            return resized
+
+        # Both amounts ramp with the enlargement and stop climbing: past this
+        # much correction you get ringing halos and staircased edges, which
+        # look worse than the softness they replace.
+        percent = int(np.clip((factor - 1.0) * 90.0, 0.0, 150.0))
+        radius = float(np.clip(factor * 0.5, 0.6, 2.5))
+        resized = sharpen_rgba(resized, radius=radius, percent=percent)
+        return steepen_alpha(resized, strength=float(np.clip(1.0 + (factor - 1.0) * 0.35, 1.0, 1.8)))
 
     # -- realism ----------------------------------------------------------
     def _match_texture(self, background: Image.Image, logo: Image.Image, landing: BBox) -> Image.Image:

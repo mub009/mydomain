@@ -367,6 +367,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="paste the logo flat: no grain matching, no contrast halo",
     )
     ov_group.add_argument("--min-contrast", type=float, help="contrast ratio below which a halo is added")
+    ov_group.add_argument("--no-sharpen", action="store_true", help="do not sharpen a logo that had to be enlarged")
+    ov_group.add_argument("--max-upscale", type=float, help="never enlarge the logo beyond this multiple")
 
     rt_group = parser.add_argument_group("runtime")
     rt_group.add_argument("--device", help="auto, cpu, cuda, cuda:0 or mps")
@@ -457,6 +459,10 @@ def apply_args(config: Config, args: argparse.Namespace) -> Config:
         overlay.realistic = False
     if args.min_contrast is not None:
         overlay.min_contrast = args.min_contrast
+    if args.no_sharpen:
+        overlay.sharpen_upscale = False
+    if args.max_upscale is not None:
+        overlay.max_upscale = args.max_upscale
 
     if args.device:
         runtime.device = args.device

@@ -175,6 +175,37 @@ Two things give away a pasted logo, and both are handled automatically
   symbol and white type averages to mid-grey and passes while its wordmark is
   invisible.
 
+### Logo quality
+
+Enlarging cannot invent detail. If the logo file is smaller than the slot it
+has to fill, the result will be soft no matter what any tool does — so the
+pipeline tells you, with the numbers:
+
+```
+WARNING logo.png is only 97x48 and this slot needs 200x99 — enlarging 2.1x,
+        so it will look soft. Supply the logo at 200 px wide or more
+        (an SVG or the vector original is better still).
+```
+
+What it does do when it must enlarge: LANCZOS resampling, then an unsharp
+mask and a tightened alpha edge, both ramped with the enlargement factor and
+capped before they start ringing. That recovers some of the crispness
+interpolation costs. It does not recover JPEG artefacts, a fuzzy scan, or
+detail that was never in the file. `--no-sharpen` turns it off.
+
+In order of what actually fixes a poor logo:
+
+1. **The vector original** — SVG, AI, EPS or PDF. Export a PNG from it at the
+   size you need and the problem disappears permanently.
+2. **A large PNG with real transparency**, at least as wide as the biggest
+   slot you will fill.
+3. **A JPEG on a white background** — the common case, and the worst. It has
+   no alpha, so it lands as a solid rectangle (the tool warns), and JPEG rings
+   every edge. Usable on a white poster, visibly wrong anywhere else.
+
+`--max-upscale` (default 4.0) caps enlargement; when it bites, the logo will
+not fill its slot and you get told that too.
+
 ### Inpainting backends
 
 | `--inpaint` | Needs | Speed | Use it when |
@@ -276,6 +307,7 @@ had no detection, `2` for bad usage or configuration.
 | `--auto` picks the wrong thing | use `--boxes` for that poster, or raise `--auto-max` and pick |
 | Poster is a template with an empty box | use `--slots`, not `--auto` |
 | Logo barely visible on the page | heed the contrast warning — supply a light/dark logo variant |
+| Logo looks soft or blocky | it is being enlarged; supply it at the px width the warning names |
 
 `--debug-dir` writes three files per image: the detections drawn on the
 input, the mask, and the cleaned plate before the new logo goes on. That is

@@ -564,6 +564,37 @@ def add_grain(image: Image.Image, sigma: float, seed: int = 0) -> Image.Image:
     return Image.fromarray(array.astype(np.uint8), mode="RGBA")
 
 
+def sharpen_rgba(image: Image.Image, radius: float, percent: int) -> Image.Image:
+    """Unsharp-mask the colour channels, leaving alpha untouched.
+
+    Sharpening alpha as well would eat into the anti-aliased rim and give the
+    logo a hard, cut-out edge.
+    """
+    rgba = image.convert("RGBA")
+    red, green, blue, alpha = rgba.split()
+    sharp = Image.merge("RGB", (red, green, blue)).filter(
+        ImageFilter.UnsharpMask(radius=radius, percent=percent, threshold=2)
+    )
+    return Image.merge("RGBA", (*sharp.split(), alpha))
+
+
+def steepen_alpha(image: Image.Image, strength: float) -> Image.Image:
+    """Tighten a soft alpha edge without turning it into a staircase.
+
+    Enlarging spreads a logo's one-pixel anti-aliased rim over several pixels,
+    which reads as a blurry halo. Pushing part-transparent values back towards
+    0 or 1 narrows that rim; ``strength`` stays modest on purpose, because
+    going further just trades blur for jaggies.
+    """
+    if strength <= 1.0:
+        return image
+    rgba = image.convert("RGBA")
+    alpha = np.asarray(rgba.getchannel("A"), dtype=np.float32) / 255.0
+    tightened = np.clip((alpha - 0.5) * strength + 0.5, 0.0, 1.0)
+    rgba.putalpha(Image.fromarray((tightened * 255.0).astype(np.uint8), mode="L"))
+    return rgba
+
+
 def alpha_weighted_colour(image: Image.Image) -> np.ndarray | None:
     """Mean colour of an RGBA image weighted by its alpha — its visible ink."""
     rgba = np.asarray(image.convert("RGBA"), dtype=np.float32)

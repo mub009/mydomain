@@ -201,6 +201,11 @@ class OverlayConfig:
     match_grain: bool = field(default_factory=lambda: _env_bool("MATCH_GRAIN", True))
     #: WCAG contrast ratio below which the logo gets a separating halo.
     min_contrast: float = field(default_factory=lambda: _env_float("MIN_CONTRAST", 2.0))
+    #: Sharpen a logo that had to be enlarged, recovering some of the
+    #: crispness interpolation costs. It cannot invent detail that is absent.
+    sharpen_upscale: bool = field(default_factory=lambda: _env_bool("SHARPEN_UPSCALE", True))
+    #: Warn when the logo must be enlarged by more than this to fill its slot.
+    warn_upscale: float = field(default_factory=lambda: _env_float("WARN_UPSCALE", 1.25))
 
 
 @dataclass
@@ -276,6 +281,8 @@ class Config:
             errors.append("overlay.align_y must be top, center or bottom")
         if self.overlay.max_upscale < 1.0:
             errors.append("overlay.max_upscale must be at least 1.0")
+        if self.overlay.warn_upscale < 1.0:
+            errors.append("overlay.warn_upscale must be at least 1.0")
         if not 1.0 <= self.overlay.min_contrast <= 21.0:
             errors.append("overlay.min_contrast must be in [1, 21] (WCAG contrast ratio)")
 
