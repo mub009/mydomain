@@ -157,8 +157,10 @@ class InpaintConfig:
     retry_on_oom: bool = field(default_factory=lambda: _env_bool("RETRY_ON_OOM", True))
     #: Move submodules to CPU between steps — slower, but fits in ~6 GB VRAM.
     cpu_offload: bool = field(default_factory=lambda: _env_bool("CPU_OFFLOAD", False))
-    #: OpenCV algorithm used when ``backend == "classical"``: ``telea`` or ``ns``.
-    classical_method: str = field(default_factory=lambda: _env_str("CLASSICAL_METHOD", "telea"))
+    #: Fill used when ``backend == "classical"``. ``pillow`` is the built-in
+    #: NumPy pyramid fill (no extra dependency); ``telea`` and ``ns`` are
+    #: OpenCV's, and fall back to ``pillow`` if cv2 cannot be imported.
+    classical_method: str = field(default_factory=lambda: _env_str("CLASSICAL_METHOD", "pillow"))
     classical_radius: int = field(default_factory=lambda: _env_int("CLASSICAL_RADIUS", 7))
     #: Holes wider than this are filled on a downscaled copy — see
     #: ``ClassicalInpainter``. Larger keeps more detail, smaller smears less.
@@ -236,8 +238,8 @@ class Config:
 
         if self.inpaint.backend not in {"sdxl", "classical", "none"}:
             errors.append("inpaint.backend must be one of: sdxl, classical, none")
-        if self.inpaint.classical_method not in {"telea", "ns"}:
-            errors.append("inpaint.classical_method must be 'telea' or 'ns'")
+        if self.inpaint.classical_method not in {"pillow", "telea", "ns"}:
+            errors.append("inpaint.classical_method must be 'pillow', 'telea' or 'ns'")
         if self.inpaint.classical_max_span < 16:
             errors.append("inpaint.classical_max_span must be at least 16")
         if self.inpaint.classical_radius < 1:

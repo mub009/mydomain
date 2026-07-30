@@ -1,9 +1,14 @@
 # --- always required -------------------------------------------------------
 # The classical pipeline (--inpaint classical / none, --boxes) runs on these
-# three alone: no GPU, no model downloads, a few seconds to install.
+# two alone: no GPU, no model downloads, a few seconds to install.
 pillow>=10.2,<12
 numpy>=1.26,<3
-opencv-python>=4.9,<5
+
+# --- optional: alternative classical fills ---------------------------------
+# --classical-method telea|ns. The default 'pillow' fill needs no OpenCV, and
+# on Windows a cv2 wheel can import-fail with "DLL load failed" when the
+# Visual C++ runtime is absent — which is why it is not a hard requirement.
+# opencv-python>=4.9,<5
 
 # --- YOLO detection --------------------------------------------------------
 # Needed for automatic logo detection (anything except --boxes).

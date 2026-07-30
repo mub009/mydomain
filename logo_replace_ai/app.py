@@ -274,7 +274,11 @@ def build_parser() -> argparse.ArgumentParser:
     inp_group.add_argument("--feather", type=int, help="blur the mask edge by N px")
     inp_group.add_argument("--seed", type=int, help="random seed (-1 for random)")
     inp_group.add_argument("--cpu-offload", action="store_true", help="offload SDXL submodules to CPU (low VRAM)")
-    inp_group.add_argument("--classical-method", choices=("telea", "ns"), help="OpenCV algorithm for --inpaint classical")
+    inp_group.add_argument(
+        "--classical-method",
+        choices=("pillow", "telea", "ns"),
+        help="fill used by --inpaint classical; pillow needs no OpenCV",
+    )
     inp_group.add_argument(
         "--classical-max-span",
         type=int,

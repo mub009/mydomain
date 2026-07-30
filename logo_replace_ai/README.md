@@ -8,7 +8,7 @@ whole folder.
 ```
 input/poster.png  ──►  detect  ──►  mask  ──►  inpaint  ──►  overlay  ──►  output/poster.png
                        YOLO         dilate     SDXL          fit + shadow
-                                    feather    (or OpenCV)
+                                    feather    (or NumPy fill)
 ```
 
 ---
@@ -26,22 +26,22 @@ python -m venv .venv
 # Linux / macOS
 source .venv/bin/activate
 
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 ```
 
 **NVIDIA GPU?** Install the CUDA build of torch *before* the rest, otherwise
 pip hands you the CPU-only wheel and SDXL will take minutes per image:
 
 ```bash
-pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
-pip install -r requirements.txt
+python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+python -m pip install -r requirements.txt
 ```
 
-Only need the fast CPU path (`--inpaint classical`, `--boxes`)? Three packages
+Only need the fast CPU path (`--inpaint classical`, `--boxes`)? Two packages
 are enough:
 
 ```bash
-pip install pillow numpy opencv-python
+python -m pip install pillow numpy
 ```
 
 ---
@@ -107,14 +107,23 @@ a generic COCO model has no "logo" class.
 | `--inpaint` | Needs | Speed | Use it when |
 |-------------|-------|-------|-------------|
 | `sdxl` *(default)* | GPU + ~7 GB download | seconds/image on GPU | Final renders; textured or photographic backgrounds. |
-| `classical` | opencv only | milliseconds | Previews, CI, flat or gradient backgrounds. |
+| `classical` | pillow + numpy | milliseconds | Previews, CI, flat or gradient backgrounds. |
 | `none` | — | instant | The new logo fully covers the old one anyway. |
 
-`classical` fills wide holes on a downscaled copy and scales the patch back
-up. Telea and Navier-Stokes both fan colour in from the rim, which smears
-visibly on a hole more than ~100 px wide; filling small and enlarging gives a
-smooth continuation instead. Tune with `--classical-max-span` via
-`LOGO_AI_CLASSICAL_MAX_SPAN`.
+`classical` has three implementations, chosen with `--classical-method`:
+
+* `pillow` *(default)* — a pull-push pyramid fill in pure NumPy. It halves the
+  image repeatedly while tracking how much real pixel data backs each sample,
+  then walks back up filling holes from the coarser level. Smooth
+  extrapolation of the surrounding colour and gradient, no extra dependency.
+* `telea` / `ns` — OpenCV's algorithms, if `opencv-python` is installed. They
+  fall back to `pillow` with a warning when cv2 cannot be imported, which on
+  Windows is common: the wheel installs fine and then fails with "DLL load
+  failed" because the Visual C++ runtime is missing.
+
+Whichever runs, wide holes are filled on a downscaled copy and the patch is
+scaled back up — the OpenCV algorithms fan colour in from the rim and smear
+visibly on a hole more than ~100 px wide. Tune with `--classical-max-span`.
 
 ---
 
@@ -129,6 +138,7 @@ smooth continuation instead. Tune with `--classical-max-span` via
 --boxes "x,y,w,h; …"       bypass YOLO entirely
 
 --inpaint sdxl|classical|none    --steps 30   --guidance 7.0
+--classical-method pillow|telea|ns   --classical-max-span 96
 --prompt "…"  --negative-prompt "…"  --seed 42
 --dilate 10   --feather 6    --work-size 1024   --cpu-offload
 
@@ -219,4 +229,11 @@ reports the exact `pip install` line rather than a traceback.
 * Paths are handled with `pathlib`; forward and back slashes both work.
 * Long HuggingFace cache paths can trip the 260-character limit — set
   `HF_HOME=C:\hf` if a download fails with a path error.
+* `import cv2` failing with "DLL load failed" means the Visual C++ runtime is
+  missing. Nothing needs fixing — the default `pillow` fill does not use
+  OpenCV. Install [vc_redist.x64.exe](https://aka.ms/vs/17/release/vc_redist.x64.exe)
+  only if you specifically want `--classical-method telea`.
+* Use `python -m pip install …` rather than `pip install …`. A bare `pip` can
+  belong to a different interpreter than the one running the script, which
+  installs the package somewhere your venv will never look.
 * No symlinks or `fork()` are used anywhere.

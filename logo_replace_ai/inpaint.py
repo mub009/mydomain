@@ -4,8 +4,8 @@ Three backends share one interface:
 
 ``sdxl``       Stable Diffusion XL inpainting — best quality, needs a GPU and
                a few GB of downloaded weights.
-``classical``  OpenCV Telea / Navier-Stokes — instant, CPU-only, good enough
-               for flat or lightly textured backgrounds.
+``classical``  A NumPy pyramid fill (or OpenCV, if installed) — instant,
+               CPU-only, good enough for flat or lightly textured backgrounds.
 ``none``       Leave the pixels alone; the new logo is pasted straight on top.
 
 The diffusion backend works on a square crop around each masked region rather
@@ -19,11 +19,12 @@ from __future__ import annotations
 from typing import Protocol, Sequence
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageFilter
 
 from config import Config
 from utils import (
     BBox,
+    DependencyError,
     InpaintError,
     ModelLoadError,
     get_logger,
@@ -81,38 +82,100 @@ class NoOpInpainter:
         return image.convert("RGB")
 
 
+def _downsample(array: np.ndarray) -> np.ndarray:
+    """Average 2x2 blocks, repeating the last row/column on odd sizes."""
+    if array.shape[0] % 2:
+        array = np.concatenate([array, array[-1:]], axis=0)
+    if array.shape[1] % 2:
+        array = np.concatenate([array, array[:, -1:]], axis=1)
+    height, width = array.shape[:2]
+    return array.reshape(height // 2, 2, width // 2, 2, array.shape[2]).mean(axis=(1, 3))
+
+
+def _upsample(array: np.ndarray, shape: tuple[int, int]) -> np.ndarray:
+    """Bilinear resize to ``shape``, channel by channel.
+
+    Nearest-neighbour is the textbook choice here and it is visibly wrong:
+    every pyramid level stamps its own 2x2 blocks into the hole, and the
+    upscale back to full resolution turns them into a quilt.
+    """
+    height, width, channels = array.shape
+    if (height, width) == shape:
+        return array
+    out = np.empty((shape[0], shape[1], channels), dtype=np.float32)
+    for channel in range(channels):
+        plane = Image.fromarray(array[..., channel].astype(np.float32), mode="F")
+        out[..., channel] = np.asarray(plane.resize((shape[1], shape[0]), Image.BILINEAR), dtype=np.float32)
+    return out
+
+
+def _pull_push_fill(rgb: np.ndarray, known: np.ndarray, eps: float = 1e-6) -> np.ndarray:
+    """Fill holes with a weighted image pyramid — the pull-push algorithm.
+
+    Pull: repeatedly halve the image, carrying a weight channel that records
+    how much real pixel data went into each sample, until the hole is smaller
+    than a pixel and every sample is backed by something real. Push: walk back
+    down, using the coarse level to fill wherever the fine level has no data.
+
+    The result is a smooth extrapolation of the surrounding colour and
+    gradient into the hole — which is what a poster background usually is —
+    and it needs nothing but NumPy.
+    """
+    weights = known[..., None].astype(np.float32)
+    pyramid = [(rgb.astype(np.float32) * weights, weights)]
+    while min(pyramid[-1][0].shape[:2]) > 2:
+        image_level, weight_level = pyramid[-1]
+        pyramid.append((_downsample(image_level), _downsample(weight_level)))
+
+    # Coarsest level: normalise so it holds colours rather than colour x weight.
+    image_level, weight_level = pyramid[-1]
+    coarse = image_level / np.maximum(weight_level, eps)
+
+    for index in range(len(pyramid) - 2, -1, -1):
+        image_level, weight_level = pyramid[index]
+        shape = image_level.shape[:2]
+        parent = _upsample(coarse, shape)
+        # Where this level has data, keep it; elsewhere take the parent's.
+        alpha = np.clip(weight_level, 0.0, 1.0)
+        here = image_level / np.maximum(weight_level, eps)
+        coarse = alpha * here + (1.0 - alpha) * parent
+
+    return np.clip(coarse, 0.0, 255.0)
+
+
 class ClassicalInpainter:
-    """OpenCV's Telea / Navier-Stokes fill.
+    """Fast, model-free background fill.
 
-    No model download, no GPU, milliseconds per image. It propagates
-    surrounding colour inwards, so it is convincing on flat, gradient or
-    softly textured backgrounds and obviously smeary on detailed ones.
+    No download, no GPU, milliseconds per image. Two implementations:
 
-    Both algorithms fan colour in from the hole's rim, which on a hole wider
-    than a few dozen pixels leaves a fan-shaped smear. The fix is to shrink
-    the image until the hole is small, fill it there, and scale the patch back
-    up: the result is a smooth low-frequency continuation of the background,
-    which is what posters usually need. Small holes are filled at full
-    resolution, where the rim really does carry the right detail.
+    * **pillow** (default) — a pull-push pyramid fill in pure NumPy. Smooth
+      extrapolation of the surrounding colour, no extra dependency.
+    * **telea / ns** — OpenCV's edge-propagating algorithms, used when
+      ``opencv-python`` is importable and asked for.
+
+    Either way, wide holes are filled on a downscaled copy and the patch is
+    scaled back up. Both OpenCV algorithms fan colour in from the hole's rim
+    and smear visibly on anything wider than ~100 px; filling small and
+    enlarging gives a smooth continuation instead. Small holes are filled at
+    full resolution, where the rim really does carry the right detail.
     """
 
     name = "classical"
 
     def __init__(self, config: Config) -> None:
         self._config = config
+        self._warned_about_cv2 = False
 
     def fill(self, image: Image.Image, mask: Image.Image, regions: Sequence[BBox]) -> Image.Image:
-        cv2 = require_module("cv2", "opencv-python")
         cfg = self._config.inpaint
         rgb = image.convert("RGB")
-        # cv2.inpaint wants a hard mask; the feathered one is kept for the
-        # final composite so the repaired patch still blends at its border.
+        # The fill wants a hard mask; the feathered one is kept for the final
+        # composite so the repaired patch still blends at its border.
         hard = Image.fromarray((np.asarray(mask.convert("L")) > 16).astype(np.uint8) * 255, mode="L")
         bounds = mask_bounds(hard)
         if bounds is None:
             return rgb
 
-        method = cv2.INPAINT_TELEA if cfg.classical_method == "telea" else cv2.INPAINT_NS
         span = max(1, bounds.longest_side)
         factor = min(1.0, cfg.classical_max_span / span)
 
@@ -126,20 +189,59 @@ class ClassicalInpainter:
             # leave slivers of the old logo behind.
             work_hard = hard.resize(size, Image.BOX).point(lambda v: 255 if v > 0 else 0)
 
+        filled = self._fill_patch(work_image, work_hard, factor)
+        return _composite(rgb, filled, mask)
+
+    # -- implementations --------------------------------------------------
+    def _fill_patch(self, image: Image.Image, hard: Image.Image, factor: float) -> Image.Image:
+        method = self._config.inpaint.classical_method
+        if method in {"telea", "ns"}:
+            cv2 = self._try_opencv()
+            if cv2 is not None:
+                return self._fill_opencv(cv2, image, hard, factor)
+        return self._fill_pyramid(image, hard)
+
+    def _try_opencv(self):
+        """Import cv2, or fall back with one warning per run.
+
+        A broken OpenCV install — a missing system DLL is the usual cause on
+        Windows — should not stop a fill that NumPy can do perfectly well.
+        """
+        try:
+            return require_module("cv2", "opencv-python")
+        except DependencyError as exc:
+            if not self._warned_about_cv2:
+                get_logger().warning(
+                    "%s\n  Falling back to the built-in NumPy fill "
+                    "(--classical-method pillow to silence this).",
+                    exc,
+                )
+                self._warned_about_cv2 = True
+            return None
+
+    def _fill_opencv(self, cv2, image: Image.Image, hard: Image.Image, factor: float) -> Image.Image:
+        cfg = self._config.inpaint
+        algorithm = cv2.INPAINT_TELEA if cfg.classical_method == "telea" else cv2.INPAINT_NS
         radius = max(3, int(round(cfg.classical_radius * (factor if factor < 1.0 else 1.0))))
         try:
-            with timed("classical inpaint"):
-                filled = cv2.inpaint(
-                    np.asarray(work_image)[:, :, ::-1].copy(),
-                    np.asarray(work_hard),
-                    radius,
-                    method,
-                )
+            with timed("classical inpaint (opencv)"):
+                filled = cv2.inpaint(np.asarray(image)[:, :, ::-1].copy(), np.asarray(hard), radius, algorithm)
         except Exception as exc:
             raise InpaintError(f"OpenCV inpainting failed: {exc}") from exc
+        return Image.fromarray(filled[:, :, ::-1])
 
-        result = Image.fromarray(filled[:, :, ::-1])
-        return _composite(rgb, result, mask)
+    def _fill_pyramid(self, image: Image.Image, hard: Image.Image) -> Image.Image:
+        rgb = np.asarray(image, dtype=np.float32)
+        known = 1.0 - (np.asarray(hard, dtype=np.float32) / 255.0)
+        if not known.any():
+            raise InpaintError("the mask covers the whole image — nothing left to fill from")
+        with timed("classical inpaint (pyramid)"):
+            filled = _pull_push_fill(rgb, known)
+        result = Image.fromarray(filled.astype(np.uint8), mode="RGB")
+        # The pyramid's nearest-neighbour upsampling leaves faint 2x2 steps;
+        # a sub-pixel blur removes them without touching real detail, which
+        # the composite restores outside the mask anyway.
+        return result.filter(ImageFilter.GaussianBlur(radius=0.8))
 
 
 class SDXLInpainter:
