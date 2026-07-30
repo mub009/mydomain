@@ -206,8 +206,7 @@ class LogoReplacePipeline:
             self.log.info("Dry run — would write %s", output)
             # Report on the original: nothing was cleaned, so say so rather
             # than pretending the numbers come from a finished poster.
-            if self.colour.report:
-                self._apply_colour(image)
+            self._apply_colour(image)
             self._dump_debug(source, image=image, mask=mask, detections=detections)
             return result
 
@@ -240,7 +239,7 @@ class LogoReplacePipeline:
         options = self.colour
         if not (options.report or options.match_poster or options.tint_logo):
             return poster
-        if options.match_poster:
+        if options.match_poster and not self.config.runtime.dry_run:
             self.log.warning(
                 "Retinting moves every pixel near the accent hue — including any third-party mark that "
                 "happens to share it (a Google badge, a payment logo, a map pin). Check those before publishing."
@@ -264,9 +263,15 @@ class LogoReplacePipeline:
             self.log.warning("--match-poster needs a detectable accent in both images; leaving colours alone")
             return poster
 
-        self.log.info(
-            "Retinting poster #%02x%02x%02x → #%02x%02x%02x", *source, *target
-        )
+        if self.config.runtime.dry_run:
+            # Saying "Retinting" while writing nothing reads as a silent
+            # failure. Name the colours it *would* use instead.
+            self.log.info(
+                "Dry run — would retint #%02x%02x%02x → #%02x%02x%02x", *source, *target
+            )
+            return poster
+
+        self.log.info("Retinting poster #%02x%02x%02x → #%02x%02x%02x", *source, *target)
         return retint(poster, source, target, tolerance=options.tolerance).convert("RGB")
 
     def _swatch_rgb(self, swatch, label: str) -> tuple[int, int, int] | None:
