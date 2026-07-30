@@ -441,13 +441,35 @@ def human_size(size: tuple[int, int]) -> str:
 # torch device resolution (lazy — torch is optional)
 # --------------------------------------------------------------------------
 def require_module(name: str, package: str, extra: str = ""):
-    """Import an optional dependency or raise a ``DependencyError`` that says
-    exactly what to install."""
+    """Import an optional dependency, or explain precisely what went wrong.
+
+    "Not installed" and "installed but broken" need different fixes, and a
+    package installed into a *different* interpreter looks exactly like the
+    first while no amount of ``pip install`` fixes it — so the interpreter
+    path is part of the message, and the install line uses ``python -m pip``,
+    which cannot target the wrong environment.
+    """
+    hint = f"\n  {extra}" if extra else ""
     try:
         return __import__(name)
     except ImportError as exc:
-        hint = f"\n  {extra}" if extra else ""
-        raise DependencyError(f"{name} is required for this step. Install it with:\n  pip install {package}{hint}") from exc
+        missing = (getattr(exc, "name", None) or "").split(".")[0]
+        if isinstance(exc, ModuleNotFoundError) and missing == name:
+            raise DependencyError(
+                f"{name} is required for this step but is not installed in this interpreter.\n"
+                f"  python: {sys.executable}\n"
+                f"  Install it with:\n  python -m pip install {package}{hint}"
+            ) from exc
+        # Importable but unusable: a broken wheel, a missing system library
+        # (the classic one on Windows is "DLL load failed" from cv2), or a
+        # half-installed dependency. Telling the user to pip install here
+        # sends them in circles, so surface the real error instead.
+        raise DependencyError(
+            f"{name} is installed but failed to import:\n"
+            f"  {type(exc).__name__}: {exc}\n"
+            f"  python: {sys.executable}\n"
+            f"  Try: python -m pip install --force-reinstall {package}{hint}"
+        ) from exc
 
 
 def resolve_device(preference: str = "auto") -> str:
