@@ -42,3 +42,6 @@ logo_replace_ai/output/*
 !logo_replace_ai/output/.gitkeep
 logo_replace_ai/models/*
 !logo_replace_ai/models/.gitkeep
+## --debug-dir writes full-size PNGs; wherever it is pointed, it is not source
+logo_replace_ai/**/_debug/
+logo_replace_ai/output_debug/
