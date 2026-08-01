@@ -284,6 +284,32 @@ not a Python package:
 * Debian/Ubuntu: `sudo apt install tesseract-ocr`
 * then `python -m pip install pytesseract`
 
+### Fitting values of any length
+
+Business names vary from "DRK" to "Al Rahimi Advanced Dental and Orthodontic
+Care Centre". A replacement is not simply scaled to the placeholder's box —
+that would balloon a short value and shrink a long one to nothing. Instead:
+
+1. **Keep the designer's size.** The point size that renders the *original*
+   words at their observed height is measured and reused, so a short value
+   stays the size the design intended rather than growing to fill the box.
+2. **Measure the room that is really there.** The clear background around the
+   placeholder is probed outward — a name in a wide margin may run past its
+   box; one hemmed in by an icon may not.
+3. **Wrap before shrinking.** Long values go onto a second or third line at
+   full size where the space allows, because that reads better than the same
+   words set half as tall.
+4. **Shrink only as a last resort**, and say so:
+
+```
+WARNING 'Al Rahimi Advanced Dental Care Centre' did not fit at the original
+        36pt — set at 25pt over 2 lines. Shorten the value, or give the
+        placeholder more room in the template.
+```
+
+If a value cannot be set legibly even at the smallest size, the warning says
+it will overlap what is below rather than quietly printing over it.
+
 ### What this cannot do
 
 * **Match the font.** Pixels do not record which typeface drew them. The

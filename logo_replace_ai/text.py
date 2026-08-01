@@ -299,58 +299,227 @@ def load_font(path: str | None, size: int) -> ImageFont.FreeTypeFont:
     )
 
 
-def fit_font(text: str, box: BBox, font_path: str | None, max_size: int = 400) -> ImageFont.FreeTypeFont:
-    """Largest font size whose rendering of ``text`` still fits ``box``."""
-    low, high, best = 4, max(6, min(max_size, box.height * 3)), None
+def match_original_size(original: str, box: BBox, font_path: str | None) -> int:
+    """The point size at which ``original`` fills ``box``'s height.
+
+    The replacement should be set at the size the designer chose, not at
+    whatever happens to fill the placeholder's bounding box. Measuring the
+    size that reproduces the *original* words at their observed height
+    recovers that intent, so a short value does not balloon and a long one
+    starts from the right place before any shrinking.
+    """
+    low, high, best = 4, max(8, box.height * 3), max(6, box.height)
     while low <= high:
         middle = (low + high) // 2
-        font = load_font(font_path, middle)
-        left, top, right, bottom = font.getbbox(text)
-        if (right - left) <= box.width and (bottom - top) <= box.height:
-            best, low = font, middle + 1
+        left, top, right, bottom = load_font(font_path, middle).getbbox(original or "Xg")
+        if (bottom - top) <= box.height:
+            best, low = middle, middle + 1
         else:
             high = middle - 1
-    return best or load_font(font_path, 8)
+    return best
+
+
+def measure_free_space(
+    image: Image.Image,
+    box: BBox,
+    align: str,
+    tolerance: float = 20.0,
+    step: int = 4,
+) -> BBox:
+    """How far the plain background extends around ``box``.
+
+    The placeholder's own width is not the constraint that matters — a name
+    set in a wide empty margin can run past it, and one boxed in by an icon
+    cannot. Growing outward while the pixels stay the colour of the page
+    measures the room that is actually there, so long values wrap or shrink
+    only when they genuinely have to.
+
+    Expects the plate *after* the original text is erased; otherwise it
+    measures up against the very words it is replacing.
+    """
+    rgb = np.asarray(image.convert("RGB"), dtype=np.float32)
+    height, width = rgb.shape[:2]
+    inner = box.clamp(width, height)
+    if inner.area <= 0:
+        return box
+
+    page = np.median(rgb[inner.y1 : inner.y2, inner.x1 : inner.x2].reshape(-1, 3), axis=0)
+
+    def uniform(y1: int, y2: int, x1: int, x2: int) -> bool:
+        if x2 <= x1 or y2 <= y1:
+            return False
+        strip = rgb[y1:y2, x1:x2].reshape(-1, 3)
+        return bool((np.linalg.norm(strip - page, axis=1) <= tolerance).mean() > 0.97)
+
+    limit = int(max(box.width, box.height) * 2.5)
+
+    right = box.x2
+    if align in {"left", "center", "auto"}:
+        while right + step <= width and right - box.x2 < limit and uniform(box.y1, box.y2, right, right + step):
+            right += step
+
+    left = box.x1
+    if align in {"right", "center"}:
+        while left - step >= 0 and box.x1 - left < limit and uniform(box.y1, box.y2, left - step, left):
+            left -= step
+
+    bottom = box.y2
+    while bottom + step <= height and bottom - box.y2 < box.height * 2 and uniform(bottom, bottom + step, box.x1, box.x2):
+        bottom += step
+
+    return BBox(left, box.y1, right, bottom)
+
+
+def wrap_to_width(text: str, font: ImageFont.FreeTypeFont, width: int) -> list[str]:
+    """Greedy word wrap. A single word too wide for the line is left alone."""
+    words = text.split()
+    if not words:
+        return [text]
+    lines: list[str] = []
+    current = words[0]
+    for word in words[1:]:
+        candidate = f"{current} {word}"
+        left, _top, right, _bottom = font.getbbox(candidate)
+        if (right - left) <= width:
+            current = candidate
+        else:
+            lines.append(current)
+            current = word
+    lines.append(current)
+    return lines
+
+
+@dataclass
+class Layout:
+    """A planned rendering of replacement text."""
+
+    lines: list[str]
+    font: ImageFont.FreeTypeFont
+    size: int
+    #: The space the text may occupy — the placeholder plus any clear room
+    #: found around it.
+    area: BBox
+    shrunk_from: int | None = None
+
+
+def plan_text(
+    image: Image.Image,
+    line: "TextLine",
+    replacement: str,
+    font_path: str | None,
+    align: str,
+    max_lines: int = 3,
+    min_scale: float = 0.55,
+) -> Layout:
+    """Decide the size, wrapping and area for a replacement string.
+
+    Order of preference: keep the designer's size on one line; then wrap onto
+    as many lines as the clear space below allows; only then shrink. Shrinking
+    last is what stops a long business name from being set in type half the
+    height of everything around it when there was room to wrap instead.
+    """
+    area = measure_free_space(image, line.box, align)
+    target = match_original_size(line.text, line.box, font_path)
+
+    # Search well below the comfortable floor before giving up. Type that is
+    # smaller than intended is a compromise; type printed over the line below
+    # it is a broken poster, so the hard limit is legibility, not taste.
+    hard_floor = max(7, int(target * 0.30))
+    for size in range(target, hard_floor - 1, -1):
+        font = load_font(font_path, size)
+        lines = wrap_to_width(replacement, font, area.width)
+        if len(lines) > max_lines:
+            continue
+        line_height = font.getbbox("Xg")[3] - font.getbbox("Xg")[1]
+        spacing = int(round(line_height * 0.22))
+        total = len(lines) * line_height + (len(lines) - 1) * spacing
+        widest = max((font.getbbox(text)[2] - font.getbbox(text)[0]) for text in lines)
+        # ``area`` always starts at the placeholder and only grows, so its
+        # height is the real ceiling — there is no reason to fall back to the
+        # box's own height, and doing so let a block overrun into the line
+        # below.
+        if widest <= area.width and total <= area.height:
+            return Layout(lines, font, size, area, None if size == target else target)
+
+    # Not even the hard floor fitted: this value cannot be set in this space.
+    # Use the floor, and let the caller warn that it will overlap.
+    font = load_font(font_path, hard_floor)
+    return Layout(wrap_to_width(replacement, font, area.width), font, hard_floor, area, target)
 
 
 def draw_replacement(
     image: Image.Image,
-    line: TextLine,
+    line: "TextLine",
     replacement: str,
     font_path: str | None = None,
     align: str = "auto",
 ) -> Image.Image:
-    """Draw ``replacement`` where ``line`` was, matched to its size and colour.
+    """Draw ``replacement`` where ``line`` was, at the original's size and colour.
 
     The caller is expected to have erased the original first; this only draws.
     """
     canvas = image.convert("RGB").copy()
     draw = ImageDraw.Draw(canvas)
-    font = fit_font(replacement, line.box, font_path)
-    left, top, right, bottom = font.getbbox(replacement)
-    width, height = right - left, bottom - top
 
     if align == "auto":
         # Centre it only if the original was centred on the page; otherwise
         # keep the left edge, which is what almost every layout wants.
-        page_centre = canvas.width / 2
-        line_centre = (line.box.x1 + line.box.x2) / 2
-        align = "center" if abs(line_centre - page_centre) < canvas.width * 0.06 else "left"
+        centre = (line.box.x1 + line.box.x2) / 2
+        align = "center" if abs(centre - canvas.width / 2) < canvas.width * 0.06 else "left"
 
-    if align == "center":
-        x = line.box.x1 + (line.box.width - width) // 2
-    elif align == "right":
-        x = line.box.x2 - width
+    plan = plan_text(canvas, line, replacement, font_path, align)
+    font = plan.font
+    metrics = font.getbbox("Xg")
+    line_height = metrics[3] - metrics[1]
+    spacing = int(round(line_height * 0.22))
+
+    total = len(plan.lines) * line_height + (len(plan.lines) - 1) * spacing
+    # A single line is centred in the space the original occupied. A wrapped
+    # block starts at the top of it and grows down into the room that was
+    # measured — centring the *first* line and then growing pushed the last
+    # line past the free space and into the tagline below it.
+    if total <= line.box.height:
+        top = line.box.y1 + (line.box.height - line_height) // 2
     else:
-        x = line.box.x1
-    y = line.box.y1 + (line.box.height - height) // 2
+        top = line.box.y1
 
-    draw.text((x - left, y - top), replacement, font=font, fill=line.colour)
-    get_logger().debug(
-        "drew %r at %dpt, %s-aligned, in #%02x%02x%02x",
-        replacement,
-        font.size,
-        align,
-        *line.colour,
-    )
+    for index, text in enumerate(plan.lines):
+        left, top_offset, right, _bottom = font.getbbox(text)
+        width = right - left
+        if align == "center":
+            x = plan.area.x1 + (plan.area.width - width) // 2
+        elif align == "right":
+            x = plan.area.x2 - width
+        else:
+            x = line.box.x1
+        y = top + index * (line_height + spacing)
+        draw.text((x - left, y - top_offset), text, font=font, fill=line.colour)
+
+    if plan.shrunk_from and total > plan.area.height:
+        get_logger().warning(
+            "%r does not fit the space at any readable size (%d lines at %dpt need %dpx, only %dpx are "
+            "clear) and will overlap what is below it. Shorten the value or redesign the slot.",
+            replacement,
+            len(plan.lines),
+            plan.size,
+            total,
+            plan.area.height,
+        )
+    elif plan.shrunk_from:
+        get_logger().warning(
+            "%r did not fit at the original %dpt — set at %dpt%s. Shorten the value, or give the "
+            "placeholder more room in the template.",
+            replacement,
+            plan.shrunk_from,
+            plan.size,
+            f" over {len(plan.lines)} lines" if len(plan.lines) > 1 else "",
+        )
+    else:
+        get_logger().debug(
+            "drew %r at %dpt over %d line(s), %s-aligned",
+            replacement,
+            plan.size,
+            len(plan.lines),
+            align,
+        )
     return canvas
