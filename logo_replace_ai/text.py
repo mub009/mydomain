@@ -116,26 +116,52 @@ def find_text_lines(image: Image.Image, min_confidence: float = 45.0) -> list[Te
 
     lines: list[TextLine] = []
     for indices in grouped.values():
-        words = [data["text"][i].strip() for i in indices]
-        box = BBox(
-            min(data["left"][i] for i in indices),
-            min(data["top"][i] for i in indices),
-            max(data["left"][i] + data["width"][i] for i in indices),
-            max(data["top"][i] + data["height"][i] for i in indices),
-        )
-        lines.append(
-            TextLine(
-                text=" ".join(words),
-                box=box.clamp(*image.size),
-                confidence=float(np.mean([float(data["conf"][i]) for i in indices])),
-                colour=ink_colour(image, box),
-                words=words,
+        for segment in _split_columns(data, indices):
+            words = [data["text"][i].strip() for i in segment]
+            box = BBox(
+                min(data["left"][i] for i in segment),
+                min(data["top"][i] for i in segment),
+                max(data["left"][i] + data["width"][i] for i in segment),
+                max(data["top"][i] + data["height"][i] for i in segment),
             )
-        )
+            lines.append(
+                TextLine(
+                    text=" ".join(words),
+                    box=box.clamp(*image.size),
+                    confidence=float(np.mean([float(data["conf"][i]) for i in segment])),
+                    colour=ink_colour(image, box),
+                    words=words,
+                )
+            )
 
     lines.sort(key=lambda line: (line.box.y1, line.box.x1))
     get_logger().debug("OCR found %d line(s)", len(lines))
     return lines
+
+
+def _split_columns(data: dict, indices: list[int], gap_factor: float = 1.2) -> list[list[int]]:
+    """Break one OCR "line" apart where it crosses a column gutter.
+
+    Tesseract reads a row of the page as a single line, so a two-column
+    address block comes back as "Address Call Us" — replace that and you
+    overwrite both columns with one string. Splitting on any horizontal gap
+    wider than the text is tall separates the columns and leaves ordinary word
+    spacing alone.
+    """
+    ordered = sorted(indices, key=lambda i: data["left"][i])
+    if len(ordered) < 2:
+        return [ordered]
+    heights = [data["height"][i] for i in ordered]
+    threshold = max(8.0, float(np.median(heights)) * gap_factor)
+
+    segments: list[list[int]] = [[ordered[0]]]
+    for previous, current in zip(ordered, ordered[1:]):
+        gap = data["left"][current] - (data["left"][previous] + data["width"][previous])
+        if gap > threshold:
+            segments.append([current])
+        else:
+            segments[-1].append(current)
+    return segments
 
 
 def ink_colour(image: Image.Image, box: BBox) -> tuple[int, int, int]:

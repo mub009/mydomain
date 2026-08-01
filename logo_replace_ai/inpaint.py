@@ -163,7 +163,12 @@ def _flat_backdrop(image: Image.Image, hard: Image.Image, tolerance: float = 14.
     samples = rgb[ring]
     median = np.median(samples, axis=0)
     close = np.linalg.norm(samples - median, axis=1) <= tolerance
-    if close.mean() < 0.85:
+    # 0.70, not a stricter figure: erasing a line of text puts its neighbours
+    # in the ring, so a genuinely flat card measures 0.78 while an empty
+    # margin measures 0.96 and a gradient measures 0.37. The gap is wide, and
+    # demanding 0.85 threw away the text case and left a grey smudge behind
+    # every replaced line.
+    if close.mean() < 0.70:
         return None
     return median
 
