@@ -33,7 +33,9 @@ from inpaint import build_inpainter
 from overlay import LogoOverlay, Placement
 from palette import accent_colour, brand_colour, describe_palettes, extract_palette, retint
 from text import (
+    TOKEN_PATTERN,
     describe_lines,
+    load_text_map,
     draw_replacement,
     find_text_lines,
     match_line,
@@ -142,16 +144,28 @@ class TextOptions:
     """What to do about text, gathered from the CLI."""
 
     report: bool = False
-    replacements: dict[str, str] = field(default_factory=dict)
+    #: ``(token as the caller wrote it, normalised key, replacement text)``.
+    replacements: list[tuple[str, str, str]] = field(default_factory=list)
     font: str | None = None
     align: str = "auto"
 
     @classmethod
     def from_args(cls, args: argparse.Namespace) -> "TextOptions":
-        replacements: dict[str, str] = {}
+        pairs: list[tuple[str, str]] = []
+        if args.text_map:
+            pairs.extend(load_text_map(args.text_map))
         for raw in args.set_text or []:
-            key, value = parse_assignment(raw)
-            replacements[key] = value
+            key, value = raw.split("=", 1) if "=" in raw else (raw, "")
+            pairs.append((key, value))
+
+        replacements: list[tuple[str, str, str]] = []
+        seen: set[str] = set()
+        for token, value in pairs:
+            normalised, text = parse_assignment(f"{token}={value}")
+            if normalised in seen:  # a later flag wins over an earlier file entry
+                replacements = [entry for entry in replacements if entry[1] != normalised]
+            seen.add(normalised)
+            replacements.append((token.strip(), normalised, text))
         return cls(
             report=args.find_text,
             replacements=replacements,
@@ -295,15 +309,22 @@ class LogoReplacePipeline:
             return poster
 
         chosen: list[tuple[object, str]] = []
-        for key, value in options.replacements.items():
-            line = match_line(lines, key)
+        unfilled: list[str] = []
+        for token, key, value in options.replacements:
+            line = match_line(lines, key, token_only=bool(TOKEN_PATTERN.match(token)))
             if line is None:
-                self.log.warning(
-                    "--set-text %s=… matched no text; run --find-text to see the keys that were read", key
-                )
+                unfilled.append(token)
                 continue
             chosen.append((line, value))
 
+        if unfilled:
+            # Same distinction fillSvgTemplate draws: a token nobody could
+            # place is not an error, but it must not pass in silence either.
+            self.log.warning(
+                "%d token(s) not found in this poster: %s. Run --find-text to see what OCR actually read.",
+                len(unfilled),
+                ", ".join(unfilled),
+            )
         if not chosen:
             return poster
         if self.config.runtime.dry_run:
@@ -596,6 +617,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="append",
         metavar="KEY=VALUE",
         help='replace a line: --set-text "CLINICNAME=Smile Dental Care" (repeatable)',
+    )
+    txt_group.add_argument(
+        "--text-map",
+        metavar="FILE",
+        help="read TOKEN=value pairs from a JSON or plain-text file instead of repeating --set-text",
     )
     txt_group.add_argument("--font", help="TrueType font for replacement text — ideally the template's own")
     txt_group.add_argument(

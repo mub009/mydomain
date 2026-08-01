@@ -23,6 +23,8 @@ and none of them have to be guessed.
 
 from __future__ import annotations
 
+import json
+import pathlib
 import re
 from dataclasses import dataclass, field
 
@@ -212,16 +214,60 @@ def parse_assignment(raw: str) -> tuple[str, str]:
     return re.sub(r"[^A-Za-z0-9]", "", key).upper(), value
 
 
-def match_line(lines: list[TextLine], key: str) -> TextLine | None:
-    """Find the line a ``--set-text`` key refers to: an index, or its text."""
+def load_text_map(path: str) -> list[tuple[str, str]]:
+    """Read ``@TOKEN@ = value`` pairs from a JSON or plain-text file.
+
+    A template has the same handful of tokens every time, so naming them once
+    in a file beats repeating five ``--set-text`` flags for every shop.
+    """
+    file = pathlib.Path(path).expanduser()
+    if not file.exists():
+        raise TextError(f"text map not found: {file}")
+    raw = file.read_text(encoding="utf-8-sig")
+
+    if raw.lstrip().startswith("{"):
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise TextError(f"{file} is not valid JSON: {exc}") from exc
+        if not isinstance(data, dict):
+            raise TextError(f"{file} must hold an object of token: value pairs")
+        return [(str(key), str(value)) for key, value in data.items()]
+
+    pairs: list[tuple[str, str]] = []
+    for number, line in enumerate(raw.splitlines(), start=1):
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        if "=" not in stripped:
+            raise TextError(f"{file}:{number}: expected TOKEN=value, got {stripped!r}")
+        key, value = stripped.split("=", 1)
+        pairs.append((key.strip(), value.strip()))
+    return pairs
+
+
+def match_line(lines: list[TextLine], key: str, token_only: bool = False) -> TextLine | None:
+    """Find the line a ``--set-text`` key refers to: an index, or its text.
+
+    ``token_only`` is set when the caller wrote the key as a placeholder, and
+    it is what keeps the tool honest about intent. ``@ADDRESS@`` strips to
+    ``ADDRESS``, which is also what the *label* "Address" on a contact block
+    strips to — so without it, asking to fill the address placeholder
+    overwrote the word "Address" instead. Someone who writes a token means the
+    token; someone who writes plain text means that text.
+    """
     if key.isdigit():
         position = int(key) - 1
         return lines[position] if 0 <= position < len(lines) else None
-    for line in lines:
+    if not key:
+        return None
+
+    candidates = [line for line in lines if line.is_token] if token_only else lines
+    for line in candidates:
         if line.key == key:
             return line
-    for line in lines:  # substring, so @CLINIC_NAME@ can be given as CLINICNAME
-        if key and key in line.key:
+    for line in candidates:  # a fragment may name a token: CLINICNAME for @CLINIC_NAME@
+        if line.is_token and key in line.key:
             return line
     return None
 

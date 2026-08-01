@@ -227,7 +227,42 @@ Text
   2 line(s), 1 placeholder token(s).
 ```
 
-Then replace by key or by index:
+### A token map, for a template you fill repeatedly
+
+A template has the same handful of placeholders every time, so name them once
+in a file rather than repeating flags:
+
+```
+# tokens.txt — blank lines and # comments ignored
+@CLINIC_NAME@   = Smile Dental Care
+@BUSINESS_NAME@ = Smile Dental Care
+@PHONE@         = +966 11 555 0123
+@ADDRESS@       = 42 Olaya Street, Riyadh
+@CITY@          = Riyadh
+```
+
+```bash
+python app.py --input poster.png --slots --inpaint classical --text-map tokens.txt
+```
+
+JSON works too (`{"@PHONE@": "+966 …"}`). Any `--set-text` on the command
+line overrides the file for that token.
+
+Tokens that are not in this particular poster are reported, not silently
+skipped — the same distinction `fillSvgTemplate` draws between filled and
+unfilled slots:
+
+```
+WARNING 4 token(s) not found in this poster: @BUSINESS_NAME@, @PHONE@,
+        @ADDRESS@, @CITY@. Run --find-text to see what OCR actually read.
+```
+
+**Writing a key as a token means the token.** `@ADDRESS@` matches only a
+placeholder; it will not touch the word "Address" used as a label, even
+though both reduce to the same letters. To replace ordinary text, give the
+text's own key (`ADDRESS`) or its `[n]` index.
+
+### Replacing individual lines
 
 ```bash
 python app.py --input poster.png --slots --inpaint classical \
@@ -383,6 +418,7 @@ visibly on a hole more than ~100 px wide. Tune with `--classical-max-span`.
 
 --find-text                list every line of text with box, colour and key
 --set-text "KEY=words"     replace a line (repeatable)
+--text-map tokens.txt      read TOKEN=value pairs from a file
 --font path.ttf            font for replacement text  --text-align auto
 
 --palette                  report both palettes and their ΔE distance
