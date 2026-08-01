@@ -27,6 +27,7 @@ import json
 import pathlib
 import re
 from dataclasses import dataclass, field
+from typing import Sequence
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
@@ -50,6 +51,10 @@ class TextLine:
     confidence: float
     #: Colour of the strokes themselves, sampled from the darkest ink.
     colour: tuple[int, int, int] = (0, 0, 0)
+    #: Height of the inked rows, which is the type size. The OCR box can be
+    #: taller than the glyphs it holds, and sizing from it overestimated one
+    #: 19pt address line as 41pt.
+    ink_height: int = 0
     words: list[str] = field(default_factory=list)
 
     @property
@@ -133,6 +138,7 @@ def find_text_lines(image: Image.Image, min_confidence: float = 45.0) -> list[Te
                     box=box.clamp(*image.size),
                     confidence=float(np.mean([float(data["conf"][i]) for i in segment])),
                     colour=ink_colour(image, box),
+                    ink_height=measure_ink_height(image, box),
                     words=words,
                 )
             )
@@ -185,6 +191,19 @@ def ink_colour(image: Image.Image, box: BBox) -> tuple[int, int, int]:
     cutoff = np.quantile(distance, 0.75)
     ink = flat[distance >= cutoff]
     return tuple(int(v) for v in np.median(ink, axis=0))  # type: ignore[return-value]
+
+
+def measure_ink_height(image: Image.Image, box: BBox) -> int:
+    """Height of the rows that actually carry ink inside ``box``."""
+    patch = np.asarray(image.convert("L").crop(box.as_tuple()), dtype=np.float32)
+    if patch.size == 0:
+        return box.height
+    background = float(np.median(patch))
+    inked = np.abs(patch - background).max(axis=1) > 40
+    rows = np.flatnonzero(inked)
+    if rows.size == 0:
+        return box.height
+    return int(rows[-1] - rows[0] + 1)
 
 
 def describe_lines(lines: list[TextLine]) -> str:
@@ -256,16 +275,19 @@ def match_line(lines: list[TextLine], key: str, token_only: bool = False) -> Tex
     overwrote the word "Address" instead. Someone who writes a token means the
     token; someone who writes plain text means that text.
     """
-    if key.isdigit():
-        position = int(key) - 1
-        return lines[position] if 0 <= position < len(lines) else None
     if not key:
         return None
 
     candidates = [line for line in lines if line.is_token] if token_only else lines
+    # Exact text match before the index reading: a phone number keys as
+    # "966123456789", which is all digits, and was being looked up as line
+    # number 966,123,456,789 instead of the line that actually reads it.
     for line in candidates:
         if line.key == key:
             return line
+    if key.isdigit():
+        position = int(key) - 1
+        return lines[position] if 0 <= position < len(lines) else None
     for line in candidates:  # a fragment may name a token: CLINICNAME for @CLINIC_NAME@
         if line.is_token and key in line.key:
             return line
@@ -279,12 +301,17 @@ def load_font(path: str | None, size: int) -> ImageFont.FreeTypeFont:
     silently render tiny text — better to look for a real one and say what
     happened.
     """
+    # Regular before bold. Most replaced lines are body copy, and a bold face
+    # is wider than the type it stands in for — which forces the fitter to
+    # shrink lines that would otherwise have fitted, leaving a block of text
+    # at three different sizes. Pass --font for anything that matters.
     candidates = [path] if path else []
     candidates += [
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
         "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        "C:/Windows/Fonts/arialbd.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
         "C:/Windows/Fonts/arial.ttf",
+        "C:/Windows/Fonts/arialbd.ttf",
+        "C:/Windows/Fonts/segoeui.ttf",
     ]
     for candidate in candidates:
         if not candidate:
@@ -323,6 +350,7 @@ def measure_free_space(
     image: Image.Image,
     box: BBox,
     align: str,
+    reserved: Sequence[BBox] = (),
     tolerance: float = 20.0,
     step: int = 4,
 ) -> BBox:
@@ -335,7 +363,10 @@ def measure_free_space(
     only when they genuinely have to.
 
     Expects the plate *after* the original text is erased; otherwise it
-    measures up against the very words it is replacing.
+    measures up against the very words it is replacing. That erasure is also
+    why ``reserved`` exists: when several lines are replaced in one pass they
+    are cleared together, so every one of them looks like free space to the
+    others until their own replacements are drawn.
     """
     rgb = np.asarray(image.convert("RGB"), dtype=np.float32)
     height, width = rgb.shape[:2]
@@ -345,9 +376,12 @@ def measure_free_space(
 
     page = np.median(rgb[inner.y1 : inner.y2, inner.x1 : inner.x2].reshape(-1, 3), axis=0)
 
-    def uniform(y1: int, y2: int, x1: int, x2: int) -> bool:
+    def free(y1: int, y2: int, x1: int, x2: int) -> bool:
         if x2 <= x1 or y2 <= y1:
             return False
+        for other in reserved:
+            if other.x1 < x2 and x1 < other.x2 and other.y1 < y2 and y1 < other.y2:
+                return False
         strip = rgb[y1:y2, x1:x2].reshape(-1, 3)
         return bool((np.linalg.norm(strip - page, axis=1) <= tolerance).mean() > 0.97)
 
@@ -355,16 +389,16 @@ def measure_free_space(
 
     right = box.x2
     if align in {"left", "center", "auto"}:
-        while right + step <= width and right - box.x2 < limit and uniform(box.y1, box.y2, right, right + step):
+        while right + step <= width and right - box.x2 < limit and free(box.y1, box.y2, right, right + step):
             right += step
 
     left = box.x1
     if align in {"right", "center"}:
-        while left - step >= 0 and box.x1 - left < limit and uniform(box.y1, box.y2, left - step, left):
+        while left - step >= 0 and box.x1 - left < limit and free(box.y1, box.y2, left - step, left):
             left -= step
 
     bottom = box.y2
-    while bottom + step <= height and bottom - box.y2 < box.height * 2 and uniform(bottom, bottom + step, box.x1, box.x2):
+    while bottom + step <= height and bottom - box.y2 < box.height * 2 and free(bottom, bottom + step, box.x1, box.x2):
         bottom += step
 
     return BBox(left, box.y1, right, bottom)
@@ -408,6 +442,7 @@ def plan_text(
     replacement: str,
     font_path: str | None,
     align: str,
+    reserved: Sequence[BBox] = (),
     max_lines: int = 3,
     min_scale: float = 0.55,
 ) -> Layout:
@@ -418,8 +453,9 @@ def plan_text(
     last is what stops a long business name from being set in type half the
     height of everything around it when there was room to wrap instead.
     """
-    area = measure_free_space(image, line.box, align)
-    target = match_original_size(line.text, line.box, font_path)
+    area = measure_free_space(image, line.box, align, reserved)
+    measured = BBox(line.box.x1, line.box.y1, line.box.x2, line.box.y1 + (line.ink_height or line.box.height))
+    target = match_original_size(line.text, measured, font_path)
 
     # Search well below the comfortable floor before giving up. Type that is
     # smaller than intended is a compromise; type printed over the line below
@@ -453,6 +489,7 @@ def draw_replacement(
     replacement: str,
     font_path: str | None = None,
     align: str = "auto",
+    reserved: Sequence[BBox] = (),
 ) -> Image.Image:
     """Draw ``replacement`` where ``line`` was, at the original's size and colour.
 
@@ -467,7 +504,7 @@ def draw_replacement(
         centre = (line.box.x1 + line.box.x2) / 2
         align = "center" if abs(centre - canvas.width / 2) < canvas.width * 0.06 else "left"
 
-    plan = plan_text(canvas, line, replacement, font_path, align)
+    plan = plan_text(canvas, line, replacement, font_path, align, reserved)
     font = plan.font
     metrics = font.getbbox("Xg")
     line_height = metrics[3] - metrics[1]

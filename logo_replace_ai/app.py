@@ -341,9 +341,14 @@ class LogoReplacePipeline:
         feather = max(0, min(self.config.inpaint.mask_feather, int(round(smallest * 0.06))))
         mask = build_mask(poster.size, boxes, dilate=dilate, feather=feather)
         result = self.inpainter.fill(poster, mask, boxes)
-        for line, value in chosen:
+        for index, (line, value) in enumerate(chosen):
             self.log.info("Replacing %r with %r", line.text, value)  # type: ignore[attr-defined]
-            result = draw_replacement(result, line, value, options.font, options.align)  # type: ignore[arg-type]
+            # Every other line in this pass is spoken for, even though it has
+            # been erased and looks like empty page right now.
+            others = [box for position, box in enumerate(boxes) if position != index]
+            result = draw_replacement(
+                result, line, value, options.font, options.align, reserved=others  # type: ignore[arg-type]
+            )
         return result
 
     # -- colour -----------------------------------------------------------

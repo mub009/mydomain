@@ -146,9 +146,12 @@ def _pull_push_fill(rgb: np.ndarray, known: np.ndarray, eps: float = 1e-6) -> np
 def _flat_backdrop(image: Image.Image, hard: Image.Image, tolerance: float = 14.0) -> np.ndarray | None:
     """The single colour surrounding the hole, or ``None`` if it is not plain.
 
-    Samples a ring just outside the masked area. When nearly all of that ring
-    is one colour — a white page margin, a solid panel — that colour *is* the
-    answer, and filling with it is exact rather than approximate.
+    Judged on the ring's *modal* colour rather than its median. Erasing a line
+    of type puts its neighbours in the ring, so 30-40% of the samples are ink;
+    a median survives that but the "how much of the ring sits near it" test
+    does not — measured on a real contact block, text lines scored 0.68 and a
+    gradient 0.60, which is no separation at all. Against the mode the same
+    cases score 0.60-0.93 and 0.26.
     """
     mask = np.asarray(hard.convert("L")) > 127
     if not mask.any():
@@ -161,16 +164,16 @@ def _flat_backdrop(image: Image.Image, hard: Image.Image, tolerance: float = 14.
 
     rgb = np.asarray(image.convert("RGB"), dtype=np.float32)
     samples = rgb[ring]
-    median = np.median(samples, axis=0)
-    close = np.linalg.norm(samples - median, axis=1) <= tolerance
-    # 0.70, not a stricter figure: erasing a line of text puts its neighbours
-    # in the ring, so a genuinely flat card measures 0.78 while an empty
-    # margin measures 0.96 and a gradient measures 0.37. The gap is wide, and
-    # demanding 0.85 threw away the text case and left a grey smudge behind
-    # every replaced line.
-    if close.mean() < 0.70:
+
+    bucket = 12.0
+    quantised = np.round(samples / bucket).astype(np.int32)
+    keys, counts = np.unique(quantised, axis=0, return_counts=True)
+    mode = keys[counts.argmax()].astype(np.float32) * bucket
+
+    inliers = np.linalg.norm(samples - mode, axis=1) <= tolerance
+    if inliers.mean() < 0.45:
         return None
-    return median
+    return samples[inliers].mean(axis=0)
 
 
 def _relax(filled: np.ndarray, original: np.ndarray, known: np.ndarray, passes: int = 2) -> np.ndarray:
