@@ -92,6 +92,7 @@ def find_text_lines(image: Image.Image, min_confidence: float = 45.0) -> list[Te
             "  Debian/Ubuntu: sudo apt install tesseract-ocr"
         ),
     )
+    get_logger().info("Reading text with OCR (a few seconds on a full-size poster)…")
     try:
         data = pytesseract.image_to_data(image, output_type=pytesseract.Output.DICT)
     except Exception as exc:  # the engine is missing, or the language pack is

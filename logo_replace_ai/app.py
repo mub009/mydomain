@@ -208,6 +208,9 @@ class LogoReplacePipeline:
         image = load_image(source, mode="RGB")
         self.log.info("Processing %s (%s)", source.name, human_size(image.size))
 
+        # These two steps are the slow ones — several seconds on a large
+        # poster — and used to run in total silence, which reads as a hang.
+        self.log.info("Locating the logo region…")
         detections = self.detector.detect(image)
         result.detections = detections
 
