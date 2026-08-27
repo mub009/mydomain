@@ -29,16 +29,56 @@ This is a **core-first** conversion. Ported and tested:
   the last-admin-can't-be-demoted guard), business management (list/pending/
   update/approve/reject/suspend/reassign), and dealer points admin
   (grant/deduct + transaction history).
+- Leads (create — anonymous or signed-in — list, status updates), gated by
+  the `MANAGE_LEADS` dealer privilege.
+- Bookings (create with business-hours + double-booking validation, list
+  mine/for-business, status transitions with the same
+  customer-can-only-cancel rule), gated by `MANAGE_BOOKINGS`.
+- Points "mine" (a dealer's own balance/ledger — the admin grant/deduct side
+  was already ported with the admin module).
+- Storefront/e-commerce: product catalogue (CRUD, auto-incrementing slugs,
+  compare-at-price validation), orders (list with summary stats,
+  status transitions that restock on cancel, customer report grouped by
+  phone), and the public storefront (product listing + checkout with
+  server-recomputed pricing/stock). Site type switching
+  (WEBSITE/ECOMMERCE) and publish/unpublish are ported too — but only the
+  fields storefront needs (`siteType`, `isPublished`, delivery settings).
 
-**Not ported** (still Node-only — see `backend/src/modules/`): leads,
-bookings, payments/Stripe, B2B RFQ/quotes, visitors (welcome-popup capture),
-review-QR boards (`/admin/qr-codes`, the `/r/<code>` redirect), site builder,
-storefront/orders, WhatsApp broadcasts, Poster Studio (`/admin/posters`),
-notifications, email sending. Each is a self-contained subsystem with its own
-tables — `admin/stats`'s `leadCount`/`bookingCount`/`openRfqCount` report `0`
-until leads/bookings/RFQs are ported, since those tables don't exist here yet.
-Porting any of these follows the same pattern established here — see
-"Porting another module" below.
+**Not ported** (still Node-only — see `backend/src/modules/`): payments/
+Stripe, B2B RFQ/quotes, visitors (welcome-popup capture), review-QR boards
+(`/admin/qr-codes`, the `/r/<code>` redirect), the drag-and-drop **brochure
+website builder** (`PUT /:id/site` for `projectData`/`html`/`css`, template
+preview/rendering, HTML sanitization — `SiteType.WEBSITE` only; e-commerce
+sites don't use it), WhatsApp broadcasts, Poster Studio (`/admin/posters`),
+notifications, email sending (new-order and business-welcome emails are
+no-ops here). Each is a self-contained subsystem with its own tables —
+`admin/stats`'s `leadCount`/`bookingCount`/`openRfqCount` still report `0`
+since bookings/leads exist but aren't aggregated into that endpoint yet, and
+RFQs aren't ported at all. Porting any of these follows the same pattern
+established here — see "Porting another module" below.
+
+### A recurring gotcha ported modules hit twice
+
+Eloquent does **not** reload a row after `Model::create()`/`updateOrCreate()`
+— a column with only a DB-level default (`points`, `isActive`, `status`
+enums with a Prisma `@default`, …) comes back `null` on the in-memory model
+even though the row itself has the real default value. Always pass the
+default explicitly in the `create()` array (see `AdminController::createUser`,
+`BookingController::store`, `LeadController::store`), or call `->refresh()`
+after an `updateOrCreate()` that might have just inserted a row (see
+`SiteController::updateType`).
+
+### Laravel positional route-parameter binding gotcha
+
+A controller method's non-`Request` parameters are matched to route
+`{placeholders}` **by position, not by name** — a route like
+`/businesses/{id}/orders/{orderId}` calling a method that only declares
+`string $orderId` silently receives the *business* id instead (this broke
+`OrderController@show`/`updateStatus` and `ProductController@update`/
+`destroy` during the storefront port; caught by feature tests, not by
+inspection). Always declare **every** route segment as a method parameter,
+in the same order they appear in the route, even ones the method body never
+reads.
 
 ## Requirements
 
@@ -75,9 +115,11 @@ in `.env` — see the commented block there.
 php artisan test
 ```
 
-26 feature tests cover auth, business creation (owner/dealer paths, points
-spend, ownership checks), categories, reviews, and admin (stats, user/business
-management, points admin, approval flow).
+47 feature tests cover auth, business creation (owner/dealer paths, points
+spend, ownership checks), categories, reviews, admin (stats, user/business
+management, points admin, approval flow), leads, bookings (hours/conflict
+validation, status transitions), points, and the storefront (catalogue,
+checkout pricing/stock recompute, orders, customer report).
 
 ## Porting another module
 

@@ -352,6 +352,7 @@ class BusinessController extends Controller
         ]);
         $data['currency'] = $data['currency'] ?? 'INR';
         $data['durationMins'] = $data['durationMins'] ?? 60;
+        $data['isActive'] = true;
 
         return ApiResponse::created(Service::create([...$data, 'businessId' => $id]));
     }

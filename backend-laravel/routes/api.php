@@ -2,10 +2,17 @@
 
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\BookingController;
 use App\Http\Controllers\BusinessController;
 use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\LeadController;
+use App\Http\Controllers\OrderController;
+use App\Http\Controllers\PointsController;
+use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\SearchController;
+use App\Http\Controllers\SiteController;
+use App\Http\Controllers\StorefrontController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
@@ -54,11 +61,63 @@ Route::prefix('businesses')->group(function () {
 
     Route::post('/{businessId}/reviews', [ReviewController::class, 'store'])->middleware('auth.jwt');
     Route::get('/{businessId}/reviews', [ReviewController::class, 'index']);
+
+    // Anonymous visitors can leave a lead (e.g. a contact-form callback
+    // request); listing them still requires owning the business.
+    Route::post('/{businessId}/leads', [LeadController::class, 'store'])->middleware('auth.optional');
+    Route::get('/{businessId}/leads', [LeadController::class, 'index'])->middleware(['auth.jwt', 'privilege:MANAGE_LEADS']);
+
+    Route::post('/{businessId}/bookings', [BookingController::class, 'store'])->middleware('auth.jwt');
+    Route::get('/{businessId}/bookings', [BookingController::class, 'forBusiness'])->middleware(['auth.jwt', 'privilege:MANAGE_BOOKINGS']);
+
+    // Storefront settings (site type, delivery fee, publish). The
+    // drag-and-drop brochure-website builder is not part of this port.
+    Route::middleware('auth.jwt')->group(function () {
+        Route::get('/{id}/site', [SiteController::class, 'show']);
+        Route::patch('/{id}/site/type', [SiteController::class, 'updateType']);
+        Route::post('/{id}/site/publish', [SiteController::class, 'publish']);
+    });
+
+    // Owner-facing catalogue, orders, and customer report.
+    Route::middleware('auth.jwt')->group(function () {
+        Route::get('/{id}/products', [ProductController::class, 'index']);
+        Route::get('/{id}/orders', [OrderController::class, 'index']);
+        Route::get('/{id}/orders/{orderId}', [OrderController::class, 'show']);
+        Route::get('/{id}/customers', [OrderController::class, 'customers']);
+
+        Route::middleware('privilege:MANAGE_LISTINGS')->group(function () {
+            Route::post('/{id}/products', [ProductController::class, 'store']);
+            Route::patch('/{id}/products/{productId}', [ProductController::class, 'update']);
+            Route::delete('/{id}/products/{productId}', [ProductController::class, 'destroy']);
+            Route::patch('/{id}/orders/{orderId}/status', [OrderController::class, 'updateStatus']);
+        });
+    });
+});
+
+// Public: what a shopper on a published storefront can reach. Checkout is
+// open to guests — most buyers will not have an account.
+Route::prefix('sites')->group(function () {
+    Route::get('/{slug}/products', [StorefrontController::class, 'publicProducts']);
+    Route::post('/{slug}/orders', [StorefrontController::class, 'checkout'])->middleware('auth.optional');
 });
 
 Route::prefix('reviews')->middleware('auth.jwt')->group(function () {
     Route::post('/{reviewId}/reply', [ReviewController::class, 'reply']);
     Route::delete('/{reviewId}', [ReviewController::class, 'destroy']);
+});
+
+Route::prefix('leads')->middleware(['auth.jwt', 'privilege:MANAGE_LEADS'])->group(function () {
+    Route::patch('/{leadId}/status', [LeadController::class, 'updateStatus']);
+});
+
+Route::prefix('bookings')->middleware('auth.jwt')->group(function () {
+    Route::get('/mine', [BookingController::class, 'mine']);
+    Route::patch('/{bookingId}/status', [BookingController::class, 'updateStatus'])->middleware('privilege:MANAGE_BOOKINGS');
+});
+
+Route::prefix('points')->middleware(['auth.jwt', 'role:DEALER,ADMIN'])->group(function () {
+    Route::get('/mine', [PointsController::class, 'mine']);
+    Route::get('/mine/transactions', [PointsController::class, 'mineTransactions']);
 });
 
 Route::prefix('search')->group(function () {

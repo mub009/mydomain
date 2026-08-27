@@ -6,6 +6,7 @@ use App\Models\Concerns\HasUuid;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Business extends Model
 {
@@ -72,5 +73,30 @@ class Business extends Model
     public function reviews(): HasMany
     {
         return $this->hasMany(Review::class, 'businessId');
+    }
+
+    public function leads(): HasMany
+    {
+        return $this->hasMany(Lead::class, 'businessId');
+    }
+
+    public function bookings(): HasMany
+    {
+        return $this->hasMany(Booking::class, 'businessId');
+    }
+
+    public function site(): HasOne
+    {
+        return $this->hasOne(BusinessSite::class, 'businessId');
+    }
+
+    public function products(): HasMany
+    {
+        return $this->hasMany(Product::class, 'businessId');
+    }
+
+    public function orders(): HasMany
+    {
+        return $this->hasMany(Order::class, 'businessId');
     }
 }
