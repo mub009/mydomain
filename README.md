@@ -20,9 +20,10 @@ module boundaries.
 ## Project layout
 
 ```
-backend/    Express API — modular monolith, one folder per domain module
-frontend/   React SPA consuming the API
-docs/       Architecture notes
+backend/          Express API — modular monolith, one folder per domain module
+backend-laravel/  Laravel 11 port of backend/ (core modules only — see its README)
+frontend/         React SPA consuming the API
+docs/             Architecture notes
 docker-compose.yml   MySQL + Redis + backend + frontend for local dev
 ```
 
