@@ -24,14 +24,21 @@ This is a **core-first** conversion. Ported and tested:
   sort by relevance/rating/distance/newest) + popular cities.
 - Reviews (one per user per business, rating rollup recalculated from the
   `reviews` table, owner replies, delete).
+- Admin: platform stats (leads/bookings/RFQs report as 0 — see below), the
+  business-creators report, user management (list/create/update, including
+  the last-admin-can't-be-demoted guard), business management (list/pending/
+  update/approve/reject/suspend/reassign), and dealer points admin
+  (grant/deduct + transaction history).
 
 **Not ported** (still Node-only — see `backend/src/modules/`): leads,
-bookings, payments/Stripe, B2B RFQ/quotes, admin dashboards, points admin
-endpoints (the spend-on-create logic *is* ported, just not the
-grant/adjust/list-transactions admin endpoints), visitors, review-QR boards,
-site builder, storefront/orders, WhatsApp broadcasts, Poster Studio,
-notifications, email sending. Porting any of these follows the same pattern
-established here — see "Porting another module" below.
+bookings, payments/Stripe, B2B RFQ/quotes, visitors (welcome-popup capture),
+review-QR boards (`/admin/qr-codes`, the `/r/<code>` redirect), site builder,
+storefront/orders, WhatsApp broadcasts, Poster Studio (`/admin/posters`),
+notifications, email sending. Each is a self-contained subsystem with its own
+tables — `admin/stats`'s `leadCount`/`bookingCount`/`openRfqCount` report `0`
+until leads/bookings/RFQs are ported, since those tables don't exist here yet.
+Porting any of these follows the same pattern established here — see
+"Porting another module" below.
 
 ## Requirements
 
@@ -68,8 +75,9 @@ in `.env` — see the commented block there.
 php artisan test
 ```
 
-18 feature tests cover auth, business creation (owner/dealer paths, points
-spend, ownership checks), categories, and reviews.
+26 feature tests cover auth, business creation (owner/dealer paths, points
+spend, ownership checks), categories, reviews, and admin (stats, user/business
+management, points admin, approval flow).
 
 ## Porting another module
 

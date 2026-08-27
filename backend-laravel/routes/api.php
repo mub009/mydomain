@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BusinessController;
 use App\Http\Controllers\CategoryController;
@@ -68,4 +69,25 @@ Route::prefix('search')->group(function () {
 Route::prefix('users')->middleware(['auth.jwt', 'role:DEALER,ADMIN'])->group(function () {
     Route::get('/created', [UserController::class, 'listCreated']);
     Route::patch('/{id}/password', [UserController::class, 'resetPassword']);
+});
+
+// Admin. QR boards, Poster Studio, and visitor capture are not part of
+// this Laravel port yet — see backend-laravel/README.md.
+Route::prefix('admin')->middleware(['auth.jwt', 'role:ADMIN'])->group(function () {
+    Route::get('/stats', [AdminController::class, 'stats']);
+    Route::get('/reports/business-creators', [AdminController::class, 'businessCreatorsReport']);
+
+    Route::get('/users', [AdminController::class, 'listUsers']);
+    Route::post('/users', [AdminController::class, 'createUser']);
+    Route::patch('/users/{id}', [AdminController::class, 'updateUser']);
+    Route::patch('/users/{id}/points', [AdminController::class, 'adjustPoints']);
+    Route::get('/users/{id}/points/transactions', [AdminController::class, 'userTransactions']);
+
+    Route::get('/businesses', [AdminController::class, 'listBusinesses']);
+    Route::get('/businesses/pending', [AdminController::class, 'listPendingBusinesses']);
+    Route::patch('/businesses/{id}', [AdminController::class, 'updateBusiness']);
+    Route::post('/businesses/{id}/approve', [AdminController::class, 'approveBusiness']);
+    Route::post('/businesses/{id}/reject', [AdminController::class, 'rejectBusiness']);
+    Route::post('/businesses/{id}/suspend', [AdminController::class, 'suspendBusiness']);
+    Route::post('/businesses/{id}/reassign', [AdminController::class, 'reassignBusiness']);
 });
