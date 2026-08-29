@@ -43,6 +43,11 @@ This is a **core-first** conversion. Ported and tested:
   server-recomputed pricing/stock). Site type switching
   (WEBSITE/ECOMMERCE) and publish/unpublish are ported too — but only the
   fields storefront needs (`siteType`, `isPublished`, delivery settings).
+  The public `GET /sites/:slug` page a shopper actually lands on is ported
+  for both site types: for `ECOMMERCE` it returns the business + a static
+  theme keyed by `templateId` (`SiteThemes`, matching the 4 built-in
+  designs) for `<Storefront/>` to render; for `WEBSITE` it serves back
+  whatever `html`/`css` a site already has saved (read-only — see below).
 - Visitors (welcome-popup phone capture, revisit dedup, admin list).
 - Review-QR boards: admin batch-generation and management
   (`/admin/qr-codes*`), shop-facing lookup/claim/re-point-a-board, the
@@ -53,10 +58,14 @@ This is a **core-first** conversion. Ported and tested:
   back to the unassigned pool.
 
 **Not ported** (still Node-only — see `backend/src/modules/`): payments/
-Stripe, B2B RFQ/quotes, the drag-and-drop **brochure website builder**
-(`PUT /:id/site` for `projectData`/`html`/`css`, template preview/rendering,
-HTML sanitization — `SiteType.WEBSITE` only; e-commerce sites don't use it),
-WhatsApp broadcasts, Poster Studio (`/admin/posters`), notifications, email
+Stripe, B2B RFQ/quotes, *authoring* a drag-and-drop **brochure website**
+(`GET/PUT /:id/site` for the editor, `GET /:id/site/templates/:templateId`
+preview rendering, HTML sanitization — `SiteType.WEBSITE` only; e-commerce
+sites don't use the builder). Reading back an already-published `WEBSITE`
+site (`GET /sites/:slug`) *is* ported — it just serves whatever `html`/`css`
+is already in the `business_sites` row, since a Node-authored site on the
+same database still has that data. WhatsApp broadcasts, Poster Studio
+(`/admin/posters`), notifications, email
 sending (new-order and business-welcome emails are no-ops here). Each is a
 self-contained subsystem with its own tables — `admin/stats`'s
 `leadCount`/`bookingCount`/`openRfqCount` still report `0`
@@ -159,13 +168,13 @@ endpoint's geo (`lat`/`lng`) radius filter, which uses MySQL-specific SQL
 php artisan test
 ```
 
-64 feature tests cover auth, business creation (owner/dealer paths, points
+68 feature tests cover auth, business creation (owner/dealer paths, points
 spend, ownership checks), categories, reviews, admin (stats, user/business
 management, points admin, approval flow), leads, bookings (hours/conflict
 validation, status transitions), points, the storefront (catalogue, checkout
-pricing/stock recompute, orders, customer report), visitors, and review-QR
-boards (batch generation, claim/conflict rules, scan redirects, review-link
-resolution).
+pricing/stock recompute, orders, customer report, the public site page for
+both ECOMMERCE and WEBSITE), visitors, and review-QR boards (batch
+generation, claim/conflict rules, scan redirects, review-link resolution).
 
 ## Porting another module
 

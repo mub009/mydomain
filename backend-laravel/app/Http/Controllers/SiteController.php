@@ -7,6 +7,7 @@ use App\Models\Business;
 use App\Models\BusinessSite;
 use App\Models\Product;
 use App\Support\ApiResponse;
+use App\Support\SiteThemes;
 use Illuminate\Http\Request;
 
 // Owner-facing storefront settings (site type, delivery fee, publish state).
@@ -112,6 +113,70 @@ class SiteController extends Controller
 
         return ApiResponse::ok([
             'isPublished' => $site->isPublished,
+            'publishedAt' => $site->publishedAt,
+        ]);
+    }
+
+    // Public: what a visitor sees at a business's own page — either the
+    // e-commerce storefront (products rendered by the app, themed from the
+    // chosen template) or a published brochure website's saved html/css.
+    public function published(string $slug)
+    {
+        $business = Business::where('slug', $slug)->with([
+            'photos' => fn ($q) => $q->orderBy('sortOrder')->select(['businessId', 'url', 'caption']),
+            'hours' => fn ($q) => $q->orderBy('dayOfWeek')->select(['businessId', 'dayOfWeek', 'openTime', 'closeTime', 'isClosed']),
+        ])->first([
+            'id', 'name', 'slug', 'city', 'description', 'phone', 'email', 'logoUrl',
+            'addressLine1', 'addressLine2', 'state', 'postalCode', 'latitude', 'longitude',
+            'instagramUsername', 'avgRating', 'reviewCount',
+        ]);
+        if (! $business) {
+            throw ApiException::notFound('Business not found');
+        }
+
+        $site = BusinessSite::where('businessId', $business->id)->first();
+        if (! $site || ! $site->isPublished) {
+            throw ApiException::notFound('This business has not published a website yet');
+        }
+
+        $businessPayload = [
+            ...$business->only([
+                'id', 'name', 'slug', 'city', 'description', 'phone', 'email', 'logoUrl',
+                'addressLine1', 'addressLine2', 'state', 'postalCode', 'latitude', 'longitude',
+                'instagramUsername', 'avgRating', 'reviewCount',
+            ]),
+            'photos' => $business->photos->map->only(['url', 'caption']),
+            'hours' => $business->hours->map->only(['dayOfWeek', 'openTime', 'closeTime', 'isClosed']),
+        ];
+
+        if ($site->siteType === 'ECOMMERCE') {
+            return ApiResponse::ok([
+                'siteType' => 'ECOMMERCE',
+                'business' => $businessPayload,
+                'theme' => SiteThemes::resolve($site->templateId),
+                'templateId' => $site->templateId,
+                'storefront' => [
+                    'deliveryFeeCents' => $site->deliveryFeeCents,
+                    'freeDeliveryAboveCents' => $site->freeDeliveryAboveCents,
+                ],
+                'html' => '',
+                'css' => '',
+                'publishedAt' => $site->publishedAt,
+            ]);
+        }
+
+        if (! $site->html) {
+            throw ApiException::notFound('This business has not published a website yet');
+        }
+
+        return ApiResponse::ok([
+            'siteType' => 'WEBSITE',
+            'business' => $businessPayload,
+            'theme' => SiteThemes::resolve($site->templateId),
+            'templateId' => $site->templateId,
+            'storefront' => null,
+            'html' => $site->html,
+            'css' => $site->css ?? '',
             'publishedAt' => $site->publishedAt,
         ]);
     }

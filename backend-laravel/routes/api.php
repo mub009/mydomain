@@ -109,6 +109,7 @@ Route::prefix('businesses')->group(function () {
 // Public: what a shopper on a published storefront can reach. Checkout is
 // open to guests — most buyers will not have an account.
 Route::prefix('sites')->group(function () {
+    Route::get('/{slug}', [SiteController::class, 'published']);
     Route::get('/{slug}/products', [StorefrontController::class, 'publicProducts']);
     Route::post('/{slug}/orders', [StorefrontController::class, 'checkout'])->middleware('auth.optional');
 });

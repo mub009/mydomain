@@ -226,4 +226,61 @@ class StorefrontTest extends TestCase
         $this->postJson("/api/v1/businesses/{$business->id}/products", ['name' => 'Item', 'priceCents' => 1000], ['Authorization' => "Bearer {$token}"])
             ->assertStatus(403);
     }
+
+    public function test_public_site_404s_when_nothing_is_published(): void
+    {
+        $owner = $this->user(['role' => 'BUSINESS_OWNER']);
+        $business = $this->business($owner);
+
+        $this->getJson("/api/v1/sites/{$business->slug}")->assertStatus(404);
+
+        BusinessSite::create(['businessId' => $business->id, 'siteType' => 'ECOMMERCE', 'isPublished' => false]);
+        $this->getJson("/api/v1/sites/{$business->slug}")->assertStatus(404);
+    }
+
+    public function test_public_site_renders_a_published_ecommerce_storefront_with_its_theme(): void
+    {
+        $owner = $this->user(['role' => 'BUSINESS_OWNER']);
+        $business = $this->business($owner);
+        BusinessSite::create([
+            'businessId' => $business->id, 'siteType' => 'ECOMMERCE', 'isPublished' => true,
+            'templateId' => 'vibrant', 'deliveryFeeCents' => 5000, 'freeDeliveryAboveCents' => 20000,
+        ]);
+
+        $this->getJson("/api/v1/sites/{$business->slug}")
+            ->assertStatus(200)
+            ->assertJsonPath('data.siteType', 'ECOMMERCE')
+            ->assertJsonPath('data.business.slug', $business->slug)
+            ->assertJsonPath('data.templateId', 'vibrant')
+            ->assertJsonPath('data.theme.accent', '#7c3aed')
+            ->assertJsonPath('data.storefront.deliveryFeeCents', 5000)
+            ->assertJsonPath('data.storefront.freeDeliveryAboveCents', 20000)
+            ->assertJsonPath('data.html', '');
+    }
+
+    public function test_public_site_renders_a_published_brochure_website(): void
+    {
+        $owner = $this->user(['role' => 'BUSINESS_OWNER']);
+        $business = $this->business($owner);
+        BusinessSite::create([
+            'businessId' => $business->id, 'siteType' => 'WEBSITE', 'isPublished' => true,
+            'templateId' => 'classic', 'html' => '<h1>Welcome</h1>', 'css' => 'h1{color:red}',
+        ]);
+
+        $this->getJson("/api/v1/sites/{$business->slug}")
+            ->assertStatus(200)
+            ->assertJsonPath('data.siteType', 'WEBSITE')
+            ->assertJsonPath('data.html', '<h1>Welcome</h1>')
+            ->assertJsonPath('data.css', 'h1{color:red}')
+            ->assertJsonPath('data.storefront', null);
+    }
+
+    public function test_public_site_404s_for_a_website_marked_published_with_no_saved_html(): void
+    {
+        $owner = $this->user(['role' => 'BUSINESS_OWNER']);
+        $business = $this->business($owner);
+        BusinessSite::create(['businessId' => $business->id, 'siteType' => 'WEBSITE', 'isPublished' => true]);
+
+        $this->getJson("/api/v1/sites/{$business->slug}")->assertStatus(404);
+    }
 }
