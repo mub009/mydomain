@@ -229,7 +229,7 @@ function UsersPanel({ onChanged }: { onChanged: () => void }) {
       {!loading && (
       <div className="card divide-y divide-gray-100">
         {users.map((u) => (
-          <div key={u.id} className="p-4 flex items-center justify-between gap-3">
+          <div key={u.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3 min-w-0">
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-100 text-brand-700 text-sm font-bold">
                 {u.firstName[0]?.toUpperCase()}
@@ -254,7 +254,7 @@ function UsersPanel({ onChanged }: { onChanged: () => void }) {
                 )}
               </div>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
               <span className={`badge ${roleBadge(u.role)} hidden sm:inline-flex`}>{u.role.replace("_", " ")}</span>
               <span className={`badge ${statusBadge(u.status)} hidden md:inline-flex`}>{u.status.replace("_", " ")}</span>
               {u._count && u._count.businesses > 0 && <span className="text-xs text-ink-400 hidden lg:inline">{u._count.businesses} biz</span>}
@@ -519,7 +519,7 @@ function BusinessesPanel({ categories, onChanged }: { categories: Category[]; on
                   </p>
                 )}
               </div>
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex flex-wrap items-center gap-2">
                 {b.status === "PENDING_APPROVAL" && (
                   <button onClick={() => quickAction(b.id, "approve")} className="btn-primary px-3 py-1.5 text-sm">
                     <Check size={14} /> Approve
@@ -796,7 +796,7 @@ function VisitorsPanel() {
       {!loading && (
         <div className="card divide-y divide-gray-100">
           {visitors.map((v) => (
-            <div key={v.id} className="p-4 flex items-center justify-between gap-3">
+            <div key={v.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0">
                 <p className="font-semibold text-sm text-ink-900">+91 {v.phone}</p>
                 <p className="text-xs text-ink-500 mt-0.5 flex items-center gap-1">
@@ -822,7 +822,7 @@ function VisitorsPanel() {
                   {v.visitCount === 1 ? "visit" : "visits"} · last {new Date(v.lastSeenAt).toLocaleString()}
                 </p>
               </div>
-              <div className="shrink-0 flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
                 {v.latitude != null && <span className="badge bg-emerald-50 text-emerald-700">Located</span>}
                 <a href={`tel:+91${v.phone}`} className="btn-secondary px-3 py-1.5 text-sm">
                   Call
