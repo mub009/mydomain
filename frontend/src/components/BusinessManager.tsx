@@ -6,6 +6,7 @@ import {
   ExternalLink,
   ImagePlus,
   Info,
+  LocateFixed,
   Plus,
   Send,
   Trash2,
@@ -82,6 +83,8 @@ export default function BusinessManager({
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [detectingLocation, setDetectingLocation] = useState(false);
+  const [locationError, setLocationError] = useState("");
 
   const [details, setDetails] = useState({
     name: "",
@@ -166,6 +169,30 @@ export default function BusinessManager({
     } finally {
       setSaving(false);
     }
+  }
+
+  function detectLocation() {
+    setLocationError("");
+    if (!navigator.geolocation) {
+      setLocationError("Geolocation isn't supported by this browser.");
+      return;
+    }
+    setDetectingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setDetectingLocation(false);
+        setDetails((d) => ({
+          ...d,
+          latitude: String(position.coords.latitude),
+          longitude: String(position.coords.longitude),
+        }));
+      },
+      (err) => {
+        setDetectingLocation(false);
+        setLocationError(err.code === err.PERMISSION_DENIED ? "Location access denied." : "Couldn't detect your location.");
+      },
+      { enableHighAccuracy: false, timeout: 8000 },
+    );
   }
 
   async function saveHours() {
@@ -396,15 +423,27 @@ export default function BusinessManager({
               <input required value={details.postalCode} onChange={(e) => setDetails({ ...details, postalCode: e.target.value })} className="input" />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-ink-700 mb-1">Latitude</label>
-              <input required value={details.latitude} onChange={(e) => setDetails({ ...details, latitude: e.target.value })} className="input" />
+          <div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-ink-700 mb-1">Latitude</label>
+                <input required value={details.latitude} onChange={(e) => setDetails({ ...details, latitude: e.target.value })} className="input" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-ink-700 mb-1">Longitude</label>
+                <input required value={details.longitude} onChange={(e) => setDetails({ ...details, longitude: e.target.value })} className="input" />
+              </div>
             </div>
-            <div>
-              <label className="block text-xs font-semibold text-ink-700 mb-1">Longitude</label>
-              <input required value={details.longitude} onChange={(e) => setDetails({ ...details, longitude: e.target.value })} className="input" />
-            </div>
+            <button
+              type="button"
+              disabled={detectingLocation}
+              onClick={detectLocation}
+              className="btn-secondary mt-2 px-3 py-1.5 text-sm"
+            >
+              <LocateFixed size={14} className={detectingLocation ? "animate-pulse" : ""} />
+              {detectingLocation ? "Detecting…" : "Use my current location"}
+            </button>
+            {locationError && <p className="mt-1 text-xs text-red-600">{locationError}</p>}
           </div>
           <button disabled={saving} className="btn-primary px-5 py-2.5">
             {saving ? "Saving…" : "Save details"}
@@ -418,47 +457,50 @@ export default function BusinessManager({
           <h3 className="font-bold text-ink-900 flex items-center gap-1.5">
             <Clock size={16} className="text-brand-600" /> Opening hours
           </h3>
-          <div className="space-y-2">
+          <div className="divide-y divide-gray-100">
             {hours.map((h, i) => (
-              <div key={h.dayOfWeek} className="flex items-center gap-3 flex-wrap">
-                <span className="w-24 text-sm font-medium text-ink-800">{DAY_NAMES[h.dayOfWeek]}</span>
-                <label className="flex items-center gap-1.5 text-sm text-ink-600">
-                  <input
-                    type="checkbox"
-                    checked={h.isClosed}
-                    onChange={(e) => {
-                      const next = [...hours];
-                      next[i] = { ...h, isClosed: e.target.checked };
-                      setHours(next);
-                    }}
-                  />
-                  Closed
-                </label>
-                {!h.isClosed && (
-                  <div className="flex items-center gap-2">
+              <div key={h.dayOfWeek} className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:gap-3">
+                <span className="w-24 shrink-0 text-sm font-medium text-ink-800">{DAY_NAMES[h.dayOfWeek]}</span>
+                <div className="flex flex-wrap items-center gap-3">
+                  <label className="flex items-center gap-1.5 text-sm text-ink-600">
                     <input
-                      type="time"
-                      value={h.openTime}
+                      type="checkbox"
+                      className="h-4 w-4 accent-brand-600"
+                      checked={h.isClosed}
                       onChange={(e) => {
                         const next = [...hours];
-                        next[i] = { ...h, openTime: e.target.value };
+                        next[i] = { ...h, isClosed: e.target.checked };
                         setHours(next);
                       }}
-                      className="input !w-32 !py-1.5"
                     />
-                    <span className="text-ink-400">–</span>
-                    <input
-                      type="time"
-                      value={h.closeTime}
-                      onChange={(e) => {
-                        const next = [...hours];
-                        next[i] = { ...h, closeTime: e.target.value };
-                        setHours(next);
-                      }}
-                      className="input !w-32 !py-1.5"
-                    />
-                  </div>
-                )}
+                    Closed
+                  </label>
+                  {!h.isClosed && (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="time"
+                        value={h.openTime}
+                        onChange={(e) => {
+                          const next = [...hours];
+                          next[i] = { ...h, openTime: e.target.value };
+                          setHours(next);
+                        }}
+                        className="input !w-32 !py-1.5"
+                      />
+                      <span className="text-ink-400">–</span>
+                      <input
+                        type="time"
+                        value={h.closeTime}
+                        onChange={(e) => {
+                          const next = [...hours];
+                          next[i] = { ...h, closeTime: e.target.value };
+                          setHours(next);
+                        }}
+                        className="input !w-32 !py-1.5"
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
             ))}
           </div>
