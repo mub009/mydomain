@@ -63,7 +63,7 @@ function PhotoHero({
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 rounded-2xl overflow-hidden h-64 sm:h-80">
-      <button onClick={onSeeAll} className="relative group h-40 sm:h-full bg-gray-100">
+      <button onClick={onSeeAll} className="relative group h-full bg-gray-100">
         <PhotoImage src={lead.url} alt={lead.caption ?? name} className="h-full w-full object-cover" />
         <span className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
       </button>
