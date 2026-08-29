@@ -44,20 +44,25 @@ own `public/`, so there's no CORS to configure and no second server to run.
 
 1. `cd frontend && npm install && npm run build` — produces `frontend/dist/`
    (`index.html` + a hashed `assets/` folder).
-2. Copy the **contents** of `dist/` into `backend-laravel/public/`
+2. Copy the **contents** of `dist/` directly into `backend-laravel/public/`
    (`cp -r frontend/dist/* backend-laravel/public/`) — merges alongside
    Laravel's own `index.php`/`.htaccess`/`favicon.ico`/`robots.txt`, no
-   filename collisions.
-3. That's it — `routes/web.php` has a catch-all `Route::fallback()` that
-   serves the SPA's `index.html` for anything not matched by a real route
-   (so client-side routes like `/business/some-slug` work on a hard
+   filename collisions. **Don't** put it in a subfolder like `public/cus/` —
+   the built `index.html` references its JS/CSS with root-absolute paths
+   (`/assets/...`), so anywhere but `public/` itself breaks it (blank page,
+   404s on the JS/CSS in the browser console).
+3. `git add backend-laravel/public && git commit` — the build output *is*
+   committed here specifically so a host with no Node runtime (most cPanel
+   accounts) can deploy a frontend change with nothing more than `git pull`.
+   Every rebuild replaces the previous `assets/*` files with new
+   content-hashed filenames, so stale ones don't linger — `git status` after
+   a build shows exactly what changed.
+4. `routes/web.php` has a catch-all `Route::fallback()` that serves the
+   SPA's `index.html` for anything not matched by a real route (so
+   client-side routes like `/business/some-slug` work on a hard
    refresh/direct link too), while leaving `api/v1/*` alone so a bad API
    route still 404s as JSON, not HTML, and real files under `assets/` are
    served directly by Apache since they exist on disk.
-
-Rebuilding the frontend later means repeating steps 1-2 — the build output
-isn't committed to this repo, so a fresh deploy always needs it built and
-copied in again.
 
 ## Scope of this port
 
