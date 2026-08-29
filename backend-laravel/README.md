@@ -83,19 +83,27 @@ reads.
 ## Requirements
 
 - PHP 8.2+, Composer
-- MySQL (production/parity with `backend/`) — SQLite works for local dev and
-  is what the test suite uses, except the search endpoint's geo (`lat`/`lng`)
-  radius filter, which uses MySQL-specific SQL (`radians`, `acos`, `least`,
-  `greatest`) and needs a real MySQL connection to exercise.
+- MySQL — the configured and tested default, matching `backend/`. SQLite
+  also works for local dev (and is what the automated test suite uses,
+  via `phpunit.xml`, regardless of what `.env` points at) except the search
+  endpoint's geo (`lat`/`lng`) radius filter, which uses MySQL-specific SQL
+  (`radians`, `acos`, `least`, `greatest`) and needs a real MySQL connection
+  to exercise.
 
 ## Getting started
 
+`.env.example` defaults to MySQL — the same `mydomain`/`mydomain`/`mydomain`
+database/user/password the repo's `docker-compose.yml` provisions for the
+Node backend, so either backend can point at the same server.
+
 ```bash
 cd backend-laravel
-cp .env.example .env    # fill in JWT secrets, DB credentials
+cp .env.example .env    # fill in JWT secrets; DB_* already points at MySQL
 composer install
 php artisan key:generate   # only if APP_KEY is blank
-touch database/database.sqlite   # if using the sqlite default
+
+# Start MySQL: either `docker compose up -d mysql` from the repo root, or
+# point DB_HOST/DB_DATABASE/DB_USERNAME/DB_PASSWORD in .env at your own server.
 php artisan migrate
 php artisan db:seed         # admin/owner/dealer/customer + one demo listing
 php artisan serve --port=4000
@@ -105,9 +113,11 @@ Seeded accounts (password `Password123!`), same as `backend/`:
 `admin@mydomain.dev`, `owner@mydomain.dev`, `dealer@mydomain.dev`,
 `customer@mydomain.dev`.
 
-To point at the same MySQL the Node backend uses (`docker compose up -d
-mysql`), set `DB_CONNECTION=mysql` and the `DB_HOST`/`DB_DATABASE`/etc vars
-in `.env` — see the commented block there.
+For a zero-setup local start without MySQL, switch `.env` to
+`DB_CONNECTION=sqlite` (comment out the `DB_HOST`/etc lines) and
+`touch database/database.sqlite` — everything works except the search
+endpoint's geo (`lat`/`lng`) radius filter, which uses MySQL-specific SQL
+(`radians`, `acos`, `least`, `greatest`).
 
 ## Tests
 
