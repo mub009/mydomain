@@ -64,6 +64,43 @@ own `public/`, so there's no CORS to configure and no second server to run.
    route still 404s as JSON, not HTML, and real files under `assets/` are
    served directly by Apache since they exist on disk.
 
+### Image uploads (DigitalOcean Spaces)
+
+Every "upload a photo" button in the app — business photos/logo/cover,
+product images, and category icons — goes through one endpoint,
+`POST /api/v1/uploads/image` (`UploadController`), which stores the file to
+a DigitalOcean Space (S3-compatible object storage, via
+`league/flysystem-aws-s3-v3` on Laravel's `spaces` disk — see
+`config/filesystems.php`) and returns its CDN URL. That URL is then just
+saved into the same field a pasted URL would have gone into — no schema or
+API-contract change. `posters` is one of the accepted `purpose` values and
+already sanitizes SVG artwork (`App\Support\Uploads\SvgSanitizer`, ported
+from the Node poster module's DOM-walking sanitizer, strips `<script>`,
+event-handler attributes, `javascript:` URLs, unsafe CSS), ready for when
+the Poster Studio module itself is ported — that module's designer/
+renderer/template-slot logic is not part of this change and Poster Studio
+remains otherwise unported (see "Not ported" below).
+
+To set it up, create a Space and a Spaces API key pair in the DigitalOcean
+dashboard (**Spaces Object Storage** → Create a Space, with its CDN
+enabled; **API** → **Spaces Keys** → Generate New Key), then fill in 5
+vars in `.env`:
+
+```
+DO_SPACES_KEY=            # the Spaces access key
+DO_SPACES_SECRET=         # the Spaces secret key
+DO_SPACES_REGION=blr1     # the region code chosen when creating the Space
+DO_SPACES_BUCKET=your-space-name
+DO_SPACES_ENDPOINT=https://blr1.digitaloceanspaces.com          # region endpoint
+DO_SPACES_CDN_ENDPOINT=https://your-space-name.blr1.cdn.digitaloceanspaces.com
+```
+
+Until these are set, uploads fail with a clear `INTERNAL_ERROR` response
+rather than a stack trace — everything else in the app works unaffected.
+Raster images (PNG/JPEG/GIF/WebP) are capped at 5MB, SVG (posters only) at
+2MB; both content-sniffed rather than trusted from the client's declared
+mime type.
+
 ## Scope of this port
 
 This is a **core-first** conversion. Ported and tested:

@@ -15,6 +15,7 @@ use App\Http\Controllers\ReviewLinkController;
 use App\Http\Controllers\SearchController;
 use App\Http\Controllers\SiteController;
 use App\Http\Controllers\StorefrontController;
+use App\Http\Controllers\UploadController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VisitorController;
 use Illuminate\Support\Facades\Route;
@@ -28,6 +29,10 @@ Route::prefix('auth')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me'])->middleware('auth.jwt');
 });
+
+// Behind every "upload an image" button — see UploadController for the
+// purposes it accepts and what each is gated to.
+Route::post('/uploads/image', [UploadController::class, 'image'])->middleware('auth.jwt');
 
 Route::prefix('categories')->group(function () {
     Route::get('/', [CategoryController::class, 'index']);

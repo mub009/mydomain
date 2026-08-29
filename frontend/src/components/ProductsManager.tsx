@@ -6,6 +6,7 @@ import { Business, Product } from "@/types";
 import { ListSkeleton } from "@/components/Loading";
 import Modal from "@/components/Modal";
 import Pagination from "@/components/Pagination";
+import ImageUploadField from "@/components/ImageUploadField";
 
 const PAGE_SIZE = 10;
 
@@ -364,16 +365,12 @@ export default function ProductsManager({ business }: { business: Business }) {
               </label>
             </div>
 
-            <label className="block">
-              <span className="mb-1 block text-xs font-semibold text-ink-700">Image URL</span>
-              <input
-                type="url"
-                className="input"
-                placeholder="https://…"
-                value={form.imageUrl}
-                onChange={(e) => setForm((f) => ({ ...f, imageUrl: e.target.value }))}
-              />
-            </label>
+            <ImageUploadField
+              label="Image"
+              purpose="products"
+              value={form.imageUrl}
+              onChange={(url) => setForm((f) => ({ ...f, imageUrl: url }))}
+            />
 
             {form.imageUrl.trim() && (
               <img

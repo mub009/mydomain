@@ -60,6 +60,25 @@ return [
             'report' => false,
         ],
 
+        // DigitalOcean Spaces — S3-compatible, so it uses the s3 driver
+        // pointed at the region's Spaces endpoint. `url` is the CDN
+        // subdomain (not the raw Spaces endpoint) so every uploaded file's
+        // public URL is served through the CDN. See README "Image uploads
+        // (DigitalOcean Spaces)" for the 5 env vars this needs.
+        'spaces' => [
+            'driver' => 's3',
+            'key' => env('DO_SPACES_KEY'),
+            'secret' => env('DO_SPACES_SECRET'),
+            'region' => env('DO_SPACES_REGION'),
+            'bucket' => env('DO_SPACES_BUCKET'),
+            'endpoint' => env('DO_SPACES_ENDPOINT'),
+            'url' => env('DO_SPACES_CDN_ENDPOINT'),
+            'use_path_style_endpoint' => false,
+            'visibility' => 'public',
+            'throw' => true,
+            'report' => false,
+        ],
+
     ],
 
     /*

@@ -16,6 +16,7 @@ import { businessesApi } from "@/api/endpoints";
 import { apiErrorMessage } from "@/api/client";
 import { Business, Category } from "@/types";
 import { Spinner } from "@/components/Loading";
+import ImageUploadField from "@/components/ImageUploadField";
 import ReviewQrBoard from "@/components/ReviewQrBoard";
 import ProductsManager from "@/components/ProductsManager";
 import OrdersManager from "@/components/OrdersManager";
@@ -360,27 +361,21 @@ export default function BusinessManager({
             <p className="mb-2 text-xs font-bold uppercase tracking-wide text-ink-500">Branding</p>
             <div className="flex gap-3">
               <div className="flex-1 space-y-3">
-                <div>
-                  <label className="block text-xs font-semibold text-ink-700 mb-1">Logo image URL</label>
-                  <input
-                    value={details.logoUrl}
-                    onChange={(e) => setDetails({ ...details, logoUrl: e.target.value })}
-                    className="input"
-                    placeholder="https://…/logo.png"
-                  />
-                  <p className="mt-1 text-[11px] text-ink-400">
-                    Shown in your website header and next to your name. Square images work best.
-                  </p>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-ink-700 mb-1">Cover image URL</label>
-                  <input
-                    value={details.coverImageUrl}
-                    onChange={(e) => setDetails({ ...details, coverImageUrl: e.target.value })}
-                    className="input"
-                    placeholder="https://…/cover.jpg"
-                  />
-                </div>
+                <ImageUploadField
+                  label="Logo image"
+                  purpose="business-logo"
+                  value={details.logoUrl}
+                  onChange={(url) => setDetails({ ...details, logoUrl: url })}
+                  placeholder="https://…/logo.png"
+                  hint="Shown in your website header and next to your name. Square images work best."
+                />
+                <ImageUploadField
+                  label="Cover image"
+                  purpose="business-cover"
+                  value={details.coverImageUrl}
+                  onChange={(url) => setDetails({ ...details, coverImageUrl: url })}
+                  placeholder="https://…/cover.jpg"
+                />
               </div>
               <div className="shrink-0 text-center">
                 <p className="mb-1 text-[11px] font-medium text-ink-500">Preview</p>
@@ -597,9 +592,11 @@ export default function BusinessManager({
             <h3 className="font-bold text-ink-900 flex items-center gap-1.5">
               <Plus size={16} className="text-brand-600" /> Add a photo
             </h3>
-            <input required type="url" placeholder="Image URL (https://…)" value={newPhoto.url} onChange={(e) => setNewPhoto({ ...newPhoto, url: e.target.value })} className="input" />
+            <ImageUploadField purpose="business-photos" value={newPhoto.url} onChange={(url) => setNewPhoto({ ...newPhoto, url })} placeholder="Image URL (https://…)" />
             <input placeholder="Caption (optional)" value={newPhoto.caption} onChange={(e) => setNewPhoto({ ...newPhoto, caption: e.target.value })} className="input" />
-            <button className="btn-primary px-5 py-2.5">Add photo</button>
+            <button disabled={!newPhoto.url.trim()} className="btn-primary px-5 py-2.5">
+              Add photo
+            </button>
           </form>
         </div>
       )}

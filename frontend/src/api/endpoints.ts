@@ -48,6 +48,19 @@ export const categoriesApi = {
   list: () => api.get<ApiResponse<Category[]>>("/categories").then((r) => r.data.data),
 };
 
+export type UploadPurpose = "business-photos" | "business-logo" | "business-cover" | "products" | "categories" | "posters";
+
+export const uploadsApi = {
+  image: (file: File, purpose: UploadPurpose) => {
+    const form = new FormData();
+    form.append("purpose", purpose);
+    form.append("file", file);
+    return api
+      .post<ApiResponse<{ url: string }>>("/uploads/image", form, { headers: { "Content-Type": "multipart/form-data" } })
+      .then((r) => r.data.data.url);
+  },
+};
+
 export const searchApi = {
   search: (params: Record<string, unknown>) =>
     api.get<PaginatedResponse<Business>>("/search", { params }).then((r) => r.data),
