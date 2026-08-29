@@ -101,6 +101,35 @@ Raster images (PNG/JPEG/GIF/WebP) are capped at 5MB, SVG (posters only) at
 2MB; both content-sniffed rather than trusted from the client's declared
 mime type.
 
+### Analytics (admin "Analytics" tab)
+
+Every page load — the frontend's `usePageViewTracking` hook, on every route
+change — pings `POST /api/v1/analytics/pageview` (public, no visitor action
+needed) with a client-generated `visitorId` (persisted in `localStorage`,
+not a cookie) and the path. `AnalyticsController` records it with the
+request's IP, an IP → city/country lookup (`App\Support\Analytics\GeoLocator`,
+via the free `ip-api.com` API, cached in `ip_geolocations` since an IP's
+city essentially never changes and the free tier is rate-limited — a failed
+or unreachable lookup just leaves location blank rather than failing the
+page view), and a lightweight User-Agent sniff for device/browser
+(`App\Support\Analytics\UserAgentParser`). This is broader than
+`VisitorController`/the "Visitors" tab, which only records people who
+explicitly shared their phone through the welcome popup.
+
+Two admin endpoints read that table: `GET /admin/analytics/online` (the
+latest page view per `visitorId` in the last 5 minutes — "who's on the site
+right now") and `GET /admin/analytics/pages` (page path, view count, and
+unique-visitor count, ranked, over `?range=today|7d|30d|all`). The
+`page_views.createdAt` column is microsecond-precision (`timestamp(...,
+6)`, with `PageView::$dateFormat` overridden to match) — Eloquent's default
+second-precision timestamp otherwise makes several page views in the same
+second order arbitrarily, which breaks "the latest page" for a fast SPA
+navigation.
+
+Since this tracks every visitor passively rather than only those who
+opt in, it has a bigger privacy footprint than the existing Visitors
+capture — worth a line in your privacy policy.
+
 ## Scope of this port
 
 This is a **core-first** conversion. Ported and tested:

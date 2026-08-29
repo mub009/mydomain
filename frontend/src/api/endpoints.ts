@@ -48,6 +48,33 @@ export const categoriesApi = {
   list: () => api.get<ApiResponse<Category[]>>("/categories").then((r) => r.data.data),
 };
 
+export const analyticsApi = {
+  pageview: (payload: { visitorId: string; path: string; referrer?: string }) =>
+    api.post("/analytics/pageview", payload).then(() => undefined),
+  online: () => api.get<ApiResponse<{ online: OnlineVisitor[]; count: number }>>("/admin/analytics/online").then((r) => r.data.data),
+  pages: (range: "today" | "7d" | "30d" | "all" = "7d") =>
+    api
+      .get<ApiResponse<{ range: string; pages: PageStat[]; totalViews: number }>>("/admin/analytics/pages", { params: { range } })
+      .then((r) => r.data.data),
+};
+
+export interface OnlineVisitor {
+  visitorId: string;
+  path: string;
+  ip: string;
+  location: string | null;
+  device: string | null;
+  browser: string | null;
+  loggedIn: boolean;
+  lastSeenAt: string;
+}
+
+export interface PageStat {
+  path: string;
+  views: number;
+  uniqueVisitors: number;
+}
+
 export type UploadPurpose = "business-photos" | "business-logo" | "business-cover" | "products" | "categories" | "posters";
 
 export const uploadsApi = {

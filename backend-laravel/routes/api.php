@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BookingController;
 use App\Http\Controllers\BusinessController;
@@ -166,6 +167,11 @@ Route::prefix('visitors')->group(function () {
     Route::patch('/{id}/location', [VisitorController::class, 'updateLocation']);
 });
 
+// Public: every page load pings here (frontend's usePageViewTracking
+// hook) — no visitor action needed. auth.optional so a logged-in view is
+// attributed to that user without requiring one.
+Route::post('/analytics/pageview', [AnalyticsController::class, 'pageview'])->middleware('auth.optional');
+
 // Admin. Poster Studio is not part of this Laravel port yet — see
 // backend-laravel/README.md.
 Route::prefix('admin')->middleware(['auth.jwt', 'role:ADMIN'])->group(function () {
@@ -187,6 +193,9 @@ Route::prefix('admin')->middleware(['auth.jwt', 'role:ADMIN'])->group(function (
     Route::post('/businesses/{id}/reassign', [AdminController::class, 'reassignBusiness']);
 
     Route::get('/visitors', [VisitorController::class, 'index']);
+
+    Route::get('/analytics/online', [AnalyticsController::class, 'online']);
+    Route::get('/analytics/pages', [AnalyticsController::class, 'pages']);
 
     Route::get('/qr-codes', [QrCodeController::class, 'index']);
     Route::post('/qr-codes/batch', [QrCodeController::class, 'generateBatch']);

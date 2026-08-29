@@ -35,9 +35,10 @@ import Pagination from "@/components/Pagination";
 import PointsModal from "@/components/PointsModal";
 import QrCodesPanel from "@/components/QrCodesPanel";
 import PostersPanel from "@/components/PostersPanel";
+import AnalyticsPanel from "@/components/AnalyticsPanel";
 import ResetPasswordModal from "@/components/ResetPasswordModal";
 
-const TABS = ["Overview", "Users", "Businesses", "Approvals", "QR Boards", "Posters", "Visitors", "Reports"] as const;
+const TABS = ["Overview", "Users", "Businesses", "Approvals", "QR Boards", "Posters", "Visitors", "Analytics", "Reports"] as const;
 type Tab = (typeof TABS)[number];
 
 const ROLES: UserRole[] = ["CUSTOMER", "BUSINESS_OWNER", "DEALER", "ADMIN"];
@@ -157,6 +158,7 @@ export default function AdminDashboard() {
       {tab === "QR Boards" && <QrCodesPanel />}
       {tab === "Posters" && <PostersPanel />}
       {tab === "Visitors" && <VisitorsPanel />}
+      {tab === "Analytics" && <AnalyticsPanel />}
       {tab === "Reports" && <ReportsPanel />}
     </div>
   );
