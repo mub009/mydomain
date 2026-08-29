@@ -8,6 +8,7 @@ import {
   Instagram,
   LayoutDashboard,
   Linkedin,
+  LogIn,
   LogOut,
   Menu,
   SearchCheck,
@@ -16,6 +17,7 @@ import {
   Store,
   Twitter,
   User,
+  UserPlus,
   X,
   Youtube,
 } from "lucide-react";
@@ -118,10 +120,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             ) : (
               <div className="flex items-center gap-2">
                 <Link to="/login" className="btn-ghost text-sm px-3 py-1.5">
-                  Log in
+                  <LogIn size={15} /> Log in
                 </Link>
                 <Link to="/register" className="btn-primary text-sm px-4 py-1.5">
-                  Sign up
+                  <UserPlus size={15} /> Sign up
                 </Link>
               </div>
             )}
@@ -163,11 +165,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 </button>
               ) : (
                 <div className="flex gap-2 px-3 pt-1">
-                  <Link to="/login" onClick={() => setMenuOpen(false)} className="btn-secondary text-sm flex-1">
-                    Log in
+                  <Link to="/login" onClick={() => setMenuOpen(false)} className="btn-secondary flex-1 py-2.5 text-sm">
+                    <LogIn size={15} /> Log in
                   </Link>
-                  <Link to="/register" onClick={() => setMenuOpen(false)} className="btn-primary text-sm flex-1">
-                    Sign up
+                  <Link to="/register" onClick={() => setMenuOpen(false)} className="btn-primary flex-1 py-2.5 text-sm">
+                    <UserPlus size={15} /> Sign up
                   </Link>
                 </div>
               )}
