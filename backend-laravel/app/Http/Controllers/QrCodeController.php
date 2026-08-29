@@ -102,9 +102,9 @@ class QrCodeController extends Controller
     public function index(Request $request)
     {
         $request->validate([
-            'status' => ['sometimes', 'in:UNASSIGNED,ASSIGNED,DISABLED'],
-            'search' => ['sometimes', 'string', 'max:100'],
-            'batchLabel' => ['sometimes', 'string', 'max:100'],
+            'status' => ['sometimes', 'nullable', 'in:UNASSIGNED,ASSIGNED,DISABLED'],
+            'search' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'batchLabel' => ['sometimes', 'nullable', 'string', 'max:100'],
         ]);
         $pagination = Pagination::parse($request->query());
 

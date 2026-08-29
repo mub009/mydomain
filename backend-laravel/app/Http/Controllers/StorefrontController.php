@@ -20,7 +20,7 @@ class StorefrontController extends Controller
             throw ApiException::notFound('This shop is not open for orders');
         }
 
-        $request->validate(['search' => ['sometimes', 'string', 'max:120']]);
+        $request->validate(['search' => ['sometimes', 'nullable', 'string', 'max:120']]);
         $pagination = Pagination::parse($request->query());
 
         $query = Product::where('businessId', $site->businessId)->where('isActive', true);

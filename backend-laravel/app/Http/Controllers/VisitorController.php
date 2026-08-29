@@ -27,9 +27,9 @@ class VisitorController extends Controller
     {
         $data = $request->validate([
             'phone' => ['required', 'string', 'regex:/^(\+?91)?[6-9]\d{9}$/'],
-            'latitude' => ['sometimes', 'numeric', 'min:-90', 'max:90'],
-            'longitude' => ['sometimes', 'numeric', 'min:-180', 'max:180'],
-            'city' => ['sometimes', 'string', 'max:100'],
+            'latitude' => ['sometimes', 'nullable', 'numeric', 'min:-90', 'max:90'],
+            'longitude' => ['sometimes', 'nullable', 'numeric', 'min:-180', 'max:180'],
+            'city' => ['sometimes', 'nullable', 'string', 'max:100'],
             'consent' => ['required', 'accepted'],
         ]);
 
@@ -79,7 +79,7 @@ class VisitorController extends Controller
         $data = $request->validate([
             'latitude' => ['required', 'numeric', 'min:-90', 'max:90'],
             'longitude' => ['required', 'numeric', 'min:-180', 'max:180'],
-            'city' => ['sometimes', 'string', 'max:100'],
+            'city' => ['sometimes', 'nullable', 'string', 'max:100'],
         ]);
 
         $visitor = Visitor::find($id);
@@ -100,8 +100,8 @@ class VisitorController extends Controller
     public function index(Request $request)
     {
         $request->validate([
-            'search' => ['sometimes', 'string', 'max:100'],
-            'withLocation' => ['sometimes', 'in:true,false'],
+            'search' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'withLocation' => ['sometimes', 'nullable', 'in:true,false'],
         ]);
         $pagination = Pagination::parse($request->query());
 

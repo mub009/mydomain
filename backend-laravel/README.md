@@ -97,6 +97,23 @@ first, then strip. Caught by a feature test asserting a full round-trip
 (claim a code, then scan it), not by a test that only checked the normalized
 *shape*.
 
+### Empty-string query params become `null`, not `""`
+
+Laravel's default global middleware (`ConvertEmptyStringsToNull`) turns every
+empty-string input — query params included — into `null` *before*
+validation runs. A cleared "All categories" dropdown or search box submits
+`?categorySlug=`, which arrives as `null`, not `""`. Node's zod treats an
+optional `z.string()` field as satisfied by an actual empty string, so this
+is a real behavior difference, not just a message wording issue: a bare
+`['sometimes', 'string']` rule rejects `null` outright ("The category slug
+field must be a string"), 400ing on what should be "no filter applied".
+Every optional **filter** field (used only in an `if ($x = ...)` — never
+written to the database) needs `'nullable'` alongside `'sometimes'`. Don't
+reflexively add `'nullable'` to fields that get written straight into
+`Model::create()`/`update()` without a `?? $default` fallback first — the
+column may be `NOT NULL`, and passing `null` through validation just turns a
+clean 400 into a database error later.
+
 ## Requirements
 
 - PHP 8.2+, Composer
@@ -142,7 +159,7 @@ endpoint's geo (`lat`/`lng`) radius filter, which uses MySQL-specific SQL
 php artisan test
 ```
 
-63 feature tests cover auth, business creation (owner/dealer paths, points
+64 feature tests cover auth, business creation (owner/dealer paths, points
 spend, ownership checks), categories, reviews, admin (stats, user/business
 management, points admin, approval flow), leads, bookings (hours/conflict
 validation, status transitions), points, the storefront (catalogue, checkout

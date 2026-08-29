@@ -61,8 +61,8 @@ class OrderController extends Controller
         $this->ownedBusiness($actor, $businessId);
 
         $request->validate([
-            'status' => ['sometimes', 'in:'.implode(',', self::STATUSES)],
-            'search' => ['sometimes', 'string', 'max:120'],
+            'status' => ['sometimes', 'nullable', 'in:'.implode(',', self::STATUSES)],
+            'search' => ['sometimes', 'nullable', 'string', 'max:120'],
         ]);
         $pagination = Pagination::parse($request->query());
 
@@ -150,7 +150,7 @@ class OrderController extends Controller
         $actor = $request->attributes->get('auth');
         $this->ownedBusiness($actor, $businessId);
 
-        $request->validate(['search' => ['sometimes', 'string', 'max:120']]);
+        $request->validate(['search' => ['sometimes', 'nullable', 'string', 'max:120']]);
         $pagination = Pagination::parse($request->query());
 
         $query = Order::where('businessId', $businessId);

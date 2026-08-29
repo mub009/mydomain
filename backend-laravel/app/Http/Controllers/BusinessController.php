@@ -159,8 +159,8 @@ class BusinessController extends Controller
     public function index(Request $request)
     {
         $request->validate([
-            'categoryId' => ['sometimes', 'uuid'],
-            'city' => ['sometimes', 'string'],
+            'categoryId' => ['sometimes', 'nullable', 'uuid'],
+            'city' => ['sometimes', 'nullable', 'string'],
         ]);
         $pagination = Pagination::parse($request->query());
 

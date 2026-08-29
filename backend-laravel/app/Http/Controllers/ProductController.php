@@ -96,8 +96,8 @@ class ProductController extends Controller
         $this->ownedBusiness($actor, $businessId);
 
         $request->validate([
-            'search' => ['sometimes', 'string', 'max:120'],
-            'includeInactive' => ['sometimes', 'boolean'],
+            'search' => ['sometimes', 'nullable', 'string', 'max:120'],
+            'includeInactive' => ['sometimes', 'nullable', 'boolean'],
         ]);
         $pagination = Pagination::parse($request->query());
 

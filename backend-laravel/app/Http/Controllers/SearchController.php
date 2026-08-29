@@ -15,16 +15,16 @@ class SearchController extends Controller
     public function index(Request $request)
     {
         $data = $request->validate([
-            'q' => ['sometimes', 'string', 'max:150'],
-            'categorySlug' => ['sometimes', 'string', 'max:100'],
-            'city' => ['sometimes', 'string', 'max:100'],
-            'lat' => ['sometimes', 'numeric', 'min:-90', 'max:90'],
-            'lng' => ['sometimes', 'numeric', 'min:-180', 'max:180'],
-            'radiusKm' => ['sometimes', 'numeric', 'min:0.5', 'max:100'],
-            'minRating' => ['sometimes', 'numeric', 'min:0', 'max:5'],
-            'sort' => ['sometimes', 'in:relevance,rating,distance,newest'],
-            'page' => ['sometimes', 'integer', 'min:1'],
-            'pageSize' => ['sometimes', 'integer', 'min:1', 'max:50'],
+            'q' => ['sometimes', 'nullable', 'string', 'max:150'],
+            'categorySlug' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'city' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'lat' => ['sometimes', 'nullable', 'numeric', 'min:-90', 'max:90'],
+            'lng' => ['sometimes', 'nullable', 'numeric', 'min:-180', 'max:180'],
+            'radiusKm' => ['sometimes', 'nullable', 'numeric', 'min:0.5', 'max:100'],
+            'minRating' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:5'],
+            'sort' => ['sometimes', 'nullable', 'in:relevance,rating,distance,newest'],
+            'page' => ['sometimes', 'nullable', 'integer', 'min:1'],
+            'pageSize' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:50'],
         ]);
 
         $q = $data['q'] ?? null;

@@ -85,8 +85,8 @@ class AdminController extends Controller
     public function listUsers(Request $request)
     {
         $request->validate([
-            'role' => ['sometimes', 'in:CUSTOMER,BUSINESS_OWNER,DEALER,ADMIN'],
-            'search' => ['sometimes', 'string', 'max:150'],
+            'role' => ['sometimes', 'nullable', 'in:CUSTOMER,BUSINESS_OWNER,DEALER,ADMIN'],
+            'search' => ['sometimes', 'nullable', 'string', 'max:150'],
         ]);
         $pagination = Pagination::parse($request->query());
 
@@ -226,8 +226,8 @@ class AdminController extends Controller
     public function listBusinesses(Request $request)
     {
         $request->validate([
-            'status' => ['sometimes', 'string', 'max:30'],
-            'search' => ['sometimes', 'string', 'max:150'],
+            'status' => ['sometimes', 'nullable', 'string', 'max:30'],
+            'search' => ['sometimes', 'nullable', 'string', 'max:150'],
         ]);
         $pagination = Pagination::parse($request->query());
 
