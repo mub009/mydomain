@@ -33,6 +33,32 @@ Either way, on the server you still need to:
   server user)
 - `php artisan migrate` (and `php artisan db:seed` for the demo data, if wanted)
 
+### Deploying the frontend together with this backend
+
+`frontend/src/api/client.ts` calls the API with a **relative** base URL
+(`/api/v1`), not a full URL — it's built to be served from the exact same
+origin as the API, not a separate domain. On shared hosting with no
+Node runtime and no reverse proxy available, that's the simplest possible
+setup: the frontend ships as static files sitting right next to Laravel's
+own `public/`, so there's no CORS to configure and no second server to run.
+
+1. `cd frontend && npm install && npm run build` — produces `frontend/dist/`
+   (`index.html` + a hashed `assets/` folder).
+2. Copy the **contents** of `dist/` into `backend-laravel/public/`
+   (`cp -r frontend/dist/* backend-laravel/public/`) — merges alongside
+   Laravel's own `index.php`/`.htaccess`/`favicon.ico`/`robots.txt`, no
+   filename collisions.
+3. That's it — `routes/web.php` has a catch-all `Route::fallback()` that
+   serves the SPA's `index.html` for anything not matched by a real route
+   (so client-side routes like `/business/some-slug` work on a hard
+   refresh/direct link too), while leaving `api/v1/*` alone so a bad API
+   route still 404s as JSON, not HTML, and real files under `assets/` are
+   served directly by Apache since they exist on disk.
+
+Rebuilding the frontend later means repeating steps 1-2 — the build output
+isn't committed to this repo, so a fresh deploy always needs it built and
+copied in again.
+
 ## Scope of this port
 
 This is a **core-first** conversion. Ported and tested:
