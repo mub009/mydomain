@@ -7,6 +7,7 @@ use App\Models\Business;
 use App\Models\BusinessHours;
 use App\Models\BusinessPhoto;
 use App\Models\Category;
+use App\Models\ReviewQrCode;
 use App\Models\Service;
 use App\Models\User;
 use App\Support\ApiResponse;
@@ -266,7 +267,17 @@ class BusinessController extends Controller
         $actor = $request->attributes->get('auth');
         $business = $this->findOrFail($id);
         $this->assertOwnerOrAdmin($actor, $business->ownerId);
-        $business->delete();
+
+        // Return any issued QR boards to the unassigned pool first. Without
+        // this the board keeps its "assigned" status while losing the
+        // business behind it, leaving a printed board that can neither be
+        // scanned nor re-claimed.
+        DB::transaction(function () use ($business, $id) {
+            ReviewQrCode::where('businessId', $id)->update([
+                'businessId' => null, 'status' => 'UNASSIGNED', 'assignedAt' => null, 'assignedById' => null, 'channel' => null,
+            ]);
+            $business->delete();
+        });
 
         return ApiResponse::noContent();
     }

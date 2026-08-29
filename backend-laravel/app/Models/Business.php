@@ -99,4 +99,14 @@ class Business extends Model
     {
         return $this->hasMany(Order::class, 'businessId');
     }
+
+    public function reviewQrCodes(): HasMany
+    {
+        return $this->hasMany(ReviewQrCode::class, 'businessId');
+    }
+
+    public function reviewScans(): HasMany
+    {
+        return $this->hasMany(ReviewScan::class, 'businessId');
+    }
 }

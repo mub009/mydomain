@@ -43,16 +43,23 @@ This is a **core-first** conversion. Ported and tested:
   server-recomputed pricing/stock). Site type switching
   (WEBSITE/ECOMMERCE) and publish/unpublish are ported too — but only the
   fields storefront needs (`siteType`, `isPublished`, delivery settings).
+- Visitors (welcome-popup phone capture, revisit dedup, admin list).
+- Review-QR boards: admin batch-generation and management
+  (`/admin/qr-codes*`), shop-facing lookup/claim/re-point-a-board, the
+  per-business review-links (Google/Instagram/Facebook/YouTube/website,
+  scan-count report), and the public `/r/q/<code>` scan redirect (resolves
+  to the board's channel, the shop's default, or the claim/listing page,
+  with best-effort scan analytics). A deleted business releases its boards
+  back to the unassigned pool.
 
 **Not ported** (still Node-only — see `backend/src/modules/`): payments/
-Stripe, B2B RFQ/quotes, visitors (welcome-popup capture), review-QR boards
-(`/admin/qr-codes`, the `/r/<code>` redirect), the drag-and-drop **brochure
-website builder** (`PUT /:id/site` for `projectData`/`html`/`css`, template
-preview/rendering, HTML sanitization — `SiteType.WEBSITE` only; e-commerce
-sites don't use it), WhatsApp broadcasts, Poster Studio (`/admin/posters`),
-notifications, email sending (new-order and business-welcome emails are
-no-ops here). Each is a self-contained subsystem with its own tables —
-`admin/stats`'s `leadCount`/`bookingCount`/`openRfqCount` still report `0`
+Stripe, B2B RFQ/quotes, the drag-and-drop **brochure website builder**
+(`PUT /:id/site` for `projectData`/`html`/`css`, template preview/rendering,
+HTML sanitization — `SiteType.WEBSITE` only; e-commerce sites don't use it),
+WhatsApp broadcasts, Poster Studio (`/admin/posters`), notifications, email
+sending (new-order and business-welcome emails are no-ops here). Each is a
+self-contained subsystem with its own tables — `admin/stats`'s
+`leadCount`/`bookingCount`/`openRfqCount` still report `0`
 since bookings/leads exist but aren't aggregated into that endpoint yet, and
 RFQs aren't ported at all. Porting any of these follows the same pattern
 established here — see "Porting another module" below.
@@ -79,6 +86,16 @@ A controller method's non-`Request` parameters are matched to route
 inspection). Always declare **every** route segment as a method parameter,
 in the same order they appear in the route, even ones the method body never
 reads.
+
+### PHP regex + `strtoupper` ordering gotcha
+
+`preg_replace('/[^A-Z0-9]/', '', $raw)` only matches *already-uppercase*
+letters — run it before `strtoupper()` and it silently strips every lowercase
+letter instead of keeping it (`QrCodeController::normalizeCode` did this:
+`"mk-scan01"` came out as `"MK-01"`, dropping every letter). Always uppercase
+first, then strip. Caught by a feature test asserting a full round-trip
+(claim a code, then scan it), not by a test that only checked the normalized
+*shape*.
 
 ## Requirements
 
@@ -125,11 +142,13 @@ endpoint's geo (`lat`/`lng`) radius filter, which uses MySQL-specific SQL
 php artisan test
 ```
 
-47 feature tests cover auth, business creation (owner/dealer paths, points
+63 feature tests cover auth, business creation (owner/dealer paths, points
 spend, ownership checks), categories, reviews, admin (stats, user/business
 management, points admin, approval flow), leads, bookings (hours/conflict
-validation, status transitions), points, and the storefront (catalogue,
-checkout pricing/stock recompute, orders, customer report).
+validation, status transitions), points, the storefront (catalogue, checkout
+pricing/stock recompute, orders, customer report), visitors, and review-QR
+boards (batch generation, claim/conflict rules, scan redirects, review-link
+resolution).
 
 ## Porting another module
 

@@ -9,11 +9,14 @@ use App\Http\Controllers\LeadController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PointsController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\QrCodeController;
 use App\Http\Controllers\ReviewController;
+use App\Http\Controllers\ReviewLinkController;
 use App\Http\Controllers\SearchController;
 use App\Http\Controllers\SiteController;
 use App\Http\Controllers\StorefrontController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\VisitorController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('throttle:auth')->prefix('auth')->group(function () {
@@ -92,6 +95,15 @@ Route::prefix('businesses')->group(function () {
             Route::patch('/{id}/orders/{orderId}/status', [OrderController::class, 'updateStatus']);
         });
     });
+
+    // Review links (Google/Instagram/Facebook/YouTube/website) + the QR
+    // boards attached to this business.
+    Route::middleware('auth.jwt')->group(function () {
+        Route::get('/{id}/review-links', [ReviewLinkController::class, 'show']);
+        Route::patch('/{id}/review-links', [ReviewLinkController::class, 'update'])->middleware('privilege:MANAGE_LISTINGS');
+        Route::get('/{id}/qr-codes', [QrCodeController::class, 'businessQrCodes']);
+        Route::patch('/{id}/qr-codes/{qrId}', [QrCodeController::class, 'setBoardChannel'])->middleware('privilege:MANAGE_LISTINGS');
+    });
 });
 
 // Public: what a shopper on a published storefront can reach. Checkout is
@@ -130,8 +142,23 @@ Route::prefix('users')->middleware(['auth.jwt', 'role:DEALER,ADMIN'])->group(fun
     Route::patch('/{id}/password', [UserController::class, 'resetPassword']);
 });
 
-// Admin. QR boards, Poster Studio, and visitor capture are not part of
-// this Laravel port yet — see backend-laravel/README.md.
+// Shop-facing QR board lookup/claim (the admin side is under /admin below).
+Route::prefix('qr-codes')->group(function () {
+    Route::get('/lookup/{code}', [QrCodeController::class, 'lookup']);
+    Route::middleware(['auth.jwt', 'role:BUSINESS_OWNER,DEALER,ADMIN'])->group(function () {
+        Route::get('/assignable-businesses', [QrCodeController::class, 'assignableBusinesses']);
+        Route::post('/claim', [QrCodeController::class, 'claim']);
+    });
+});
+
+// Public: the welcome popup posts here once the visitor consents.
+Route::prefix('visitors')->group(function () {
+    Route::post('/', [VisitorController::class, 'store']);
+    Route::patch('/{id}/location', [VisitorController::class, 'updateLocation']);
+});
+
+// Admin. Poster Studio is not part of this Laravel port yet — see
+// backend-laravel/README.md.
 Route::prefix('admin')->middleware(['auth.jwt', 'role:ADMIN'])->group(function () {
     Route::get('/stats', [AdminController::class, 'stats']);
     Route::get('/reports/business-creators', [AdminController::class, 'businessCreatorsReport']);
@@ -149,4 +176,10 @@ Route::prefix('admin')->middleware(['auth.jwt', 'role:ADMIN'])->group(function (
     Route::post('/businesses/{id}/reject', [AdminController::class, 'rejectBusiness']);
     Route::post('/businesses/{id}/suspend', [AdminController::class, 'suspendBusiness']);
     Route::post('/businesses/{id}/reassign', [AdminController::class, 'reassignBusiness']);
+
+    Route::get('/visitors', [VisitorController::class, 'index']);
+
+    Route::get('/qr-codes', [QrCodeController::class, 'index']);
+    Route::post('/qr-codes/batch', [QrCodeController::class, 'generateBatch']);
+    Route::patch('/qr-codes/{id}', [QrCodeController::class, 'updateAdmin']);
 });
