@@ -73,10 +73,13 @@ Route::prefix('businesses')->group(function () {
     Route::post('/{businessId}/bookings', [BookingController::class, 'store'])->middleware('auth.jwt');
     Route::get('/{businessId}/bookings', [BookingController::class, 'forBusiness'])->middleware(['auth.jwt', 'privilege:MANAGE_BOOKINGS']);
 
-    // Storefront settings (site type, delivery fee, publish). The
-    // drag-and-drop brochure-website builder is not part of this port.
+    // Storefront settings (site type, delivery fee, publish) and the
+    // drag-and-drop brochure-website builder (starter page, template
+    // preview, save-with-sanitization).
     Route::middleware('auth.jwt')->group(function () {
         Route::get('/{id}/site', [SiteController::class, 'show']);
+        Route::put('/{id}/site', [SiteController::class, 'save']);
+        Route::get('/{id}/site/templates/{templateId}', [SiteController::class, 'previewTemplate']);
         Route::patch('/{id}/site/type', [SiteController::class, 'updateType']);
         Route::post('/{id}/site/publish', [SiteController::class, 'publish']);
     });

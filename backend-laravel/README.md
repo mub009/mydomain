@@ -47,7 +47,23 @@ This is a **core-first** conversion. Ported and tested:
   for both site types: for `ECOMMERCE` it returns the business + a static
   theme keyed by `templateId` (`SiteThemes`, matching the 4 built-in
   designs) for `<Storefront/>` to render; for `WEBSITE` it serves back
-  whatever `html`/`css` a site already has saved (read-only — see below).
+  whatever `html`/`css` a site has saved.
+- The drag-and-drop **brochure website** builder (`SiteType.WEBSITE` only —
+  e-commerce sites don't use it): `GET /:id/site` opens the editor and, on a
+  business's first visit, seeds a starter page rendered straight from the
+  listing's own data (name, contact details, opening hours, services,
+  photos) rather than a blank canvas; `GET /:id/site/templates/:templateId`
+  previews any of the 4 built-in designs (classic/modern/elegant/vibrant)
+  without saving; `PUT /:id/site` saves the editor's `html`/`css`/
+  `projectData`, sanitizing `html`/`css` before they are stored (`<script>`/
+  `<object>`/`<embed>`/`<base>`, inline event handlers,
+  `javascript:`/`vbscript:`/`data:` URLs, and non-Google-Maps iframes are
+  stripped; CSS `expression()`/`behavior`/`@import` too) — everything a
+  visitor's browser would otherwise render as-is on the public site. Publish
+  requires a saved `html` first (`App\Support\SiteBuilder`: `Helpers`
+  builds the shared template context, `Icons` holds the inline SVGs,
+  `Sanitizer` the HTML/CSS cleanup, `Templates\*` the 4 page generators,
+  `TemplateRegistry` ties them together).
 - Visitors (welcome-popup phone capture, revisit dedup, admin list).
 - Review-QR boards: admin batch-generation and management
   (`/admin/qr-codes*`), shop-facing lookup/claim/re-point-a-board, the
@@ -58,13 +74,7 @@ This is a **core-first** conversion. Ported and tested:
   back to the unassigned pool.
 
 **Not ported** (still Node-only — see `backend/src/modules/`): payments/
-Stripe, B2B RFQ/quotes, *authoring* a drag-and-drop **brochure website**
-(`GET/PUT /:id/site` for the editor, `GET /:id/site/templates/:templateId`
-preview rendering, HTML sanitization — `SiteType.WEBSITE` only; e-commerce
-sites don't use the builder). Reading back an already-published `WEBSITE`
-site (`GET /sites/:slug`) *is* ported — it just serves whatever `html`/`css`
-is already in the `business_sites` row, since a Node-authored site on the
-same database still has that data. WhatsApp broadcasts, Poster Studio
+Stripe, B2B RFQ/quotes, WhatsApp broadcasts, Poster Studio
 (`/admin/posters`), notifications, email
 sending (new-order and business-welcome emails are no-ops here). Each is a
 self-contained subsystem with its own tables — `admin/stats`'s
