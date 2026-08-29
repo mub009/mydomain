@@ -186,7 +186,7 @@ export default function QrCodesPanel() {
       {!loading && (
         <div className="card divide-y divide-gray-100">
           {codes.map((qr) => (
-            <div key={qr.id} className="flex items-center justify-between gap-3 p-4">
+            <div key={qr.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="font-mono font-bold text-ink-900">{qr.code}</p>
@@ -205,7 +205,7 @@ export default function QrCodesPanel() {
                 )}
                 {qr.batchLabel && <p className="mt-0.5 text-[11px] text-ink-400">Batch: {qr.batchLabel}</p>}
               </div>
-              <div className="flex shrink-0 items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
                 <button onClick={() => setPrintJob({ codes: [qr.code], purpose: qr.channel })} className="btn-secondary px-3 py-1.5 text-sm">
                   <QrIcon size={14} /> View
                 </button>
