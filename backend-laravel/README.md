@@ -8,6 +8,31 @@ on success, `{ success: false, error: { code, message, details } }` on
 failure, including the `error.details.issues[].path/.message` shape the
 frontend's `apiErrorMessage()` reads for validation errors.
 
+## Deploying (shared hosting / cPanel)
+
+Point the domain's **Document Root** directly at `backend-laravel/public` —
+that's the setup Laravel expects, and it's what keeps `.env`, `app/`,
+`vendor/`, etc. outside the web server's reach. If your host doesn't let
+you set the Document Root below the account's fixed webroot, this repo
+also ships a root-level `backend-laravel/.htaccess` that transparently
+forwards every request into `public/` internally (so the URL never shows
+`/public/`) — a fallback, not a replacement for setting the Document Root
+correctly when you can.
+
+Either way, on the server you still need to:
+
+- `composer install --no-dev` (a `vendor/` uploaded without running this,
+  or without matching the account's PHP version, is a common cause of a
+  blank/500 response)
+- Copy `.env.example` to `.env`, then set real `DB_*` credentials,
+  `JWT_ACCESS_SECRET`/`JWT_REFRESH_SECRET` (never the `change-me-*`
+  placeholders), `APP_URL`, `APP_ENV=production`, `APP_DEBUG=false`
+- `php artisan key:generate` — a missing `APP_KEY` raises
+  `MissingAppKeyException` on every request
+- `chmod -R 775 storage bootstrap/cache` (must be writable by the web
+  server user)
+- `php artisan migrate` (and `php artisan db:seed` for the demo data, if wanted)
+
 ## Scope of this port
 
 This is a **core-first** conversion. Ported and tested:

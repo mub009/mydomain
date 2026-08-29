@@ -1,0 +1,19 @@
+# Workaround for hosts (e.g. cPanel) where the domain's Document Root
+# cannot be pointed directly at `public/`: transparently forward every
+# request into `public/` internally, so the URL never shows `/public/`
+# and files outside `public/` (`.env`, `app/`, `vendor/`, ...) are only
+# reachable through this forwarding — never served directly, since Apache
+# is still rooted here rather than at `public/` itself.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond %{REQUEST_URI} !^/public/
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>
+
+# Block direct access to anything else at this level — should only ever
+# be reached through the rewrite above.
+<IfModule mod_authz_core.c>
+    <FilesMatch "^\.">
+        Require all denied
+    </FilesMatch>
+</IfModule>
