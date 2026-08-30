@@ -1,7 +1,6 @@
 export interface ShowcaseItem {
   label: string;
   query: string;
-  seed: string;
 }
 
 export interface ShowcaseGroup {
@@ -18,33 +17,33 @@ export const CATEGORY_SHOWCASE: ShowcaseGroup[] = [
   {
     title: "Wedding Requisites",
     items: [
-      { label: "Banquet Halls", query: "banquet hall", seed: "banquet-halls" },
-      { label: "Bridal Requisite", query: "bridal", seed: "bridal-requisite" },
-      { label: "Caterers", query: "caterer", seed: "caterers" },
+      { label: "Banquet Halls", query: "banquet hall" },
+      { label: "Bridal Requisite", query: "bridal" },
+      { label: "Caterers", query: "caterer" },
     ],
   },
   {
     title: "Beauty & Spa",
     items: [
-      { label: "Beauty Parlours", query: "beauty parlour", seed: "beauty-parlours" },
-      { label: "Spa & Massages", query: "spa massage", seed: "spa-massages" },
-      { label: "Salons", query: "salon", seed: "salons" },
+      { label: "Beauty Parlours", query: "beauty parlour" },
+      { label: "Spa & Massages", query: "spa massage" },
+      { label: "Salons", query: "salon" },
     ],
   },
   {
     title: "Repairs & Services",
     items: [
-      { label: "AC Service", query: "ac service", seed: "ac-service" },
-      { label: "Car Service", query: "car service", seed: "car-service" },
-      { label: "Bike Service", query: "bike service", seed: "bike-service" },
+      { label: "AC Service", query: "ac service" },
+      { label: "Car Service", query: "car service" },
+      { label: "Bike Service", query: "bike service" },
     ],
   },
   {
     title: "Daily Needs",
     items: [
-      { label: "Grocery", query: "grocery", seed: "grocery" },
-      { label: "Electricians", query: "electrician", seed: "electricians" },
-      { label: "Laundry", query: "laundry", seed: "laundry" },
+      { label: "Grocery", query: "grocery" },
+      { label: "Electricians", query: "electrician" },
+      { label: "Laundry", query: "laundry" },
     ],
   },
 ];
