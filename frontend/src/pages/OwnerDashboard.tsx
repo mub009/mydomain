@@ -147,6 +147,7 @@ export default function OwnerDashboard() {
     categoryId: "",
     businessType: "B2C" as "B2C" | "B2B",
     phone: "",
+    website: "",
     addressLine1: "",
     city: "",
     state: "",
@@ -271,6 +272,7 @@ export default function OwnerDashboard() {
     try {
       const created = await businessesApi.create({
         ...newBusiness,
+        website: newBusiness.website || undefined,
         latitude: Number(newBusiness.latitude),
         longitude: Number(newBusiness.longitude),
         country: "IN",
@@ -287,7 +289,7 @@ export default function OwnerDashboard() {
           : {}),
       });
       setNewBusiness({
-        name: "", slug: "", categoryId: "", businessType: "B2C", phone: "",
+        name: "", slug: "", categoryId: "", businessType: "B2C", phone: "", website: "",
         addressLine1: "", city: "", state: "", postalCode: "", latitude: "", longitude: "",
       });
       setShowCreate(false);
@@ -499,6 +501,7 @@ export default function OwnerDashboard() {
               </div>
 
               <input required minLength={7} maxLength={20} placeholder="Phone" value={newBusiness.phone} onChange={(e) => setNewBusiness({ ...newBusiness, phone: e.target.value })} className="input" />
+              <input type="url" placeholder="Website (optional) — https://…" value={newBusiness.website} onChange={(e) => setNewBusiness({ ...newBusiness, website: e.target.value })} className="input" />
               <input required placeholder="Address line 1" value={newBusiness.addressLine1} onChange={(e) => setNewBusiness({ ...newBusiness, addressLine1: e.target.value })} className="input" />
               <div className="flex gap-3">
                 <input required placeholder="City" value={newBusiness.city} onChange={(e) => setNewBusiness({ ...newBusiness, city: e.target.value })} className="input w-1/2" />
