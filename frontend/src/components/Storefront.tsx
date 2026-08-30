@@ -4,6 +4,7 @@ import { shopApi, type PlacedOrder, type PublishedSite } from "@/api/endpoints";
 import { apiErrorMessage } from "@/api/client";
 import { Product } from "@/types";
 import { Spinner } from "@/components/Loading";
+import { to12Hour } from "@/lib/time";
 
 const PAGE_SIZE = 12;
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -16,14 +17,6 @@ interface CartLine {
 function money(cents: number, currency = "INR"): string {
   const symbol = currency === "INR" ? "₹" : "";
   return `${symbol}${(cents / 100).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
-}
-
-function to12Hour(time: string): string {
-  const [h, m] = time.split(":").map(Number);
-  if (Number.isNaN(h)) return time;
-  const period = h >= 12 ? "pm" : "am";
-  const hour = h % 12 === 0 ? 12 : h % 12;
-  return m ? `${hour}.${String(m).padStart(2, "0")}${period}` : `${hour}${period}`;
 }
 
 // A shopper who half-filled a basket and reloaded should still have it. Scoped

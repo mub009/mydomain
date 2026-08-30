@@ -27,6 +27,7 @@ import { useAuthStore } from "@/store/authStore";
 import StarRating, { StarRow } from "@/components/StarRating";
 import { Spinner } from "@/components/Loading";
 import Pagination from "@/components/Pagination";
+import { to12Hour } from "@/lib/time";
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const TABS = ["Overview", "Photos", "Services", "Reviews"] as const;
@@ -124,10 +125,10 @@ function getOpenStatus(hours: Business["hours"]): OpenStatus | null {
   const close = toMin(today.closeTime);
 
   if (nowMin >= open && nowMin < close) {
-    return { open: true, label: "Open now", detail: `Closes at ${today.closeTime}` };
+    return { open: true, label: "Open now", detail: `Closes at ${to12Hour(today.closeTime)}` };
   }
   if (nowMin < open) {
-    return { open: false, label: "Closed", detail: `Opens at ${today.openTime}` };
+    return { open: false, label: "Closed", detail: `Opens at ${to12Hour(today.openTime)}` };
   }
   return { open: false, label: "Closed", detail: `Opens tomorrow` };
 }
@@ -444,7 +445,7 @@ export default function BusinessDetail() {
                       <li key={h.dayOfWeek} className="flex justify-between py-1.5">
                         <span>{DAY_NAMES[h.dayOfWeek]}</span>
                         <span className={h.isClosed ? "text-ink-500" : "font-medium"}>
-                          {h.isClosed ? "Closed" : `${h.openTime} – ${h.closeTime}`}
+                          {h.isClosed ? "Closed" : `${to12Hour(h.openTime)} – ${to12Hour(h.closeTime)}`}
                         </span>
                       </li>
                     ))}
