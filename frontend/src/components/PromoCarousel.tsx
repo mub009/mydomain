@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, Briefcase, CalendarCheck2, ChevronRight, ShieldCheck, Store } from "lucide-react";
+import { ArrowRight, Briefcase, ChevronRight, ShieldCheck, Store, Tag } from "lucide-react";
 
 const SLIDES = [
   {
@@ -36,12 +36,12 @@ const PROMO_TILES = [
     seed: "warehouse-logistics",
   },
   {
-    label: "Book a service",
-    subtitle: "Instant scheduling",
-    icon: CalendarCheck2,
-    to: "/",
+    label: "Buy & Sell",
+    subtitle: "New & used items",
+    icon: Tag,
+    to: "/classifieds",
     className: "from-violet-900/90 via-violet-800/60",
-    seed: "technician-repair",
+    seed: "flea-market-items",
   },
   {
     label: "Verified businesses",
