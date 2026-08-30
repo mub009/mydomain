@@ -3,22 +3,55 @@ import { Link, useParams } from "react-router-dom";
 import {
   AlertTriangle,
   Calendar,
+  CheckCircle2,
+  Clock,
   Eye,
   Heart,
   ImageIcon,
   MapPin,
   MessageSquare,
+  PauseCircle,
   Phone,
   Settings2,
+  ShieldOff,
   User as UserIcon,
 } from "lucide-react";
 import { classifiedsApi } from "@/api/endpoints";
 import { apiErrorMessage } from "@/api/client";
-import { ClassifiedListing } from "@/types";
+import { ClassifiedListing, ClassifiedStatus } from "@/types";
 import { useAuthStore } from "@/store/authStore";
 import { Spinner } from "@/components/Loading";
 import { money } from "@/components/ClassifiedCard";
 import { rememberRecentlyViewedClassified } from "@/lib/recentlyViewedClassifieds";
+
+// What a buyer sees when a listing isn't ACTIVE — SOLD gets its own clear
+// message rather than being lumped in with paused/expired/removed.
+const UNAVAILABLE_INFO: Record<Exclude<ClassifiedStatus, "ACTIVE">, { icon: typeof AlertTriangle; title: string; detail: string; tint: string }> = {
+  SOLD: {
+    icon: CheckCircle2,
+    title: "This item has been sold",
+    detail: "The seller has marked this item as sold. It's no longer available.",
+    tint: "bg-gray-900 text-white",
+  },
+  PAUSED: {
+    icon: PauseCircle,
+    title: "Listing paused",
+    detail: "The seller has temporarily paused this listing.",
+    tint: "bg-amber-50 text-amber-700",
+  },
+  EXPIRED: {
+    icon: Clock,
+    title: "Listing expired",
+    detail: "This listing is no longer active.",
+    tint: "bg-gray-100 text-gray-600",
+  },
+  REMOVED: {
+    icon: ShieldOff,
+    title: "Listing unavailable",
+    detail: "This listing is no longer available.",
+    tint: "bg-red-50 text-red-700",
+  },
+};
 
 export default function ClassifiedDetail() {
   const { id = "" } = useParams();
@@ -67,12 +100,23 @@ export default function ClassifiedDetail() {
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
       <div className="lg:col-span-2">
         <div className="card overflow-hidden">
-          <div className="aspect-square w-full bg-gray-100">
+          <div className="relative aspect-square w-full bg-gray-100">
             {photos.length > 0 ? (
-              <img src={photos[activePhoto]?.url} alt={listing.title} className="h-full w-full object-cover" />
+              <img
+                src={photos[activePhoto]?.url}
+                alt={listing.title}
+                className={`h-full w-full object-cover ${listing.status === "SOLD" ? "opacity-60 grayscale" : ""}`}
+              />
             ) : (
               <div className="flex h-full w-full items-center justify-center text-gray-300">
                 <ImageIcon size={40} />
+              </div>
+            )}
+            {listing.status === "SOLD" && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="-rotate-6 rounded-md border-4 border-white bg-gray-900/90 px-6 py-2 text-xl font-extrabold uppercase tracking-widest text-white shadow-lg">
+                  Sold
+                </span>
               </div>
             )}
           </div>
@@ -102,7 +146,9 @@ export default function ClassifiedDetail() {
       <div>
         <div className="card p-5">
           {isOwner && listing.status !== "ACTIVE" && (
-            <span className="badge mb-3 bg-amber-50 text-amber-700">{listing.status}</span>
+            <span className={`badge mb-3 ${UNAVAILABLE_INFO[listing.status].tint}`}>
+              {listing.status === "SOLD" && <CheckCircle2 size={11} />} {listing.status}
+            </span>
           )}
           <p className="text-2xl font-extrabold text-ink-900">{money(listing.priceCents, listing.currency)}</p>
           <h1 className="mt-1 text-lg font-bold text-ink-900">{listing.title}</h1>
@@ -174,9 +220,19 @@ export default function ClassifiedDetail() {
           )}
 
           {!isOwner && listing.status !== "ACTIVE" && (
-            <p className="mt-4 flex items-center gap-1.5 rounded-md bg-gray-50 px-3 py-2 text-sm text-ink-500">
-              <AlertTriangle size={14} /> This listing is no longer available.
-            </p>
+            <div className={`mt-4 rounded-lg px-3 py-3 text-sm ${UNAVAILABLE_INFO[listing.status].tint}`}>
+              <p className="flex items-center gap-1.5 font-semibold">
+                {(() => {
+                  const Icon = UNAVAILABLE_INFO[listing.status].icon;
+                  return <Icon size={16} />;
+                })()}
+                {UNAVAILABLE_INFO[listing.status].title}
+              </p>
+              <p className="mt-1 opacity-90">{UNAVAILABLE_INFO[listing.status].detail}</p>
+              <Link to="/classifieds" className="mt-2 inline-block font-semibold underline underline-offset-2">
+                Browse similar items
+              </Link>
+            </div>
           )}
         </div>
 
