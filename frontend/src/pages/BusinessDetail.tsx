@@ -387,12 +387,12 @@ export default function BusinessDetail() {
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-gray-200 flex gap-1 sticky top-16 bg-gray-50 z-10">
+      <div className="border-b border-gray-200 flex gap-1 overflow-x-auto sticky top-16 bg-gray-50 z-10">
         {TABS.map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`px-4 py-3 text-sm font-semibold border-b-2 -mb-px transition-colors ${
+            className={`whitespace-nowrap px-4 py-3 text-sm font-semibold border-b-2 -mb-px transition-colors ${
               tab === t ? "border-brand-600 text-brand-600" : "border-transparent text-ink-500 hover:text-ink-900"
             }`}
           >
