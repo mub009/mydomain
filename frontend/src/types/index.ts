@@ -496,3 +496,52 @@ export interface ApiResponse<T> {
   success: boolean;
   data: T;
 }
+
+export interface ClassifiedCategory {
+  id: string;
+  name: string;
+  slug: string;
+  iconUrl?: string | null;
+  sortOrder?: number;
+  children?: ClassifiedCategory[];
+}
+
+export type ClassifiedCondition = "NEW" | "USED";
+export type ClassifiedStatus = "ACTIVE" | "SOLD" | "PAUSED" | "EXPIRED" | "REMOVED";
+
+export interface ClassifiedListingPhoto {
+  id: string;
+  url: string;
+  sortOrder: number;
+}
+
+export interface ClassifiedListing {
+  id: string;
+  sellerId: string;
+  seller?: { id: string; firstName: string; lastName: string; avatarUrl?: string | null; createdAt: string };
+  categoryId: string;
+  category?: ClassifiedCategory;
+  title: string;
+  slug: string;
+  description?: string | null;
+  condition: ClassifiedCondition;
+  priceCents: number;
+  currency: string;
+  status: ClassifiedStatus;
+  city: string;
+  state?: string | null;
+  country?: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  contactPhone: string;
+  whatsappEnabled: boolean;
+  whatsappNumber?: string | null;
+  viewCount: number;
+  favoriteCount: number;
+  bumpedAt?: string | null;
+  expiresAt?: string | null;
+  soldAt?: string | null;
+  createdAt: string;
+  photos?: ClassifiedListingPhoto[];
+  distanceKm?: number | null;
+}

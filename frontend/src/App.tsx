@@ -16,6 +16,12 @@ import Login from "@/pages/Login";
 import Register from "@/pages/Register";
 import OwnerDashboard from "@/pages/OwnerDashboard";
 import AdminDashboard from "@/pages/AdminDashboard";
+import ClassifiedsBrowse from "@/pages/ClassifiedsBrowse";
+import ClassifiedDetail from "@/pages/ClassifiedDetail";
+import ClassifiedForm from "@/pages/ClassifiedForm";
+import SellerProfile from "@/pages/SellerProfile";
+import MyListings from "@/pages/MyListings";
+import Favorites from "@/pages/Favorites";
 
 export default function App() {
   const accessToken = useAuthStore((s) => s.accessToken);
@@ -61,6 +67,45 @@ function AppShell() {
         {/* B2B is the same directory as B2C, just pre-filtered — a business
             picks B2B/B2C at registration, not a separate marketplace. */}
         <Route path="/b2b" element={<Navigate to="/search?businessType=B2B" replace />} />
+
+        {/* OLX-style classifieds — any signed-in user can post and manage
+            their own items, so these aren't gated to business roles. */}
+        <Route path="/classifieds" element={<ClassifiedsBrowse />} />
+        <Route
+          path="/classifieds/new"
+          element={
+            <ProtectedRoute>
+              <ClassifiedForm />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/classifieds/sellers/:sellerId" element={<SellerProfile />} />
+        <Route path="/classifieds/:id" element={<ClassifiedDetail />} />
+        <Route
+          path="/classifieds/:id/edit"
+          element={
+            <ProtectedRoute>
+              <ClassifiedForm />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/my-listings"
+          element={
+            <ProtectedRoute>
+              <MyListings />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/favorites"
+          element={
+            <ProtectedRoute>
+              <Favorites />
+            </ProtectedRoute>
+          }
+        />
+
         <Route
           path="/dashboard"
           element={

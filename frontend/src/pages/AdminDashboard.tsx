@@ -34,11 +34,12 @@ import Modal from "@/components/Modal";
 import Pagination from "@/components/Pagination";
 import PointsModal from "@/components/PointsModal";
 import QrCodesPanel from "@/components/QrCodesPanel";
+import ClassifiedsAdminPanel from "@/components/ClassifiedsAdminPanel";
 import PostersPanel from "@/components/PostersPanel";
 import AnalyticsPanel from "@/components/AnalyticsPanel";
 import ResetPasswordModal from "@/components/ResetPasswordModal";
 
-const TABS = ["Overview", "Users", "Businesses", "Approvals", "QR Boards", "Posters", "Visitors", "Analytics", "Reports"] as const;
+const TABS = ["Overview", "Users", "Businesses", "Approvals", "Classifieds", "QR Boards", "Posters", "Visitors", "Analytics", "Reports"] as const;
 type Tab = (typeof TABS)[number];
 
 const ROLES: UserRole[] = ["CUSTOMER", "BUSINESS_OWNER", "DEALER", "ADMIN"];
@@ -155,6 +156,7 @@ export default function AdminDashboard() {
       {tab === "Users" && <UsersPanel onChanged={() => adminApi.stats().then(setStats)} />}
       {tab === "Businesses" && <BusinessesPanel categories={categories} onChanged={() => adminApi.stats().then(setStats)} />}
       {tab === "Approvals" && <ApprovalsPanel onChanged={() => adminApi.stats().then(setStats)} />}
+      {tab === "Classifieds" && <ClassifiedsAdminPanel />}
       {tab === "QR Boards" && <QrCodesPanel />}
       {tab === "Posters" && <PostersPanel />}
       {tab === "Visitors" && <VisitorsPanel />}

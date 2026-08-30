@@ -6,6 +6,9 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BookingController;
 use App\Http\Controllers\BusinessController;
 use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\ClassifiedCategoryController;
+use App\Http\Controllers\ClassifiedFavoriteController;
+use App\Http\Controllers\ClassifiedListingController;
 use App\Http\Controllers\LeadController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PointsController;
@@ -42,6 +45,43 @@ Route::prefix('categories')->group(function () {
         Route::post('/', [CategoryController::class, 'store']);
         Route::patch('/{id}', [CategoryController::class, 'update']);
         Route::delete('/{id}', [CategoryController::class, 'destroy']);
+    });
+});
+
+Route::prefix('classified-categories')->group(function () {
+    Route::get('/', [ClassifiedCategoryController::class, 'index']);
+    Route::get('/{slug}', [ClassifiedCategoryController::class, 'show']);
+    Route::middleware(['auth.jwt', 'role:ADMIN'])->group(function () {
+        Route::post('/', [ClassifiedCategoryController::class, 'store']);
+        Route::patch('/{id}', [ClassifiedCategoryController::class, 'update']);
+        Route::delete('/{id}', [ClassifiedCategoryController::class, 'destroy']);
+    });
+});
+
+// OLX-style classifieds — any signed-in user can post, edit, and manage
+// their own listings; browsing and viewing a listing is public.
+Route::prefix('classifieds')->group(function () {
+    Route::get('/', [ClassifiedListingController::class, 'index']);
+    // Both must be registered ahead of the "/{id}" show route below, or
+    // "mine"/"favorites" would be swallowed as a listing id.
+    Route::middleware('auth.jwt')->group(function () {
+        Route::get('/mine', [ClassifiedListingController::class, 'mine']);
+        Route::get('/favorites', [ClassifiedFavoriteController::class, 'index']);
+        Route::post('/', [ClassifiedListingController::class, 'store']);
+    });
+    Route::get('/sellers/{sellerId}', [ClassifiedListingController::class, 'sellerProfile']);
+    Route::get('/batch', [ClassifiedListingController::class, 'batch']);
+    Route::get('/{id}', [ClassifiedListingController::class, 'show']);
+
+    Route::middleware('auth.jwt')->group(function () {
+        Route::patch('/{id}', [ClassifiedListingController::class, 'update']);
+        Route::delete('/{id}', [ClassifiedListingController::class, 'destroy']);
+        Route::post('/{id}/sold', [ClassifiedListingController::class, 'markSold']);
+        Route::post('/{id}/pause', [ClassifiedListingController::class, 'pause']);
+        Route::post('/{id}/activate', [ClassifiedListingController::class, 'activate']);
+        Route::post('/{id}/renew', [ClassifiedListingController::class, 'renew']);
+        Route::post('/{id}/favorite', [ClassifiedFavoriteController::class, 'store']);
+        Route::delete('/{id}/favorite', [ClassifiedFavoriteController::class, 'destroy']);
     });
 });
 
@@ -200,4 +240,8 @@ Route::prefix('admin')->middleware(['auth.jwt', 'role:ADMIN'])->group(function (
     Route::get('/qr-codes', [QrCodeController::class, 'index']);
     Route::post('/qr-codes/batch', [QrCodeController::class, 'generateBatch']);
     Route::patch('/qr-codes/{id}', [QrCodeController::class, 'updateAdmin']);
+
+    Route::get('/classifieds', [AdminController::class, 'listClassifieds']);
+    Route::post('/classifieds/{id}/remove', [AdminController::class, 'removeClassified']);
+    Route::delete('/classifieds/{id}', [AdminController::class, 'deleteClassified']);
 });

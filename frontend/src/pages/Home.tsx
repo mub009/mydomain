@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { MapPin, Search, ShieldCheck, TrendingUp } from "lucide-react";
+import { ArrowRight, MapPin, Search, ShieldCheck, Tag, TrendingUp } from "lucide-react";
 import { searchApi, categoriesApi } from "@/api/endpoints";
 import { apiErrorMessage } from "@/api/client";
 import { Business, Category } from "@/types";
@@ -158,6 +158,23 @@ export default function Home() {
           </div>
         </form>
       </section>
+
+      {/* Classifieds cross-promo */}
+      <Link
+        to="/classifieds"
+        className="mb-8 flex items-center justify-between gap-3 rounded-2xl bg-gradient-to-r from-brand-700 to-brand-500 px-5 py-4 text-white transition-opacity hover:opacity-95 sm:px-7 sm:py-5"
+      >
+        <div className="flex items-center gap-3">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/15">
+            <Tag size={20} />
+          </span>
+          <div>
+            <p className="font-bold sm:text-lg">Buy &amp; sell used or new items nearby</p>
+            <p className="text-sm text-white/80">Mobiles, vehicles, furniture, and more — post an item free.</p>
+          </div>
+        </div>
+        <ArrowRight size={20} className="shrink-0" />
+      </Link>
 
       {/* Promo strip */}
       <PromoCarousel />

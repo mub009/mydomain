@@ -6,6 +6,8 @@ import {
   Booking,
   Business,
   Category,
+  ClassifiedCategory,
+  ClassifiedListing,
   Lead,
   Order,
   OrderStatus,
@@ -47,6 +49,50 @@ export const categoriesApi = {
   list: () => api.get<ApiResponse<Category[]>>("/categories").then((r) => r.data.data),
 };
 
+export const classifiedCategoriesApi = {
+  list: () => api.get<ApiResponse<ClassifiedCategory[]>>("/classified-categories").then((r) => r.data.data),
+  create: (payload: Record<string, unknown>) =>
+    api.post<ApiResponse<ClassifiedCategory>>("/classified-categories", payload).then((r) => r.data.data),
+  update: (id: string, payload: Record<string, unknown>) =>
+    api.patch<ApiResponse<ClassifiedCategory>>(`/classified-categories/${id}`, payload).then((r) => r.data.data),
+  remove: (id: string) => api.delete(`/classified-categories/${id}`),
+};
+
+export const classifiedsApi = {
+  list: (params: Record<string, unknown> = {}) =>
+    api.get<PaginatedResponse<ClassifiedListing>>("/classifieds", { params }).then((r) => r.data),
+  mine: (params: Record<string, unknown> = {}) =>
+    api.get<PaginatedResponse<ClassifiedListing>>("/classifieds/mine", { params }).then((r) => r.data),
+  favorites: (params: Record<string, unknown> = {}) =>
+    api.get<PaginatedResponse<ClassifiedListing>>("/classifieds/favorites", { params }).then((r) => r.data),
+  get: (id: string) => api.get<ApiResponse<ClassifiedListing>>(`/classifieds/${id}`).then((r) => r.data.data),
+  batch: (ids: string[]) =>
+    ids.length === 0
+      ? Promise.resolve([] as ClassifiedListing[])
+      : api.get<ApiResponse<ClassifiedListing[]>>("/classifieds/batch", { params: { ids: ids.join(",") } }).then((r) => r.data.data),
+  sellerProfile: (sellerId: string, params: Record<string, unknown> = {}) =>
+    api
+      .get<
+        ApiResponse<{
+          seller: { id: string; firstName: string; lastName: string; avatarUrl?: string | null; createdAt: string };
+          listings: ClassifiedListing[];
+          meta: { page: number; pageSize: number; total: number };
+        }>
+      >(`/classifieds/sellers/${sellerId}`, { params })
+      .then((r) => r.data.data),
+  create: (payload: Record<string, unknown>) =>
+    api.post<ApiResponse<ClassifiedListing>>("/classifieds", payload).then((r) => r.data.data),
+  update: (id: string, payload: Record<string, unknown>) =>
+    api.patch<ApiResponse<ClassifiedListing>>(`/classifieds/${id}`, payload).then((r) => r.data.data),
+  remove: (id: string) => api.delete(`/classifieds/${id}`),
+  markSold: (id: string) => api.post<ApiResponse<ClassifiedListing>>(`/classifieds/${id}/sold`).then((r) => r.data.data),
+  pause: (id: string) => api.post<ApiResponse<ClassifiedListing>>(`/classifieds/${id}/pause`).then((r) => r.data.data),
+  activate: (id: string) => api.post<ApiResponse<ClassifiedListing>>(`/classifieds/${id}/activate`).then((r) => r.data.data),
+  renew: (id: string) => api.post<ApiResponse<ClassifiedListing>>(`/classifieds/${id}/renew`).then((r) => r.data.data),
+  favorite: (id: string) => api.post(`/classifieds/${id}/favorite`),
+  unfavorite: (id: string) => api.delete(`/classifieds/${id}/favorite`),
+};
+
 export const analyticsApi = {
   pageview: (payload: { visitorId: string; path: string; referrer?: string }) =>
     api.post("/analytics/pageview", payload).then(() => undefined),
@@ -74,7 +120,7 @@ export interface PageStat {
   uniqueVisitors: number;
 }
 
-export type UploadPurpose = "business-photos" | "business-logo" | "business-cover" | "products" | "categories" | "posters";
+export type UploadPurpose = "business-photos" | "business-logo" | "business-cover" | "products" | "categories" | "posters" | "classifieds";
 
 export const uploadsApi = {
   image: (file: File, purpose: UploadPurpose) => {
@@ -386,6 +432,12 @@ export const adminApi = {
     api.patch<ApiResponse<Business>>(`/admin/businesses/${id}`, payload).then((r) => r.data.data),
   reassignBusiness: (id: string, ownerId: string) =>
     api.post<ApiResponse<Business>>(`/admin/businesses/${id}/reassign`, { ownerId }).then((r) => r.data.data),
+
+  // Classifieds moderation
+  classifieds: (params: Record<string, unknown> = {}) =>
+    api.get<PaginatedResponse<ClassifiedListing>>("/admin/classifieds", { params }).then((r) => r.data),
+  removeClassified: (id: string) => api.post<ApiResponse<ClassifiedListing>>(`/admin/classifieds/${id}/remove`).then((r) => r.data.data),
+  deleteClassified: (id: string) => api.delete(`/admin/classifieds/${id}`),
 };
 
 // ---------------------------------------------------------------------------

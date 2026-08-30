@@ -75,6 +75,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const navLinks = [
     { to: "/", label: "Search" },
     { to: "/b2b", label: "B2B Directory" },
+    { to: "/classifieds", label: "Buy & Sell" },
+    ...(user ? [{ to: "/my-listings", label: "My Listings" }, { to: "/favorites", label: "Favorites" }] : []),
     ...(user?.role === "BUSINESS_OWNER" || user?.role === "DEALER" ? [{ to: "/dashboard", label: "My Business" }] : []),
     ...(user?.role === "ADMIN" ? [{ to: "/admin", label: "Admin" }] : []),
   ];

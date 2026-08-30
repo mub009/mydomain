@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Exceptions\ApiException;
 use App\Models\Business;
 use App\Models\Category;
+use App\Models\ClassifiedListing;
 use App\Models\PointTransaction;
 use App\Models\Review;
 use App\Models\User;
@@ -348,5 +349,54 @@ class AdminController extends Controller
         $business->load('owner:id,email,firstName,lastName,role');
 
         return ApiResponse::ok($business);
+    }
+
+    public function listClassifieds(Request $request)
+    {
+        $request->validate([
+            'status' => ['sometimes', 'nullable', 'in:ACTIVE,SOLD,PAUSED,EXPIRED,REMOVED'],
+            'search' => ['sometimes', 'nullable', 'string', 'max:120'],
+        ]);
+        $pagination = Pagination::parse($request->query());
+
+        $query = ClassifiedListing::query();
+        if ($status = $request->query('status')) {
+            $query->where('status', $status);
+        }
+        if ($search = $request->query('search')) {
+            $query->where('title', 'like', "%{$search}%");
+        }
+
+        $total = (clone $query)->count();
+        $items = $query->orderByDesc('createdAt')
+            ->skip($pagination['skip'])->take($pagination['take'])
+            ->with(['category', 'seller:id,firstName,lastName,email,phone', 'photos' => fn ($p) => $p->limit(1)])
+            ->get();
+
+        return ApiResponse::paginated($items, ['page' => $pagination['page'], 'pageSize' => $pagination['pageSize'], 'total' => $total]);
+    }
+
+    // Reactive moderation: pull a listing out of search results without
+    // deleting it outright, or delete it entirely for policy violations.
+    public function removeClassified(string $id)
+    {
+        $listing = ClassifiedListing::find($id);
+        if (! $listing) {
+            throw ApiException::notFound('Listing not found');
+        }
+        $listing->update(['status' => 'REMOVED']);
+
+        return ApiResponse::ok($listing);
+    }
+
+    public function deleteClassified(string $id)
+    {
+        $listing = ClassifiedListing::find($id);
+        if (! $listing) {
+            throw ApiException::notFound('Listing not found');
+        }
+        $listing->delete();
+
+        return ApiResponse::noContent();
     }
 }
