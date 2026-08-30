@@ -141,9 +141,17 @@ This is a **core-first** conversion. Ported and tested:
 - Businesses (create — including the dealer owner-account-provisioning and
   points-spend flow, list, search-list, manage, update, delete, photos,
   hours, services). Dealer privilege gating (`MANAGE_LISTINGS`) and
-  role/ownership checks match the Node backend.
-- Search (keyword + category + city + radius Haversine + rating filters,
-  sort by relevance/rating/distance/newest) + popular cities.
+  role/ownership checks match the Node backend. `businessType`
+  (`B2C`/`B2B`, defaulting to `B2C`) is picked at registration and editable
+  afterward — it's a label for discovery, not a different feature set: a
+  B2B business is an ordinary listing with the same storefront/booking/
+  review features, just filterable by who it serves. There is no separate
+  B2B marketplace — `/b2b` is the same search/detail pages as B2C,
+  pre-filtered to `businessType=B2B` (see `SearchController`,
+  `AdminController::listBusinesses`).
+- Search (keyword + category + businessType + city + radius Haversine +
+  rating filters, sort by relevance/rating/distance/newest) + popular
+  cities.
 - Reviews (one per user per business, rating rollup recalculated from the
   `reviews` table, owner replies, delete).
 - Admin: platform stats (leads/bookings/RFQs report as 0 — see below), the
@@ -196,9 +204,11 @@ This is a **core-first** conversion. Ported and tested:
   back to the unassigned pool.
 
 **Not ported** (still Node-only — see `backend/src/modules/`): payments/
-Stripe, B2B RFQ/quotes, WhatsApp broadcasts, Poster Studio
-(`/admin/posters`), notifications, email
-sending (new-order and business-welcome emails are no-ops here). Each is a
+Stripe, WhatsApp broadcasts, Poster Studio (`/admin/posters`),
+notifications, email sending (new-order and business-welcome emails are
+no-ops here). B2B RFQ/quotes (a separate post-a-request/submit-a-quote
+flow) was intentionally dropped rather than ported — see "Businesses"
+above for why. Each is a
 self-contained subsystem with its own tables — `admin/stats`'s
 `leadCount`/`bookingCount`/`openRfqCount` still report `0`
 since bookings/leads exist but aren't aggregated into that endpoint yet, and

@@ -91,6 +91,7 @@ export default function BusinessManager({
     name: "",
     description: "",
     categoryId: "",
+    businessType: "B2C" as "B2C" | "B2B",
     phone: "",
     email: "",
     website: "",
@@ -114,6 +115,7 @@ export default function BusinessManager({
       name: b.name,
       description: b.description ?? "",
       categoryId: b.category?.id ?? "",
+      businessType: b.businessType ?? "B2C",
       phone: b.phone,
       email: b.email ?? "",
       website: b.website ?? "",
@@ -341,6 +343,29 @@ export default function BusinessManager({
                   </option>
                 ))}
               </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-ink-700 mb-1">Who does this business serve?</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDetails({ ...details, businessType: "B2C" })}
+                  className={`rounded-lg border px-3 py-2.5 text-left text-sm font-semibold transition-colors ${
+                    details.businessType === "B2C" ? "border-brand-500 bg-brand-50 text-brand-700" : "border-gray-300 text-ink-700 hover:bg-gray-50"
+                  }`}
+                >
+                  Consumer (B2C)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDetails({ ...details, businessType: "B2B" })}
+                  className={`rounded-lg border px-3 py-2.5 text-left text-sm font-semibold transition-colors ${
+                    details.businessType === "B2B" ? "border-brand-500 bg-brand-50 text-brand-700" : "border-gray-300 text-ink-700 hover:bg-gray-50"
+                  }`}
+                >
+                  Business (B2B)
+                </button>
+              </div>
             </div>
             <div>
               <label className="block text-xs font-semibold text-ink-700 mb-1">Phone</label>

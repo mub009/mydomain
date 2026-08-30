@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import {
   Bookmark,
+  Briefcase,
   Building2,
   Calendar,
   ChevronRight,
@@ -325,6 +326,11 @@ export default function BusinessDetail() {
               <h1 className="text-2xl sm:text-3xl font-extrabold text-ink-900">{biz.name}</h1>
               <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                 <StarRating rating={biz.avgRating} count={biz.reviewCount} />
+                {biz.businessType === "B2B" && (
+                  <span className="badge bg-violet-50 text-violet-700">
+                    <Briefcase size={12} /> B2B Supplier
+                  </span>
+                )}
                 {biz.isVerified && (
                   <span className="badge bg-emerald-50 text-emerald-700">
                     <ShieldCheck size={12} /> Verified

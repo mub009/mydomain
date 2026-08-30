@@ -39,4 +39,29 @@ class SearchTest extends TestCase
             ->assertStatus(200)
             ->assertJsonPath('meta.total', 1);
     }
+
+    public function test_search_filters_by_business_type(): void
+    {
+        $owner = User::create([
+            'email' => 'o2@example.com', 'passwordHash' => bcrypt('x'),
+            'firstName' => 'O', 'lastName' => 'W', 'role' => 'BUSINESS_OWNER', 'status' => 'ACTIVE',
+        ]);
+        $category = Category::create(['name' => 'Restaurants', 'slug' => 'restaurants']);
+        Business::create([
+            'ownerId' => $owner->id, 'name' => 'Consumer Diner', 'slug' => 'consumer-diner', 'categoryId' => $category->id,
+            'status' => 'PUBLISHED', 'businessType' => 'B2C', 'phone' => '9998887777', 'addressLine1' => '1 Main St',
+            'city' => 'Pune', 'state' => 'MH', 'postalCode' => '411001', 'latitude' => 18.5, 'longitude' => 73.8,
+        ]);
+        Business::create([
+            'ownerId' => $owner->id, 'name' => 'Wholesale Supplier', 'slug' => 'wholesale-supplier', 'categoryId' => $category->id,
+            'status' => 'PUBLISHED', 'businessType' => 'B2B', 'phone' => '9998887778', 'addressLine1' => '2 Main St',
+            'city' => 'Pune', 'state' => 'MH', 'postalCode' => '411001', 'latitude' => 18.5, 'longitude' => 73.8,
+        ]);
+
+        $b2b = $this->getJson('/api/v1/search?businessType=B2B');
+        $b2b->assertStatus(200)->assertJsonPath('meta.total', 1)->assertJsonPath('data.0.slug', 'wholesale-supplier');
+
+        $all = $this->getJson('/api/v1/search');
+        $all->assertStatus(200)->assertJsonPath('meta.total', 2);
+    }
 }

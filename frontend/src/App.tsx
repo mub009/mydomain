@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import { authApi } from "@/api/endpoints";
 import { useAuthStore } from "@/store/authStore";
 import { usePageViewTracking } from "@/hooks/usePageViewTracking";
@@ -15,8 +15,6 @@ import BusinessDetail from "@/pages/BusinessDetail";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
 import OwnerDashboard from "@/pages/OwnerDashboard";
-import B2BMarketplace from "@/pages/B2BMarketplace";
-import RfqDetail from "@/pages/RfqDetail";
 import AdminDashboard from "@/pages/AdminDashboard";
 
 export default function App() {
@@ -60,8 +58,9 @@ function AppShell() {
         <Route path="/business/:slug" element={<BusinessDetail />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/b2b" element={<B2BMarketplace />} />
-        <Route path="/b2b/:id" element={<RfqDetail />} />
+        {/* B2B is the same directory as B2C, just pre-filtered — a business
+            picks B2B/B2C at registration, not a separate marketplace. */}
+        <Route path="/b2b" element={<Navigate to="/search?businessType=B2B" replace />} />
         <Route
           path="/dashboard"
           element={

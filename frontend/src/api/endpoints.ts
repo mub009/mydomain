@@ -26,7 +26,6 @@ import {
   ContactSummary,
   ImportResult,
   MessageTemplate,
-  Rfq,
   ShopCustomer,
   SiteType,
   StorefrontTheme,
@@ -144,17 +143,6 @@ export const bookingsApi = {
     api.get<PaginatedResponse<Booking>>(`/businesses/${businessId}/bookings`, { params }).then((r) => r.data),
   updateStatus: (bookingId: string, status: string) =>
     api.patch<ApiResponse<Booking>>(`/bookings/${bookingId}/status`, { status }).then((r) => r.data.data),
-};
-
-export const b2bApi = {
-  list: (params: Record<string, unknown> = {}) => api.get<PaginatedResponse<Rfq>>("/b2b/rfqs", { params }).then((r) => r.data),
-  mine: () => api.get<ApiResponse<Rfq[]>>("/b2b/rfqs/mine").then((r) => r.data.data),
-  get: (id: string) => api.get<ApiResponse<Rfq>>(`/b2b/rfqs/${id}`).then((r) => r.data.data),
-  create: (payload: Record<string, unknown>) => api.post<ApiResponse<Rfq>>("/b2b/rfqs", payload).then((r) => r.data.data),
-  submitQuote: (rfqId: string, payload: Record<string, unknown>) =>
-    api.post(`/b2b/rfqs/${rfqId}/quotes`, payload).then((r) => r.data.data),
-  awardQuote: (rfqId: string, quoteId: string) =>
-    api.post(`/b2b/rfqs/${rfqId}/quotes/${quoteId}/award`).then((r) => r.data.data),
 };
 
 export const usersApi = {

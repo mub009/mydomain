@@ -95,7 +95,7 @@ const STAT_META: { key: string; label: string; icon: LucideIcon; tint: string }[
   { key: "pendingBusinessCount", label: "Pending", icon: Calendar, tint: "bg-amber-50 text-amber-600" },
   { key: "reviewCount", label: "Reviews", icon: Star, tint: "bg-gold-50 text-gold-500" },
   { key: "leadCount", label: "Leads", icon: MessageSquare, tint: "bg-pink-50 text-pink-600" },
-  { key: "openRfqCount", label: "Open RFQs", icon: Briefcase, tint: "bg-teal-50 text-teal-600" },
+  { key: "b2bBusinessCount", label: "B2B Businesses", icon: Briefcase, tint: "bg-teal-50 text-teal-600" },
 ];
 
 export default function AdminDashboard() {
@@ -440,6 +440,7 @@ function BusinessesPanel({ categories, onChanged }: { categories: Category[]; on
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [typeFilter, setTypeFilter] = useState("");
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [editing, setEditing] = useState<Business | null>(null);
@@ -450,7 +451,7 @@ function BusinessesPanel({ categories, onChanged }: { categories: Category[]; on
   function load() {
     setLoading(true);
     adminApi
-      .businesses({ search: search || undefined, status: statusFilter || undefined, page })
+      .businesses({ search: search || undefined, status: statusFilter || undefined, businessType: typeFilter || undefined, page })
       .then((r) => {
         setBusinesses(r.data);
         setTotalPages(r.meta.totalPages);
@@ -463,11 +464,11 @@ function BusinessesPanel({ categories, onChanged }: { categories: Category[]; on
     const id = setTimeout(load, 250);
     return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, statusFilter, page]);
+  }, [search, statusFilter, typeFilter, page]);
 
   useEffect(() => {
     setPage(1);
-  }, [search, statusFilter]);
+  }, [search, statusFilter, typeFilter]);
 
   async function quickAction(id: string, action: "approve" | "reject" | "suspend") {
     await adminApi[action](id);
@@ -490,6 +491,11 @@ function BusinessesPanel({ categories, onChanged }: { categories: Category[]; on
             </option>
           ))}
         </select>
+        <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className="input sm:w-40">
+          <option value="">B2C & B2B</option>
+          <option value="B2C">B2C only</option>
+          <option value="B2B">B2B only</option>
+        </select>
       </div>
 
       {error && <p className="text-sm text-red-700 bg-red-50 rounded-md px-3 py-2 mb-4">{error}</p>}
@@ -505,6 +511,7 @@ function BusinessesPanel({ categories, onChanged }: { categories: Category[]; on
                 <div className="flex items-center gap-2 flex-wrap">
                   <p className="font-semibold text-ink-900">{b.name}</p>
                   <span className={`badge ${statusBadge(b.status)}`}>{b.status.replace("_", " ")}</span>
+                  {b.businessType === "B2B" && <span className="badge bg-violet-50 text-violet-700">B2B</span>}
                   {b.isVerified && (
                     <span className="badge bg-emerald-50 text-emerald-700">
                       <ShieldCheck size={11} /> Verified

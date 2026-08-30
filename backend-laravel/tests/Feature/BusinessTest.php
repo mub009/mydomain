@@ -50,6 +50,47 @@ class BusinessTest extends TestCase
             ->assertJsonPath('data.ownerId', $owner->id);
     }
 
+    public function test_business_type_defaults_to_b2c_and_can_be_set_to_b2b(): void
+    {
+        [, $token] = $this->actingToken(['role' => 'BUSINESS_OWNER']);
+        $category = $this->category();
+
+        $default = $this->postJson('/api/v1/businesses', [
+            'name' => 'Consumer Shop', 'slug' => 'consumer-shop', 'categoryId' => $category->id,
+            'phone' => '9998887777', 'addressLine1' => '1 Main St', 'city' => 'Pune', 'state' => 'MH',
+            'postalCode' => '411001', 'latitude' => 18.5, 'longitude' => 73.8,
+        ], ['Authorization' => "Bearer {$token}"]);
+        $default->assertStatus(201)->assertJsonPath('data.businessType', 'B2C');
+
+        $b2b = $this->postJson('/api/v1/businesses', [
+            'name' => 'Bulk Supplier', 'slug' => 'bulk-supplier', 'categoryId' => $category->id,
+            'businessType' => 'B2B',
+            'phone' => '9998887778', 'addressLine1' => '2 Main St', 'city' => 'Pune', 'state' => 'MH',
+            'postalCode' => '411001', 'latitude' => 18.5, 'longitude' => 73.8,
+        ], ['Authorization' => "Bearer {$token}"]);
+        $b2b->assertStatus(201)->assertJsonPath('data.businessType', 'B2B');
+
+        $this->assertDatabaseHas('businesses', ['slug' => 'consumer-shop', 'businessType' => 'B2C']);
+        $this->assertDatabaseHas('businesses', ['slug' => 'bulk-supplier', 'businessType' => 'B2B']);
+    }
+
+    public function test_owner_changes_business_type_after_creation(): void
+    {
+        [, $token] = $this->actingToken(['role' => 'BUSINESS_OWNER']);
+        $category = $this->category();
+
+        $created = $this->postJson('/api/v1/businesses', [
+            'name' => 'Shop', 'slug' => 'shop-type-switch', 'categoryId' => $category->id,
+            'phone' => '9998887777', 'addressLine1' => '1 Main St', 'city' => 'Pune', 'state' => 'MH',
+            'postalCode' => '411001', 'latitude' => 18.5, 'longitude' => 73.8,
+        ], ['Authorization' => "Bearer {$token}"]);
+        $id = $created->json('data.id');
+
+        $this->patchJson("/api/v1/businesses/{$id}", ['businessType' => 'B2B'], ['Authorization' => "Bearer {$token}"])
+            ->assertStatus(200)
+            ->assertJsonPath('data.businessType', 'B2B');
+    }
+
     public function test_dealer_created_business_is_published_immediately_and_spends_a_point(): void
     {
         [$dealer, $token] = $this->actingToken([

@@ -38,6 +38,9 @@ class BusinessController extends Controller
             'slug' => [$required, 'string', 'min:2', 'max:150', 'regex:/^[a-z0-9-]+$/'],
             'description' => ['nullable', 'string', 'max:2000'],
             'categoryId' => [$required, 'uuid'],
+            // A label for discovery, not a different feature set — B2B
+            // businesses are ordinary listings, just filterable by this.
+            'businessType' => ['sometimes', 'nullable', 'in:B2C,B2B'],
             'email' => ['nullable', 'email'],
             'phone' => [$required, 'string', 'min:7', 'max:20'],
             'website' => ['nullable', 'url'],
@@ -67,6 +70,10 @@ class BusinessController extends Controller
         $owner = $data['owner'] ?? null;
         unset($data['owner']);
         $data['country'] = $data['country'] ?? 'IN';
+        // Explicit rather than relying on the DB column default — Eloquent
+        // doesn't reload a row after create(), so the response would show
+        // null here instead of the value MySQL actually stored.
+        $data['businessType'] = $data['businessType'] ?? 'B2C';
 
         if (! Category::find($data['categoryId'])) {
             throw ApiException::badRequest('Invalid categoryId');

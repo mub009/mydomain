@@ -35,12 +35,12 @@ class AdminController extends Controller
             'publishedBusinessCount' => Business::where('status', 'PUBLISHED')->count(),
             'pendingBusinessCount' => Business::where('status', 'PENDING_APPROVAL')->count(),
             'reviewCount' => Review::count(),
-            // Leads, bookings, and B2B RFQs are not part of this Laravel
-            // port yet (still Node-only) — reported as 0 rather than
-            // querying tables that don't exist here.
+            'b2bBusinessCount' => Business::where('businessType', 'B2B')->count(),
+            // Leads and bookings are not part of this Laravel port yet
+            // (still Node-only) — reported as 0 rather than querying
+            // tables that don't exist here.
             'leadCount' => 0,
             'bookingCount' => 0,
-            'openRfqCount' => 0,
         ]);
     }
 
@@ -227,6 +227,7 @@ class AdminController extends Controller
     {
         $request->validate([
             'status' => ['sometimes', 'nullable', 'string', 'max:30'],
+            'businessType' => ['sometimes', 'nullable', 'in:B2C,B2B'],
             'search' => ['sometimes', 'nullable', 'string', 'max:150'],
         ]);
         $pagination = Pagination::parse($request->query());
@@ -234,6 +235,9 @@ class AdminController extends Controller
         $query = Business::query();
         if ($status = $request->query('status')) {
             $query->where('status', $status);
+        }
+        if ($businessType = $request->query('businessType')) {
+            $query->where('businessType', $businessType);
         }
         if ($search = $request->query('search')) {
             $query->where(fn ($q) => $q->where('name', 'like', "%{$search}%")->orWhere('city', 'like', "%{$search}%"));

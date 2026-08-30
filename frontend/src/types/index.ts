@@ -101,6 +101,9 @@ export interface Business {
   logoUrl?: string | null;
   coverImageUrl?: string | null;
   status: string;
+  // A label for discovery, not a different feature set — B2B businesses
+  // are ordinary listings, just filterable by this.
+  businessType?: "B2C" | "B2B";
   category?: Category;
   categoryName?: string;
   categorySlug?: string;
@@ -157,29 +160,6 @@ export interface Booking {
   notes?: string | null;
   business?: Business;
   service?: Service;
-}
-
-export interface Rfq {
-  id: string;
-  title: string;
-  description: string;
-  quantity: number;
-  city: string;
-  state: string;
-  status: "OPEN" | "QUOTED" | "AWARDED" | "CLOSED" | "CANCELLED";
-  category?: Category;
-  createdAt: string;
-  quotes?: Quote[];
-}
-
-export interface Quote {
-  id: string;
-  priceCents: number;
-  currency: string;
-  message?: string | null;
-  deliveryDays?: number | null;
-  status: "SUBMITTED" | "ACCEPTED" | "REJECTED" | "WITHDRAWN";
-  business?: { id: string; name: string; slug: string; avgRating: number };
 }
 
 export type ReviewChannel =

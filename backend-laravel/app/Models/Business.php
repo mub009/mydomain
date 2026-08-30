@@ -19,7 +19,7 @@ class Business extends Model
 
     protected $fillable = [
         'ownerId', 'createdById', 'name', 'slug', 'description', 'categoryId',
-        'status', 'subscriptionPlan', 'email', 'phone', 'website',
+        'status', 'subscriptionPlan', 'businessType', 'email', 'phone', 'website',
         'addressLine1', 'addressLine2', 'city', 'state', 'postalCode', 'country',
         'latitude', 'longitude', 'googlePlaceId', 'googleReviewUrl',
         'instagramUsername', 'facebookPageUrl', 'youtubeUrl', 'preferredReviewChannel',

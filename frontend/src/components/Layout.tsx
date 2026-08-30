@@ -39,8 +39,8 @@ const SERVICE_HIGHLIGHTS = [
   },
   {
     icon: Briefcase,
-    title: "B2B marketplace",
-    description: "Post a request for quote and get competing offers from verified suppliers — built for bulk and business sourcing.",
+    title: "B2B directory",
+    description: "Browse verified suppliers and wholesalers directly — the same search and listing pages, filtered to businesses that serve other businesses.",
   },
   {
     icon: CalendarCheck2,
@@ -74,7 +74,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   const navLinks = [
     { to: "/", label: "Search" },
-    { to: "/b2b", label: "B2B Marketplace" },
+    { to: "/b2b", label: "B2B Directory" },
     ...(user?.role === "BUSINESS_OWNER" || user?.role === "DEALER" ? [{ to: "/dashboard", label: "My Business" }] : []),
     ...(user?.role === "ADMIN" ? [{ to: "/admin", label: "Admin" }] : []),
   ];
@@ -218,8 +218,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </p>
             <p>
               List your business for free to start receiving leads, manage bookings and appointments in real
-              time, and grow with genuine customer reviews. Need to source products or services at scale? Post
-              a request on our B2B marketplace and receive competing quotes from verified suppliers.
+              time, and grow with genuine customer reviews. Sourcing at scale? Browse our B2B directory to find
+              and contact verified suppliers and wholesalers directly.
             </p>
           </div>
 
@@ -250,7 +250,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <span className="font-bold text-ink-900">Markkito</span>
             </div>
             <p className="text-ink-500 text-xs leading-relaxed">
-              Find, book, and review local businesses — plus a B2B marketplace for bulk sourcing.
+              Find, book, and review local businesses — B2C and B2B, in one directory.
             </p>
           </div>
           <div>
@@ -259,7 +259,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </h4>
             <ul className="space-y-2 text-ink-500">
               <li><Link to="/" className="hover:text-brand-600">Search businesses</Link></li>
-              <li><Link to="/b2b" className="hover:text-brand-600">Post an RFQ</Link></li>
+              <li><Link to="/b2b" className="hover:text-brand-600">Browse B2B suppliers</Link></li>
             </ul>
           </div>
           <div>

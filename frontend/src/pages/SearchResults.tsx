@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
+  Briefcase,
   ChevronRight,
   Flame,
   ImageIcon,
@@ -36,6 +37,14 @@ const RATING_OPTIONS = [
   { value: "", label: "Any rating" },
   { value: "4", label: "4★ & above" },
   { value: "3", label: "3★ & above" },
+];
+
+// A label for discovery, not a different feature set — the same directory
+// and search just filtered by who a listing serves.
+const BUSINESS_TYPE_OPTIONS = [
+  { value: "", label: "All businesses" },
+  { value: "B2C", label: "Consumer (B2C)" },
+  { value: "B2B", label: "Business (B2B)" },
 ];
 
 // A light "signal" badge derived from the listing's own numbers, so the row
@@ -156,11 +165,18 @@ function ResultRow({ business, index }: { business: Business; index: number }) {
                 {business.name}
               </h3>
             </Link>
-            {business.isVerified && (
-              <span className="badge shrink-0 bg-emerald-50 text-emerald-700">
-                <ShieldCheck size={11} /> Verified
-              </span>
-            )}
+            <div className="flex shrink-0 items-center gap-1.5">
+              {business.businessType === "B2B" && (
+                <span className="badge bg-violet-50 text-violet-700">
+                  <Briefcase size={11} /> B2B
+                </span>
+              )}
+              {business.isVerified && (
+                <span className="badge bg-emerald-50 text-emerald-700">
+                  <ShieldCheck size={11} /> Verified
+                </span>
+              )}
+            </div>
           </div>
 
           <div className="mt-1.5 flex flex-wrap items-center gap-2">
@@ -231,6 +247,7 @@ export default function SearchResults() {
   const { city, geo, setCity, setGeo } = useLocationStore();
 
   const categorySlug = params.get("category") ?? "";
+  const businessType = params.get("businessType") ?? "";
   const q = params.get("q") ?? "";
   const sort = (params.get("sort") as SortKey) ?? "relevance";
   const minRating = params.get("minRating") ?? "";
@@ -258,7 +275,7 @@ export default function SearchResults() {
   // The heading mirrors what was actually searched: category and/or term,
   // narrowed to the chosen location.
   const locationLabel = geo ? "Near you" : city || "All locations";
-  const subject = category?.name ?? (q ? `“${q}”` : "Businesses");
+  const subject = category?.name ?? (q ? `“${q}”` : businessType === "B2B" ? "B2B Suppliers" : "Businesses");
   const heading = `Popular ${subject}${geo || city ? ` in ${locationLabel}` : ""}`;
 
   function updateParams(patch: Record<string, string | number | null>) {
@@ -279,6 +296,7 @@ export default function SearchResults() {
       .search({
         q: q || undefined,
         categorySlug: categorySlug || undefined,
+        businessType: businessType || undefined,
         city: geo ? undefined : city || undefined,
         lat: geo?.lat,
         lng: geo?.lng,
@@ -293,7 +311,7 @@ export default function SearchResults() {
       })
       .catch((err) => setError(apiErrorMessage(err)))
       .finally(() => setLoading(false));
-  }, [q, categorySlug, city, geo, minRating, sort, radiusKm, page]);
+  }, [q, categorySlug, businessType, city, geo, minRating, sort, radiusKm, page]);
 
   return (
     <div>
@@ -328,9 +346,17 @@ export default function SearchResults() {
       <h1 className="text-xl font-extrabold text-ink-900 sm:text-2xl">{heading}</h1>
 
       {/* Active filters — the location narrowing results must never be invisible */}
-      {(geo || city || minRating) && (
+      {(geo || city || minRating || businessType) && (
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <span className="text-xs text-ink-500">Filtered by:</span>
+          {businessType && (
+            <button
+              onClick={() => updateParams({ businessType: null })}
+              className="badge bg-violet-50 text-violet-700 hover:bg-violet-100"
+            >
+              <Briefcase size={11} /> {businessType === "B2B" ? "B2B businesses" : "B2C businesses"} <X size={11} />
+            </button>
+          )}
           {geo && (
             <button
               onClick={() => setGeo(null)}
@@ -395,6 +421,18 @@ export default function SearchResults() {
           {categories.map((c) => (
             <option key={c.id} value={c.slug}>
               {c.name}
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={businessType}
+          onChange={(e) => updateParams({ businessType: e.target.value })}
+          className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-ink-700 focus:border-brand-500 focus:outline-none"
+        >
+          {BUSINESS_TYPE_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
             </option>
           ))}
         </select>

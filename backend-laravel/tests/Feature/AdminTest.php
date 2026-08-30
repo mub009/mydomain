@@ -48,13 +48,42 @@ class AdminTest extends TestCase
             'status' => 'PUBLISHED', 'phone' => '9998887777', 'addressLine1' => '1 Main St',
             'city' => 'Pune', 'state' => 'MH', 'postalCode' => '411001', 'latitude' => 18.5, 'longitude' => 73.8,
         ]);
+        Business::create([
+            'ownerId' => $owner->id, 'name' => 'Supplier', 'slug' => 'supplier', 'categoryId' => $category->id,
+            'status' => 'PUBLISHED', 'businessType' => 'B2B', 'phone' => '9998887778', 'addressLine1' => '2 Main St',
+            'city' => 'Pune', 'state' => 'MH', 'postalCode' => '411001', 'latitude' => 18.5, 'longitude' => 73.8,
+        ]);
 
         $token = $this->token($admin);
         $this->getJson('/api/v1/admin/stats', ['Authorization' => "Bearer {$token}"])
             ->assertStatus(200)
-            ->assertJsonPath('data.businessCount', 1)
-            ->assertJsonPath('data.publishedBusinessCount', 1)
+            ->assertJsonPath('data.businessCount', 2)
+            ->assertJsonPath('data.publishedBusinessCount', 2)
+            ->assertJsonPath('data.b2bBusinessCount', 1)
             ->assertJsonPath('data.userCount', 2);
+    }
+
+    public function test_admin_filters_businesses_by_type(): void
+    {
+        $admin = $this->user(['role' => 'ADMIN']);
+        $owner = $this->user(['role' => 'BUSINESS_OWNER']);
+        $category = Category::create(['name' => 'Restaurants', 'slug' => 'restaurants']);
+        Business::create([
+            'ownerId' => $owner->id, 'name' => 'Consumer Shop', 'slug' => 'consumer-shop-admin', 'categoryId' => $category->id,
+            'status' => 'PUBLISHED', 'businessType' => 'B2C', 'phone' => '9998887777', 'addressLine1' => '1 Main St',
+            'city' => 'Pune', 'state' => 'MH', 'postalCode' => '411001', 'latitude' => 18.5, 'longitude' => 73.8,
+        ]);
+        Business::create([
+            'ownerId' => $owner->id, 'name' => 'Wholesale Co', 'slug' => 'wholesale-co-admin', 'categoryId' => $category->id,
+            'status' => 'PUBLISHED', 'businessType' => 'B2B', 'phone' => '9998887778', 'addressLine1' => '2 Main St',
+            'city' => 'Pune', 'state' => 'MH', 'postalCode' => '411001', 'latitude' => 18.5, 'longitude' => 73.8,
+        ]);
+
+        $token = $this->token($admin);
+        $this->getJson('/api/v1/admin/businesses?businessType=B2B', ['Authorization' => "Bearer {$token}"])
+            ->assertStatus(200)
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('data.0.slug', 'wholesale-co-admin');
     }
 
     public function test_admin_creates_a_dealer_with_default_privileges_and_zero_points(): void

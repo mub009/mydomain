@@ -145,6 +145,7 @@ export default function OwnerDashboard() {
     name: "",
     slug: "",
     categoryId: "",
+    businessType: "B2C" as "B2C" | "B2B",
     phone: "",
     addressLine1: "",
     city: "",
@@ -285,7 +286,10 @@ export default function OwnerDashboard() {
             }
           : {}),
       });
-      setNewBusiness({ name: "", slug: "", categoryId: "", phone: "", addressLine1: "", city: "", state: "", postalCode: "", latitude: "", longitude: "" });
+      setNewBusiness({
+        name: "", slug: "", categoryId: "", businessType: "B2C", phone: "",
+        addressLine1: "", city: "", state: "", postalCode: "", latitude: "", longitude: "",
+      });
       setShowCreate(false);
       loadBusinesses();
       loadPoints();
@@ -461,6 +465,39 @@ export default function OwnerDashboard() {
                   </option>
                 ))}
               </select>
+
+              <div>
+                <p className="mb-1.5 text-xs font-semibold text-ink-700">Who does this business serve?</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setNewBusiness({ ...newBusiness, businessType: "B2C" })}
+                    className={`flex items-start gap-2 rounded-lg border p-3 text-left transition-colors ${
+                      newBusiness.businessType === "B2C" ? "border-brand-500 bg-brand-50" : "border-gray-300 hover:bg-gray-50"
+                    }`}
+                  >
+                    <UsersRound size={16} className={newBusiness.businessType === "B2C" ? "text-brand-600" : "text-ink-400"} />
+                    <span>
+                      <span className="block text-sm font-semibold text-ink-900">Consumer (B2C)</span>
+                      <span className="block text-xs text-ink-500">Public customers find and contact you directly</span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNewBusiness({ ...newBusiness, businessType: "B2B" })}
+                    className={`flex items-start gap-2 rounded-lg border p-3 text-left transition-colors ${
+                      newBusiness.businessType === "B2B" ? "border-brand-500 bg-brand-50" : "border-gray-300 hover:bg-gray-50"
+                    }`}
+                  >
+                    <Building2 size={16} className={newBusiness.businessType === "B2B" ? "text-brand-600" : "text-ink-400"} />
+                    <span>
+                      <span className="block text-sm font-semibold text-ink-900">Business (B2B)</span>
+                      <span className="block text-xs text-ink-500">Other businesses find you as a supplier</span>
+                    </span>
+                  </button>
+                </div>
+              </div>
+
               <input required minLength={7} maxLength={20} placeholder="Phone" value={newBusiness.phone} onChange={(e) => setNewBusiness({ ...newBusiness, phone: e.target.value })} className="input" />
               <input required placeholder="Address line 1" value={newBusiness.addressLine1} onChange={(e) => setNewBusiness({ ...newBusiness, addressLine1: e.target.value })} className="input" />
               <div className="flex gap-3">

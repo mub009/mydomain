@@ -17,6 +17,7 @@ class SearchController extends Controller
         $data = $request->validate([
             'q' => ['sometimes', 'nullable', 'string', 'max:150'],
             'categorySlug' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'businessType' => ['sometimes', 'nullable', 'in:B2C,B2B'],
             'city' => ['sometimes', 'nullable', 'string', 'max:100'],
             'lat' => ['sometimes', 'nullable', 'numeric', 'min:-90', 'max:90'],
             'lng' => ['sometimes', 'nullable', 'numeric', 'min:-180', 'max:180'],
@@ -29,6 +30,7 @@ class SearchController extends Controller
 
         $q = $data['q'] ?? null;
         $categorySlug = $data['categorySlug'] ?? null;
+        $businessType = $data['businessType'] ?? null;
         $city = $data['city'] ?? null;
         $lat = $data['lat'] ?? null;
         $lng = $data['lng'] ?? null;
@@ -51,6 +53,10 @@ class SearchController extends Controller
         if ($categorySlug) {
             $conditions[] = 'c.slug = ?';
             $bindings[] = $categorySlug;
+        }
+        if ($businessType) {
+            $conditions[] = 'b.businessType = ?';
+            $bindings[] = $businessType;
         }
         if ($city) {
             $conditions[] = 'b.city LIKE ?';
@@ -87,7 +93,7 @@ class SearchController extends Controller
             SELECT
                 b.id, b.name, b.slug, b.description, b.city, b.state, b.latitude, b.longitude,
                 b.avgRating AS avgRating, b.reviewCount AS reviewCount, b.logoUrl AS logoUrl,
-                b.phone, b.addressLine1 AS addressLine1, b.isVerified AS isVerified,
+                b.phone, b.addressLine1 AS addressLine1, b.isVerified AS isVerified, b.businessType AS businessType,
                 c.name AS categoryName, c.slug AS categorySlug,
                 (SELECT p.url FROM business_photos p WHERE p.businessId = b.id ORDER BY p.sortOrder ASC LIMIT 1) AS photoUrl,
                 {$distanceExpr} AS distance_km
@@ -115,6 +121,7 @@ class SearchController extends Controller
                 'categoryName' => $r['categoryName'], 'categorySlug' => $r['categorySlug'],
                 'distanceKm' => $r['distance_km'] !== null ? (float) $r['distance_km'] : null,
                 'phone' => $r['phone'], 'addressLine1' => $r['addressLine1'], 'isVerified' => (bool) $r['isVerified'],
+                'businessType' => $r['businessType'],
                 'photoUrl' => $r['photoUrl'],
             ];
         }, $rows);

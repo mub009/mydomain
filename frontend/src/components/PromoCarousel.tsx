@@ -28,8 +28,8 @@ const SLIDES = [
 
 const PROMO_TILES = [
   {
-    label: "B2B Marketplace",
-    subtitle: "Quick quotes",
+    label: "B2B Directory",
+    subtitle: "Find suppliers",
     icon: Briefcase,
     to: "/b2b",
     className: "from-sky-900/90 via-sky-800/60",
