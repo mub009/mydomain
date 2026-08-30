@@ -3,6 +3,7 @@ import { Routes, Route } from "react-router-dom";
 import { authApi } from "@/api/endpoints";
 import { useAuthStore } from "@/store/authStore";
 import { usePageViewTracking } from "@/hooks/usePageViewTracking";
+import { useScrollToTop } from "@/hooks/useScrollToTop";
 import Layout from "@/components/Layout";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import WelcomeModal from "@/components/WelcomeModal";
@@ -32,6 +33,7 @@ export default function App() {
   // Powers the admin Analytics tab — every route change (including
   // /site/:slug, since this runs above that branch) pings the backend.
   usePageViewTracking();
+  useScrollToTop();
 
   return (
     <Routes>
