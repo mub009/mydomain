@@ -48,7 +48,10 @@ class BusinessController extends Controller
             'owner' => ['sometimes', 'array'],
             'owner.firstName' => ['required_with:owner', 'string', 'min:1', 'max:80'],
             'owner.lastName' => ['required_with:owner', 'string', 'min:1', 'max:80'],
-            'owner.email' => ['required_with:owner', 'email'],
+            // The login can be an email or a phone number — at least one is
+            // required, checked below since Laravel has no "either of these
+            // two fields" rule.
+            'owner.email' => ['nullable', 'email'],
             'owner.phone' => ['nullable', 'string', 'min:7', 'max:20'],
             'owner.password' => ['required_with:owner', 'string', 'min:8', 'max:72'],
         ];
@@ -96,18 +99,35 @@ class BusinessController extends Controller
             });
         }
 
-        $existing = User::where('email', $owner['email'])->first();
-        if ($existing && in_array($existing->role, ['ADMIN', 'DEALER'], true)) {
-            throw ApiException::badRequest("This email belongs to a staff account and can't be used as a business login");
+        $ownerEmail = $owner['email'] ?? null;
+        $ownerPhone = $owner['phone'] ?? null;
+        if (! $ownerEmail && ! $ownerPhone) {
+            throw ApiException::badRequest('Provide an email or phone number for the business login');
         }
-        if (! empty($owner['phone']) && (! $existing || $existing->phone !== $owner['phone'])) {
-            $phoneTaken = User::where('phone', $owner['phone'])->first();
-            if ($phoneTaken && $phoneTaken->id !== $existing?->id) {
-                throw ApiException::conflict('That phone number is already registered to another account');
+
+        // The login can be identified by either field — look it up by
+        // whichever was given, preferring email since it's the more likely
+        // stable identifier when both are present on an existing account.
+        $existing = $ownerEmail ? User::where('email', $ownerEmail)->first() : null;
+        if (! $existing && $ownerPhone) {
+            $existing = User::where('phone', $ownerPhone)->first();
+        }
+        if ($existing && in_array($existing->role, ['ADMIN', 'DEALER'], true)) {
+            throw ApiException::badRequest("This login belongs to a staff account and can't be used as a business login");
+        }
+        foreach (['email' => $ownerEmail, 'phone' => $ownerPhone] as $field => $value) {
+            if (! $value) {
+                continue;
+            }
+            $taken = User::where($field, $value)->first();
+            if ($taken && $taken->id !== $existing?->id) {
+                throw ApiException::conflict(
+                    ($field === 'email' ? 'That email' : 'That phone number').' is already registered to another account'
+                );
             }
         }
 
-        $result = DB::transaction(function () use ($data, $actor, $initialStatus, $isStaff, $owner, $existing) {
+        $result = DB::transaction(function () use ($data, $actor, $initialStatus, $isStaff, $owner, $existing, $ownerEmail, $ownerPhone) {
             $ownerRecord = $existing;
 
             if ($ownerRecord) {
@@ -117,8 +137,8 @@ class BusinessController extends Controller
                 }
             } else {
                 $ownerRecord = User::create([
-                    'email' => $owner['email'],
-                    'phone' => $owner['phone'] ?? null,
+                    'email' => $ownerEmail,
+                    'phone' => $ownerPhone,
                     'passwordHash' => Hash::make($owner['password']),
                     'firstName' => $owner['firstName'],
                     'lastName' => $owner['lastName'],
@@ -142,7 +162,12 @@ class BusinessController extends Controller
             Points::spendForBusiness($actor, $business->id);
 
             $payload = $business->toArray();
-            $payload['ownerAccount'] = ['email' => $ownerRecord->email, 'created' => ! $existing];
+            $payload['ownerAccount'] = [
+                'email' => $ownerRecord->email,
+                'phone' => $ownerRecord->phone,
+                'username' => $ownerRecord->email ?? $ownerRecord->phone,
+                'created' => ! $existing,
+            ];
 
             return $payload;
         });

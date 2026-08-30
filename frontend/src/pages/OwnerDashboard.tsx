@@ -79,11 +79,11 @@ function OwnerCredsCard({ creds, onDismiss }: { creds: OwnerCreds; onDismiss: ()
       </div>
       <p className="text-xs text-emerald-700/90 mt-1 mb-3">
         {creds.created
-          ? "A welcome email with these login details has been sent to the owner. You can also share them directly — the password won't be shown here again."
-          : "This listing was linked to an existing account — the business team signs in with the email below and their existing password. A welcome email has been sent."}
+          ? "Share these login details with the owner directly — the password won't be shown here again."
+          : "This listing was linked to an existing account — the business team signs in with the username below and their existing password."}
       </p>
       <div className="space-y-2.5">
-        <CopyField label="Username (email)" value={creds.username} />
+        <CopyField label="Username" value={creds.username} />
         {creds.created && <CopyField label="Password" value={creds.password} />}
       </div>
     </div>
@@ -159,7 +159,7 @@ export default function OwnerDashboard() {
   // Dealers/admins can create a login for the business team while adding the
   // listing; the listing is then assigned to that account.
   const canAssignOwner = isDealer || user?.role === "ADMIN";
-  const emptyOwnerAccount = { firstName: "", lastName: "", email: "", phone: "", password: "" };
+  const emptyOwnerAccount = { firstName: "", lastName: "", username: "", phone: "", password: "" };
   const [withOwner, setWithOwner] = useState(isDealer);
   const [ownerAccount, setOwnerAccount] = useState(emptyOwnerAccount);
   const [ownerCreds, setOwnerCreds] = useState<OwnerCreds | null>(null);
@@ -281,8 +281,9 @@ export default function OwnerDashboard() {
               owner: {
                 firstName: ownerAccount.firstName,
                 lastName: ownerAccount.lastName,
-                email: ownerAccount.email,
-                phone: ownerAccount.phone || undefined,
+                ...(ownerAccount.username.includes("@")
+                  ? { email: ownerAccount.username, phone: ownerAccount.phone || undefined }
+                  : { phone: ownerAccount.username }),
                 password: ownerAccount.password,
               },
             }
@@ -298,10 +299,10 @@ export default function OwnerDashboard() {
       if (assignOwner) {
         // The listing belongs to the business team's account now — surface
         // the login so the dealer can hand it over.
-        setNotice("Business created, published, and assigned to the business team's account. Their login has also been emailed to them.");
+        setNotice("Business created, published, and assigned to the business team's account. Share the login below with them.");
         setOwnerCreds({
           businessName: created.name,
-          username: created.ownerAccount?.email ?? ownerAccount.email,
+          username: created.ownerAccount?.username ?? ownerAccount.username,
           password: ownerAccount.password,
           created: created.ownerAccount?.created ?? true,
         });
@@ -522,16 +523,23 @@ export default function OwnerDashboard() {
                   {withOwner ? (
                     <>
                       <p className="text-[11px] text-ink-500">
-                        The listing is assigned to this account so the business can sign in and manage it. If the email
-                        already has an account, the listing is linked to it and the password is ignored.
+                        The listing is assigned to this account so the business can sign in and manage it. If the
+                        username already has an account, the listing is linked to it and the password is ignored.
                       </p>
                       <div className="flex gap-3">
                         <input required className="input" placeholder="Contact first name" value={ownerAccount.firstName} onChange={(e) => setOwnerAccount({ ...ownerAccount, firstName: e.target.value })} />
                         <input required className="input" placeholder="Contact last name" value={ownerAccount.lastName} onChange={(e) => setOwnerAccount({ ...ownerAccount, lastName: e.target.value })} />
                       </div>
                       <div>
-                        <label className="block text-[11px] font-medium text-ink-600 mb-1">Login username (email)</label>
-                        <input required type="email" className="input" placeholder="owner@business.com" value={ownerAccount.email} onChange={(e) => setOwnerAccount({ ...ownerAccount, email: e.target.value })} />
+                        <label className="block text-[11px] font-medium text-ink-600 mb-1">Login username (email or phone)</label>
+                        <input
+                          required
+                          type="text"
+                          className="input"
+                          placeholder="owner@business.com or phone number"
+                          value={ownerAccount.username}
+                          onChange={(e) => setOwnerAccount({ ...ownerAccount, username: e.target.value })}
+                        />
                       </div>
                       <div>
                         <label className="block text-[11px] font-medium text-ink-600 mb-1">Login password (min 8 chars)</label>
@@ -542,7 +550,16 @@ export default function OwnerDashboard() {
                           </button>
                         </div>
                       </div>
-                      <input minLength={7} maxLength={20} className="input" placeholder="Contact phone (optional, min 7 digits)" value={ownerAccount.phone} onChange={(e) => setOwnerAccount({ ...ownerAccount, phone: e.target.value })} />
+                      {ownerAccount.username.includes("@") && (
+                        <input
+                          minLength={7}
+                          maxLength={20}
+                          className="input"
+                          placeholder="Contact phone (optional, min 7 digits)"
+                          value={ownerAccount.phone}
+                          onChange={(e) => setOwnerAccount({ ...ownerAccount, phone: e.target.value })}
+                        />
+                      )}
                     </>
                   ) : (
                     <p className="text-[11px] text-ink-500">The listing stays under your own account.</p>

@@ -55,6 +55,18 @@ class AuthTest extends TestCase
         $response->assertStatus(401)->assertJsonPath('error.code', 'UNAUTHORIZED');
     }
 
+    public function test_login_accepts_a_phone_number_as_the_username(): void
+    {
+        $user = User::create([
+            'email' => 'a@example.com', 'phone' => '9998887777', 'passwordHash' => Hash::make('correct-password'),
+            'firstName' => 'A', 'lastName' => 'B', 'role' => 'CUSTOMER', 'status' => 'ACTIVE',
+        ]);
+
+        $response = $this->postJson('/api/v1/auth/login', ['email' => '9998887777', 'password' => 'correct-password']);
+
+        $response->assertStatus(200)->assertJsonPath('data.user.id', $user->id);
+    }
+
     public function test_login_then_refresh_rotates_the_refresh_token(): void
     {
         User::create([
