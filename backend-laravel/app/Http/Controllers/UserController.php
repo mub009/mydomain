@@ -67,12 +67,16 @@ class UserController extends Controller
         $items = $query->orderByDesc('createdAt')
             ->skip($pagination['skip'])->take($pagination['take'])
             ->withCount('businesses')
+            ->with(['businesses' => fn ($q) => $q->orderByDesc('createdAt')->select('id', 'ownerId', 'name', 'slug', 'status')])
             ->get(['id', 'email', 'phone', 'firstName', 'lastName', 'role', 'status', 'createdAt'])
             ->map(fn ($u) => [
                 'id' => $u->id, 'email' => $u->email, 'phone' => $u->phone,
                 'firstName' => $u->firstName, 'lastName' => $u->lastName,
                 'role' => $u->role, 'status' => $u->status, 'createdAt' => $u->createdAt,
                 '_count' => ['businesses' => $u->businesses_count],
+                'businesses' => $u->businesses->map(fn ($b) => [
+                    'id' => $b->id, 'name' => $b->name, 'slug' => $b->slug, 'status' => $b->status,
+                ]),
             ]);
 
         return ApiResponse::paginated($items, ['page' => $pagination['page'], 'pageSize' => $pagination['pageSize'], 'total' => $total]);

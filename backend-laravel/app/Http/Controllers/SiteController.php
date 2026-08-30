@@ -7,6 +7,7 @@ use App\Models\Business;
 use App\Models\BusinessSite;
 use App\Models\Product;
 use App\Support\ApiResponse;
+use App\Support\BusinessAccess;
 use App\Support\SiteBuilder\Sanitizer;
 use App\Support\SiteBuilder\TemplateRegistry;
 use App\Support\SiteThemes;
@@ -33,23 +34,13 @@ class SiteController extends Controller
         return $business;
     }
 
-    private function assertOwnerOrAdmin(array $actor, string $ownerId): void
-    {
-        if ($actor['role'] === 'ADMIN') {
-            return;
-        }
-        if ($actor['sub'] !== $ownerId) {
-            throw ApiException::forbidden('You do not own this business');
-        }
-    }
-
     private function ownedBusiness(array $actor, string $businessId): Business
     {
         $business = Business::find($businessId);
         if (! $business) {
             throw ApiException::notFound('Business not found');
         }
-        $this->assertOwnerOrAdmin($actor, $business->ownerId);
+        BusinessAccess::assertCanManage($actor, $business);
 
         return $business;
     }
@@ -66,7 +57,7 @@ class SiteController extends Controller
     {
         $actor = $request->attributes->get('auth');
         $business = $this->loadBusinessForTemplate($id);
-        $this->assertOwnerOrAdmin($actor, $business->ownerId);
+        BusinessAccess::assertCanManage($actor, $business);
 
         $data = $request->validate(['templateId' => ['sometimes', 'nullable', 'string', 'max:40']]);
 
@@ -108,7 +99,7 @@ class SiteController extends Controller
     {
         $actor = $request->attributes->get('auth');
         $business = $this->loadBusinessForTemplate($id);
-        $this->assertOwnerOrAdmin($actor, $business->ownerId);
+        BusinessAccess::assertCanManage($actor, $business);
 
         if (! TemplateRegistry::isKnown($templateId)) {
             throw ApiException::badRequest("Unknown website template \"{$templateId}\"");

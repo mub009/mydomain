@@ -11,6 +11,7 @@ use App\Models\ReviewQrCode;
 use App\Models\Service;
 use App\Models\User;
 use App\Support\ApiResponse;
+use App\Support\BusinessAccess;
 use App\Support\Pagination;
 use App\Support\Points;
 use Illuminate\Http\Request;
@@ -19,16 +20,6 @@ use Illuminate\Support\Facades\Hash;
 
 class BusinessController extends Controller
 {
-    private function assertOwnerOrAdmin(array $actor, string $ownerId): void
-    {
-        if ($actor['role'] === 'ADMIN') {
-            return;
-        }
-        if ($actor['sub'] !== $ownerId) {
-            throw ApiException::forbidden('You do not own this business');
-        }
-    }
-
     private function businessRules(bool $partial = false): array
     {
         $required = $partial ? 'sometimes' : 'required';
@@ -234,7 +225,7 @@ class BusinessController extends Controller
         if (! $business) {
             throw ApiException::notFound('Business not found');
         }
-        $this->assertOwnerOrAdmin($actor, $business->ownerId);
+        BusinessAccess::assertCanManage($actor, $business);
 
         return ApiResponse::ok($business);
     }
@@ -253,7 +244,7 @@ class BusinessController extends Controller
     {
         $actor = $request->attributes->get('auth');
         $business = $this->findOrFail($id);
-        $this->assertOwnerOrAdmin($actor, $business->ownerId);
+        BusinessAccess::assertCanManage($actor, $business);
 
         $data = $request->validate($this->businessRulesForUpdate());
         $business->update($data);
@@ -273,7 +264,7 @@ class BusinessController extends Controller
     {
         $actor = $request->attributes->get('auth');
         $business = $this->findOrFail($id);
-        $this->assertOwnerOrAdmin($actor, $business->ownerId);
+        BusinessAccess::assertCanManage($actor, $business);
 
         // Return any issued QR boards to the unassigned pool first. Without
         // this the board keeps its "assigned" status while losing the
@@ -293,7 +284,7 @@ class BusinessController extends Controller
     {
         $actor = $request->attributes->get('auth');
         $business = $this->findOrFail($id);
-        $this->assertOwnerOrAdmin($actor, $business->ownerId);
+        BusinessAccess::assertCanManage($actor, $business);
         $business->update(['status' => 'PENDING_APPROVAL']);
 
         return ApiResponse::ok($business);
@@ -303,7 +294,7 @@ class BusinessController extends Controller
     {
         $actor = $request->attributes->get('auth');
         $business = $this->findOrFail($id);
-        $this->assertOwnerOrAdmin($actor, $business->ownerId);
+        BusinessAccess::assertCanManage($actor, $business);
 
         $data = $request->validate([
             'url' => ['required', 'url'],
@@ -321,7 +312,7 @@ class BusinessController extends Controller
     {
         $actor = $request->attributes->get('auth');
         $business = $this->findOrFail($id);
-        $this->assertOwnerOrAdmin($actor, $business->ownerId);
+        BusinessAccess::assertCanManage($actor, $business);
         BusinessPhoto::where('id', $photoId)->delete();
 
         return ApiResponse::noContent();
@@ -331,7 +322,7 @@ class BusinessController extends Controller
     {
         $actor = $request->attributes->get('auth');
         $business = $this->findOrFail($id);
-        $this->assertOwnerOrAdmin($actor, $business->ownerId);
+        BusinessAccess::assertCanManage($actor, $business);
 
         $data = $request->validate([
             'hours' => ['required', 'array', 'min:1', 'max:7'],
@@ -359,7 +350,7 @@ class BusinessController extends Controller
     {
         $actor = $request->attributes->get('auth');
         $business = $this->findOrFail($id);
-        $this->assertOwnerOrAdmin($actor, $business->ownerId);
+        BusinessAccess::assertCanManage($actor, $business);
 
         $data = $request->validate([
             'name' => ['required', 'string', 'min:1', 'max:150'],
@@ -379,7 +370,7 @@ class BusinessController extends Controller
     {
         $actor = $request->attributes->get('auth');
         $business = $this->findOrFail($id);
-        $this->assertOwnerOrAdmin($actor, $business->ownerId);
+        BusinessAccess::assertCanManage($actor, $business);
 
         $data = $request->validate([
             'name' => ['sometimes', 'string', 'min:1', 'max:150'],
@@ -400,7 +391,7 @@ class BusinessController extends Controller
     {
         $actor = $request->attributes->get('auth');
         $business = $this->findOrFail($id);
-        $this->assertOwnerOrAdmin($actor, $business->ownerId);
+        BusinessAccess::assertCanManage($actor, $business);
         Service::where('id', $serviceId)->delete();
 
         return ApiResponse::noContent();

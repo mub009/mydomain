@@ -7,6 +7,7 @@ use App\Models\Business;
 use App\Models\Order;
 use App\Models\Product;
 use App\Support\ApiResponse;
+use App\Support\BusinessAccess;
 use App\Support\Pagination;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -15,23 +16,13 @@ class OrderController extends Controller
 {
     private const STATUSES = ['PENDING', 'CONFIRMED', 'PACKED', 'SHIPPED', 'DELIVERED', 'CANCELLED'];
 
-    private function assertOwnerOrAdmin(array $actor, string $ownerId): void
-    {
-        if ($actor['role'] === 'ADMIN') {
-            return;
-        }
-        if ($actor['sub'] !== $ownerId) {
-            throw ApiException::forbidden('You do not own this business');
-        }
-    }
-
     private function ownedBusiness(array $actor, string $businessId): Business
     {
         $business = Business::find($businessId);
         if (! $business) {
             throw ApiException::notFound('Business not found');
         }
-        $this->assertOwnerOrAdmin($actor, $business->ownerId);
+        BusinessAccess::assertCanManage($actor, $business);
 
         return $business;
     }
@@ -95,11 +86,11 @@ class OrderController extends Controller
     public function show(Request $request, string $id, string $orderId)
     {
         $actor = $request->attributes->get('auth');
-        $order = Order::with(['items', 'business:id,ownerId,name'])->find($orderId);
+        $order = Order::with(['items', 'business:id,ownerId,createdById,name'])->find($orderId);
         if (! $order) {
             throw ApiException::notFound('Order not found');
         }
-        $this->assertOwnerOrAdmin($actor, $order->business->ownerId);
+        BusinessAccess::assertCanManage($actor, $order->business);
 
         return ApiResponse::ok($order);
     }
@@ -109,11 +100,11 @@ class OrderController extends Controller
         $actor = $request->attributes->get('auth');
         $data = $request->validate(['status' => ['required', 'in:'.implode(',', self::STATUSES)]]);
 
-        $order = Order::with(['items', 'business:id,ownerId,name'])->find($orderId);
+        $order = Order::with(['items', 'business:id,ownerId,createdById,name'])->find($orderId);
         if (! $order) {
             throw ApiException::notFound('Order not found');
         }
-        $this->assertOwnerOrAdmin($actor, $order->business->ownerId);
+        BusinessAccess::assertCanManage($actor, $order->business);
 
         if ($order->status === $data['status']) {
             return ApiResponse::ok($order);

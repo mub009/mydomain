@@ -6,28 +6,19 @@ use App\Exceptions\ApiException;
 use App\Models\Business;
 use App\Models\Product;
 use App\Support\ApiResponse;
+use App\Support\BusinessAccess;
 use App\Support\Pagination;
 use Illuminate\Http\Request;
 
 class ProductController extends Controller
 {
-    private function assertOwnerOrAdmin(array $actor, string $ownerId): void
-    {
-        if ($actor['role'] === 'ADMIN') {
-            return;
-        }
-        if ($actor['sub'] !== $ownerId) {
-            throw ApiException::forbidden('You do not own this business');
-        }
-    }
-
     private function ownedBusiness(array $actor, string $businessId): Business
     {
         $business = Business::find($businessId);
         if (! $business) {
             throw ApiException::notFound('Business not found');
         }
-        $this->assertOwnerOrAdmin($actor, $business->ownerId);
+        BusinessAccess::assertCanManage($actor, $business);
 
         return $business;
     }
@@ -152,7 +143,7 @@ class ProductController extends Controller
         if (! $product) {
             throw ApiException::notFound('Product not found');
         }
-        $this->assertOwnerOrAdmin($actor, $product->business->ownerId);
+        BusinessAccess::assertCanManage($actor, $product->business);
 
         $data = $request->validate($this->productRules(partial: true));
         $this->assertPricing(
@@ -177,7 +168,7 @@ class ProductController extends Controller
         if (! $product) {
             throw ApiException::notFound('Product not found');
         }
-        $this->assertOwnerOrAdmin($actor, $product->business->ownerId);
+        BusinessAccess::assertCanManage($actor, $product->business);
 
         // Order items keep a snapshot of what was bought, so removing a
         // product from the catalogue never rewrites what a customer was charged.

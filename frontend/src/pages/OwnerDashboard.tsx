@@ -595,21 +595,36 @@ export default function OwnerDashboard() {
               {!accountsLoading && (
               <div className="card divide-y divide-gray-100">
                 {createdAccounts.map((a) => (
-                  <div key={a.id} className="p-4 flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="font-semibold text-sm text-ink-900 truncate">
-                        {a.firstName} {a.lastName}
-                      </p>
-                      <p className="text-xs text-ink-500 truncate">{a.email}</p>
-                      {a._count && (
-                        <p className="text-[11px] text-ink-400 mt-0.5">
-                          {a._count.businesses} {a._count.businesses === 1 ? "business" : "businesses"}
+                  <div key={a.id} className="p-4 flex flex-col gap-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-sm text-ink-900 truncate">
+                          {a.firstName} {a.lastName}
                         </p>
-                      )}
+                        <p className="text-xs text-ink-500 truncate">{a.email}</p>
+                        {a._count && (
+                          <p className="text-[11px] text-ink-400 mt-0.5">
+                            {a._count.businesses} {a._count.businesses === 1 ? "business" : "businesses"}
+                          </p>
+                        )}
+                      </div>
+                      <button onClick={() => setResettingUser(a)} className="btn-secondary px-3 py-1.5 text-sm shrink-0 whitespace-nowrap">
+                        <KeyRound size={14} /> Reset password
+                      </button>
                     </div>
-                    <button onClick={() => setResettingUser(a)} className="btn-secondary px-3 py-1.5 text-sm shrink-0 whitespace-nowrap">
-                      <KeyRound size={14} /> Reset password
-                    </button>
+                    {a.businesses && a.businesses.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {a.businesses.map((b) => (
+                          <button
+                            key={b.id}
+                            onClick={() => setManageId(b.id)}
+                            className="btn-secondary px-3 py-1.5 text-xs shrink-0 whitespace-nowrap"
+                          >
+                            <Settings2 size={13} /> Manage {b.name}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

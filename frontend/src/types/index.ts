@@ -23,6 +23,7 @@ export interface AdminUser {
   avatarUrl?: string | null;
   createdAt: string;
   _count?: { businesses: number };
+  businesses?: { id: string; name: string; slug: string; status: string }[];
 }
 
 export type PointTransactionType = "ADMIN_GRANT" | "ADMIN_DEDUCTION" | "BUSINESS_CREATED";

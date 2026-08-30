@@ -6,6 +6,7 @@ use App\Exceptions\ApiException;
 use App\Models\Business;
 use App\Models\Lead;
 use App\Support\ApiResponse;
+use App\Support\BusinessAccess;
 use App\Support\Pagination;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -50,9 +51,7 @@ class LeadController extends Controller
         if (! $business) {
             throw ApiException::notFound('Business not found');
         }
-        if ($business->ownerId !== $auth['sub']) {
-            throw ApiException::forbidden('You do not own this business');
-        }
+        BusinessAccess::assertCanManage($auth, $business);
 
         $query = Lead::where('businessId', $businessId);
         if ($status = $request->query('status')) {
@@ -74,9 +73,7 @@ class LeadController extends Controller
         if (! $lead) {
             throw ApiException::notFound('Lead not found');
         }
-        if ($lead->business->ownerId !== $auth['sub']) {
-            throw ApiException::forbidden('You do not own this business');
-        }
+        BusinessAccess::assertCanManage($auth, $lead->business);
 
         $lead->update(['status' => $data['status']]);
 

@@ -8,6 +8,7 @@ use App\Models\Business;
 use App\Models\BusinessHours;
 use App\Models\Service;
 use App\Support\ApiResponse;
+use App\Support\BusinessAccess;
 use App\Support\Pagination;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -108,9 +109,7 @@ class BookingController extends Controller
         if (! $business) {
             throw ApiException::notFound('Business not found');
         }
-        if ($business->ownerId !== $auth['sub']) {
-            throw ApiException::forbidden('You do not own this business');
-        }
+        BusinessAccess::assertCanManage($auth, $business);
 
         $query = Booking::where('businessId', $businessId);
         $total = (clone $query)->count();
@@ -131,12 +130,12 @@ class BookingController extends Controller
             throw ApiException::notFound('Booking not found');
         }
 
-        $isOwner = $booking->business->ownerId === $auth['sub'];
+        $isManager = BusinessAccess::canManage($auth, $booking->business);
         $isCustomer = $booking->customerId === $auth['sub'];
-        if (! $isOwner && ! $isCustomer && $auth['role'] !== 'ADMIN') {
+        if (! $isManager && ! $isCustomer) {
             throw ApiException::forbidden();
         }
-        if ($isCustomer && ! $isOwner && $data['status'] !== 'CANCELLED') {
+        if ($isCustomer && ! $isManager && $data['status'] !== 'CANCELLED') {
             throw ApiException::forbidden('Customers may only cancel bookings');
         }
 
