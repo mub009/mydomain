@@ -51,6 +51,36 @@ body {
   .badge {
     @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold;
   }
+
+  /* Legal/policy pages: plain semantic HTML (h2/h3/p/ul/ol) styled once here
+     instead of repeating utility classes in every section of every page. */
+  .legal-content h2 {
+    @apply mt-8 mb-2 text-lg font-bold text-ink-900 first:mt-0;
+  }
+
+  .legal-content h3 {
+    @apply mt-4 mb-1.5 text-sm font-bold text-ink-900;
+  }
+
+  .legal-content p {
+    @apply mb-3 text-sm leading-relaxed text-ink-700;
+  }
+
+  .legal-content ul {
+    @apply mb-3 list-disc space-y-1 pl-5 text-sm text-ink-700;
+  }
+
+  .legal-content ol {
+    @apply mb-3 list-decimal space-y-1 pl-5 text-sm text-ink-700;
+  }
+
+  .legal-content a {
+    @apply text-brand-600 underline hover:text-brand-700;
+  }
+
+  .legal-content strong {
+    @apply font-semibold text-ink-900;
+  }
 }
 
 /* Promo carousel animations */

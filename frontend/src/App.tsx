@@ -22,6 +22,12 @@ import ClassifiedForm from "@/pages/ClassifiedForm";
 import SellerProfile from "@/pages/SellerProfile";
 import MyListings from "@/pages/MyListings";
 import Favorites from "@/pages/Favorites";
+import About from "@/pages/About";
+import Terms from "@/pages/Terms";
+import Privacy from "@/pages/Privacy";
+import RefundPolicy from "@/pages/RefundPolicy";
+import ShippingPolicy from "@/pages/ShippingPolicy";
+import Grievance from "@/pages/Grievance";
 
 export default function App() {
   const accessToken = useAuthStore((s) => s.accessToken);
@@ -67,6 +73,14 @@ function AppShell() {
         {/* B2B is the same directory as B2C, just pre-filtered — a business
             picks B2B/B2C at registration, not a separate marketplace. */}
         <Route path="/b2b" element={<Navigate to="/search?businessType=B2B" replace />} />
+
+        {/* Legal/policy pages and About Us — public, no auth required */}
+        <Route path="/about" element={<About />} />
+        <Route path="/terms" element={<Terms />} />
+        <Route path="/privacy" element={<Privacy />} />
+        <Route path="/refund-policy" element={<RefundPolicy />} />
+        <Route path="/shipping-policy" element={<ShippingPolicy />} />
+        <Route path="/grievance" element={<Grievance />} />
 
         {/* OLX-style classifieds — any signed-in user can post and manage
             their own items, so these aren't gated to business roles. */}

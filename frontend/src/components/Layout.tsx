@@ -5,6 +5,7 @@ import {
   Building2,
   CalendarCheck2,
   Facebook,
+  FileText,
   Instagram,
   LayoutDashboard,
   Linkedin,
@@ -243,7 +244,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        <div className="container-page py-10 border-t border-gray-100 grid grid-cols-2 sm:grid-cols-4 gap-8 text-sm">
+        <div className="container-page py-10 border-t border-gray-100 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-8 text-sm">
           <div className="col-span-2 sm:col-span-1">
             <div className="flex items-center gap-2 mb-3">
               <span className="flex h-7 w-7 items-center justify-center rounded-md bg-brand-600 text-white">
@@ -262,6 +263,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <ul className="space-y-2 text-ink-500">
               <li><Link to="/" className="hover:text-brand-600">Search businesses</Link></li>
               <li><Link to="/b2b" className="hover:text-brand-600">Browse B2B suppliers</Link></li>
+              <li><Link to="/classifieds" className="hover:text-brand-600">Buy &amp; sell</Link></li>
+              <li><Link to="/favorites" className="hover:text-brand-600">Saved items</Link></li>
             </ul>
           </div>
           <div>
@@ -278,7 +281,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <Shield size={14} /> Platform
             </h4>
             <ul className="space-y-2 text-ink-500">
+              <li><Link to="/about" className="hover:text-brand-600">About us</Link></li>
               <li><Link to="/admin" className="hover:text-brand-600">Admin console</Link></li>
+            </ul>
+          </div>
+          <div>
+            <h4 className="font-semibold text-ink-900 mb-3 flex items-center gap-1.5">
+              <FileText size={14} /> Legal
+            </h4>
+            <ul className="space-y-2 text-ink-500">
+              <li><Link to="/terms" className="hover:text-brand-600">Terms of Use</Link></li>
+              <li><Link to="/privacy" className="hover:text-brand-600">Privacy Policy</Link></li>
+              <li><Link to="/refund-policy" className="hover:text-brand-600">Refund &amp; Cancellation</Link></li>
+              <li><Link to="/shipping-policy" className="hover:text-brand-600">Shipping &amp; Delivery</Link></li>
+              <li><Link to="/grievance" className="hover:text-brand-600">Grievance Redressal</Link></li>
             </ul>
           </div>
         </div>
