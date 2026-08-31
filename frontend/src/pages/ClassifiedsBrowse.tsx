@@ -117,11 +117,12 @@ export default function ClassifiedsBrowse() {
           </h1>
           <p className="mt-1 text-sm text-ink-500">{meta.total} listings{city ? ` in ${city}` : ""}</p>
         </div>
-        {user && (
-          <Link to="/classifieds/new" className="btn-primary px-4 py-2.5 text-sm shrink-0">
-            <Plus size={15} /> Sell an item
-          </Link>
-        )}
+        <Link
+          to={user ? "/classifieds/new" : "/login?next=/classifieds/new"}
+          className="btn-primary px-4 py-2.5 text-sm shrink-0"
+        >
+          <Plus size={15} /> Sell an item
+        </Link>
       </div>
 
       <form
