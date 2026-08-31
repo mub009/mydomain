@@ -85,7 +85,12 @@ class UploadController extends Controller
 
         try {
             Storage::disk('spaces')->put($path, $contents, ['visibility' => 'public', 'ContentType' => $mime]);
-        } catch (Throwable) {
+        } catch (Throwable $e) {
+            // The client only ever sees the generic message below — never
+            // leak Spaces config details in the response — but the real
+            // cause (bad key, wrong bucket/region, DNS failure, etc.) still
+            // needs to reach the log, or every failure here is a dead end.
+            report($e);
             throw new ApiException(500, 'INTERNAL_ERROR', "Could not upload that file \u{2014} check the server's DigitalOcean Spaces configuration");
         }
 
