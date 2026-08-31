@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Exceptions\ApiException;
 use App\Support\ApiResponse;
+use App\Support\Uploads\ImageOptimizer;
 use App\Support\Uploads\SvgSanitizer;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -37,6 +38,11 @@ class UploadController extends Controller
     ];
 
     private const MAX_RASTER_BYTES = 5 * 1024 * 1024;
+
+    // Raw upload ceiling, before optimization — generous enough for an
+    // un-shrunk phone photo (typically 3-15MB) to make it through to
+    // ImageOptimizer, which is what actually gets it under MAX_RASTER_BYTES.
+    private const MAX_RASTER_INPUT_BYTES = 20 * 1024 * 1024;
 
     private const MAX_SVG_BYTES = 2 * 1024 * 1024;
 
@@ -75,10 +81,21 @@ class UploadController extends Controller
             $sanitized = SvgSanitizer::sanitize(file_get_contents($file->getRealPath()));
             $contents = $sanitized['svg'];
         } else {
-            if ($file->getSize() > self::MAX_RASTER_BYTES) {
-                throw ApiException::badRequest('That file is larger than 5MB');
+            // A generous ceiling on the raw upload, checked before it's read
+            // into memory at all — well above what any real photo needs,
+            // just to rule out something absurd before optimizing it.
+            if ($file->getSize() > self::MAX_RASTER_INPUT_BYTES) {
+                throw ApiException::badRequest('That file is larger than 20MB');
             }
             $contents = file_get_contents($file->getRealPath());
+            // Downscales anything wider than needed for display and
+            // re-compresses it — a typical phone photo shrinks by 70-90%
+            // with no visible quality loss. Falls back to the original
+            // bytes untouched if GD can't process it for any reason.
+            $contents = ImageOptimizer::optimize($contents, $extension);
+            if (strlen($contents) > self::MAX_RASTER_BYTES) {
+                throw ApiException::badRequest('That file is larger than 5MB, even after compression');
+            }
         }
 
         $path = $purpose['folder'].'/'.Str::uuid().'.'.$extension;

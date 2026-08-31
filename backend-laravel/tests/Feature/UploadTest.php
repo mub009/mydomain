@@ -52,13 +52,36 @@ class UploadTest extends TestCase
         Storage::disk('spaces')->assertExists(str_replace(Storage::disk('spaces')->url(''), '', $url));
     }
 
+    public function test_an_oversized_photo_is_downscaled_to_the_max_display_dimension(): void
+    {
+        $owner = $this->user('BUSINESS_OWNER');
+        $token = $this->token($owner);
+
+        $response = $this->post('/api/v1/uploads/image', [
+            'purpose' => 'business-photos',
+            // Larger than ImageOptimizer's 2000px cap on both edges.
+            'file' => UploadedFile::fake()->image('big-photo.jpg', 3000, 2400),
+        ], ['Authorization' => "Bearer {$token}"]);
+
+        $response->assertStatus(200);
+        $path = str_replace(Storage::disk('spaces')->url(''), '', $response->json('data.url'));
+        $stored = Storage::disk('spaces')->get($path);
+
+        [$width, $height] = getimagesizefromstring($stored);
+        $this->assertLessThanOrEqual(2000, max($width, $height));
+        // Aspect ratio (3000:2400 = 5:4) is preserved, not stretched.
+        $this->assertEqualsWithDelta(3000 / 2400, $width / $height, 0.01);
+    }
+
     public function test_rejects_a_file_larger_than_the_5mb_raster_limit(): void
     {
         $owner = $this->user('BUSINESS_OWNER');
         $token = $this->token($owner);
 
-        // fake()->image() lets us request an oversized JPEG directly.
-        $big = UploadedFile::fake()->create('huge.jpg', 6 * 1024, 'image/jpeg');
+        // Real (non-image) bytes, not just a declared size — ImageOptimizer
+        // can't shrink what GD can't decode, so this still exceeds the
+        // limit after the optimization pass runs over it.
+        $big = UploadedFile::fake()->createWithContent('huge.jpg', str_repeat('x', 6 * 1024 * 1024));
 
         $this->post('/api/v1/uploads/image', [
             'purpose' => 'business-photos',
