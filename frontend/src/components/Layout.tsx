@@ -23,6 +23,7 @@ import {
   Youtube,
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
+import { useUnreadMessageCount } from "@/hooks/useUnreadMessageCount";
 
 const SOCIAL_LINKS = [
   { label: "Facebook", icon: Facebook, className: "bg-[#1877F2]" },
@@ -72,12 +73,19 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const { user, clearAuth } = useAuthStore();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
+  const unreadCount = useUnreadMessageCount();
 
-  const navLinks = [
+  const navLinks: { to: string; label: string; badge?: number }[] = [
     { to: "/", label: "Search" },
     { to: "/b2b", label: "B2B Directory" },
     { to: "/classifieds", label: "Buy & Sell" },
-    ...(user ? [{ to: "/my-listings", label: "My Listings" }, { to: "/favorites", label: "Favorites" }] : []),
+    ...(user
+      ? [
+          { to: "/messages", label: "Messages", badge: unreadCount },
+          { to: "/my-listings", label: "My Listings" },
+          { to: "/favorites", label: "Favorites" },
+        ]
+      : []),
     ...(user?.role === "BUSINESS_OWNER" || user?.role === "DEALER" ? [{ to: "/dashboard", label: "My Business" }] : []),
     ...(user?.role === "ADMIN" ? [{ to: "/admin", label: "Admin" }] : []),
   ];
@@ -93,9 +101,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <Link
                 key={l.to}
                 to={l.to}
-                className="px-3 py-2 rounded-md text-sm font-medium text-ink-700 hover:text-brand-600 hover:bg-brand-50 transition-colors"
+                className="relative px-3 py-2 rounded-md text-sm font-medium text-ink-700 hover:text-brand-600 hover:bg-brand-50 transition-colors"
               >
                 {l.label}
+                {!!l.badge && (
+                  <span className="absolute -top-0.5 right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">
+                    {l.badge > 9 ? "9+" : l.badge}
+                  </span>
+                )}
               </Link>
             ))}
           </nav>
@@ -149,9 +162,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   key={l.to}
                   to={l.to}
                   onClick={() => setMenuOpen(false)}
-                  className="px-3 py-2.5 rounded-md text-sm font-medium text-ink-700 hover:bg-brand-50 hover:text-brand-600"
+                  className="flex items-center gap-2 px-3 py-2.5 rounded-md text-sm font-medium text-ink-700 hover:bg-brand-50 hover:text-brand-600"
                 >
                   {l.label}
+                  {!!l.badge && (
+                    <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">
+                      {l.badge > 9 ? "9+" : l.badge}
+                    </span>
+                  )}
                 </Link>
               ))}
               <div className="h-px bg-gray-200 my-1" />

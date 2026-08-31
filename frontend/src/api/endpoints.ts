@@ -7,7 +7,10 @@ import {
   Business,
   Category,
   ClassifiedCategory,
+  ClassifiedConversation,
   ClassifiedListing,
+  ClassifiedMessage,
+  ClassifiedReport,
   Lead,
   Order,
   OrderStatus,
@@ -91,6 +94,45 @@ export const classifiedsApi = {
   renew: (id: string) => api.post<ApiResponse<ClassifiedListing>>(`/classifieds/${id}/renew`).then((r) => r.data.data),
   favorite: (id: string) => api.post(`/classifieds/${id}/favorite`),
   unfavorite: (id: string) => api.delete(`/classifieds/${id}/favorite`),
+};
+
+export const classifiedMessagesApi = {
+  // A buyer's first message to a seller about this listing (also reused for
+  // any later message — the backend finds the existing thread).
+  start: (listingId: string, body: string) =>
+    api.post<ApiResponse<ClassifiedConversation>>(`/classifieds/${listingId}/messages`, { body }).then((r) => r.data.data),
+  conversations: (params: Record<string, unknown> = {}) =>
+    api.get<PaginatedResponse<ClassifiedConversation>>("/classifieds/conversations", { params }).then((r) => r.data),
+  unreadCount: () => api.get<ApiResponse<{ count: number }>>("/classifieds/conversations/unread-count").then((r) => r.data.data),
+  thread: (conversationId: string, params: Record<string, unknown> = {}) =>
+    api
+      .get<{ success: boolean; data: ClassifiedMessage[]; conversation: ClassifiedConversation; meta: { page: number; pageSize: number; total: number } }>(
+        `/classifieds/conversations/${conversationId}/messages`,
+        { params },
+      )
+      .then((r) => r.data),
+  reply: (conversationId: string, body: string) =>
+    api.post<ApiResponse<ClassifiedMessage>>(`/classifieds/conversations/${conversationId}/messages`, { body }).then((r) => r.data.data),
+  markRead: (conversationId: string) => api.post(`/classifieds/conversations/${conversationId}/read`),
+};
+
+export const classifiedFollowsApi = {
+  follow: (sellerId: string) => api.post(`/classifieds/sellers/${sellerId}/follow`),
+  unfollow: (sellerId: string) => api.delete(`/classifieds/sellers/${sellerId}/follow`),
+  status: (sellerId: string) =>
+    api.get<ApiResponse<{ following: boolean; followerCount: number }>>(`/classifieds/sellers/${sellerId}/follow`).then((r) => r.data.data),
+  following: (params: Record<string, unknown> = {}) =>
+    api.get<PaginatedResponse<{ id: string; firstName: string; lastName: string }>>("/classifieds/following", { params }).then((r) => r.data),
+};
+
+export const classifiedReportsApi = {
+  create: (listingId: string, payload: { reason: string; message?: string }) =>
+    api.post<ApiResponse<ClassifiedReport>>(`/classifieds/${listingId}/reports`, payload).then((r) => r.data.data),
+  // Admin
+  list: (params: Record<string, unknown> = {}) =>
+    api.get<PaginatedResponse<ClassifiedReport>>("/admin/classifieds/reports", { params }).then((r) => r.data),
+  updateStatus: (id: string, status: string) =>
+    api.patch<ApiResponse<ClassifiedReport>>(`/admin/classifieds/reports/${id}`, { status }).then((r) => r.data.data),
 };
 
 export const analyticsApi = {

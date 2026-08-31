@@ -7,8 +7,11 @@ use App\Http\Controllers\BookingController;
 use App\Http\Controllers\BusinessController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\ClassifiedCategoryController;
+use App\Http\Controllers\ClassifiedConversationController;
 use App\Http\Controllers\ClassifiedFavoriteController;
+use App\Http\Controllers\ClassifiedFollowController;
 use App\Http\Controllers\ClassifiedListingController;
+use App\Http\Controllers\ClassifiedReportController;
 use App\Http\Controllers\LeadController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PointsController;
@@ -62,14 +65,25 @@ Route::prefix('classified-categories')->group(function () {
 // their own listings; browsing and viewing a listing is public.
 Route::prefix('classifieds')->group(function () {
     Route::get('/', [ClassifiedListingController::class, 'index']);
-    // Both must be registered ahead of the "/{id}" show route below, or
-    // "mine"/"favorites" would be swallowed as a listing id.
+    // All of these must be registered ahead of the "/{id}" show route below,
+    // or they'd be swallowed as a listing id.
     Route::middleware('auth.jwt')->group(function () {
         Route::get('/mine', [ClassifiedListingController::class, 'mine']);
         Route::get('/favorites', [ClassifiedFavoriteController::class, 'index']);
         Route::post('/', [ClassifiedListingController::class, 'store']);
+        Route::get('/following', [ClassifiedFollowController::class, 'index']);
+        Route::get('/conversations', [ClassifiedConversationController::class, 'index']);
+        Route::get('/conversations/unread-count', [ClassifiedConversationController::class, 'unreadCount']);
+        Route::get('/conversations/{id}/messages', [ClassifiedConversationController::class, 'messages']);
+        Route::post('/conversations/{id}/messages', [ClassifiedConversationController::class, 'reply']);
+        Route::post('/conversations/{id}/read', [ClassifiedConversationController::class, 'markRead']);
     });
     Route::get('/sellers/{sellerId}', [ClassifiedListingController::class, 'sellerProfile']);
+    Route::get('/sellers/{sellerId}/follow', [ClassifiedFollowController::class, 'status'])->middleware('auth.optional');
+    Route::middleware('auth.jwt')->group(function () {
+        Route::post('/sellers/{sellerId}/follow', [ClassifiedFollowController::class, 'store']);
+        Route::delete('/sellers/{sellerId}/follow', [ClassifiedFollowController::class, 'destroy']);
+    });
     Route::get('/batch', [ClassifiedListingController::class, 'batch']);
     Route::get('/{id}', [ClassifiedListingController::class, 'show']);
 
@@ -82,6 +96,8 @@ Route::prefix('classifieds')->group(function () {
         Route::post('/{id}/renew', [ClassifiedListingController::class, 'renew']);
         Route::post('/{id}/favorite', [ClassifiedFavoriteController::class, 'store']);
         Route::delete('/{id}/favorite', [ClassifiedFavoriteController::class, 'destroy']);
+        Route::post('/{id}/messages', [ClassifiedConversationController::class, 'store']);
+        Route::post('/{id}/reports', [ClassifiedReportController::class, 'store']);
     });
 });
 
@@ -244,4 +260,7 @@ Route::prefix('admin')->middleware(['auth.jwt', 'role:ADMIN'])->group(function (
     Route::get('/classifieds', [AdminController::class, 'listClassifieds']);
     Route::post('/classifieds/{id}/remove', [AdminController::class, 'removeClassified']);
     Route::delete('/classifieds/{id}', [AdminController::class, 'deleteClassified']);
+
+    Route::get('/classifieds/reports', [ClassifiedReportController::class, 'index']);
+    Route::patch('/classifieds/reports/{id}', [ClassifiedReportController::class, 'updateStatus']);
 });

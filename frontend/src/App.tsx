@@ -22,6 +22,8 @@ import ClassifiedForm from "@/pages/ClassifiedForm";
 import SellerProfile from "@/pages/SellerProfile";
 import MyListings from "@/pages/MyListings";
 import Favorites from "@/pages/Favorites";
+import Messages from "@/pages/Messages";
+import MessageThread from "@/pages/MessageThread";
 import About from "@/pages/About";
 import Terms from "@/pages/Terms";
 import Privacy from "@/pages/Privacy";
@@ -116,6 +118,22 @@ function AppShell() {
           element={
             <ProtectedRoute>
               <Favorites />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/messages"
+          element={
+            <ProtectedRoute>
+              <Messages />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/messages/:id"
+          element={
+            <ProtectedRoute>
+              <MessageThread />
             </ProtectedRoute>
           }
         />

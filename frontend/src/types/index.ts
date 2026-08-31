@@ -545,3 +545,42 @@ export interface ClassifiedListing {
   photos?: ClassifiedListingPhoto[];
   distanceKm?: number | null;
 }
+
+export interface ClassifiedParty {
+  id: string;
+  firstName: string;
+  lastName: string;
+}
+
+export interface ClassifiedMessage {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  body: string;
+  createdAt: string;
+}
+
+export interface ClassifiedConversation {
+  id: string;
+  listing: Pick<ClassifiedListing, "id" | "title" | "slug" | "sellerId" | "status"> & { photos?: ClassifiedListingPhoto[] };
+  otherParty: ClassifiedParty;
+  role: "buyer" | "seller";
+  lastMessage: string | null;
+  lastMessageAt: string | null;
+  unread: boolean;
+}
+
+export type ClassifiedReportReason = "PROHIBITED_ITEM" | "SCAM_FRAUD" | "INAPPROPRIATE" | "SPAM" | "OTHER";
+export type ClassifiedReportStatus = "PENDING" | "REVIEWED" | "DISMISSED";
+
+export interface ClassifiedReport {
+  id: string;
+  listingId: string;
+  listing?: Pick<ClassifiedListing, "id" | "title" | "slug" | "sellerId" | "status">;
+  reporterId: string;
+  reporter?: { id: string; firstName: string; lastName: string; email: string };
+  reason: ClassifiedReportReason;
+  message: string | null;
+  status: ClassifiedReportStatus;
+  createdAt: string;
+}

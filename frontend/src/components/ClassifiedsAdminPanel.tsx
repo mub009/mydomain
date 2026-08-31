@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { Plus, Search, Tag, Trash2, XCircle } from "lucide-react";
-import { adminApi, classifiedCategoriesApi } from "@/api/endpoints";
+import { Link } from "react-router-dom";
+import { CheckCircle2, Flag, Plus, Search, Tag, Trash2, XCircle } from "lucide-react";
+import { adminApi, classifiedCategoriesApi, classifiedReportsApi } from "@/api/endpoints";
 import { apiErrorMessage } from "@/api/client";
-import { ClassifiedCategory, ClassifiedListing, ClassifiedStatus } from "@/types";
+import { ClassifiedCategory, ClassifiedListing, ClassifiedReport, ClassifiedReportStatus, ClassifiedStatus } from "@/types";
 import { money } from "@/components/ClassifiedCard";
 import { ListSkeleton } from "@/components/Loading";
 import Pagination from "@/components/Pagination";
@@ -224,13 +225,134 @@ function ListingsSection() {
   );
 }
 
+const REPORT_STATUS_TABS: { value: ClassifiedReportStatus | ""; label: string }[] = [
+  { value: "PENDING", label: "Pending" },
+  { value: "REVIEWED", label: "Reviewed" },
+  { value: "DISMISSED", label: "Dismissed" },
+  { value: "", label: "All" },
+];
+
+const REASON_LABEL: Record<string, string> = {
+  PROHIBITED_ITEM: "Prohibited item",
+  SCAM_FRAUD: "Scam or fraud",
+  INAPPROPRIATE: "Inappropriate content",
+  SPAM: "Spam or duplicate",
+  OTHER: "Other",
+};
+
+function ReportsSection() {
+  const [status, setStatus] = useState<ClassifiedReportStatus | "">("PENDING");
+  const [page, setPage] = useState(1);
+  const [items, setItems] = useState<ClassifiedReport[]>([]);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  function load() {
+    setLoading(true);
+    classifiedReportsApi
+      .list({ status: status || undefined, page })
+      .then((r) => {
+        setItems(r.data);
+        setTotalPages(r.meta.totalPages);
+      })
+      .catch((err) => setError(apiErrorMessage(err)))
+      .finally(() => setLoading(false));
+  }
+
+  useEffect(load, [status, page]);
+
+  async function updateStatus(id: string, next: "REVIEWED" | "DISMISSED") {
+    setBusyId(id);
+    try {
+      await classifiedReportsApi.updateStatus(id, next);
+      setItems((prev) => prev.filter((r) => r.id !== id));
+    } catch (err) {
+      setError(apiErrorMessage(err));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  return (
+    <div>
+      <div className="flex flex-wrap gap-1.5">
+        {REPORT_STATUS_TABS.map((t) => (
+          <button
+            key={t.value}
+            onClick={() => {
+              setStatus(t.value);
+              setPage(1);
+            }}
+            className={`badge ${status === t.value ? "bg-brand-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {error && <p className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+
+      <div className="mt-3">
+        {loading && <ListSkeleton rows={5} />}
+        {!loading && (
+          <div className="card divide-y divide-gray-100">
+            {items.map((r) => (
+              <div key={r.id} className="flex flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <p className="flex items-center gap-2 font-semibold text-ink-900">
+                    <Flag size={13} className="shrink-0 text-red-500" />
+                    <span>{REASON_LABEL[r.reason] ?? r.reason}</span>
+                  </p>
+                  <p className="text-xs text-ink-500">
+                    {r.listing ? (
+                      <Link to={`/classifieds/${r.listing.id}`} target="_blank" className="hover:underline">
+                        {r.listing.title}
+                      </Link>
+                    ) : (
+                      "Listing deleted"
+                    )}
+                    {r.reporter ? ` · reported by ${r.reporter.firstName} ${r.reporter.lastName}` : ""}
+                  </p>
+                  {r.message && <p className="mt-1 text-sm text-ink-700">{r.message}</p>}
+                </div>
+                {r.status === "PENDING" && (
+                  <div className="flex shrink-0 gap-1.5">
+                    <button
+                      disabled={busyId === r.id}
+                      onClick={() => updateStatus(r.id, "REVIEWED")}
+                      className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 px-2.5 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
+                    >
+                      <CheckCircle2 size={13} /> Reviewed
+                    </button>
+                    <button
+                      disabled={busyId === r.id}
+                      onClick={() => updateStatus(r.id, "DISMISSED")}
+                      className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-semibold text-ink-600 hover:bg-gray-50"
+                    >
+                      <XCircle size={13} /> Dismiss
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+            {items.length === 0 && <p className="p-6 text-center text-sm text-ink-500">No reports in this filter.</p>}
+          </div>
+        )}
+        <Pagination page={page} totalPages={totalPages} onChange={setPage} />
+      </div>
+    </div>
+  );
+}
+
 export default function ClassifiedsAdminPanel() {
-  const [tab, setTab] = useState<"listings" | "categories">("listings");
+  const [tab, setTab] = useState<"listings" | "categories" | "reports">("listings");
 
   return (
     <div>
       <div className="mb-4 flex gap-1 border-b border-gray-200">
-        {(["listings", "categories"] as const).map((t) => (
+        {(["listings", "categories", "reports"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -242,7 +364,9 @@ export default function ClassifiedsAdminPanel() {
           </button>
         ))}
       </div>
-      {tab === "listings" ? <ListingsSection /> : <CategoriesSection />}
+      {tab === "listings" && <ListingsSection />}
+      {tab === "categories" && <CategoriesSection />}
+      {tab === "reports" && <ReportsSection />}
     </div>
   );
 }
