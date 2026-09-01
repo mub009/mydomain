@@ -1,7 +1,22 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { CheckCircle2, Flag, Plus, Search, Tag, Trash2, XCircle } from "lucide-react";
-import { adminApi, classifiedCategoriesApi, classifiedReportsApi } from "@/api/endpoints";
+import {
+  BarChart3,
+  CheckCircle2,
+  Eye,
+  Flag,
+  Heart,
+  type LucideIcon,
+  MessageCircle,
+  Plus,
+  Search,
+  Tag,
+  Trash2,
+  UserCheck,
+  Users,
+  XCircle,
+} from "lucide-react";
+import { adminApi, classifiedCategoriesApi, ClassifiedMarketplaceStats, classifiedReportsApi, classifiedStatsApi } from "@/api/endpoints";
 import { apiErrorMessage } from "@/api/client";
 import { ClassifiedCategory, ClassifiedListing, ClassifiedReport, ClassifiedReportStatus, ClassifiedStatus } from "@/types";
 import { money } from "@/components/ClassifiedCard";
@@ -346,13 +361,115 @@ function ReportsSection() {
   );
 }
 
+const STAT_TILES: { key: string; label: string; icon: LucideIcon; tint: string; pick: (s: ClassifiedMarketplaceStats) => number }[] = [
+  { key: "total", label: "Total listings", icon: Tag, tint: "bg-brand-50 text-brand-600", pick: (s) => s.listings.total },
+  { key: "active", label: "Active now", icon: CheckCircle2, tint: "bg-emerald-50 text-emerald-600", pick: (s) => s.listings.byStatus.ACTIVE },
+  { key: "week", label: "Posted this week", icon: BarChart3, tint: "bg-sky-50 text-sky-600", pick: (s) => s.listings.postedThisWeek },
+  { key: "views", label: "Total views", icon: Eye, tint: "bg-violet-50 text-violet-600", pick: (s) => s.listings.totalViews },
+  { key: "favorites", label: "Total saves", icon: Heart, tint: "bg-pink-50 text-pink-600", pick: (s) => s.listings.totalFavorites },
+  { key: "sellers", label: "Active sellers", icon: Users, tint: "bg-teal-50 text-teal-600", pick: (s) => s.sellers.activeSellers },
+  { key: "messages", label: "Messages sent", icon: MessageCircle, tint: "bg-amber-50 text-amber-600", pick: (s) => s.messaging.totalMessages },
+  { key: "follows", label: "Seller follows", icon: UserCheck, tint: "bg-indigo-50 text-indigo-600", pick: (s) => s.follows.total },
+];
+
+function MarketplaceStatsSection() {
+  const [stats, setStats] = useState<ClassifiedMarketplaceStats | null>(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    classifiedStatsApi.overview().then(setStats).catch((e) => setError(apiErrorMessage(e)));
+  }, []);
+
+  if (error) return <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>;
+  if (!stats) return <ListSkeleton rows={4} />;
+
+  const maxCategoryCount = Math.max(1, ...stats.listings.topCategories.map((c) => c.count));
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {STAT_TILES.map((t) => {
+          const Icon = t.icon;
+          return (
+            <div key={t.key} className="card p-4">
+              <span className={`flex h-9 w-9 items-center justify-center rounded-lg ${t.tint}`}>
+                <Icon size={17} />
+              </span>
+              <p className="mt-3 text-2xl font-extrabold leading-none text-ink-900">{t.pick(stats).toLocaleString("en-IN")}</p>
+              <p className="mt-1 text-xs text-ink-500">{t.label}</p>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div className="card p-5">
+          <h3 className="mb-3 font-bold text-ink-900">Listings by status</h3>
+          <div className="space-y-2.5">
+            {(Object.keys(stats.listings.byStatus) as ClassifiedStatus[]).map((status) => (
+              <div key={status} className="flex items-center justify-between gap-2 text-sm">
+                <span className={`badge ${STATUS_TINT[status] ?? "bg-gray-100 text-gray-600"}`}>{status}</span>
+                <span className="font-semibold text-ink-800">{stats.listings.byStatus[status].toLocaleString("en-IN")}</span>
+              </div>
+            ))}
+          </div>
+          <p className="mt-4 border-t border-gray-100 pt-3 text-xs text-ink-500">
+            {stats.listings.postedToday.toLocaleString("en-IN")} posted today ·{" "}
+            {stats.listings.postedThisMonth.toLocaleString("en-IN")} this month
+          </p>
+        </div>
+
+        <div className="card p-5">
+          <h3 className="mb-3 font-bold text-ink-900">Top active categories</h3>
+          {stats.listings.topCategories.length === 0 && <p className="text-sm text-ink-500">No active listings yet.</p>}
+          <div className="space-y-2.5">
+            {stats.listings.topCategories.map((c) => (
+              <div key={c.categoryId}>
+                <div className="mb-1 flex items-center justify-between gap-2 text-sm">
+                  <span className="truncate text-ink-800">{c.name}</span>
+                  <span className="shrink-0 text-xs text-ink-500">{c.count.toLocaleString("en-IN")}</span>
+                </div>
+                <div className="h-1.5 rounded-full bg-gray-100">
+                  <div className="h-1.5 rounded-full bg-brand-500" style={{ width: `${(c.count / maxCategoryCount) * 100}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="card p-5">
+        <h3 className="mb-3 font-bold text-ink-900">Reports</h3>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div>
+            <p className="text-xl font-extrabold text-amber-600">{stats.reports.pending.toLocaleString("en-IN")}</p>
+            <p className="text-xs text-ink-500">Pending</p>
+          </div>
+          <div>
+            <p className="text-xl font-extrabold text-emerald-600">{stats.reports.reviewed.toLocaleString("en-IN")}</p>
+            <p className="text-xs text-ink-500">Reviewed</p>
+          </div>
+          <div>
+            <p className="text-xl font-extrabold text-ink-500">{stats.reports.dismissed.toLocaleString("en-IN")}</p>
+            <p className="text-xs text-ink-500">Dismissed</p>
+          </div>
+          <div>
+            <p className="text-xl font-extrabold text-ink-900">{stats.reports.today.toLocaleString("en-IN")}</p>
+            <p className="text-xs text-ink-500">Filed today</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ClassifiedsAdminPanel() {
-  const [tab, setTab] = useState<"listings" | "categories" | "reports">("listings");
+  const [tab, setTab] = useState<"stats" | "listings" | "categories" | "reports">("stats");
 
   return (
     <div>
       <div className="mb-4 flex gap-1 border-b border-gray-200">
-        {(["listings", "categories", "reports"] as const).map((t) => (
+        {(["stats", "listings", "categories", "reports"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -364,6 +481,7 @@ export default function ClassifiedsAdminPanel() {
           </button>
         ))}
       </div>
+      {tab === "stats" && <MarketplaceStatsSection />}
       {tab === "listings" && <ListingsSection />}
       {tab === "categories" && <CategoriesSection />}
       {tab === "reports" && <ReportsSection />}

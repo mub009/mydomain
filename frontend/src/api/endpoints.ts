@@ -11,6 +11,7 @@ import {
   ClassifiedListing,
   ClassifiedMessage,
   ClassifiedReport,
+  ClassifiedStatus,
   Lead,
   Order,
   OrderStatus,
@@ -480,6 +481,27 @@ export const adminApi = {
     api.get<PaginatedResponse<ClassifiedListing>>("/admin/classifieds", { params }).then((r) => r.data),
   removeClassified: (id: string) => api.post<ApiResponse<ClassifiedListing>>(`/admin/classifieds/${id}/remove`).then((r) => r.data.data),
   deleteClassified: (id: string) => api.delete(`/admin/classifieds/${id}`),
+};
+
+export interface ClassifiedMarketplaceStats {
+  listings: {
+    total: number;
+    byStatus: Record<ClassifiedStatus, number>;
+    postedToday: number;
+    postedThisWeek: number;
+    postedThisMonth: number;
+    totalViews: number;
+    totalFavorites: number;
+    topCategories: { categoryId: string; name: string; count: number }[];
+  };
+  sellers: { totalWithListings: number; activeSellers: number };
+  messaging: { totalConversations: number; totalMessages: number; messagesToday: number };
+  follows: { total: number };
+  reports: { pending: number; reviewed: number; dismissed: number; today: number };
+}
+
+export const classifiedStatsApi = {
+  overview: () => api.get<ApiResponse<ClassifiedMarketplaceStats>>("/admin/classifieds/stats").then((r) => r.data.data),
 };
 
 // ---------------------------------------------------------------------------

@@ -12,6 +12,7 @@ use App\Http\Controllers\ClassifiedFavoriteController;
 use App\Http\Controllers\ClassifiedFollowController;
 use App\Http\Controllers\ClassifiedListingController;
 use App\Http\Controllers\ClassifiedReportController;
+use App\Http\Controllers\ClassifiedStatsController;
 use App\Http\Controllers\LeadController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PointsController;
@@ -263,4 +264,6 @@ Route::prefix('admin')->middleware(['auth.jwt', 'role:ADMIN'])->group(function (
 
     Route::get('/classifieds/reports', [ClassifiedReportController::class, 'index']);
     Route::patch('/classifieds/reports/{id}', [ClassifiedReportController::class, 'updateStatus']);
+
+    Route::get('/classifieds/stats', [ClassifiedStatsController::class, 'overview']);
 });
