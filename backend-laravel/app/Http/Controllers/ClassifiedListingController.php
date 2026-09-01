@@ -15,7 +15,10 @@ use Illuminate\Support\Facades\DB;
 
 class ClassifiedListingController extends Controller
 {
-    private const RENEW_DAYS = 30;
+    // How long a listing stays ACTIVE before classifieds:expire (see
+    // routes/console.php) flips it to EXPIRED — 2 months, both for a new
+    // post and for renew()'s bump back to a fresh window.
+    private const RENEW_DAYS = 60;
 
     private function authorizeManage(array $actor, ClassifiedListing $listing): void
     {
@@ -325,7 +328,7 @@ class ClassifiedListingController extends Controller
     }
 
     // Bumps the listing back to the top of "newest" sort and pushes its
-    // expiry out another 30 days — also revives an EXPIRED listing.
+    // expiry out another RENEW_DAYS — also revives an EXPIRED listing.
     public function renew(Request $request, string $id)
     {
         return ApiResponse::ok($this->transition($request, $id, [

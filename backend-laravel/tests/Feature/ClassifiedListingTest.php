@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\ClassifiedCategory;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
@@ -150,6 +151,20 @@ class ClassifiedListingTest extends TestCase
         $renewed = $this->postJson("/api/v1/classifieds/{$id}/renew", [], ['Authorization' => "Bearer {$token}"]);
         $renewed->assertStatus(200)->assertJsonPath('data.status', 'ACTIVE');
         $this->assertNotNull($renewed->json('data.expiresAt'));
+    }
+
+    public function test_a_new_listing_and_a_renewal_both_expire_two_months_out(): void
+    {
+        [, $token] = $this->actingToken();
+        $created = $this->postJson('/api/v1/classifieds', $this->listingPayload(), ['Authorization' => "Bearer {$token}"]);
+        $id = $created->json('data.id');
+
+        $expiresAt = Carbon::parse($created->json('data.expiresAt'));
+        $this->assertEqualsWithDelta(now()->addDays(60)->timestamp, $expiresAt->timestamp, 5);
+
+        $renewed = $this->postJson("/api/v1/classifieds/{$id}/renew", [], ['Authorization' => "Bearer {$token}"]);
+        $renewedExpiresAt = Carbon::parse($renewed->json('data.expiresAt'));
+        $this->assertEqualsWithDelta(now()->addDays(60)->timestamp, $renewedExpiresAt->timestamp, 5);
     }
 
     public function test_viewing_a_listing_increments_its_view_count(): void
