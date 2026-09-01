@@ -13,6 +13,7 @@ use App\Support\ApiResponse;
 use App\Support\Pagination;
 use App\Support\Points;
 use App\Support\Privileges;
+use App\Support\Uploads\ClassifiedPhotoCleaner;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 
@@ -380,21 +381,25 @@ class AdminController extends Controller
     // deleting it outright, or delete it entirely for policy violations.
     public function removeClassified(string $id)
     {
-        $listing = ClassifiedListing::find($id);
+        $listing = ClassifiedListing::with('photos')->find($id);
         if (! $listing) {
             throw ApiException::notFound('Listing not found');
         }
         $listing->update(['status' => 'REMOVED']);
+        // A takedown has no "un-remove" action, so its photos aren't
+        // needed again — free the uploaded files immediately.
+        ClassifiedPhotoCleaner::purge($listing);
 
-        return ApiResponse::ok($listing);
+        return ApiResponse::ok($listing->fresh());
     }
 
     public function deleteClassified(string $id)
     {
-        $listing = ClassifiedListing::find($id);
+        $listing = ClassifiedListing::with('photos')->find($id);
         if (! $listing) {
             throw ApiException::notFound('Listing not found');
         }
+        ClassifiedPhotoCleaner::purge($listing);
         $listing->delete();
 
         return ApiResponse::noContent();

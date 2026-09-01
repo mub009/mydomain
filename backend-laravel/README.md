@@ -32,6 +32,15 @@ Either way, on the server you still need to:
 - `chmod -R 775 storage bootstrap/cache` (must be writable by the web
   server user)
 - `php artisan migrate` (and `php artisan db:seed` for the demo data, if wanted)
+- A cron entry calling the scheduler every minute, or scheduled tasks
+  (currently just expiring old classifieds — see "Classified listing
+  lifecycle" below) never run:
+  ```
+  * * * * * cd /home/yourcpaneluser/path/to/backend-laravel && php artisan schedule:run >> /dev/null 2>&1
+  ```
+  On cPanel, add this under **Cron Jobs** in the control panel (adjust the
+  path to wherever this repo actually lives on the server) rather than
+  editing crontab directly.
 
 ### Deploying the frontend together with this backend
 
@@ -104,6 +113,25 @@ anything over 2000px on its longest edge and converts PNG/JPEG/WebP to
 WebP (skipped for GIF, to avoid destroying animation), falling back to a
 same-format re-encode and finally the untouched original if WebP isn't
 available or doesn't actually come out smaller.
+
+### Classified listing lifecycle
+
+A classified listing's photos are the ongoing Spaces storage cost, so
+`App\Support\Uploads\ClassifiedPhotoCleaner` deletes the actual uploaded
+files (not just the DB rows) the moment a listing reaches a state with no
+way back to needing them: marked **sold**, **removed** by an admin, or
+**hard-deleted** (by its owner or an admin). The listing/DB row itself
+still exists for sold/removed (only its photos are gone — the frontend's
+existing "no photo" placeholder covers the gap), so the seller or an admin
+can still see and review it.
+
+**EXPIRED is deliberately excluded** — `renew()` can revive an expired
+listing back to ACTIVE without asking the seller to re-upload anything, so
+deleting its photos on expiry would silently break that. Nothing
+previously flipped an ACTIVE listing to EXPIRED automatically either — the
+`classifieds:expire` command (`routes/console.php`, scheduled daily) now
+does that; see the cron setup above, since without it listings just stay
+ACTIVE forever past their `expiresAt`.
 
 ### Analytics (admin "Analytics" tab)
 

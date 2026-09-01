@@ -6,6 +6,7 @@ use App\Models\ClassifiedCategory;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class ClassifiedListingTest extends TestCase
@@ -48,6 +49,20 @@ class ClassifiedListingTest extends TestCase
             'photos' => ['https://cdn.example.com/a.jpg', 'https://cdn.example.com/b.jpg'],
             ...$overrides,
         ];
+    }
+
+    // Puts a real object on the fake "spaces" disk and points the configured
+    // CDN base at a URL that actually matches it, so ClassifiedPhotoCleaner
+    // has something real to find and delete instead of skipping every photo
+    // as "not ours" (as it would with the plain https://cdn.example.com
+    // fixtures the other tests in this file use).
+    private function fakeStoredPhoto(string $key = 'classifieds/photo.webp'): string
+    {
+        config(['filesystems.disks.spaces.url' => 'https://cdn.test']);
+        Storage::fake('spaces');
+        Storage::disk('spaces')->put($key, 'fake-image-bytes');
+
+        return 'https://cdn.test/'.$key;
     }
 
     public function test_any_signed_in_user_can_post_a_listing_and_it_is_instantly_active(): void
@@ -182,6 +197,63 @@ class ClassifiedListingTest extends TestCase
     {
         [, $token] = $this->actingToken();
         $this->getJson('/api/v1/admin/classifieds', ['Authorization' => "Bearer {$token}"])->assertStatus(403);
+    }
+
+    public function test_marking_a_listing_sold_deletes_its_photo_file_from_storage(): void
+    {
+        $photoUrl = $this->fakeStoredPhoto();
+        [, $token] = $this->actingToken();
+        $id = $this->postJson('/api/v1/classifieds', $this->listingPayload(['photos' => [$photoUrl]]), ['Authorization' => "Bearer {$token}"])->json('data.id');
+        Storage::disk('spaces')->assertExists('classifieds/photo.webp');
+
+        $sold = $this->postJson("/api/v1/classifieds/{$id}/sold", [], ['Authorization' => "Bearer {$token}"]);
+        $sold->assertStatus(200)->assertJsonPath('data.status', 'SOLD')->assertJsonCount(0, 'data.photos');
+
+        Storage::disk('spaces')->assertMissing('classifieds/photo.webp');
+        $this->assertDatabaseCount('classified_listing_photos', 0);
+    }
+
+    public function test_deleting_a_listing_deletes_its_photo_file_from_storage(): void
+    {
+        $photoUrl = $this->fakeStoredPhoto();
+        [, $token] = $this->actingToken();
+        $id = $this->postJson('/api/v1/classifieds', $this->listingPayload(['photos' => [$photoUrl]]), ['Authorization' => "Bearer {$token}"])->json('data.id');
+
+        $this->deleteJson("/api/v1/classifieds/{$id}", [], ['Authorization' => "Bearer {$token}"])->assertStatus(204);
+
+        Storage::disk('spaces')->assertMissing('classifieds/photo.webp');
+    }
+
+    public function test_pausing_or_renewing_a_listing_does_not_touch_its_photo_files(): void
+    {
+        $photoUrl = $this->fakeStoredPhoto();
+        [, $token] = $this->actingToken();
+        $id = $this->postJson('/api/v1/classifieds', $this->listingPayload(['photos' => [$photoUrl]]), ['Authorization' => "Bearer {$token}"])->json('data.id');
+
+        $this->postJson("/api/v1/classifieds/{$id}/pause", [], ['Authorization' => "Bearer {$token}"])->assertStatus(200);
+        $this->postJson("/api/v1/classifieds/{$id}/renew", [], ['Authorization' => "Bearer {$token}"])->assertStatus(200);
+
+        Storage::disk('spaces')->assertExists('classifieds/photo.webp');
+        $this->assertDatabaseCount('classified_listing_photos', 1);
+    }
+
+    public function test_admin_removing_or_deleting_a_listing_deletes_its_photo_file_from_storage(): void
+    {
+        $photoUrl = $this->fakeStoredPhoto();
+        [, $sellerToken] = $this->actingToken();
+        [, $adminToken] = $this->actingToken(['role' => 'ADMIN']);
+        $id = $this->postJson('/api/v1/classifieds', $this->listingPayload(['photos' => [$photoUrl]]), ['Authorization' => "Bearer {$sellerToken}"])->json('data.id');
+
+        $this->postJson("/api/v1/admin/classifieds/{$id}/remove", [], ['Authorization' => "Bearer {$adminToken}"])
+            ->assertStatus(200)->assertJsonPath('data.status', 'REMOVED');
+        Storage::disk('spaces')->assertMissing('classifieds/photo.webp');
+
+        // A second photo, so deleteClassified has something of its own to clean up.
+        $secondUrl = $this->fakeStoredPhoto('classifieds/second.webp');
+        $id2 = $this->postJson('/api/v1/classifieds', $this->listingPayload(['photos' => [$secondUrl]]), ['Authorization' => "Bearer {$sellerToken}"])->json('data.id');
+
+        $this->deleteJson("/api/v1/admin/classifieds/{$id2}", [], ['Authorization' => "Bearer {$adminToken}"])->assertStatus(204);
+        Storage::disk('spaces')->assertMissing('classifieds/second.webp');
     }
 
     public function test_batch_lookup_does_not_bump_view_count(): void

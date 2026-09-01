@@ -9,6 +9,7 @@ use App\Models\ClassifiedListingPhoto;
 use App\Models\User;
 use App\Support\ApiResponse;
 use App\Support\Pagination;
+use App\Support\Uploads\ClassifiedPhotoCleaner;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -278,11 +279,12 @@ class ClassifiedListingController extends Controller
     public function destroy(Request $request, string $id)
     {
         $actor = $request->attributes->get('auth');
-        $listing = ClassifiedListing::find($id);
+        $listing = ClassifiedListing::with('photos')->find($id);
         if (! $listing) {
             throw ApiException::notFound('Listing not found');
         }
         $this->authorizeManage($actor, $listing);
+        ClassifiedPhotoCleaner::purge($listing);
         $listing->delete();
 
         return ApiResponse::noContent();
@@ -303,7 +305,12 @@ class ClassifiedListingController extends Controller
 
     public function markSold(Request $request, string $id)
     {
-        return ApiResponse::ok($this->transition($request, $id, ['status' => 'SOLD', 'soldAt' => now()]));
+        $listing = $this->transition($request, $id, ['status' => 'SOLD', 'soldAt' => now()]);
+        // A sold listing has no path back to needing its photos again (no
+        // "unsell" action), so the uploaded files can be freed immediately.
+        ClassifiedPhotoCleaner::purge($listing);
+
+        return ApiResponse::ok($listing->fresh(['photos', 'category']));
     }
 
     public function pause(Request $request, string $id)
