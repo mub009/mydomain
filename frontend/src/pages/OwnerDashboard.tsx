@@ -144,6 +144,7 @@ export default function OwnerDashboard() {
   const [newBusiness, setNewBusiness] = useState({
     name: "",
     slug: "",
+    description: "",
     categoryId: "",
     businessType: "B2C" as "B2C" | "B2B",
     phone: "",
@@ -272,6 +273,7 @@ export default function OwnerDashboard() {
     try {
       const created = await businessesApi.create({
         ...newBusiness,
+        description: newBusiness.description || undefined,
         website: newBusiness.website || undefined,
         latitude: Number(newBusiness.latitude),
         longitude: Number(newBusiness.longitude),
@@ -290,7 +292,7 @@ export default function OwnerDashboard() {
           : {}),
       });
       setNewBusiness({
-        name: "", slug: "", categoryId: "", businessType: "B2C", phone: "", website: "",
+        name: "", slug: "", description: "", categoryId: "", businessType: "B2C", phone: "", website: "",
         addressLine1: "", city: "", state: "", postalCode: "", latitude: "", longitude: "",
       });
       setShowCreate(false);
@@ -460,6 +462,12 @@ export default function OwnerDashboard() {
               )}
               <input required placeholder="Business name" value={newBusiness.name} onChange={(e) => setNewBusiness({ ...newBusiness, name: e.target.value })} className="input" />
               <input required placeholder="URL slug (e.g. joes-plumbing)" value={newBusiness.slug} onChange={(e) => setNewBusiness({ ...newBusiness, slug: e.target.value })} className="input" />
+              <textarea
+                placeholder="Short description — tell customers what this business does (optional, can add later)"
+                value={newBusiness.description}
+                onChange={(e) => setNewBusiness({ ...newBusiness, description: e.target.value })}
+                className="input min-h-20"
+              />
               <select required value={newBusiness.categoryId} onChange={(e) => setNewBusiness({ ...newBusiness, categoryId: e.target.value })} className="input">
                 <option value="">Select category</option>
                 {categories.map((c) => (
