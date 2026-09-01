@@ -99,7 +99,11 @@ Until these are set, uploads fail with a clear `INTERNAL_ERROR` response
 rather than a stack trace — everything else in the app works unaffected.
 Raster images (PNG/JPEG/GIF/WebP) are capped at 5MB, SVG (posters only) at
 2MB; both content-sniffed rather than trusted from the client's declared
-mime type.
+mime type. Before storing, `App\Support\Uploads\ImageOptimizer` downscales
+anything over 2000px on its longest edge and converts PNG/JPEG/WebP to
+WebP (skipped for GIF, to avoid destroying animation), falling back to a
+same-format re-encode and finally the untouched original if WebP isn't
+available or doesn't actually come out smaller.
 
 ### Analytics (admin "Analytics" tab)
 

@@ -89,10 +89,16 @@ class UploadController extends Controller
             }
             $contents = file_get_contents($file->getRealPath());
             // Downscales anything wider than needed for display and
-            // re-compresses it — a typical phone photo shrinks by 70-90%
-            // with no visible quality loss. Falls back to the original
-            // bytes untouched if GD can't process it for any reason.
-            $contents = ImageOptimizer::optimize($contents, $extension);
+            // converts it to WebP — a typical phone photo shrinks by
+            // 70-90% with no visible quality loss. Falls back to a
+            // same-format re-encode, and finally the original bytes
+            // untouched, if GD can't process it for any reason.
+            $optimized = ImageOptimizer::optimize($contents, $extension);
+            $contents = $optimized['contents'];
+            if ($optimized['extension'] !== $extension) {
+                $extension = $optimized['extension'];
+                $mime = 'image/webp';
+            }
             if (strlen($contents) > self::MAX_RASTER_BYTES) {
                 throw ApiException::badRequest('That file is larger than 5MB, even after compression');
             }

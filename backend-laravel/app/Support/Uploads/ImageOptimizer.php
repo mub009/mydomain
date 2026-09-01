@@ -7,10 +7,11 @@ use Throwable;
 
 /**
  * Resizes an oversized upload down to a sane maximum dimension and
- * re-compresses it, so a multi-megabyte phone photo isn't stored (and
- * served to every visitor) at its full original size. Falls back to the
- * original bytes untouched whenever GD isn't available, the image can't be
- * decoded, or re-encoding doesn't actually shrink it — a slightly larger
+ * converts it to WebP, so a multi-megabyte phone photo isn't stored (and
+ * served to every visitor) at its full original size or in a heavier
+ * format. Falls back to a same-format re-encode, and finally to the
+ * original bytes untouched, whenever GD isn't available, the image can't
+ * be decoded, or a step doesn't actually shrink it — a slightly larger
  * file beats a failed or corrupted upload.
  */
 class ImageOptimizer
@@ -32,26 +33,35 @@ class ImageOptimizer
     // real camera output, so anything past it is skipped rather than decoded.
     private const MAX_INPUT_PIXELS = 50_000_000;
 
-    public static function optimize(string $contents, string $extension): string
+    /**
+     * @return array{contents: string, extension: string} the bytes to store,
+     *              and the extension (hence format) they're actually in —
+     *              "webp" whenever conversion succeeded and paid off,
+     *              otherwise unchanged from the input.
+     */
+    public static function optimize(string $contents, string $extension): array
     {
+        $original = ['contents' => $contents, 'extension' => $extension];
+
         // GIF is skipped outright — GD only ever decodes a GIF's first
-        // frame, so re-encoding one would silently destroy any animation.
+        // frame, so re-encoding (in any format) would silently destroy any
+        // animation.
         if ($extension === 'gif' || ! extension_loaded('gd')) {
-            return $contents;
+            return $original;
         }
 
         $dimensions = @getimagesizefromstring($contents);
         if ($dimensions && ($dimensions[0] * $dimensions[1]) > self::MAX_INPUT_PIXELS) {
-            return $contents;
+            return $original;
         }
 
         try {
             $image = @imagecreatefromstring($contents);
             if (! $image) {
-                return $contents;
+                return $original;
             }
 
-            if ($extension === 'png') {
+            if (in_array($extension, ['png', 'webp'], true)) {
                 self::preserveAlpha($image);
             }
             if ($extension === 'jpg') {
@@ -60,14 +70,32 @@ class ImageOptimizer
 
             $image = self::resizeIfOversized($image, $extension);
 
-            $optimized = self::encode($image, $extension);
+            // WebP compresses meaningfully better than JPEG or PNG at the
+            // same visual quality, so every upload is converted to it.
+            $webp = self::encode($image, 'webp');
+            if ($webp !== null && strlen($webp) < strlen($contents)) {
+                imagedestroy($image);
+
+                return ['contents' => $webp, 'extension' => 'webp'];
+            }
+
+            // WebP encoding unavailable or didn't pay off (rare — mainly
+            // tiny/simple images where format overhead dominates): fall
+            // back to a same-format re-encode, then finally the original.
+            if ($extension === 'webp') {
+                imagedestroy($image);
+
+                return $original;
+            }
+
+            $sameFormat = self::encode($image, $extension);
             imagedestroy($image);
 
-            // Only worth it if it actually shrank the file — a small or
-            // already-compressed image can occasionally grow on re-encode.
-            return ($optimized !== null && strlen($optimized) < strlen($contents)) ? $optimized : $contents;
+            return ($sameFormat !== null && strlen($sameFormat) < strlen($contents))
+                ? ['contents' => $sameFormat, 'extension' => $extension]
+                : $original;
         } catch (Throwable) {
-            return $contents;
+            return $original;
         }
     }
 
@@ -88,7 +116,7 @@ class ImageOptimizer
         }
 
         imagedestroy($image);
-        if ($extension === 'png') {
+        if (in_array($extension, ['png', 'webp'], true)) {
             self::preserveAlpha($resized);
         }
 

@@ -47,9 +47,103 @@ class UploadTest extends TestCase
         $response->assertStatus(200)->assertJsonStructure(['data' => ['url']]);
         $url = $response->json('data.url');
         $this->assertStringContainsString('businesses/photos/', $url);
-        $this->assertStringEndsWith('.jpg', $url);
 
         Storage::disk('spaces')->assertExists(str_replace(Storage::disk('spaces')->url(''), '', $url));
+    }
+
+    public function test_a_jpeg_upload_is_converted_to_webp(): void
+    {
+        $owner = $this->user('BUSINESS_OWNER');
+        $token = $this->token($owner);
+
+        // Large and detailed enough that WebP genuinely comes out smaller —
+        // a tiny placeholder image can occasionally not shrink under WebP's
+        // per-file overhead.
+        $response = $this->post('/api/v1/uploads/image', [
+            'purpose' => 'business-photos',
+            'file' => UploadedFile::fake()->image('shopfront.jpg', 800, 600),
+        ], ['Authorization' => "Bearer {$token}"]);
+
+        $response->assertStatus(200);
+        $url = $response->json('data.url');
+        $this->assertStringEndsWith('.webp', $url);
+
+        $path = str_replace(Storage::disk('spaces')->url(''), '', $url);
+        $stored = Storage::disk('spaces')->get($path);
+        $this->assertSame('image/webp', Storage::disk('spaces')->mimeType($path));
+        $this->assertStringStartsWith('RIFF', $stored);
+        $this->assertStringContainsString('WEBP', substr($stored, 0, 16));
+    }
+
+    public function test_a_png_with_transparency_converts_to_webp_and_keeps_its_alpha_channel(): void
+    {
+        $admin = $this->user('ADMIN');
+        $token = $this->token($admin);
+
+        // Genuinely random per-pixel colour (not just a gradient — deflate
+        // compresses smooth ramps just as well as WebP does) so PNG's
+        // lossless compression can't do anything with it, the way it
+        // couldn't with a real photo's noise. Otherwise a small, flat PNG
+        // can legitimately beat a lossy WebP re-encode, and the optimizer
+        // correctly keeps the PNG (see the "only if it pays off" fallback
+        // in ImageOptimizer) — this fixture is deliberately built to defeat
+        // that so the WebP path under test actually runs.
+        mt_srand(42);
+        $image = imagecreatetruecolor(200, 200);
+        imagesavealpha($image, true);
+        imagealphablending($image, false);
+        for ($y = 0; $y < 200; $y++) {
+            for ($x = 0; $x < 200; $x++) {
+                if ($x < 10 && $y < 10) {
+                    $color = imagecolorallocatealpha($image, 0, 0, 0, 127); // transparent corner
+                } else {
+                    $color = imagecolorallocatealpha($image, mt_rand(0, 255), mt_rand(0, 255), mt_rand(0, 255), 0);
+                }
+                imagesetpixel($image, $x, $y, $color);
+            }
+        }
+        ob_start();
+        imagepng($image);
+        $pngBytes = ob_get_clean();
+        imagedestroy($image);
+
+        $tmpPath = tempnam(sys_get_temp_dir(), 'logo').'.png';
+        file_put_contents($tmpPath, $pngBytes);
+        $file = new UploadedFile($tmpPath, 'logo.png', 'image/png', null, true);
+
+        $response = $this->post('/api/v1/uploads/image', [
+            'purpose' => 'categories',
+            'file' => $file,
+        ], ['Authorization' => "Bearer {$token}"]);
+
+        $response->assertStatus(200);
+        $url = $response->json('data.url');
+        $this->assertStringEndsWith('.webp', $url);
+
+        $path = str_replace(Storage::disk('spaces')->url(''), '', $url);
+        $decoded = imagecreatefromstring(Storage::disk('spaces')->get($path));
+        // Top-left corner was filled fully transparent — still should be.
+        $corner = imagecolorat($decoded, 1, 1);
+        $alpha = ($corner >> 24) & 0x7F;
+        $this->assertSame(127, $alpha, 'corner pixel should still be fully transparent after WebP conversion');
+        imagedestroy($decoded);
+
+        @unlink($tmpPath);
+    }
+
+    public function test_an_animated_gif_upload_is_left_untouched_so_its_frames_are_not_destroyed(): void
+    {
+        $owner = $this->user('BUSINESS_OWNER');
+        $token = $this->token($owner);
+
+        $file = UploadedFile::fake()->image('animated.gif', 40, 40);
+
+        $response = $this->post('/api/v1/uploads/image', [
+            'purpose' => 'business-photos',
+            'file' => $file,
+        ], ['Authorization' => "Bearer {$token}"]);
+
+        $response->assertStatus(200)->assertJsonPath('data.url', fn ($url) => str_ends_with($url, '.gif'));
     }
 
     public function test_an_oversized_photo_is_downscaled_to_the_max_display_dimension(): void
