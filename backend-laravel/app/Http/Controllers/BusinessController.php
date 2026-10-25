@@ -542,7 +542,11 @@ class BusinessController extends Controller
             'isActive' => ['sometimes', 'boolean'],
         ]);
 
-        $service = Service::findOrFail($serviceId);
+        // Only a service of this business — not any service by id.
+        $service = Service::where('businessId', $id)->find($serviceId);
+        if (! $service) {
+            throw ApiException::notFound('Service not found');
+        }
         $service->update($data);
 
         return ApiResponse::ok($service);
@@ -553,7 +557,8 @@ class BusinessController extends Controller
         $actor = $request->attributes->get('auth');
         $business = $this->findOrFail($id);
         $this->assertOwnerOrAdmin($actor, $business);
-        Service::where('id', $serviceId)->delete();
+        // Only a service of this business — not any service by id.
+        Service::where('businessId', $id)->where('id', $serviceId)->delete();
 
         return ApiResponse::noContent();
     }

@@ -37,6 +37,8 @@
     </div>
   </div>
 
+  <x-ai-description />
+
   <input required minlength="7" maxlength="20" name="phone" placeholder="Phone" class="input" />
   <input type="url" name="website" placeholder="Website (optional) — https://…" class="input" />
   <input required name="addressLine1" placeholder="Address line 1" class="input" />

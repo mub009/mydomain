@@ -1,3 +1,5 @@
+import { initAiDescription } from "../lib/ai-describe";
+import { initAssistant } from "../lib/assistant";
 import { api, errorMessage, uploadImage } from "../lib/api";
 import { CHANNEL_LABELS, boardUrl, downloadDataUrl, renderQrDataUrl } from "../lib/channels";
 import { $, $$, openModal, pageData } from "../lib/ui";
@@ -13,6 +15,7 @@ const fail = (err) => showError(errorBox, errorMessage(err));
 
 showFlash();
 initUploadFields();
+initAssistant(biz.id);
 initCloneButtons();
 
 // Runs an API call with the button showing a busy label.
@@ -45,6 +48,7 @@ $("[data-submit-approval]")?.addEventListener("click", async (e) => {
 
 // --- Details ----------------------------------------------------------------
 const details = $("[data-details-form]");
+initAiDescription(details);
 if (details) {
   const preview = $("[data-logo-preview]", details);
   const letter = $("[data-logo-letter]", details);

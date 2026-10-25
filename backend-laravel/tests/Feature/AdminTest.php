@@ -115,7 +115,7 @@ class AdminTest extends TestCase
             ->assertJsonPath('data.phone', '9876543210')
             ->assertJsonPath('data.email', null);
         $this->postJson('/api/v1/auth/login', ['email' => '9876543210', 'password' => 'Password123!'])->assertOk();
-        $this->post('/login', ['email' => '98765 43210', 'password' => 'Password123!'])->assertRedirect('/');
+        $this->post('/login', ['email' => '98765 43210', 'password' => 'Password123!'])->assertRedirect('/dashboard');
 
         $this->postJson('/api/v1/admin/users', [...$dealer, 'phone' => '9876543210'], $auth)->assertStatus(409);
         // Other roles still sign in with an email.

@@ -4,10 +4,7 @@
     <label class="block text-xs font-semibold text-ink-700 mb-1">Business name</label>
     <input required name="name" value="{{ $biz['name'] }}" class="input" />
   </div>
-  <div>
-    <label class="block text-xs font-semibold text-ink-700 mb-1">Description</label>
-    <textarea name="description" class="input min-h-24" placeholder="Tell customers about your business">{{ $biz['description'] ?? '' }}</textarea>
-  </div>
+  <x-ai-description :value="$biz['description'] ?? ''" />
   <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
     <div>
       <label class="block text-xs font-semibold text-ink-700 mb-1">Category</label>

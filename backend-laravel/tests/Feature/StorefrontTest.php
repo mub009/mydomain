@@ -269,16 +269,20 @@ class StorefrontTest extends TestCase
             ->assertStatus(200)
             ->assertJsonPath('data.siteType', 'WEBSITE')
             ->assertJsonPath('data.html', '<h1>Welcome</h1>')
-            ->assertJsonPath('data.css', 'h1{color:red}')
+            // The template's own rules come first and the saved ones after,
+            // so the owner's styling still wins (see LiveSite).
+            ->assertJsonPath('data.css', fn ($css) => str_contains($css, 'h1{color:red}'))
             ->assertJsonPath('data.storefront', null);
     }
 
-    public function test_public_site_404s_for_a_website_marked_published_with_no_saved_html(): void
+    public function test_a_website_with_no_saved_page_shows_the_template_from_the_listing(): void
     {
         $owner = $this->user(['role' => 'BUSINESS_OWNER']);
         $business = $this->business($owner);
-        BusinessSite::create(['businessId' => $business->id, 'siteType' => 'WEBSITE', 'isPublished' => true]);
+        BusinessSite::create(['businessId' => $business->id, 'siteType' => 'WEBSITE', 'templateId' => 'standard']);
 
-        $this->getJson("/api/v1/sites/{$business->slug}")->assertStatus(404);
+        $this->getJson("/api/v1/sites/{$business->slug}")->assertOk()
+            ->assertJsonPath('data.templateId', 'standard')
+            ->assertJsonPath('data.html', fn ($html) => str_contains($html, e($business->name)));
     }
 }

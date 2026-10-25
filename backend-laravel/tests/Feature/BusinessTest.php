@@ -255,7 +255,7 @@ class BusinessTest extends TestCase
             'phone' => '9998887777', 'addressLine1' => '1 Main St', 'city' => 'Pune', 'state' => 'MH',
             'postalCode' => '411001', 'latitude' => 18.5, 'longitude' => 73.8,
             'owner' => [
-                'email' => 'client@example.com', 'password' => 'ClientPass123!',
+                'username' => 'client@example.com', 'password' => 'ClientPass123!',
                 'firstName' => 'Client', 'lastName' => 'Owner',
             ],
         ], ['Authorization' => "Bearer {$dealerToken}"]);
@@ -288,7 +288,7 @@ class BusinessTest extends TestCase
             'phone' => '9998887777', 'addressLine1' => '1 Main St', 'city' => 'Pune', 'state' => 'MH',
             'postalCode' => '411001', 'latitude' => 18.5, 'longitude' => 73.8,
             'owner' => [
-                'phone' => '9123456780', 'password' => 'ClientPass123!',
+                'username' => '9123456780', 'password' => 'ClientPass123!',
                 'firstName' => 'Client', 'lastName' => 'Owner',
             ],
         ], ['Authorization' => "Bearer {$dealerToken}"]);

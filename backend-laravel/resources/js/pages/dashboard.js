@@ -1,3 +1,4 @@
+import { initAiDescription } from "../lib/ai-describe";
 import { api, errorMessage } from "../lib/api";
 import { icon } from "../lib/icons";
 import { $, $$, esc, pageData } from "../lib/ui";
@@ -44,6 +45,8 @@ slugSource?.addEventListener("input", () => {
   $("[data-slug-value]", form).textContent = slug;
 });
 
+initAiDescription(form);
+
 form?.addEventListener("submit", async (e) => {
   e.preventDefault();
   const f = Object.fromEntries(new FormData(form));
@@ -55,6 +58,7 @@ form?.addEventListener("submit", async (e) => {
       name: f.name,
       categoryId: f.categoryId,
       businessType: f.businessType,
+      description: f.description?.trim() || undefined,
       phone: f.phone,
       website: f.website || undefined,
       addressLine1: f.addressLine1,

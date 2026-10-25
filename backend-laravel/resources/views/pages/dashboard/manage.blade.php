@@ -97,6 +97,8 @@
       $manageData = ['id' => $biz['id'], 'slug' => $biz['slug'], 'name' => $biz['name'], 'section' => $section];
   @endphp
   <script type="application/json" id="manage-data">@json($manageData)</script>
+
+  @include('pages.dashboard.partials.assistant')
 @endsection
 
 @push('scripts')

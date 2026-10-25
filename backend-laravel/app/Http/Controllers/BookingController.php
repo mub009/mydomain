@@ -130,7 +130,7 @@ class BookingController extends Controller
             throw ApiException::notFound('Booking not found');
         }
 
-        $isOwner = BusinessAccess::canManage($auth, $booking->business);
+        $isManager = BusinessAccess::canManage($auth, $booking->business);
         $isCustomer = $booking->customerId === $auth['sub'];
         if (! $isManager && ! $isCustomer) {
             throw ApiException::forbidden();

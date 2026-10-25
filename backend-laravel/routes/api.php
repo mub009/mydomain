@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\AiController;
+use App\Http\Controllers\AssistantController;
 use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BookingController;
@@ -102,6 +104,10 @@ Route::prefix('classifieds')->group(function () {
     });
 });
 
+// Drafts a listing's description from its name and category (Claude).
+Route::post('/ai/business-description', [AiController::class, 'businessDescription'])
+    ->middleware(['auth.jwt', 'role:BUSINESS_OWNER,DEALER,ADMIN', 'throttle:30,60']);
+
 Route::prefix('businesses')->group(function () {
     Route::get('/', [BusinessController::class, 'index']);
     Route::get('/mine', [BusinessController::class, 'mine'])
@@ -120,6 +126,10 @@ Route::prefix('businesses')->group(function () {
         Route::delete('/{id}/photos/{photoId}', [BusinessController::class, 'removePhoto']);
 
         Route::put('/{id}/hours', [BusinessController::class, 'setHours']);
+
+        // The website assistant: say what to change, confirm, apply.
+        Route::post('/{id}/assistant', [AssistantController::class, 'plan'])->middleware('throttle:40,60');
+        Route::post('/{id}/assistant/apply', [AssistantController::class, 'apply']);
 
         Route::post('/{id}/services', [BusinessController::class, 'addService']);
         Route::patch('/{id}/services/{serviceId}', [BusinessController::class, 'updateService']);
