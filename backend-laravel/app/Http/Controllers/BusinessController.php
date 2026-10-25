@@ -11,6 +11,7 @@ use App\Models\ReviewQrCode;
 use App\Models\Service;
 use App\Models\User;
 use App\Support\ApiResponse;
+use App\Support\BusinessAccess;
 use App\Support\Pagination;
 use App\Support\Points;
 use Illuminate\Http\Request;
@@ -19,14 +20,9 @@ use Illuminate\Support\Facades\Hash;
 
 class BusinessController extends Controller
 {
-    private function assertOwnerOrAdmin(array $actor, string $ownerId): void
+    private function assertOwnerOrAdmin(array $actor, Business $business): void
     {
-        if ($actor['role'] === 'ADMIN') {
-            return;
-        }
-        if ($actor['sub'] !== $ownerId) {
-            throw ApiException::forbidden('You do not own this business');
-        }
+        BusinessAccess::assertCanManage($actor, $business);
     }
 
     private function businessRules(bool $partial = false): array
@@ -35,7 +31,8 @@ class BusinessController extends Controller
 
         return [
             'name' => [$required, 'string', 'min:2', 'max:150'],
-            'slug' => [$required, 'string', 'min:2', 'max:150', 'regex:/^[a-z0-9-]+$/'],
+            // Optional on create — generated from the name when left out.
+            'slug' => ['sometimes', 'string', 'min:2', 'max:150', 'regex:/^[a-z0-9-]+$/'],
             'description' => ['nullable', 'string', 'max:2000'],
             'categoryId' => [$required, 'uuid'],
             // A label for discovery, not a different feature set — B2B
@@ -57,10 +54,25 @@ class BusinessController extends Controller
             'owner' => ['sometimes', 'array'],
             'owner.firstName' => ['required_with:owner', 'string', 'min:1', 'max:80'],
             'owner.lastName' => ['required_with:owner', 'string', 'min:1', 'max:80'],
-            'owner.email' => ['required_with:owner', 'email'],
+            // The business team signs in with this: an email or a mobile number.
+            'owner.username' => ['required_with:owner', 'string', 'max:255'],
             'owner.phone' => ['nullable', 'string', 'min:7', 'max:20'],
             'owner.password' => ['required_with:owner', 'string', 'min:8', 'max:72'],
         ];
+    }
+
+    private function uniqueSlug(string $value): string
+    {
+        $base = trim(preg_replace('/[^a-z0-9]+/', '-', strtolower($value)), '-');
+        $base = substr($base, 0, 140) ?: 'business';
+        for ($attempt = 0; $attempt < 50; $attempt++) {
+            $candidate = $attempt === 0 ? $base : "{$base}-".($attempt + 1);
+            if (! Business::where('slug', $candidate)->exists()) {
+                return $candidate;
+            }
+        }
+
+        return "{$base}-".substr(bin2hex(random_bytes(3)), 0, 6);
     }
 
     public function store(Request $request)
@@ -74,6 +86,7 @@ class BusinessController extends Controller
         // doesn't reload a row after create(), so the response would show
         // null here instead of the value MySQL actually stored.
         $data['businessType'] = $data['businessType'] ?? 'B2C';
+        $data['slug'] = $this->uniqueSlug($data['slug'] ?? $data['name']);
 
         if (! Category::find($data['categoryId'])) {
             throw ApiException::badRequest('Invalid categoryId');
@@ -105,9 +118,25 @@ class BusinessController extends Controller
             });
         }
 
-        $existing = User::where('email', $owner['email'])->first();
+        $username = trim($owner['username']);
+        if (str_contains($username, '@')) {
+            if (filter_var($username, FILTER_VALIDATE_EMAIL) === false) {
+                throw ApiException::badRequest('Enter a valid email address or 10-digit mobile number as the username');
+            }
+            $owner['email'] = strtolower($username);
+            $owner['phone'] = ! empty($owner['phone']) ? (User::normalizePhone($owner['phone']) ?? $owner['phone']) : null;
+        } else {
+            $phone = User::normalizePhone($username);
+            if (! $phone) {
+                throw ApiException::badRequest('Enter a valid email address or 10-digit mobile number as the username');
+            }
+            $owner['email'] = null;
+            $owner['phone'] = $phone;
+        }
+
+        $existing = User::findByLogin($username);
         if ($existing && in_array($existing->role, ['ADMIN', 'DEALER'], true)) {
-            throw ApiException::badRequest("This email belongs to a staff account and can't be used as a business login");
+            throw ApiException::badRequest("This username belongs to a staff account and can't be used as a business login");
         }
         if (! empty($owner['phone']) && (! $existing || $existing->phone !== $owner['phone'])) {
             $phoneTaken = User::where('phone', $owner['phone'])->first();
@@ -151,7 +180,11 @@ class BusinessController extends Controller
             Points::spendForBusiness($actor, $business->id);
 
             $payload = $business->toArray();
-            $payload['ownerAccount'] = ['email' => $ownerRecord->email, 'created' => ! $existing];
+            $payload['ownerAccount'] = [
+                'username' => $ownerRecord->email ?? $ownerRecord->phone,
+                'email' => $ownerRecord->email,
+                'created' => ! $existing,
+            ];
 
             return $payload;
         });
@@ -193,7 +226,11 @@ class BusinessController extends Controller
         $actor = $request->attributes->get('auth');
         $pagination = Pagination::parse($request->query());
 
-        $query = Business::where('ownerId', $actor['sub']);
+        // Dealers also see the listings they created and handed to a
+        // business team's own login, so they can keep managing them.
+        $query = $actor['role'] === 'DEALER'
+            ? Business::where(fn ($q) => $q->where('ownerId', $actor['sub'])->orWhere('createdById', $actor['sub']))
+            : Business::where('ownerId', $actor['sub']);
         $total = (clone $query)->count();
         $items = $query->orderByDesc('createdAt')
             ->skip($pagination['skip'])->take($pagination['take'])
@@ -234,7 +271,7 @@ class BusinessController extends Controller
         if (! $business) {
             throw ApiException::notFound('Business not found');
         }
-        $this->assertOwnerOrAdmin($actor, $business->ownerId);
+        $this->assertOwnerOrAdmin($actor, $business);
 
         return ApiResponse::ok($business);
     }
@@ -253,7 +290,7 @@ class BusinessController extends Controller
     {
         $actor = $request->attributes->get('auth');
         $business = $this->findOrFail($id);
-        $this->assertOwnerOrAdmin($actor, $business->ownerId);
+        $this->assertOwnerOrAdmin($actor, $business);
 
         $data = $request->validate($this->businessRulesForUpdate());
         $business->update($data);
@@ -264,7 +301,7 @@ class BusinessController extends Controller
     private function businessRulesForUpdate(): array
     {
         $rules = $this->businessRules(partial: true);
-        unset($rules['owner'], $rules['owner.firstName'], $rules['owner.lastName'], $rules['owner.email'], $rules['owner.phone'], $rules['owner.password']);
+        unset($rules['owner'], $rules['owner.firstName'], $rules['owner.lastName'], $rules['owner.username'], $rules['owner.phone'], $rules['owner.password']);
 
         return $rules;
     }
@@ -273,7 +310,11 @@ class BusinessController extends Controller
     {
         $actor = $request->attributes->get('auth');
         $business = $this->findOrFail($id);
-        $this->assertOwnerOrAdmin($actor, $business->ownerId);
+        // Deleting stays with the owner and admins — a dealer can edit the
+        // listings they created but not remove them.
+        if ($actor['role'] !== 'ADMIN' && $actor['sub'] !== $business->ownerId) {
+            throw ApiException::forbidden('You do not own this business');
+        }
 
         // Return any issued QR boards to the unassigned pool first. Without
         // this the board keeps its "assigned" status while losing the
@@ -293,7 +334,7 @@ class BusinessController extends Controller
     {
         $actor = $request->attributes->get('auth');
         $business = $this->findOrFail($id);
-        $this->assertOwnerOrAdmin($actor, $business->ownerId);
+        $this->assertOwnerOrAdmin($actor, $business);
         $business->update(['status' => 'PENDING_APPROVAL']);
 
         return ApiResponse::ok($business);
@@ -303,7 +344,7 @@ class BusinessController extends Controller
     {
         $actor = $request->attributes->get('auth');
         $business = $this->findOrFail($id);
-        $this->assertOwnerOrAdmin($actor, $business->ownerId);
+        $this->assertOwnerOrAdmin($actor, $business);
 
         $data = $request->validate([
             'url' => ['required', 'url'],
@@ -321,7 +362,7 @@ class BusinessController extends Controller
     {
         $actor = $request->attributes->get('auth');
         $business = $this->findOrFail($id);
-        $this->assertOwnerOrAdmin($actor, $business->ownerId);
+        $this->assertOwnerOrAdmin($actor, $business);
         BusinessPhoto::where('id', $photoId)->delete();
 
         return ApiResponse::noContent();
@@ -331,7 +372,7 @@ class BusinessController extends Controller
     {
         $actor = $request->attributes->get('auth');
         $business = $this->findOrFail($id);
-        $this->assertOwnerOrAdmin($actor, $business->ownerId);
+        $this->assertOwnerOrAdmin($actor, $business);
 
         $data = $request->validate([
             'hours' => ['required', 'array', 'min:1', 'max:7'],
@@ -359,7 +400,7 @@ class BusinessController extends Controller
     {
         $actor = $request->attributes->get('auth');
         $business = $this->findOrFail($id);
-        $this->assertOwnerOrAdmin($actor, $business->ownerId);
+        $this->assertOwnerOrAdmin($actor, $business);
 
         $data = $request->validate([
             'name' => ['required', 'string', 'min:1', 'max:150'],
@@ -379,7 +420,7 @@ class BusinessController extends Controller
     {
         $actor = $request->attributes->get('auth');
         $business = $this->findOrFail($id);
-        $this->assertOwnerOrAdmin($actor, $business->ownerId);
+        $this->assertOwnerOrAdmin($actor, $business);
 
         $data = $request->validate([
             'name' => ['sometimes', 'string', 'min:1', 'max:150'],
@@ -400,7 +441,7 @@ class BusinessController extends Controller
     {
         $actor = $request->attributes->get('auth');
         $business = $this->findOrFail($id);
-        $this->assertOwnerOrAdmin($actor, $business->ownerId);
+        $this->assertOwnerOrAdmin($actor, $business);
         Service::where('id', $serviceId)->delete();
 
         return ApiResponse::noContent();

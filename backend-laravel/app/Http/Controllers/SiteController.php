@@ -7,6 +7,7 @@ use App\Models\Business;
 use App\Models\BusinessSite;
 use App\Models\Product;
 use App\Support\ApiResponse;
+use App\Support\BusinessAccess;
 use App\Support\SiteBuilder\Sanitizer;
 use App\Support\SiteBuilder\TemplateRegistry;
 use App\Support\SiteThemes;
@@ -33,14 +34,9 @@ class SiteController extends Controller
         return $business;
     }
 
-    private function assertOwnerOrAdmin(array $actor, string $ownerId): void
+    private function assertOwnerOrAdmin(array $actor, Business $business): void
     {
-        if ($actor['role'] === 'ADMIN') {
-            return;
-        }
-        if ($actor['sub'] !== $ownerId) {
-            throw ApiException::forbidden('You do not own this business');
-        }
+        BusinessAccess::assertCanManage($actor, $business);
     }
 
     private function ownedBusiness(array $actor, string $businessId): Business
@@ -49,7 +45,7 @@ class SiteController extends Controller
         if (! $business) {
             throw ApiException::notFound('Business not found');
         }
-        $this->assertOwnerOrAdmin($actor, $business->ownerId);
+        $this->assertOwnerOrAdmin($actor, $business);
 
         return $business;
     }
@@ -66,7 +62,7 @@ class SiteController extends Controller
     {
         $actor = $request->attributes->get('auth');
         $business = $this->loadBusinessForTemplate($id);
-        $this->assertOwnerOrAdmin($actor, $business->ownerId);
+        $this->assertOwnerOrAdmin($actor, $business);
 
         $data = $request->validate(['templateId' => ['sometimes', 'nullable', 'string', 'max:40']]);
 
@@ -108,7 +104,7 @@ class SiteController extends Controller
     {
         $actor = $request->attributes->get('auth');
         $business = $this->loadBusinessForTemplate($id);
-        $this->assertOwnerOrAdmin($actor, $business->ownerId);
+        $this->assertOwnerOrAdmin($actor, $business);
 
         if (! TemplateRegistry::isKnown($templateId)) {
             throw ApiException::badRequest("Unknown website template \"{$templateId}\"");

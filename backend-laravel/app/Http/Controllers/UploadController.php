@@ -82,7 +82,10 @@ class UploadController extends Controller
 
         try {
             Storage::disk('spaces')->put($path, $contents, ['visibility' => 'public', 'ContentType' => $mime]);
-        } catch (Throwable) {
+        } catch (Throwable $e) {
+            // The visitor gets a generic message; the log keeps the real
+            // cause (bad key, wrong region, SSL, missing package…).
+            report($e);
             throw new ApiException(500, 'INTERNAL_ERROR', "Could not upload that file \u{2014} check the server's DigitalOcean Spaces configuration");
         }
 

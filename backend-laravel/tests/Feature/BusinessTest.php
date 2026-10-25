@@ -122,6 +122,84 @@ class BusinessTest extends TestCase
         $response->assertStatus(403)->assertJsonPath('error.code', 'FORBIDDEN');
     }
 
+    public function test_slug_is_generated_from_the_name_and_kept_unique(): void
+    {
+        [, $token] = $this->actingToken(['role' => 'BUSINESS_OWNER']);
+        $category = $this->category();
+        $body = [
+            'name' => "Joe's Plumbing & Co", 'categoryId' => $category->id,
+            'phone' => '9998887777', 'addressLine1' => '1 Main St', 'city' => 'Pune', 'state' => 'MH',
+            'postalCode' => '411001', 'latitude' => 18.5, 'longitude' => 73.8,
+        ];
+
+        $this->postJson('/api/v1/businesses', $body, ['Authorization' => "Bearer {$token}"])
+            ->assertStatus(201)->assertJsonPath('data.slug', 'joe-s-plumbing-co');
+        $this->postJson('/api/v1/businesses', $body, ['Authorization' => "Bearer {$token}"])
+            ->assertStatus(201)->assertJsonPath('data.slug', 'joe-s-plumbing-co-2');
+    }
+
+    public function test_dealer_creates_a_business_login_with_a_mobile_number_username(): void
+    {
+        [, $token] = $this->actingToken(['role' => 'DEALER', 'privileges' => ['MANAGE_LISTINGS'], 'points' => 5]);
+        $category = $this->category();
+
+        $this->postJson('/api/v1/businesses', [
+            'name' => 'Mobile Shop', 'categoryId' => $category->id,
+            'phone' => '9998887777', 'addressLine1' => '1 Main St', 'city' => 'Pune', 'state' => 'MH',
+            'postalCode' => '411001', 'latitude' => 18.5, 'longitude' => 73.8,
+            'owner' => ['firstName' => 'Ravi', 'lastName' => 'K', 'username' => '+91 98765 43210', 'password' => 'Secret123!'],
+        ], ['Authorization' => "Bearer {$token}"])
+            ->assertStatus(201)
+            ->assertJsonPath('data.ownerAccount.username', '9876543210');
+
+        $this->assertDatabaseHas('users', ['phone' => '9876543210', 'email' => null, 'role' => 'BUSINESS_OWNER']);
+        $this->postJson('/api/v1/auth/login', ['email' => '9876543210', 'password' => 'Secret123!'])
+            ->assertStatus(200);
+    }
+
+    public function test_business_login_username_can_still_be_an_email(): void
+    {
+        [, $token] = $this->actingToken(['role' => 'DEALER', 'privileges' => ['MANAGE_LISTINGS'], 'points' => 5]);
+        $category = $this->category();
+
+        $this->postJson('/api/v1/businesses', [
+            'name' => 'Email Shop', 'categoryId' => $category->id,
+            'phone' => '9998887777', 'addressLine1' => '1 Main St', 'city' => 'Pune', 'state' => 'MH',
+            'postalCode' => '411001', 'latitude' => 18.5, 'longitude' => 73.8,
+            'owner' => ['firstName' => 'Asha', 'lastName' => 'M', 'username' => 'asha@shop.test', 'password' => 'Secret123!'],
+        ], ['Authorization' => "Bearer {$token}"])
+            ->assertStatus(201)
+            ->assertJsonPath('data.ownerAccount.username', 'asha@shop.test');
+
+        $this->postJson('/api/v1/auth/login', ['email' => 'asha@shop.test', 'password' => 'Secret123!'])
+            ->assertStatus(200);
+    }
+
+    public function test_dealer_keeps_managing_a_business_handed_to_its_own_login(): void
+    {
+        [, $token] = $this->actingToken(['role' => 'DEALER', 'privileges' => ['MANAGE_LISTINGS'], 'points' => 5]);
+        [, $otherDealer] = $this->actingToken(['role' => 'DEALER', 'privileges' => ['MANAGE_LISTINGS'], 'points' => 5]);
+        $category = $this->category();
+        $auth = ['Authorization' => "Bearer {$token}"];
+
+        $id = $this->postJson('/api/v1/businesses', [
+            'name' => 'Handed Over', 'categoryId' => $category->id,
+            'phone' => '9998887777', 'addressLine1' => '1 Main St', 'city' => 'Pune', 'state' => 'MH',
+            'postalCode' => '411001', 'latitude' => 18.5, 'longitude' => 73.8,
+            'owner' => ['firstName' => 'Ravi', 'lastName' => 'K', 'username' => '9876543210', 'password' => 'Secret123!'],
+        ], $auth)->assertStatus(201)->json('data.id');
+
+        $this->getJson('/api/v1/businesses/mine', $auth)->assertStatus(200)->assertJsonPath('data.0.id', $id);
+        $this->getJson("/api/v1/businesses/{$id}/manage", $auth)->assertStatus(200);
+        $this->patchJson("/api/v1/businesses/{$id}", ['name' => 'Renamed by dealer', 'city' => 'Mumbai'], $auth)
+            ->assertStatus(200)->assertJsonPath('data.name', 'Renamed by dealer');
+        $this->postJson("/api/v1/businesses/{$id}/services", ['name' => 'Repair', 'priceCents' => 50000], $auth)->assertStatus(201);
+
+        $this->patchJson("/api/v1/businesses/{$id}", ['name' => 'Not mine'], ['Authorization' => "Bearer {$otherDealer}"])
+            ->assertStatus(403);
+        $this->deleteJson("/api/v1/businesses/{$id}", [], $auth)->assertStatus(403);
+    }
+
     public function test_a_customer_cannot_create_a_business(): void
     {
         [, $token] = $this->actingToken(['role' => 'CUSTOMER']);

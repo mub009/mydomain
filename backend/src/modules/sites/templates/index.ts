@@ -1,6 +1,7 @@
 import { classicTemplate } from "./classic";
 import { elegantTemplate } from "./elegant";
 import { modernTemplate } from "./modern";
+import { showcaseTemplate } from "./showcase";
 import { summariseHours, buildContext, BusinessWithDetails, SiteTemplate } from "./shared";
 import { vibrantTemplate } from "./vibrant";
 
@@ -8,6 +9,7 @@ import { vibrantTemplate } from "./vibrant";
 // entry is what a business gets before it has chosen anything.
 export const SITE_TEMPLATES: SiteTemplate[] = [
   classicTemplate,
+  showcaseTemplate,
   modernTemplate,
   elegantTemplate,
   vibrantTemplate,
@@ -66,6 +68,22 @@ const STOREFRONT_THEMES: Record<string, StorefrontTheme> = {
     font: SANS,
     heading: SANS,
     uppercase: true,
+  },
+  showcase: {
+    accent: "#0d6efd",
+    accentAlt: "#0a58ca",
+    onAccent: "#ffffff",
+    bg: "#ffffff",
+    surface: "#f8f9fa",
+    text: "#212529",
+    muted: "#6c757d",
+    line: "#e9ecef",
+    headerBg: "#ffffff",
+    headerText: "#212529",
+    radius: "4px",
+    font: SANS,
+    heading: SANS,
+    uppercase: false,
   },
   modern: {
     accent: "#f5b301",

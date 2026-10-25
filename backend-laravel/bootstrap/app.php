@@ -5,6 +5,7 @@ use App\Http\Middleware\OptionalAuth;
 use App\Http\Middleware\RequireAuth;
 use App\Http\Middleware\RequirePrivilege;
 use App\Http\Middleware\RequireRole;
+use App\Http\Middleware\WebRequireRole;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\QueryException;
@@ -28,18 +29,31 @@ return Application::configure(basePath: dirname(__DIR__))
             'auth.optional' => OptionalAuth::class,
             'role' => RequireRole::class,
             'privilege' => RequirePrivilege::class,
+            'web.role' => WebRequireRole::class,
         ]);
         $middleware->throttleApi();
+        // Written by the location picker in the browser, so it is plain JSON
+        // rather than a Laravel-encrypted cookie.
+        $middleware->encryptCookies(except: [\App\Support\VisitorLocation::COOKIE]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        $exceptions->render(function (ApiException $e) {
+        $exceptions->render(function (ApiException $e, $request) {
+            if (! $request->is('api/*')) {
+                return null;
+            }
+
             return response()->json([
                 'success' => false,
                 'error' => ['code' => $e->errorCode, 'message' => $e->getMessage(), 'details' => $e->details],
             ], $e->statusCode);
         });
 
-        $exceptions->render(function (ValidationException $e) {
+        $exceptions->render(function (ValidationException $e, $request) {
+            // Blade forms get Laravel's usual redirect-back-with-errors.
+            if (! $request->is('api/*')) {
+                return null;
+            }
+
             $issues = [];
             foreach ($e->errors() as $field => $messages) {
                 foreach ($messages as $message) {
@@ -57,14 +71,22 @@ return Application::configure(basePath: dirname(__DIR__))
             ], 400);
         });
 
-        $exceptions->render(function (ModelNotFoundException $e) {
+        $exceptions->render(function (ModelNotFoundException $e, $request) {
+            if (! $request->is('api/*')) {
+                return null;
+            }
+
             return response()->json([
                 'success' => false,
                 'error' => ['code' => 'NOT_FOUND', 'message' => 'Resource not found'],
             ], 404);
         });
 
-        $exceptions->render(function (AuthorizationException $e) {
+        $exceptions->render(function (AuthorizationException $e, $request) {
+            if (! $request->is('api/*')) {
+                return null;
+            }
+
             return response()->json([
                 'success' => false,
                 'error' => ['code' => 'FORBIDDEN', 'message' => $e->getMessage() ?: 'Forbidden'],
@@ -80,7 +102,11 @@ return Application::configure(basePath: dirname(__DIR__))
             }
         });
 
-        $exceptions->render(function (QueryException $e) {
+        $exceptions->render(function (QueryException $e, $request) {
+            if (! $request->is('api/*')) {
+                return null;
+            }
+
             // MySQL 1062 / SQLite unique-constraint violations.
             if ($e->getCode() === '23000') {
                 return response()->json([

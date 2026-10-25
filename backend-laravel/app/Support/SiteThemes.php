@@ -21,6 +21,12 @@ class SiteThemes
             'line' => '#e8edf3', 'headerBg' => '#ffffff', 'headerText' => '#12161c',
             'radius' => '12px', 'font' => self::SANS, 'heading' => self::SANS, 'uppercase' => true,
         ],
+        'showcase' => [
+            'accent' => '#0d6efd', 'accentAlt' => '#0a58ca', 'onAccent' => '#ffffff',
+            'bg' => '#ffffff', 'surface' => '#f8f9fa', 'text' => '#212529', 'muted' => '#6c757d',
+            'line' => '#e9ecef', 'headerBg' => '#ffffff', 'headerText' => '#212529',
+            'radius' => '4px', 'font' => self::SANS, 'heading' => self::SANS, 'uppercase' => false,
+        ],
         'modern' => [
             'accent' => '#f5b301', 'accentAlt' => '#ffc933', 'onAccent' => '#0d1015',
             'bg' => '#0d1015', 'surface' => '#161b22', 'text' => '#e8edf4', 'muted' => '#9aa6b6',
@@ -38,6 +44,18 @@ class SiteThemes
             'bg' => '#ffffff', 'surface' => '#faf8ff', 'text' => '#1b1236', 'muted' => '#6b6486',
             'line' => '#ece7f7', 'headerBg' => '#ffffff', 'headerText' => '#1b1236',
             'radius' => '22px', 'font' => self::SANS, 'heading' => self::SANS, 'uppercase' => false,
+        ],
+        'fresh' => [
+            'accent' => '#15803d', 'accentAlt' => '#166534', 'onAccent' => '#ffffff',
+            'bg' => '#ffffff', 'surface' => '#f0fdf4', 'text' => '#14281d', 'muted' => '#5b6b61',
+            'line' => '#e2ece5', 'headerBg' => '#ffffff', 'headerText' => '#14281d',
+            'radius' => '16px', 'font' => self::SANS, 'heading' => self::SANS, 'uppercase' => false,
+        ],
+        'standard' => [
+            'accent' => '#ee1c25', 'accentAlt' => '#c8161e', 'onAccent' => '#ffffff',
+            'bg' => '#ffffff', 'surface' => '#f1f7ff', 'text' => '#212529', 'muted' => '#6c757d',
+            'line' => '#e9ecef', 'headerBg' => '#ffffff', 'headerText' => '#000000',
+            'radius' => '5px', 'font' => "'Overpass',".self::SANS, 'heading' => "'Overpass',".self::SANS, 'uppercase' => true,
         ],
     ];
 

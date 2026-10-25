@@ -44,13 +44,5 @@ services:
     ports:
       - "4000:4000"
 
-  frontend:
-    build:
-      context: ./frontend
-    depends_on:
-      - backend
-    ports:
-      - "5173:5173"
-
 volumes:
   mysql_data:

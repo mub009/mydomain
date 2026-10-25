@@ -53,7 +53,7 @@ class SiteBuilderTest extends TestCase
             ->assertJsonPath('data.hasSavedDraft', false)
             ->assertJsonPath('data.templateId', 'classic')
             ->assertJsonPath('data.renderedTemplateId', 'classic')
-            ->assertJsonCount(4, 'data.templates');
+            ->assertJsonCount(7, 'data.templates');
 
         $html = $response->json('data.starterHtml');
         $this->assertStringContainsString("Alice&#039;s Diner", $html);
@@ -82,7 +82,7 @@ class SiteBuilderTest extends TestCase
         $business = $this->business($owner);
         $token = $this->token($owner);
 
-        foreach (['classic', 'modern', 'elegant', 'vibrant'] as $id) {
+        foreach (['classic', 'showcase', 'modern', 'elegant', 'vibrant', 'fresh', 'standard'] as $id) {
             $this->getJson("/api/v1/businesses/{$business->id}/site/templates/{$id}", ['Authorization' => "Bearer {$token}"])
                 ->assertStatus(200)
                 ->assertJsonPath('data.templateId', $id);

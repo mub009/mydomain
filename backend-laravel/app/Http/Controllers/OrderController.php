@@ -7,6 +7,7 @@ use App\Models\Business;
 use App\Models\Order;
 use App\Models\Product;
 use App\Support\ApiResponse;
+use App\Support\BusinessAccess;
 use App\Support\Pagination;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -15,14 +16,9 @@ class OrderController extends Controller
 {
     private const STATUSES = ['PENDING', 'CONFIRMED', 'PACKED', 'SHIPPED', 'DELIVERED', 'CANCELLED'];
 
-    private function assertOwnerOrAdmin(array $actor, string $ownerId): void
+    private function assertOwnerOrAdmin(array $actor, Business $business): void
     {
-        if ($actor['role'] === 'ADMIN') {
-            return;
-        }
-        if ($actor['sub'] !== $ownerId) {
-            throw ApiException::forbidden('You do not own this business');
-        }
+        BusinessAccess::assertCanManage($actor, $business);
     }
 
     private function ownedBusiness(array $actor, string $businessId): Business
@@ -31,7 +27,7 @@ class OrderController extends Controller
         if (! $business) {
             throw ApiException::notFound('Business not found');
         }
-        $this->assertOwnerOrAdmin($actor, $business->ownerId);
+        $this->assertOwnerOrAdmin($actor, $business);
 
         return $business;
     }
@@ -99,7 +95,7 @@ class OrderController extends Controller
         if (! $order) {
             throw ApiException::notFound('Order not found');
         }
-        $this->assertOwnerOrAdmin($actor, $order->business->ownerId);
+        $this->assertOwnerOrAdmin($actor, $order->business);
 
         return ApiResponse::ok($order);
     }
@@ -113,7 +109,7 @@ class OrderController extends Controller
         if (! $order) {
             throw ApiException::notFound('Order not found');
         }
-        $this->assertOwnerOrAdmin($actor, $order->business->ownerId);
+        $this->assertOwnerOrAdmin($actor, $order->business);
 
         if ($order->status === $data['status']) {
             return ApiResponse::ok($order);

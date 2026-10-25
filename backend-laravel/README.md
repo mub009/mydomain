@@ -2,7 +2,7 @@
 
 A Laravel 11 port of the [Node/Express backend](../backend) in `backend/`.
 Same database shape (camelCase columns matching the original Prisma schema,
-so the existing `frontend/` can point at either backend without changes) and
+so the API contract stays the same on either backend) and
 the same JSON API contract: `{ success, data }` / `{ success, data, meta }`
 on success, `{ success: false, error: { code, message, details } }` on
 failure, including the `error.details.issues[].path/.message` shape the
@@ -33,36 +33,44 @@ Either way, on the server you still need to:
   server user)
 - `php artisan migrate` (and `php artisan db:seed` for the demo data, if wanted)
 
-### Deploying the frontend together with this backend
+### The frontend
 
-`frontend/src/api/client.ts` calls the API with a **relative** base URL
-(`/api/v1`), not a full URL — it's built to be served from the exact same
-origin as the API, not a separate domain. On shared hosting with no
-Node runtime and no reverse proxy available, that's the simplest possible
-setup: the frontend ships as static files sitting right next to Laravel's
-own `public/`, so there's no CORS to configure and no second server to run.
+The site's pages are server-rendered **Blade** views — no SPA framework.
 
-1. `cd frontend && npm install && npm run build` — produces `frontend/dist/`
-   (`index.html` + a hashed `assets/` folder).
-2. Copy the **contents** of `dist/` directly into `backend-laravel/public/`
-   (`cp -r frontend/dist/* backend-laravel/public/`) — merges alongside
-   Laravel's own `index.php`/`.htaccess`/`favicon.ico`/`robots.txt`, no
-   filename collisions. **Don't** put it in a subfolder like `public/cus/` —
-   the built `index.html` references its JS/CSS with root-absolute paths
-   (`/assets/...`), so anywhere but `public/` itself breaks it (blank page,
-   404s on the JS/CSS in the browser console).
-3. `git add backend-laravel/public && git commit` — the build output *is*
-   committed here specifically so a host with no Node runtime (most cPanel
-   accounts) can deploy a frontend change with nothing more than `git pull`.
-   Every rebuild replaces the previous `assets/*` files with new
-   content-hashed filenames, so stale ones don't linger — `git status` after
-   a build shows exactly what changed.
-4. `routes/web.php` has a catch-all `Route::fallback()` that serves the
-   SPA's `index.html` for anything not matched by a real route (so
-   client-side routes like `/business/some-slug` work on a hard
-   refresh/direct link too), while leaving `api/v1/*` alone so a bad API
-   route still 404s as JSON, not HTML, and real files under `assets/` are
-   served directly by Apache since they exist on disk.
+- `routes/web.php` maps each page to a controller in `app/Http/Controllers/Web`
+  (home, search, business page, published site / storefront, QR claim,
+  login/register, owner dashboard, admin console).
+- Those controllers reuse the API controllers in-process through
+  `App\Support\InternalApi`, so a page renders exactly the data — and goes
+  through exactly the checks — the matching `/api/v1` endpoint would.
+- Views live in `resources/views` (`layouts/`, `pages/`, `components/`,
+  `partials/`). Icons are `<x-icon name="…">`, drawn from the Lucide set in
+  `resources/icons/lucide.php`.
+- Interactive parts are small plain-JavaScript modules: `resources/js/app.js`
+  on every page, plus one `resources/js/pages/*.js` per page that needs it,
+  loaded with `@vite`. Forms that change data call the same `/api/v1`
+  endpoints as before (`resources/js/lib/api.js`); most then reload so the
+  page shows the saved state. The website builder is still GrapesJS.
+- **Sign-in** is a Laravel session (`App\Support\WebAuth`, middleware
+  `web.role`). The API keeps its bearer JWTs; a signed-in page's scripts get a
+  short-lived token for the session user from `GET /session/token`.
+- The visitor's chosen city / "near me" point is kept in the `mk_loc` cookie
+  (`App\Support\VisitorLocation`) so search results render already filtered.
+
+Building:
+
+- **Develop:** `npm install`, then `php artisan serve` and, in a second
+  terminal, `npm run dev` for live reload of CSS/JS. Open http://127.0.0.1:8000.
+- **Build:** `npm run build` writes the CSS/JS to `public/build/` (hashed
+  `assets/` + `manifest.json`).
+- **Deploy:** `public/build/` is committed on purpose, so a host with no
+  Node runtime (most cPanel accounts) can deploy a change with nothing more
+  than `git pull`. Rebuild and commit it with every CSS/JS change. Delete
+  `public/hot` if it exists on the server, since it makes `@vite` point at a
+  dev server.
+
+WhatsApp broadcasts and Poster Studio exist only in the Node backend, so the
+Blade dashboards don't offer them yet.
 
 ### Image uploads (DigitalOcean Spaces)
 

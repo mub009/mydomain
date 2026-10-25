@@ -5,7 +5,10 @@ namespace App\Support\SiteBuilder;
 use App\Models\Business;
 use App\Support\SiteBuilder\Templates\ClassicTemplate;
 use App\Support\SiteBuilder\Templates\ElegantTemplate;
+use App\Support\SiteBuilder\Templates\FreshTemplate;
 use App\Support\SiteBuilder\Templates\ModernTemplate;
+use App\Support\SiteBuilder\Templates\ShowcaseTemplate;
+use App\Support\SiteBuilder\Templates\StandardTemplate;
 use App\Support\SiteBuilder\Templates\VibrantTemplate;
 use App\Support\SiteThemes;
 
@@ -15,9 +18,12 @@ class TemplateRegistry
     // first entry is what a business gets before it has chosen anything.
     private const TEMPLATES = [
         ClassicTemplate::class,
+        ShowcaseTemplate::class,
         ModernTemplate::class,
         ElegantTemplate::class,
         VibrantTemplate::class,
+        FreshTemplate::class,
+        StandardTemplate::class,
     ];
 
     public const DEFAULT_TEMPLATE_ID = ClassicTemplate::ID;
@@ -44,6 +50,15 @@ class TemplateRegistry
         }
 
         return false;
+    }
+
+    // A web font the design needs, linked by the published page — site CSS
+    // can't load it itself because @import is stripped on save.
+    public static function fontUrl(?string $templateId): ?string
+    {
+        $class = self::resolve($templateId);
+
+        return defined("{$class}::FONT_URL") ? $class::FONT_URL : null;
     }
 
     // The catalogue the picker renders — everything but the builder itself.

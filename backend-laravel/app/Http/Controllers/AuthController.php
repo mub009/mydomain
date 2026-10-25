@@ -75,13 +75,14 @@ class AuthController extends Controller
     public function login(Request $request)
     {
         $data = $request->validate([
-            'email' => ['required', 'email'],
+            // Email or mobile number — business logins can use either.
+            'email' => ['required', 'string', 'max:255'],
             'password' => ['required', 'string', 'min:1'],
         ]);
 
-        $user = User::where('email', $data['email'])->first();
+        $user = User::findByLogin($data['email']);
         if (! $user || ! Hash::check($data['password'], $user->passwordHash)) {
-            throw ApiException::unauthorized('Invalid email or password');
+            throw ApiException::unauthorized('Invalid username or password');
         }
 
         if ($user->status === 'SUSPENDED') {

@@ -6,24 +6,20 @@ use App\Exceptions\ApiException;
 use App\Models\Business;
 use App\Models\ReviewScan;
 use App\Support\ApiResponse;
+use App\Support\BusinessAccess;
 use App\Support\ReviewChannels;
 use Illuminate\Http\Request;
 
 class ReviewLinkController extends Controller
 {
-    private function assertOwnerOrAdmin(array $actor, string $ownerId): void
+    private function assertOwnerOrAdmin(array $actor, Business $business): void
     {
-        if ($actor['role'] === 'ADMIN') {
-            return;
-        }
-        if ($actor['sub'] !== $ownerId) {
-            throw ApiException::forbidden('You do not own this business');
-        }
+        BusinessAccess::assertCanManage($actor, $business);
     }
 
     private function present(array $actor, Business $business)
     {
-        $this->assertOwnerOrAdmin($actor, $business->ownerId);
+        $this->assertOwnerOrAdmin($actor, $business);
 
         $scans = ReviewScan::where('businessId', $business->id)
             ->selectRaw('channel, COUNT(*) as cnt')->groupBy('channel')->pluck('cnt', 'channel');
@@ -70,7 +66,7 @@ class ReviewLinkController extends Controller
         if (! $business) {
             throw ApiException::notFound('Business not found');
         }
-        $this->assertOwnerOrAdmin($actor, $business->ownerId);
+        $this->assertOwnerOrAdmin($actor, $business);
 
         $data = $request->validate([
             'googlePlaceId' => ['sometimes', 'nullable', 'string', 'max:255'],

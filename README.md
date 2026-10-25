@@ -10,7 +10,7 @@ domain modules.
 | Layer     | Choice                                                             |
 |-----------|---------------------------------------------------------------------|
 | Backend   | Node.js, TypeScript, Express, Prisma ORM, MySQL, Redis, Stripe      |
-| Frontend  | React 18, TypeScript, Vite, Tailwind CSS, Zustand, React Router     |
+| Frontend  | Laravel Blade, plain JavaScript, Vite, Tailwind CSS                 |
 | Auth      | JWT access + rotating refresh tokens, bcrypt password hashing       |
 | Tests     | Vitest + Supertest (backend)                                        |
 
@@ -21,10 +21,9 @@ module boundaries.
 
 ```
 backend/          Express API — modular monolith, one folder per domain module
-backend-laravel/  Laravel 11 port of backend/ (core modules only — see its README)
-frontend/         React SPA consuming the API
+backend-laravel/  Laravel 11 port of backend/, plus the Blade frontend
 docs/             Architecture notes
-docker-compose.yml   MySQL + Redis + backend + frontend for local dev
+docker-compose.yml   MySQL + Redis + backend for local dev
 ```
 
 ## Getting started
@@ -88,10 +87,14 @@ access; the UI falls back to a category icon when an image cannot be loaded.
 
 ### 3. Frontend
 
+The pages are Blade views in `backend-laravel/resources/views`, served by
+Laravel:
+
 ```bash
-cd frontend
+cd backend-laravel
 npm install
-npm run dev                # http://localhost:5173 (proxies /api to :4000)
+php artisan serve          # http://127.0.0.1:8000
+npm run dev                # in a second terminal — live reload for CSS/JS
 ```
 
 ### 4. Tests

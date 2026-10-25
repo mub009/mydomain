@@ -2,8 +2,10 @@
 
 namespace App\Providers;
 
+use App\Support\WebAuth;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -29,5 +31,8 @@ class AppServiceProvider extends ServiceProvider
                 'error' => ['code' => 'RATE_LIMITED', 'message' => 'Too many auth attempts, try again later'],
             ], 429)
         ));
+
+        // The Blade layout (header, auth meta tag) needs the session user.
+        View::composer('*', fn ($view) => $view->with('authUser', WebAuth::user()));
     }
 }

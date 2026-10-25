@@ -128,6 +128,7 @@ class Helpers
             'directionsUrl' => "https://www.google.com/maps/dir/?api=1&destination={$business->latitude},{$business->longitude}",
             'mapEmbedUrl' => "https://maps.google.com/maps?q={$business->latitude},{$business->longitude}&amp;z=16&amp;output=embed",
             'whatsappUrl' => "https://wa.me/{$phoneDigits}",
+            'siteUrl' => self::escapeHtml(url("/site/{$business->slug}")),
             'year' => (int) date('Y'),
             'rating' => $business->avgRating > 0 ? number_format($business->avgRating, 1) : '',
             'reviewCount' => $business->reviewCount,

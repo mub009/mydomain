@@ -101,7 +101,7 @@ describe.each(SITE_TEMPLATES.map((t) => [t.id] as const))("template %s", (id) =>
     expect(html).toContain('src="https://cdn.test/logo.png"');
     expect(html).toContain("mk-header");
     expect(css).toMatch(/\.mk-header\{[^}]*position:sticky/);
-    expect(html).toContain("mk-track");
+    expect(html).toContain('class="mk-slide"');
     expect(html).toContain("maps.google.com");
     expect(html).toContain("https://wa.me/919876543210");
     expect(html).toContain('data-mk-form="enquiry"');
@@ -142,5 +142,29 @@ describe.each(SITE_TEMPLATES.map((t) => [t.id] as const))("template %s", (id) =>
     expect(cleanHtml).toContain("<svg");
     expect(cleanCss).toContain("position:sticky");
     expect(cleanCss).toContain(".mk-float");
+  });
+});
+
+describe("showcase hero", () => {
+  it("cross-fades the photos with arrows, dots and a call-to-action overlay", () => {
+    const { html, css } = buildTemplate(makeBusiness(), "showcase");
+
+    expect(html).toContain('id="mk-hero-3"');
+    expect(html).toContain('class="mk-dot" for="mk-hero-1"');
+    // The first slide's previous arrow wraps round to the last photo.
+    expect(html).toContain('<label for="mk-hero-3" aria-label="Previous photo">');
+    expect(html).toContain("mk-hero-caption");
+    expect(html).toContain('href="tel:');
+    expect(css).toContain("@keyframes mk-fade");
+    expect(css).toContain("#mk-hero-2:checked~.mk-slides .mk-slide:nth-child(2){opacity:1}");
+  });
+
+  it("drops the controls when there is only one photo", () => {
+    const business = makeBusiness();
+    const { html } = buildTemplate({ ...business, photos: business.photos.slice(0, 1) }, "showcase");
+
+    expect(html).not.toContain("mk-hero-radio");
+    expect(html).not.toContain("mk-dots");
+    expect(html).toContain("mk-hero-caption");
   });
 });
