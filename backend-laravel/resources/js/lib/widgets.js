@@ -215,35 +215,91 @@ export function statusBadgeClass(status) {
 }
 
 // --- Clone a business (dealers only) ---------------------------------------
-// Buttons carry data-clone-business='{"id":…,"name":…}'. Asks first, since
-// a copy costs a point, then opens the new draft's menu.
+// Buttons carry data-clone-business='{"id":…,"name":…}'. The copy is a
+// separate business, so the dealer sets up its team's login here; once it
+// is made, the login is shown for handing over and the dealer moves on to
+// the new draft.
 export function initCloneButtons() {
   $$("[data-clone-business]").forEach((button) =>
     button.addEventListener("click", () => {
       const business = JSON.parse(button.dataset.cloneBusiness);
+      let copy = null;
       const modal = openModal(
         "Clone business",
-        `<p class="text-sm text-ink-700">Make a copy of <strong>${esc(business.name)}</strong>?</p>
-        <p class="mt-2 text-sm text-ink-500">The copy gets its details, hours, services, photos, slider, gallery, products and website. It starts as a draft named “${esc(business.name)} (Copy)” and uses 1 point.</p>
-        <p class="mt-2 text-xs text-ink-400">Reviews, leads, bookings, orders and QR boards stay with the original.</p>
-        <p class="mt-3 text-sm text-red-700 bg-red-50 rounded-md px-3 py-2" data-clone-error hidden></p>
-        <div class="mt-4 flex justify-end gap-2">
-          <button type="button" class="btn-secondary px-4 py-2 text-sm" data-close>Cancel</button>
-          <button type="button" class="btn-primary px-4 py-2 text-sm" data-clone-confirm>${icon("copy", { size: 14 })} Clone</button>
-        </div>`,
+        `<form class="space-y-3" data-clone-form>
+          <div>
+            <p class="text-sm text-ink-700">Make a copy of <strong>${esc(business.name)}</strong>.</p>
+            <p class="mt-1 text-xs text-ink-500">The copy gets its details, hours, services, photos, slider, gallery, products and website, starts as a draft named “${esc(business.name)} (Copy)” and uses 1 point. Reviews, leads, bookings, orders and QR boards stay with the original.</p>
+          </div>
+          <div class="rounded-lg border border-gray-200 p-3 space-y-2">
+            <p class="text-sm font-semibold text-ink-900 flex items-center gap-1.5">${icon("key-round", { size: 14 })} Login for the copy</p>
+            <p class="text-[11px] text-ink-500">The copy is assigned to this account so its business team can sign in. If the username already has an account, the copy is linked to it and the password is ignored.</p>
+            <div class="flex gap-2">
+              <input class="input" name="firstName" placeholder="Contact first name" required />
+              <input class="input" name="lastName" placeholder="Contact last name" required />
+            </div>
+            <div>
+              <label class="block text-[11px] font-medium text-ink-600 mb-1">Username (email or mobile number)</label>
+              <input class="input" name="username" placeholder="owner@business.com or 9876543210" autocomplete="off" required />
+            </div>
+            <div>
+              <label class="block text-[11px] font-medium text-ink-600 mb-1">Password (min 8 characters)</label>
+              <div class="flex gap-2">
+                <input class="input font-mono" name="password" minlength="8" maxlength="72" autocomplete="off" required />
+                <button type="button" class="btn-secondary px-3 py-2 text-sm whitespace-nowrap" data-clone-generate>${icon("refresh-cw", { size: 14 })} Generate</button>
+              </div>
+            </div>
+            <input class="input" name="phone" minlength="7" maxlength="20" placeholder="Contact phone (optional)" />
+          </div>
+          <p class="text-sm text-red-700 bg-red-50 rounded-md px-3 py-2" data-clone-error hidden></p>
+          <div class="flex justify-end gap-2">
+            <button type="button" class="btn-secondary px-4 py-2 text-sm" data-close>Cancel</button>
+            <button class="btn-primary px-4 py-2 text-sm" data-clone-confirm>${icon("copy", { size: 14 })} Clone</button>
+          </div>
+        </form>`,
+        // Once the copy exists, closing the dialog goes to it.
+        { onClose: () => copy && reloadWithFlash(`This is the copy, “${copy.name}” — change what you need, then publish it.`, `/dashboard/businesses/${copy.id}`) },
       );
-      const confirm = $("[data-clone-confirm]", modal.body);
-      confirm.addEventListener("click", async () => {
+      const form = $("[data-clone-form]", modal.body);
+      form.password.value = generatePassword();
+      $("[data-clone-generate]", form).addEventListener("click", () => (form.password.value = generatePassword()));
+
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const confirm = $("[data-clone-confirm]", form);
         confirm.disabled = true;
         confirm.textContent = "Cloning…";
+        const owner = {
+          firstName: form.firstName.value.trim(),
+          lastName: form.lastName.value.trim(),
+          username: form.username.value.trim(),
+          password: form.password.value,
+          phone: form.phone.value.trim() || undefined,
+        };
         try {
-          const { data: copy } = await api.post(`/businesses/${business.id}/clone`);
-          reloadWithFlash(`Cloned. This is the copy, “${copy.name}” — change what you need, then publish it.`, `/dashboard/businesses/${copy.id}`);
+          ({ data: copy } = await api.post(`/businesses/${business.id}/clone`, { owner }));
         } catch (err) {
-          showError($("[data-clone-error]", modal.body), errorMessage(err));
+          showError($("[data-clone-error]", form), errorMessage(err));
           confirm.disabled = false;
           confirm.innerHTML = `${icon("copy", { size: 14 })} Clone`;
+          return;
         }
+        const account = copy.ownerAccount;
+        modal.body.innerHTML = `<div class="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+            <p class="font-bold text-emerald-800 flex items-center gap-1.5">${icon("check-circle-2", { size: 16 })} Cloned “${esc(copy.name)}”</p>
+            <p class="text-xs text-emerald-700/90 mt-1 mb-3">${
+              account.created
+                ? "Share this login with the business team. The password won't be shown again."
+                : "The copy was linked to an existing account — its team signs in with this username and their existing password."
+            }</p>
+            <div class="space-y-2.5">
+              ${copyField("Username", account.username)}
+              ${account.created ? copyField("Password", owner.password) : ""}
+            </div>
+          </div>
+          <div class="mt-4 flex justify-end">
+            <button type="button" class="btn-primary px-4 py-2 text-sm" data-close>${icon("arrow-right", { size: 14 })} Open the copy</button>
+          </div>`;
       });
     }),
   );

@@ -53,13 +53,7 @@ class BusinessController extends Controller
             'longitude' => [$required, 'numeric', 'min:-180', 'max:180'],
             'logoUrl' => ['nullable', 'url'],
             'coverImageUrl' => ['nullable', 'url'],
-            'owner' => ['sometimes', 'array'],
-            'owner.firstName' => ['required_with:owner', 'string', 'min:1', 'max:80'],
-            'owner.lastName' => ['required_with:owner', 'string', 'min:1', 'max:80'],
-            // The business team signs in with this: an email or a mobile number.
-            'owner.username' => ['required_with:owner', 'string', 'max:255'],
-            'owner.phone' => ['nullable', 'string', 'min:7', 'max:20'],
-            'owner.password' => ['required_with:owner', 'string', 'min:8', 'max:72'],
+            ...self::ownerRules('sometimes'),
         ];
     }
 
@@ -75,6 +69,95 @@ class BusinessController extends Controller
         }
 
         return "{$base}-".substr(bin2hex(random_bytes(3)), 0, 6);
+    }
+
+    // The login a dealer or admin can set up for a business's own team: an
+    // email or a mobile number as the username, and a password.
+    private static function ownerRules(string $presence): array
+    {
+        return [
+            'owner' => [$presence, 'array'],
+            'owner.firstName' => ['required_with:owner', 'string', 'min:1', 'max:80'],
+            'owner.lastName' => ['required_with:owner', 'string', 'min:1', 'max:80'],
+            'owner.username' => ['required_with:owner', 'string', 'max:255'],
+            'owner.phone' => ['nullable', 'string', 'min:7', 'max:20'],
+            'owner.password' => ['required_with:owner', 'string', 'min:8', 'max:72'],
+        ];
+    }
+
+    // Works out the email/phone the username stands for and checks it can
+    // be used, before anything is written. An existing customer or owner
+    // account is reused; a staff account never is.
+    private function checkOwnerLogin(array $owner): array
+    {
+        $username = trim($owner['username']);
+        if (str_contains($username, '@')) {
+            if (filter_var($username, FILTER_VALIDATE_EMAIL) === false) {
+                throw ApiException::badRequest('Enter a valid email address or 10-digit mobile number as the username');
+            }
+            $email = strtolower($username);
+            $phone = ! empty($owner['phone']) ? (User::normalizePhone($owner['phone']) ?? $owner['phone']) : null;
+        } else {
+            $phone = User::normalizePhone($username);
+            if (! $phone) {
+                throw ApiException::badRequest('Enter a valid email address or 10-digit mobile number as the username');
+            }
+            $email = null;
+        }
+
+        $existing = User::findByLogin($username);
+        if ($existing && in_array($existing->role, ['ADMIN', 'DEALER'], true)) {
+            throw ApiException::badRequest("This username belongs to a staff account and can't be used as a business login");
+        }
+        foreach (['email' => $email, 'phone' => $phone] as $field => $value) {
+            if (! $value) {
+                continue;
+            }
+            $taken = User::where($field, $value)->first();
+            if ($taken && $taken->id !== $existing?->id) {
+                throw ApiException::conflict(
+                    ($field === 'email' ? 'That email' : 'That phone number').' is already registered to another account'
+                );
+            }
+        }
+
+        return ['owner' => $owner, 'email' => $email, 'phone' => $phone, 'existing' => $existing];
+    }
+
+    // Inside the caller's transaction: the account the listing goes to.
+    private function ownerAccount(array $login, array $actor): User
+    {
+        $account = $login['existing'];
+        if ($account) {
+            // Reuse the account; promote a plain customer to a business owner.
+            if ($account->role === 'CUSTOMER') {
+                $account->update(['role' => 'BUSINESS_OWNER']);
+            }
+
+            return $account;
+        }
+
+        return User::create([
+            'email' => $login['email'],
+            'phone' => $login['phone'],
+            'passwordHash' => Hash::make($login['owner']['password']),
+            'firstName' => $login['owner']['firstName'],
+            'lastName' => $login['owner']['lastName'],
+            'role' => 'BUSINESS_OWNER',
+            'status' => 'ACTIVE',
+            // Remember who set this account up so the dealer can manage it
+            // later (e.g. reset the password on the owner's behalf).
+            'createdById' => $actor['sub'],
+        ]);
+    }
+
+    private function ownerAccountPayload(User $account, array $login): array
+    {
+        return [
+            'username' => $account->email ?? $account->phone,
+            'email' => $account->email,
+            'created' => ! $login['existing'],
+        ];
     }
 
     public function store(Request $request)
@@ -120,61 +203,10 @@ class BusinessController extends Controller
             });
         }
 
-        $username = trim($owner['username']);
-        if (str_contains($username, '@')) {
-            if (filter_var($username, FILTER_VALIDATE_EMAIL) === false) {
-                throw ApiException::badRequest('Enter a valid email address or 10-digit mobile number as the username');
-            }
-            $owner['email'] = strtolower($username);
-            $owner['phone'] = ! empty($owner['phone']) ? (User::normalizePhone($owner['phone']) ?? $owner['phone']) : null;
-        } else {
-            $phone = User::normalizePhone($username);
-            if (! $phone) {
-                throw ApiException::badRequest('Enter a valid email address or 10-digit mobile number as the username');
-            }
-            $owner['email'] = null;
-            $owner['phone'] = $phone;
-        }
+        $login = $this->checkOwnerLogin($owner);
 
-        $existing = User::findByLogin($username);
-        if ($existing && in_array($existing->role, ['ADMIN', 'DEALER'], true)) {
-            throw ApiException::badRequest("This username belongs to a staff account and can't be used as a business login");
-        }
-        foreach (['email' => $ownerEmail, 'phone' => $ownerPhone] as $field => $value) {
-            if (! $value) {
-                continue;
-            }
-            $taken = User::where($field, $value)->first();
-            if ($taken && $taken->id !== $existing?->id) {
-                throw ApiException::conflict(
-                    ($field === 'email' ? 'That email' : 'That phone number').' is already registered to another account'
-                );
-            }
-        }
-
-        $result = DB::transaction(function () use ($data, $actor, $initialStatus, $isStaff, $owner, $existing, $ownerEmail, $ownerPhone) {
-            $ownerRecord = $existing;
-
-            if ($ownerRecord) {
-                // Reuse the account; promote a plain customer to a business owner.
-                if ($ownerRecord->role === 'CUSTOMER') {
-                    $ownerRecord->update(['role' => 'BUSINESS_OWNER']);
-                }
-            } else {
-                $ownerRecord = User::create([
-                    'email' => $ownerEmail,
-                    'phone' => $ownerPhone,
-                    'passwordHash' => Hash::make($owner['password']),
-                    'firstName' => $owner['firstName'],
-                    'lastName' => $owner['lastName'],
-                    'role' => 'BUSINESS_OWNER',
-                    'status' => 'ACTIVE',
-                    // Remember who set this account up so the dealer can
-                    // manage it later (e.g. reset the password on the
-                    // owner's behalf).
-                    'createdById' => $actor['sub'],
-                ]);
-            }
+        $result = DB::transaction(function () use ($data, $actor, $initialStatus, $isStaff, $login) {
+            $ownerRecord = $this->ownerAccount($login, $actor);
 
             $business = Business::create([
                 ...$data,
@@ -186,14 +218,7 @@ class BusinessController extends Controller
 
             Points::spendForBusiness($actor, $business->id);
 
-            $payload = $business->toArray();
-            $payload['ownerAccount'] = [
-                'username' => $ownerRecord->email ?? $ownerRecord->phone,
-                'email' => $ownerRecord->email,
-                'created' => ! $existing,
-            ];
-
-            return $payload;
+            return [...$business->toArray(), 'ownerAccount' => $this->ownerAccountPayload($ownerRecord, $login)];
         });
 
         // A welcome email with the new login (when a fresh account was
@@ -340,7 +365,9 @@ class BusinessController extends Controller
     // Dealers only: a draft copy of a listing they manage, as a head start on
     // a similar one (another branch, another shop of the same kind). It
     // copies what the listing shows — details, hours, services, photos,
-    // products and website — and costs a point like any new listing.
+    // products and website — and costs a point like any new listing. The
+    // copy is a different business, so it gets its own login (`owner`, as
+    // in store) and is assigned to that account.
     // Reviews, leads, bookings, orders, QR boards and the Google review link
     // belong to the original business and stay with it.
     public function duplicate(Request $request, string $id)
@@ -351,9 +378,12 @@ class BusinessController extends Controller
             throw ApiException::notFound('Business not found');
         }
         $this->assertOwnerOrAdmin($actor, $source);
+        $owner = $request->validate(self::ownerRules('required'))['owner'];
         Points::assertHasPointsForBusiness($actor);
+        $login = $this->checkOwnerLogin($owner);
 
-        return DB::transaction(function () use ($actor, $source) {
+        return DB::transaction(function () use ($actor, $source, $login) {
+            $ownerRecord = $this->ownerAccount($login, $actor);
             $name = mb_substr($source->name, 0, 143).' (Copy)';
             $copy = Business::create([
                 ...$source->only([
@@ -363,7 +393,7 @@ class BusinessController extends Controller
                 ]),
                 'name' => $name,
                 'slug' => $this->uniqueSlug($name),
-                'ownerId' => $actor['sub'],
+                'ownerId' => $ownerRecord->id,
                 'createdById' => $actor['sub'],
                 // A draft, so a copy with the same details never shows up
                 // publicly until the dealer has made it its own.
@@ -396,7 +426,7 @@ class BusinessController extends Controller
 
             Points::spendForBusiness($actor, $copy->id);
 
-            return ApiResponse::created($copy);
+            return ApiResponse::created([...$copy->toArray(), 'ownerAccount' => $this->ownerAccountPayload($ownerRecord, $login)]);
         });
     }
 

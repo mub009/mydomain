@@ -51,6 +51,8 @@ class BusinessCloneTest extends TestCase
         ]);
     }
 
+    private const LOGIN = ['owner' => ['firstName' => 'Asha', 'lastName' => 'M', 'username' => 'branch2@shop.test', 'password' => 'Secret123!']];
+
     private function dealer(int $points = 5): User
     {
         return $this->user(['role' => 'DEALER', 'privileges' => ['MANAGE_LISTINGS'], 'points' => $points]);
@@ -68,15 +70,26 @@ class BusinessCloneTest extends TestCase
             'sliderImages' => ['https://cdn.example.com/s.jpg'], 'galleryImages' => ['https://cdn.example.com/g.jpg']]);
         Review::create(['businessId' => $source->id, 'userId' => $dealer->id, 'rating' => 5, 'comment' => 'Great']);
 
-        $copy = $this->postJson("/api/v1/businesses/{$source->id}/clone", [], $this->auth($dealer))
+        // The copy's own login is required.
+        $this->postJson("/api/v1/businesses/{$source->id}/clone", [], $this->auth($dealer))->assertStatus(400);
+
+        $copy = $this->postJson("/api/v1/businesses/{$source->id}/clone", self::LOGIN, $this->auth($dealer))
             ->assertCreated()
             ->assertJsonPath('data.name', 'Spice Route (Copy)')
             ->assertJsonPath('data.status', 'DRAFT')
+            ->assertJsonPath('data.ownerAccount.username', 'branch2@shop.test')
+            ->assertJsonPath('data.ownerAccount.created', true)
             ->json('data');
 
         $this->assertNotSame($source->slug, $copy['slug']);
         $clone = Business::find($copy['id']);
-        $this->assertSame($dealer->id, $clone->ownerId);
+        // Assigned to the new login, which can sign in; the dealer still manages it.
+        $account = User::where('email', 'branch2@shop.test')->first();
+        $this->assertSame('BUSINESS_OWNER', $account->role);
+        $this->assertSame($dealer->id, $account->createdById);
+        $this->assertSame($account->id, $clone->ownerId);
+        $this->assertSame($dealer->id, $clone->createdById);
+        $this->postJson('/api/v1/auth/login', ['email' => 'branch2@shop.test', 'password' => 'Secret123!'])->assertOk();
         $this->assertNull($clone->googleReviewUrl);
         $this->assertSame(0, (int) $clone->reviewCount);
         $this->assertSame(1, BusinessPhoto::where('businessId', $clone->id)->count());
@@ -106,8 +119,8 @@ class BusinessCloneTest extends TestCase
         $admin = $this->user(['role' => 'ADMIN']);
         $source = $this->business($owner);
 
-        $this->postJson("/api/v1/businesses/{$source->id}/clone", [], $this->auth($owner))->assertForbidden();
-        $this->postJson("/api/v1/businesses/{$source->id}/clone", [], $this->auth($admin))->assertForbidden();
+        $this->postJson("/api/v1/businesses/{$source->id}/clone", self::LOGIN, $this->auth($owner))->assertForbidden();
+        $this->postJson("/api/v1/businesses/{$source->id}/clone", self::LOGIN, $this->auth($admin))->assertForbidden();
         $this->assertSame(1, Business::count());
     }
 
@@ -115,13 +128,15 @@ class BusinessCloneTest extends TestCase
     {
         $dealer = $this->dealer();
         $someoneElses = $this->business($this->user(['role' => 'BUSINESS_OWNER']));
-        $this->postJson("/api/v1/businesses/{$someoneElses->id}/clone", [], $this->auth($dealer))->assertForbidden();
+        $this->postJson("/api/v1/businesses/{$someoneElses->id}/clone", self::LOGIN, $this->auth($dealer))->assertForbidden();
 
         $broke = $this->dealer(0);
         $own = $this->business($broke);
-        $this->postJson("/api/v1/businesses/{$own->id}/clone", [], $this->auth($broke))->assertForbidden();
+        $this->postJson("/api/v1/businesses/{$own->id}/clone", self::LOGIN, $this->auth($broke))->assertForbidden();
         $this->assertSame(2, Business::count());
 
-        $this->postJson('/api/v1/businesses/no-such-id/clone', [], $this->auth($dealer))->assertNotFound();
+        $this->postJson('/api/v1/businesses/no-such-id/clone', self::LOGIN, $this->auth($dealer))->assertNotFound();
+        // No account is made when the clone is refused.
+        $this->assertSame(0, User::where('email', 'branch2@shop.test')->count());
     }
 }
