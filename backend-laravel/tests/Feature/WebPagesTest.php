@@ -149,6 +149,10 @@ class WebPagesTest extends TestCase
                 ->assertOk()->assertDontSee('Could not', false);
         }
 
+        // With no section picked, the page is a menu of them all.
+        $this->get("/dashboard/businesses/{$business->id}")->assertOk()
+            ->assertSee('?section=Our+Gallery', false)->assertSee('Banner photos that slide on your website');
+
         $this->get("/dashboard/businesses/{$other->id}")->assertForbidden();
         $this->get('/dashboard/businesses/no-such-id')->assertNotFound();
     }

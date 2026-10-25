@@ -34,6 +34,22 @@ class DashboardController extends Controller
     // backend yet (see README), so the manager doesn't offer them.
     public const SECTIONS = ['Details', 'Hours', 'Services', 'Photos', 'Slider', 'Our Gallery', 'Reviews & QR', 'Website', 'Products', 'Orders', 'Customers'];
 
+    // How each section appears on the business's menu page: its icon, the
+    // icon's colours, and one line on what it is for.
+    public const SECTION_TILES = [
+        'Details' => ['icon' => 'info', 'tint' => 'bg-blue-50 text-blue-600', 'blurb' => 'Name, category, contact details and address'],
+        'Hours' => ['icon' => 'clock', 'tint' => 'bg-amber-50 text-amber-600', 'blurb' => 'Opening and closing times for each day'],
+        'Services' => ['icon' => 'wrench', 'tint' => 'bg-violet-50 text-violet-600', 'blurb' => 'What you offer, with prices'],
+        'Photos' => ['icon' => 'image-plus', 'tint' => 'bg-pink-50 text-pink-600', 'blurb' => 'Photos on your listing page'],
+        'Slider' => ['icon' => 'play', 'tint' => 'bg-orange-50 text-orange-600', 'blurb' => 'Banner photos that slide on your website'],
+        'Our Gallery' => ['icon' => 'layout-grid', 'tint' => 'bg-teal-50 text-teal-600', 'blurb' => 'The gallery section of your website'],
+        'Reviews & QR' => ['icon' => 'qr-code', 'tint' => 'bg-yellow-50 text-yellow-600', 'blurb' => 'Review links and QR boards'],
+        'Website' => ['icon' => 'globe', 'tint' => 'bg-sky-50 text-sky-600', 'blurb' => 'Design and publish your website'],
+        'Products' => ['icon' => 'package', 'tint' => 'bg-emerald-50 text-emerald-600', 'blurb' => 'Items for your online shop'],
+        'Orders' => ['icon' => 'receipt', 'tint' => 'bg-indigo-50 text-indigo-600', 'blurb' => 'Orders placed in your shop'],
+        'Customers' => ['icon' => 'users', 'tint' => 'bg-rose-50 text-rose-600', 'blurb' => 'People who have ordered from you'],
+    ];
+
     public const LEAD_STATUSES = ['NEW', 'CONTACTED', 'QUALIFIED', 'CONVERTED', 'LOST'];
 
     public const BOOKING_STATUSES = ['PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED', 'NO_SHOW'];
@@ -116,7 +132,8 @@ class DashboardController extends Controller
             abort($e->statusCode === 403 ? 403 : 404);
         }
 
-        $section = in_array($request->query('section'), self::SECTIONS, true) ? $request->query('section') : 'Details';
+        // With no section picked, the page is the menu of all of them.
+        $section = in_array($request->query('section'), self::SECTIONS, true) ? $request->query('section') : null;
         $page = max(1, (int) $request->query('page', 1));
         $data = [];
 

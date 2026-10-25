@@ -17,7 +17,7 @@
   <div class="space-y-4">
     <div class="flex items-center justify-between gap-3 flex-wrap">
       <div class="flex items-center gap-3">
-        <a href="/dashboard" class="btn-secondary px-3 py-2 text-sm"><x-icon name="arrow-left" :size="15" /> Back</a>
+        <a href="{{ $section ? $base : '/dashboard' }}" class="btn-secondary px-3 py-2 text-sm"><x-icon name="arrow-left" :size="15" /> {{ $section ? 'Menu' : 'Back' }}</a>
         <div>
           <h2 class="text-lg font-bold text-ink-900">{{ $biz['name'] }}</h2>
           <span class="badge {{ $statusBadge }}">{{ preg_replace('/_/', ' ', $biz['status'], 1) }}</span>
@@ -36,16 +36,30 @@
     <p class="text-sm text-brand-700 bg-brand-50 rounded-md px-3 py-2" data-flash hidden></p>
     <p class="text-sm text-red-700 bg-red-50 rounded-md px-3 py-2" data-error hidden></p>
 
-    {{-- Section tabs --}}
-    <div class="flex gap-1 overflow-x-auto border-b border-gray-200">
-      @foreach (D::SECTIONS as $s)
-        <a href="{{ $base }}?section={{ urlencode($s) }}" @class([
-            'whitespace-nowrap px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors',
-            'border-brand-600 text-brand-600' => $section === $s,
-            'border-transparent text-ink-500 hover:text-ink-900' => $section !== $s,
-        ])>{{ $s }}</a>
-      @endforeach
-    </div>
+    @if (! $section)
+      {{-- The menu: every section as an icon tile. --}}
+      <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        @foreach (D::SECTIONS as $s)
+          @php $tile = D::SECTION_TILES[$s]; @endphp
+          <a href="{{ $base }}?section={{ urlencode($s) }}" class="card group flex flex-col items-center gap-2.5 p-5 text-center transition hover:-translate-y-0.5 hover:shadow-md hover:ring-1 hover:ring-brand-200">
+            <span class="flex h-14 w-14 items-center justify-center rounded-2xl {{ $tile['tint'] }} transition-transform group-hover:scale-105"><x-icon :name="$tile['icon']" :size="26" /></span>
+            <span class="text-sm font-bold text-ink-900">{{ $s }}</span>
+            <span class="hidden text-xs leading-snug text-ink-500 sm:block">{{ $tile['blurb'] }}</span>
+          </a>
+        @endforeach
+      </div>
+    @else
+      {{-- Section tabs, for hopping between sections. --}}
+      <div class="flex gap-1 overflow-x-auto border-b border-gray-200">
+        @foreach (D::SECTIONS as $s)
+          <a href="{{ $base }}?section={{ urlencode($s) }}" @class([
+              'flex items-center gap-1.5 whitespace-nowrap px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors',
+              'border-brand-600 text-brand-600' => $section === $s,
+              'border-transparent text-ink-500 hover:text-ink-900' => $section !== $s,
+          ])><x-icon :name="D::SECTION_TILES[$s]['icon']" :size="14" /> {{ $s }}</a>
+        @endforeach
+      </div>
+    @endif
 
     @switch($section)
       @case('Details') @include('pages.dashboard.sections.details') @break
