@@ -213,3 +213,38 @@ const STATUS_BADGES = {
 export function statusBadgeClass(status) {
   return STATUS_BADGES[status] ?? "bg-gray-100 text-gray-600";
 }
+
+// --- Clone a business (dealers only) ---------------------------------------
+// Buttons carry data-clone-business='{"id":…,"name":…}'. Asks first, since
+// a copy costs a point, then opens the new draft's menu.
+export function initCloneButtons() {
+  $$("[data-clone-business]").forEach((button) =>
+    button.addEventListener("click", () => {
+      const business = JSON.parse(button.dataset.cloneBusiness);
+      const modal = openModal(
+        "Clone business",
+        `<p class="text-sm text-ink-700">Make a copy of <strong>${esc(business.name)}</strong>?</p>
+        <p class="mt-2 text-sm text-ink-500">The copy gets its details, hours, services, photos, slider, gallery, products and website. It starts as a draft named “${esc(business.name)} (Copy)” and uses 1 point.</p>
+        <p class="mt-2 text-xs text-ink-400">Reviews, leads, bookings, orders and QR boards stay with the original.</p>
+        <p class="mt-3 text-sm text-red-700 bg-red-50 rounded-md px-3 py-2" data-clone-error hidden></p>
+        <div class="mt-4 flex justify-end gap-2">
+          <button type="button" class="btn-secondary px-4 py-2 text-sm" data-close>Cancel</button>
+          <button type="button" class="btn-primary px-4 py-2 text-sm" data-clone-confirm>${icon("copy", { size: 14 })} Clone</button>
+        </div>`,
+      );
+      const confirm = $("[data-clone-confirm]", modal.body);
+      confirm.addEventListener("click", async () => {
+        confirm.disabled = true;
+        confirm.textContent = "Cloning…";
+        try {
+          const { data: copy } = await api.post(`/businesses/${business.id}/clone`);
+          reloadWithFlash(`Cloned. This is the copy, “${copy.name}” — change what you need, then publish it.`, `/dashboard/businesses/${copy.id}`);
+        } catch (err) {
+          showError($("[data-clone-error]", modal.body), errorMessage(err));
+          confirm.disabled = false;
+          confirm.innerHTML = `${icon("copy", { size: 14 })} Clone`;
+        }
+      });
+    }),
+  );
+}

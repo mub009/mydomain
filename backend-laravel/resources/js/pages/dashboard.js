@@ -1,10 +1,11 @@
 import { api, errorMessage } from "../lib/api";
 import { icon } from "../lib/icons";
 import { $, $$, esc, pageData } from "../lib/ui";
-import { copyField, generatePassword, reloadWithFlash, resetPasswordModal, showError, showFlash, statusBadgeClass } from "../lib/widgets";
+import { copyField, generatePassword, initCloneButtons, reloadWithFlash, resetPasswordModal, showError, showFlash, statusBadgeClass } from "../lib/widgets";
 
 const data = pageData("dashboard-data") ?? {};
 showFlash();
+initCloneButtons();
 
 // --- Add business -----------------------------------------------------------
 const form = $("[data-create-business]");

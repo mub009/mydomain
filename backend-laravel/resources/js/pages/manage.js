@@ -1,7 +1,7 @@
 import { api, errorMessage, uploadImage } from "../lib/api";
 import { CHANNEL_LABELS, boardUrl, downloadDataUrl, renderQrDataUrl } from "../lib/channels";
 import { $, $$, openModal, pageData } from "../lib/ui";
-import { boardPreviewModal, initUploadFields, reloadWithFlash, showError, showFlash } from "../lib/widgets";
+import { boardPreviewModal, initCloneButtons, initUploadFields, reloadWithFlash, showError, showFlash } from "../lib/widgets";
 
 // Managing one business: each section is server-rendered; these handlers
 // save through the API and reload so the page shows the saved state.
@@ -13,6 +13,7 @@ const fail = (err) => showError(errorBox, errorMessage(err));
 
 showFlash();
 initUploadFields();
+initCloneButtons();
 
 // Runs an API call with the button showing a busy label.
 async function busy(button, label, work) {
@@ -31,10 +32,12 @@ async function busy(button, label, work) {
   }
 }
 
-$("[data-submit-approval]")?.addEventListener("click", async () => {
+$("[data-submit-approval]")?.addEventListener("click", async (e) => {
+  // Dealers and admins publish straight away; owners wait for review.
+  const publishes = "publishes" in e.currentTarget.dataset;
   try {
     await api.post(`${base}/submit`);
-    reloadWithFlash("Submitted for approval.");
+    reloadWithFlash(publishes ? "Published — the listing is live." : "Submitted for approval.");
   } catch (err) {
     fail(err);
   }

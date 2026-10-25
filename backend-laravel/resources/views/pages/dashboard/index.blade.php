@@ -103,7 +103,12 @@
               <span class="badge {{ $badge($b['status']) }}">{{ preg_replace('/_/', ' ', $b['status'], 1) }}</span>
             </div>
             <p class="text-xs text-ink-500 mt-1 flex items-center gap-1"><x-icon name="map-pin" :size="12" /> {{ $b['city'] }}, {{ $b['state'] }}</p>
-            <a href="/dashboard/businesses/{{ $b['id'] }}" class="btn-secondary w-full mt-3 py-2 text-sm"><x-icon name="settings-2" :size="15" /> Manage</a>
+            <div class="mt-3 flex gap-2">
+              <a href="/dashboard/businesses/{{ $b['id'] }}" class="btn-secondary flex-1 py-2 text-sm"><x-icon name="settings-2" :size="15" /> Manage</a>
+              @if ($isDealer)
+                <button type="button" data-clone-business="{{ json_encode(['id' => $b['id'], 'name' => $b['name']]) }}" @disabled($outOfPoints) title="{{ $outOfPoints ? 'No points left — contact the admin to add more' : 'Make a draft copy of this business' }}" class="btn-secondary px-3 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"><x-icon name="copy" :size="15" /> Clone</button>
+              @endif
+            </div>
           </div>
         @empty
           <div class="card p-8 text-center text-sm text-ink-500 sm:col-span-2" data-empty-listings>No businesses yet — click “Add business” to get started.</div>

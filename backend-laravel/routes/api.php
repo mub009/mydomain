@@ -114,6 +114,7 @@ Route::prefix('businesses')->group(function () {
         Route::patch('/{id}', [BusinessController::class, 'update']);
         Route::delete('/{id}', [BusinessController::class, 'destroy']);
         Route::post('/{id}/submit', [BusinessController::class, 'submit']);
+        Route::post('/{id}/clone', [BusinessController::class, 'duplicate'])->middleware('role:DEALER');
 
         Route::post('/{id}/photos', [BusinessController::class, 'addPhoto']);
         Route::delete('/{id}/photos/{photoId}', [BusinessController::class, 'removePhoto']);

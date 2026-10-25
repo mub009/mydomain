@@ -24,11 +24,18 @@
         </div>
       </div>
       <div class="flex items-center gap-2">
+        @if ($authUser?->role === 'DEALER')
+          <button type="button" data-clone-business="{{ json_encode(['id' => $biz['id'], 'name' => $biz['name']]) }}" class="btn-secondary px-3 py-2 text-sm"><x-icon name="copy" :size="15" /> Clone</button>
+        @endif
         @if ($biz['status'] === 'PUBLISHED')
           <a href="/business/{{ $biz['slug'] }}" class="btn-secondary px-3 py-2 text-sm"><x-icon name="external-link" :size="15" /> View public page</a>
         @endif
         @if (! in_array($biz['status'], ['PUBLISHED', 'PENDING_APPROVAL'], true))
-          <button type="button" data-submit-approval class="btn-primary px-3 py-2 text-sm"><x-icon name="send" :size="15" /> Submit for approval</button>
+          @if (in_array($authUser?->role, ['DEALER', 'ADMIN'], true))
+            <button type="button" data-submit-approval data-publishes class="btn-primary px-3 py-2 text-sm"><x-icon name="send" :size="15" /> Publish</button>
+          @else
+            <button type="button" data-submit-approval class="btn-primary px-3 py-2 text-sm"><x-icon name="send" :size="15" /> Submit for approval</button>
+          @endif
         @endif
       </div>
     </div>

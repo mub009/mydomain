@@ -6,7 +6,9 @@ use App\Exceptions\ApiException;
 use App\Models\Business;
 use App\Models\BusinessHours;
 use App\Models\BusinessPhoto;
+use App\Models\BusinessSite;
 use App\Models\Category;
+use App\Models\Product;
 use App\Models\ReviewQrCode;
 use App\Models\Service;
 use App\Models\User;
@@ -335,12 +337,78 @@ class BusinessController extends Controller
         return ApiResponse::noContent();
     }
 
+    // Dealers only: a draft copy of a listing they manage, as a head start on
+    // a similar one (another branch, another shop of the same kind). It
+    // copies what the listing shows — details, hours, services, photos,
+    // products and website — and costs a point like any new listing.
+    // Reviews, leads, bookings, orders, QR boards and the Google review link
+    // belong to the original business and stay with it.
+    public function duplicate(Request $request, string $id)
+    {
+        $actor = $request->attributes->get('auth');
+        $source = Business::with(['photos', 'hours', 'services', 'site'])->find($id);
+        if (! $source) {
+            throw ApiException::notFound('Business not found');
+        }
+        $this->assertOwnerOrAdmin($actor, $source);
+        Points::assertHasPointsForBusiness($actor);
+
+        return DB::transaction(function () use ($actor, $source) {
+            $name = mb_substr($source->name, 0, 143).' (Copy)';
+            $copy = Business::create([
+                ...$source->only([
+                    'description', 'categoryId', 'subscriptionPlan', 'businessType', 'email', 'phone', 'website',
+                    'addressLine1', 'addressLine2', 'city', 'state', 'postalCode', 'country', 'latitude', 'longitude',
+                    'instagramUsername', 'facebookPageUrl', 'youtubeUrl', 'preferredReviewChannel', 'logoUrl', 'coverImageUrl',
+                ]),
+                'name' => $name,
+                'slug' => $this->uniqueSlug($name),
+                'ownerId' => $actor['sub'],
+                'createdById' => $actor['sub'],
+                // A draft, so a copy with the same details never shows up
+                // publicly until the dealer has made it its own.
+                'status' => 'DRAFT',
+                'isVerified' => false,
+            ]);
+
+            foreach ($source->photos as $photo) {
+                BusinessPhoto::create([...$photo->only(['url', 'caption', 'sortOrder']), 'businessId' => $copy->id]);
+            }
+            foreach ($source->hours as $hours) {
+                BusinessHours::create([...$hours->only(['dayOfWeek', 'openTime', 'closeTime', 'isClosed']), 'businessId' => $copy->id]);
+            }
+            foreach ($source->services as $service) {
+                Service::create([...$service->only(['name', 'description', 'priceCents', 'currency', 'durationMins', 'isActive']), 'businessId' => $copy->id]);
+            }
+            foreach (Product::where('businessId', $source->id)->get() as $product) {
+                Product::create([...$product->only([
+                    'name', 'slug', 'description', 'priceCents', 'compareAtCents', 'currency',
+                    'imageUrl', 'sku', 'trackStock', 'stock', 'isActive', 'sortOrder',
+                ]), 'businessId' => $copy->id]);
+            }
+            if ($source->site) {
+                // Offline until the dealer publishes the copy themselves.
+                BusinessSite::create([...$source->site->only([
+                    'siteType', 'templateId', 'projectData', 'html', 'css', 'sliderImages', 'galleryImages',
+                    'deliveryFeeCents', 'freeDeliveryAboveCents', 'acceptsOnlinePayment',
+                ]), 'businessId' => $copy->id, 'isPublished' => false]);
+            }
+
+            Points::spendForBusiness($actor, $copy->id);
+
+            return ApiResponse::created($copy);
+        });
+    }
+
     public function submit(Request $request, string $id)
     {
         $actor = $request->attributes->get('auth');
         $business = $this->findOrFail($id);
         $this->assertOwnerOrAdmin($actor, $business);
-        $business->update(['status' => 'PENDING_APPROVAL']);
+        // Staff listings go live without review, as they do when created
+        // (see store) — this is how a dealer publishes a cloned draft.
+        $isStaff = in_array($actor['role'], ['DEALER', 'ADMIN'], true);
+        $business->update(['status' => $isStaff ? 'PUBLISHED' : 'PENDING_APPROVAL']);
 
         return ApiResponse::ok($business);
     }
