@@ -227,12 +227,10 @@ class StorefrontTest extends TestCase
             ->assertStatus(403);
     }
 
-    public function test_public_site_404s_when_nothing_is_published(): void
+    public function test_a_shop_404s_until_it_is_opened(): void
     {
         $owner = $this->user(['role' => 'BUSINESS_OWNER']);
         $business = $this->business($owner);
-
-        $this->getJson("/api/v1/sites/{$business->slug}")->assertStatus(404);
 
         BusinessSite::create(['businessId' => $business->id, 'siteType' => 'ECOMMERCE', 'isPublished' => false]);
         $this->getJson("/api/v1/sites/{$business->slug}")->assertStatus(404);

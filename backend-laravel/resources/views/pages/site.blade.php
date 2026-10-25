@@ -3,6 +3,11 @@
 @section('title', $site['business']['name'].' — Website')
 
 @push('head')
+  {{-- Served at both <slug>.<domain> and /site/<slug>; search engines are
+       told the subdomain is the one to list. --}}
+  @if (config('sites.domain'))
+    <link rel="canonical" href="{{ \App\Support\SiteUrl::for($site['business']['slug']) }}/" />
+  @endif
   @if ($fontUrl = \App\Support\SiteBuilder\TemplateRegistry::fontUrl($site['templateId'] ?? null))
     <link rel="stylesheet" href="{{ $fontUrl }}" />
   @endif
@@ -26,7 +31,7 @@
 
     {{-- Small attribution back to the listing, kept out of the site's design. --}}
     <p class="bg-white py-4 text-center text-xs text-gray-400">
-      <a href="/business/{{ $site['business']['slug'] }}" class="hover:text-brand-600 hover:underline">{{ $site['business']['name'] }} on Markkito</a>
+      <a href="{{ \App\Support\SiteUrl::markkito('/business/'.$site['business']['slug']) }}" class="hover:text-brand-600 hover:underline">{{ $site['business']['name'] }} on Markkito</a>
     </p>
   </div>
 @endsection

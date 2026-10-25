@@ -16,17 +16,18 @@ class TemplateRegistry
 {
     // Order matters — this is the order the picker shows them in, and the
     // first entry is what a business gets before it has chosen anything.
+    // In picker order; the default comes first.
     private const TEMPLATES = [
+        StandardTemplate::class,
         ClassicTemplate::class,
         ShowcaseTemplate::class,
         ModernTemplate::class,
         ElegantTemplate::class,
         VibrantTemplate::class,
         FreshTemplate::class,
-        StandardTemplate::class,
     ];
 
-    public const DEFAULT_TEMPLATE_ID = ClassicTemplate::ID;
+    public const DEFAULT_TEMPLATE_ID = StandardTemplate::ID;
 
     // Falls back to the default rather than throwing: a template that was
     // renamed or retired must not lock an owner out of their own editor.

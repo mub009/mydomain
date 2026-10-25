@@ -34,7 +34,7 @@ class BusinessController extends Controller
         return [
             'name' => [$required, 'string', 'min:2', 'max:150'],
             // Optional on create — generated from the name when left out.
-            'slug' => ['sometimes', 'string', 'min:2', 'max:150', 'regex:/^[a-z0-9-]+$/'],
+            'slug' => ['sometimes', 'string', 'min:2', 'max:56', 'regex:/^[a-z0-9-]+$/'],
             'description' => ['nullable', 'string', 'max:2000'],
             'categoryId' => [$required, 'uuid'],
             // A label for discovery, not a different feature set — B2B
@@ -60,10 +60,13 @@ class BusinessController extends Controller
     private function uniqueSlug(string $value): string
     {
         $base = trim(preg_replace('/[^a-z0-9]+/', '-', strtolower($value)), '-');
-        $base = substr($base, 0, 140) ?: 'business';
+        // The slug is also the website's subdomain (config/sites.php): a DNS
+        // label is at most 63 characters, so leave room for a "-NN" suffix,
+        // and never take a reserved name such as "www".
+        $base = trim(substr($base, 0, 56), '-') ?: 'business';
         for ($attempt = 0; $attempt < 50; $attempt++) {
             $candidate = $attempt === 0 ? $base : "{$base}-".($attempt + 1);
-            if (! Business::where('slug', $candidate)->exists()) {
+            if (! in_array($candidate, config('sites.reserved'), true) && ! Business::where('slug', $candidate)->exists()) {
                 return $candidate;
             }
         }

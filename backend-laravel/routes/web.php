@@ -8,7 +8,17 @@ use App\Http\Controllers\Web\DashboardController;
 use App\Http\Controllers\Web\HomeController;
 use App\Http\Controllers\Web\SearchPageController;
 use App\Http\Controllers\Web\SitePageController;
+use App\Support\SiteUrl;
 use Illuminate\Support\Facades\Route;
+
+// A business's own website on its subdomain (config/sites.php). Registered
+// first so <slug>.<domain>/ is the website rather than the Markkito home
+// page; everything else on a subdomain (assets, the API) works as usual.
+if ($siteDomain = config('sites.domain')) {
+    Route::domain('{slug}.'.$siteDomain)->where(['slug' => SiteUrl::slugPattern()])->group(function () {
+        Route::get('/', SitePageController::class);
+    });
+}
 
 Route::get('/health', function () {
     return response()->json(['status' => 'ok', 'timestamp' => now()->toIso8601String()]);
@@ -25,6 +35,8 @@ Route::get('/search', SearchPageController::class);
 // B2B/B2C at registration, not a separate marketplace.
 Route::redirect('/b2b', '/search?businessType=B2B');
 Route::get('/business/{slug}', BusinessPageController::class);
+// The same website at a path on the main domain. It keeps working alongside
+// the subdomain, which the page names as its canonical address.
 Route::get('/site/{slug}', SitePageController::class);
 // Landing point for a scanned (or hand-typed) pre-printed QR board.
 Route::get('/qr/{code?}', fn (\Illuminate\Http\Request $request, ?string $code = null) => view('pages.qr-claim', [

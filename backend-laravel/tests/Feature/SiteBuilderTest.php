@@ -53,8 +53,8 @@ class SiteBuilderTest extends TestCase
 
         $response->assertStatus(200)
             ->assertJsonPath('data.hasSavedDraft', false)
-            ->assertJsonPath('data.templateId', 'classic')
-            ->assertJsonPath('data.renderedTemplateId', 'classic')
+            ->assertJsonPath('data.templateId', 'standard')
+            ->assertJsonPath('data.renderedTemplateId', 'standard')
             ->assertJsonCount(7, 'data.templates');
 
         $html = $response->json('data.starterHtml');
@@ -74,7 +74,7 @@ class SiteBuilderTest extends TestCase
         $response = $this->getJson("/api/v1/businesses/{$business->id}/site?templateId=vibrant", ['Authorization' => "Bearer {$token}"]);
 
         $response->assertStatus(200)
-            ->assertJsonPath('data.templateId', 'classic')
+            ->assertJsonPath('data.templateId', 'standard')
             ->assertJsonPath('data.renderedTemplateId', 'vibrant');
     }
 
@@ -134,25 +134,25 @@ class SiteBuilderTest extends TestCase
             ->assertStatus(400);
     }
 
-    public function test_publishing_a_website_requires_saved_html_first(): void
+    public function test_a_website_is_live_without_publishing(): void
     {
         $owner = $this->user(['role' => 'BUSINESS_OWNER']);
         $business = $this->business($owner);
         $token = $this->token($owner);
 
-        $this->postJson("/api/v1/businesses/{$business->id}/site/publish", ['isPublished' => true], ['Authorization' => "Bearer {$token}"])
-            ->assertStatus(400);
+        // Never opened in the builder: the default design, from the listing.
+        $this->getJson("/api/v1/sites/{$business->slug}")->assertOk()
+            ->assertJsonPath('data.templateId', 'standard')
+            ->assertJsonPath('data.html', fn ($html) => str_contains($html, 'Alice&#039;s Diner'));
 
+        // A save goes straight out, no publish step.
         $this->putJson("/api/v1/businesses/{$business->id}/site", ['html' => '<h1>Hi</h1>'], ['Authorization' => "Bearer {$token}"])
             ->assertStatus(200);
+        $this->getJson("/api/v1/sites/{$business->slug}")->assertOk()->assertJsonPath('data.html', '<h1>Hi</h1>');
 
-        $publish = $this->postJson("/api/v1/businesses/{$business->id}/site/publish", ['isPublished' => true], ['Authorization' => "Bearer {$token}"]);
-        $publish->assertStatus(200)
-            ->assertJsonPath('data.isPublished', true)
-            ->assertJsonPath('data.url', "/site/{$business->slug}");
-
-        $public = $this->getJson("/api/v1/sites/{$business->slug}");
-        $public->assertStatus(200)->assertJsonPath('data.html', '<h1>Hi</h1>');
+        // Only while the listing itself is live.
+        $business->update(['status' => 'DRAFT']);
+        $this->getJson("/api/v1/sites/{$business->slug}")->assertNotFound();
     }
 
     public function test_only_the_owner_can_edit_or_save_the_site(): void

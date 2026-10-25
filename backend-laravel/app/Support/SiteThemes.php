@@ -10,7 +10,7 @@ namespace App\Support;
 // only the read-only theme lookup `getPublishedSite` needs.
 class SiteThemes
 {
-    public const DEFAULT_TEMPLATE_ID = 'classic';
+    public const DEFAULT_TEMPLATE_ID = 'standard';
 
     private const SANS = 'system-ui,-apple-system,"Segoe UI",Roboto,sans-serif';
 

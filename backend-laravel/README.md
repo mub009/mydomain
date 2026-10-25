@@ -42,6 +42,47 @@ Either way, on the server you still need to:
   path to wherever this repo actually lives on the server) rather than
   editing crontab directly.
 
+### Business websites on subdomains
+
+Each business's website can live on its own subdomain, e.g.
+`https://cafe-kapichino-2.mydomainbook.com` (the subdomain is the business's
+slug). It is off until `SITE_DOMAIN` is set; until then sites stay at
+`/site/<slug>`. To turn it on:
+
+1. **DNS:** add a wildcard record `*.mydomainbook.com` pointing at the same
+   server as `mydomainbook.com` (an `A` record to the server's IP, or a
+   `CNAME` to `mydomainbook.com`).
+2. **Web server:** send every subdomain to the same Document Root as the
+   main domain (`backend-laravel/public`). On cPanel: **Domains → Create A New
+   Domain**, enter `*.mydomainbook.com`, and give it the same document root
+   folder as `mydomainbook.com`.
+   (Plain Apache: `ServerAlias *.mydomainbook.com`; nginx:
+   `server_name mydomainbook.com *.mydomainbook.com;`.)
+3. **HTTPS:** a wildcard certificate for `*.mydomainbook.com`. cPanel's
+   AutoSSL covers the wildcard domain once it exists, provided the domain's
+   DNS is managed in that cPanel account; otherwise issue one with a DNS
+   challenge (e.g. certbot's `--preferred-challenges dns`) or put the domain
+   behind Cloudflare, whose proxy certificate covers `*.` on one level.
+4. **`.env`:** `SITE_DOMAIN=mydomainbook.com` (and keep
+   `APP_URL=https://mydomainbook.com`, which links from a business site back
+   to Markkito use). Optionally `SESSION_DOMAIN=.mydomainbook.com`, so a
+   visitor signed in on Markkito stays signed in on business sites (e.g. at
+   a shop's checkout). Then `php artisan config:clear` (or `config:cache`).
+
+With it on, `<slug>.mydomainbook.com/` shows the website, every link the app
+hands out (website builder, share buttons, the publish response) uses the
+subdomain, and `/site/<slug>` keeps working as well — both show the same
+site, and the page tells search engines the subdomain is its main address
+(`<link rel="canonical">`).
+`www`, `api`, `admin`, `mail`, `app`, `static` and `cdn` are never business
+sites (`config/sites.php`), and new slugs avoid them. A subdomain can be at
+most 63 characters, so new slugs are capped at 56; any existing slug longer
+than 63 characters needs shortening before its subdomain works.
+
+To try it locally: Chrome sends any `*.localhost` name to this machine, so set
+`SITE_DOMAIN=localhost`, `SITE_SCHEME=http`, `SITE_PORT=8000` and open
+`http://<slug>.localhost:8000`.
+
 ### The frontend
 
 The site's pages are server-rendered **Blade** views — no SPA framework.

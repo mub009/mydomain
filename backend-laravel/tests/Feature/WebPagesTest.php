@@ -85,15 +85,23 @@ class WebPagesTest extends TestCase
         $owner = $this->user(['role' => 'BUSINESS_OWNER']);
         $website = $this->business($owner);
         $shop = $this->business($owner);
-        $hidden = $this->business($owner);
+        // A website is live whenever its listing is, so only a draft listing has none.
+        $hidden = $this->business($owner, ['status' => 'DRAFT']);
 
         BusinessSite::create(['businessId' => $website->id, 'siteType' => 'WEBSITE', 'html' => '<h1>Hello there</h1>', 'css' => 'h1{color:red}', 'isPublished' => true]);
         BusinessSite::create(['businessId' => $shop->id, 'siteType' => 'ECOMMERCE', 'templateId' => 'modern', 'isPublished' => true, 'deliveryFeeCents' => 4000]);
         Product::create(['businessId' => $shop->id, 'name' => 'Masala Dosa', 'slug' => 'masala-dosa', 'priceCents' => 12000]);
 
-        $this->get("/site/{$website->slug}")->assertOk()->assertSee('<h1>Hello there</h1>', false)->assertSee('on Markkito');
-        $this->get("/site/{$shop->slug}")->assertOk()->assertSee('Delivery ₹40')->assertSee('Masala Dosa');
-        $this->get("/site/{$hidden->slug}")->assertNotFound()->assertSee('Website not available');
+        // Each site is on its own subdomain, and links back to Markkito proper.
+        $this->get("https://{$website->slug}.mydomainbook.test/")->assertOk()->assertSee('<h1>Hello there</h1>', false)
+            ->assertSee('on Markkito')->assertSee(config('app.url')."/business/{$website->slug}", false);
+        $this->get("https://{$shop->slug}.mydomainbook.test/")->assertOk()->assertSee('Delivery ₹40')->assertSee('Masala Dosa');
+        $this->get("https://{$hidden->slug}.mydomainbook.test/")->assertNotFound()->assertSee('Website not available');
+        // The /site/<slug> address keeps working too, naming the subdomain as canonical.
+        $this->get("/site/{$website->slug}")->assertOk()->assertSee('<h1>Hello there</h1>', false)
+            ->assertSee("<link rel=\"canonical\" href=\"https://{$website->slug}.mydomainbook.test/\"", false);
+        // Reserved names are never a business website.
+        $this->get('https://www.mydomainbook.test/')->assertOk()->assertSee('Top rated businesses');
     }
 
     public function test_login_register_logout_and_session_token(): void

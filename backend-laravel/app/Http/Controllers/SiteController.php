@@ -12,6 +12,7 @@ use App\Support\SiteBuilder\LiveSite;
 use App\Support\SiteBuilder\Sanitizer;
 use App\Support\SiteBuilder\TemplateRegistry;
 use App\Support\SiteThemes;
+use App\Support\SiteUrl;
 use Illuminate\Http\Request;
 
 // Owner-facing storefront settings and the drag-and-drop brochure-website
@@ -90,9 +91,13 @@ class SiteController extends Controller
             'liveHtml' => $live['html'] ?? null,
             'liveCss' => $live['css'] ?? null,
             'isPublished' => $site->isPublished ?? false,
+            // A website is live whenever the listing is (see published()).
+            'listingLive' => $business->status === 'PUBLISHED',
+            'publicUrl' => SiteUrl::for($business->slug),
             'publishedAt' => $site->publishedAt ?? null,
             'updatedAt' => $site->updatedAt ?? null,
-            'hasSavedDraft' => (bool) $site,
+            // A row made only by uploading slider or gallery photos has no page yet.
+            'hasSavedDraft' => (bool) ($site?->html || $site?->projectData),
             // The hero slider's own photos, separate from the listing's gallery.
             'sliderImages' => $site->sliderImages ?? [],
             // Brochure website or storefront. A storefront is rendered by
@@ -257,20 +262,23 @@ class SiteController extends Controller
         return ApiResponse::ok([
             'isPublished' => $site->isPublished,
             'publishedAt' => $site->publishedAt,
-            'url' => "/site/{$business->slug}",
+            'url' => SiteUrl::for($business->slug),
         ]);
     }
 
     // Public: what a visitor sees at a business's own page — either the
     // e-commerce storefront (products rendered by the app, themed from the
-    // chosen template) or a published brochure website's saved html/css.
+    // chosen template), once the owner opens it, or the brochure website.
+    // The website needs no publishing: it is live whenever the listing is,
+    // as saved in the builder or, until then, the default design filled in
+    // from the listing.
     public function published(string $slug)
     {
         $business = Business::where('slug', $slug)->with([
             'photos' => fn ($q) => $q->orderBy('sortOrder')->select(['businessId', 'url', 'caption']),
             'hours' => fn ($q) => $q->orderBy('dayOfWeek')->select(['businessId', 'dayOfWeek', 'openTime', 'closeTime', 'isClosed']),
         ])->first([
-            'id', 'name', 'slug', 'city', 'description', 'phone', 'email', 'logoUrl',
+            'id', 'name', 'slug', 'status', 'city', 'description', 'phone', 'email', 'logoUrl',
             'addressLine1', 'addressLine2', 'state', 'postalCode', 'latitude', 'longitude',
             'instagramUsername', 'avgRating', 'reviewCount',
         ]);
@@ -279,8 +287,11 @@ class SiteController extends Controller
         }
 
         $site = BusinessSite::where('businessId', $business->id)->first();
-        if (! $site || ! $site->isPublished) {
-            throw ApiException::notFound('This business has not published a website yet');
+        if ($site?->siteType === 'ECOMMERCE' && ! $site->isPublished) {
+            throw ApiException::notFound('This shop is not open yet');
+        }
+        if ($site?->siteType !== 'ECOMMERCE' && $business->status !== 'PUBLISHED') {
+            throw ApiException::notFound('This business is not live yet');
         }
 
         $businessPayload = [
@@ -293,7 +304,7 @@ class SiteController extends Controller
             'hours' => $business->hours->map->only(['dayOfWeek', 'openTime', 'closeTime', 'isClosed']),
         ];
 
-        if ($site->siteType === 'ECOMMERCE') {
+        if ($site?->siteType === 'ECOMMERCE') {
             return ApiResponse::ok([
                 'siteType' => 'ECOMMERCE',
                 'business' => $businessPayload,
@@ -309,20 +320,21 @@ class SiteController extends Controller
             ]);
         }
 
-        if (! $site->html) {
-            throw ApiException::notFound('This business has not published a website yet');
-        }
-        $live = LiveSite::render($this->loadBusinessForTemplate($business->id), $site);
+        $full = $this->loadBusinessForTemplate($business->id);
+        $templateId = $site->templateId ?? TemplateRegistry::DEFAULT_TEMPLATE_ID;
+        $page = $site?->html
+            ? LiveSite::render($full, $site)
+            : TemplateRegistry::buildTemplate($full, $templateId);
 
         return ApiResponse::ok([
             'siteType' => 'WEBSITE',
             'business' => $businessPayload,
-            'theme' => SiteThemes::resolve($site->templateId),
-            'templateId' => $site->templateId,
+            'theme' => SiteThemes::resolve($templateId),
+            'templateId' => $templateId,
             'storefront' => null,
-            'html' => $live['html'],
-            'css' => $live['css'],
-            'publishedAt' => $site->publishedAt,
+            'html' => $page['html'],
+            'css' => $page['css'],
+            'publishedAt' => $site?->updatedAt,
         ]);
     }
 }

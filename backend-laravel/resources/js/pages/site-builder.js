@@ -23,7 +23,10 @@ const SITE_TYPES = [
 const rupees = (cents) => (cents / 100).toString();
 
 const state = {
+  // A shop opens with its own button; a website is live whenever the
+  // listing is, with saves going straight to it.
   isPublished: site.isPublished,
+  listingLive: site.listingLive,
   savedAt: site.updatedAt,
   siteType: site.siteType,
   templates: site.templates,
@@ -64,19 +67,24 @@ const slot = (name) => $(`[data-slot="${name}"]`, root);
 function headerView() {
   const isShop = state.siteType === "ECOMMERCE";
   const active = state.templates.find((t) => t.id === state.templateId);
-  const publicUrl = `${window.location.origin}/site/${business.slug}`;
+  // The business's subdomain when configured, else /site/<slug>.
+  const publicUrl = site.publicUrl;
   return `<div class="flex flex-wrap items-start justify-between gap-3">
       <div>
         <h3 class="flex items-center gap-1.5 font-bold text-ink-900">${icon(isShop ? "shopping-bag" : "globe", { size: 16, className: "text-brand-600" })} ${isShop ? "Your online shop" : "Your website"}</h3>
         <p class="mt-0.5 text-xs text-ink-500">${
           isShop
             ? "Customers browse your products, add them to a cart and check out. Orders arrive in the Orders tab."
-            : `Pick a template, then drag blocks in to make it yours. It starts from the details you entered for ${esc(business.name)}.`
+            : `Pick a template, then drag blocks in to make it yours. It starts from the details you entered for ${esc(business.name)}, and every save goes straight to your website.`
         }</p>
         ${state.savedAt ? `<p class="mt-1 text-[11px] text-ink-400">Last saved ${esc(formatDateTime(state.savedAt))}</p>` : ""}
       </div>
       <div class="flex flex-wrap items-center gap-2">
-        <span class="badge ${state.isPublished ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-600"}">${state.isPublished ? (isShop ? "Open" : "Live") : "Draft"}</span>
+        ${
+          isShop
+            ? `<span class="badge ${state.isPublished ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-600"}">${state.isPublished ? "Open" : "Closed"}</span>`
+            : `<span class="badge ${state.listingLive ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-600"}">${state.listingLive ? "Live" : "Not live yet"}</span>`
+        }
         <button type="button" data-action="toggle-picker" class="btn-secondary px-3 py-2 text-sm">${icon("layout-template", { size: 14 })} ${esc(active ? active.name : "Templates")}</button>
         ${
           isShop
@@ -84,14 +92,24 @@ function headerView() {
             : `<button type="button" data-action="reset" class="btn-secondary px-3 py-2 text-sm">${icon("rotate-ccw", { size: 14 })} Reset</button>
                <button type="button" data-action="save" ${state.saving ? "disabled" : ""} class="btn-secondary px-3 py-2 text-sm disabled:opacity-50">${icon("save", { size: 14 })} ${state.saving ? "Saving…" : "Save"}</button>`
         }
-        <button type="button" data-action="publish" ${state.publishing ? "disabled" : ""} class="px-3 py-2 text-sm ${state.isPublished ? "btn-secondary" : "btn-primary"} disabled:opacity-50">${icon("upload", { size: 14 })} ${
-          state.publishing ? "Working…" : state.isPublished ? "Take offline" : isShop ? "Open shop" : "Publish"
-        }</button>
+        ${
+          isShop
+            ? `<button type="button" data-action="publish" ${state.publishing ? "disabled" : ""} class="px-3 py-2 text-sm ${state.isPublished ? "btn-secondary" : "btn-primary"} disabled:opacity-50">${icon("upload", { size: 14 })} ${
+                state.publishing ? "Working…" : state.isPublished ? "Close shop" : "Open shop"
+              }</button>`
+            : ""
+        }
       </div>
     </div>
     ${state.notice ? `<p class="mt-3 rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-800">${esc(state.notice)}</p>` : ""}
     ${state.error ? `<p class="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">${esc(state.error)}</p>` : ""}
-    ${state.isPublished ? `<a href="${esc(publicUrl)}" target="_blank" rel="noreferrer" class="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-brand-600 hover:underline">${icon("external-link", { size: 14 })} ${esc(publicUrl)}</a>` : ""}`;
+    ${
+      (isShop ? state.isPublished : state.listingLive)
+        ? `<a href="${esc(publicUrl)}" target="_blank" rel="noreferrer" class="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-brand-600 hover:underline">${icon("external-link", { size: 14 })} ${esc(publicUrl)}</a>`
+        : isShop
+          ? ""
+          : `<p class="mt-3 text-xs text-ink-500">Your website goes live by itself once your listing is published.</p>`
+    }`;
 }
 
 function typesView() {
@@ -253,7 +271,7 @@ async function save() {
     });
     state.savedAt = result.savedAt;
     state.templateId = result.templateId;
-    setMessage("Website saved.");
+    setMessage(state.listingLive ? "Saved — your website is updated." : "Saved.");
     return true;
   } catch (err) {
     setMessage("", errorMessage(err));
@@ -264,19 +282,15 @@ async function save() {
   }
 }
 
+// Opening or closing the shop. (A website needs no publishing.)
 async function togglePublish() {
-  // Publishing an unsaved editor would push stale HTML, so save first. A
-  // storefront has nothing to save — it is rendered from the catalogue.
-  if (state.siteType === "WEBSITE" && !state.isPublished && !(await save())) return;
   state.publishing = true;
   state.error = "";
   render();
   try {
     const { data: result } = await api.post(`${base}/publish`, { isPublished: !state.isPublished });
     state.isPublished = result.isPublished;
-    setMessage(
-      result.isPublished ? (state.siteType === "ECOMMERCE" ? "Your shop is open and taking orders." : "Your website is live.") : "Your site has been taken offline.",
-    );
+    setMessage(result.isPublished ? "Your shop is open and taking orders." : "Your shop is closed.");
   } catch (err) {
     setMessage("", errorMessage(err));
   } finally {

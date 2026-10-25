@@ -31,6 +31,11 @@
 @section('title', $business['name'].' — Order online')
 
 @push('head')
+  {{-- Served at both <slug>.<domain> and /site/<slug>; search engines are
+       told the subdomain is the one to list. --}}
+  @if (config('sites.domain'))
+    <link rel="canonical" href="{{ \App\Support\SiteUrl::for($business['slug']) }}/" />
+  @endif
   @vite('resources/css/storefront.css')
 @endpush
 
@@ -126,7 +131,7 @@
           <a class="sf-link" href="{{ $directions }}" target="_blank" rel="noreferrer">Get directions</a>
         </div>
       </div>
-      <p class="sf-copy">© {{ now()->year }} {{ $business['name'] }} · <a href="/business/{{ $business['slug'] }}">View on Markkito</a></p>
+      <p class="sf-copy">© {{ now()->year }} {{ $business['name'] }} · <a href="{{ \App\Support\SiteUrl::markkito('/business/'.$business['slug']) }}">View on Markkito</a></p>
     </footer>
 
     {{-- Floating contact buttons, same as the brochure designs carry. --}}
