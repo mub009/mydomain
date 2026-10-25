@@ -8,6 +8,7 @@ use App\Http\Controllers\Web\DashboardController;
 use App\Http\Controllers\Web\HomeController;
 use App\Http\Controllers\Web\SearchPageController;
 use App\Http\Controllers\Web\SitePageController;
+use App\Http\Controllers\Web\SitemapController;
 use App\Support\SiteUrl;
 use Illuminate\Support\Facades\Route;
 
@@ -23,6 +24,11 @@ if ($siteDomain = config('sites.domain')) {
 Route::get('/health', function () {
     return response()->json(['status' => 'ok', 'timestamp' => now()->toIso8601String()]);
 });
+
+// For search engines: every live listing and website, and where to find them.
+Route::get('/sitemap.xml', [SitemapController::class, 'index']);
+Route::get('/sitemap-{n}.xml', [SitemapController::class, 'page'])->whereNumber('n');
+Route::get('/robots.txt', [SitemapController::class, 'robots']);
 
 // Short public path encoded on a printed QR board: /r/q/<code>
 Route::get('/r/q/{code}', [QrCodeController::class, 'scan']);

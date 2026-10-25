@@ -565,3 +565,40 @@ if (onlineList) {
     }
   }, 15000);
 }
+
+// --- SEO ----------------------------------------------------------------------------
+// Each action talks to Google and reloads to show its answer.
+async function seoAction(button, label, work, done) {
+  showError(errorBox, "");
+  const before = button.innerHTML;
+  button.disabled = true;
+  button.textContent = label;
+  try {
+    const { data } = await work();
+    reloadWithFlash(done(data));
+  } catch (err) {
+    fail(err);
+    button.disabled = false;
+    button.innerHTML = before;
+  }
+}
+
+$("[data-seo-run]")?.addEventListener("click", (e) =>
+  seoAction(e.currentTarget, "Syncing…", () => api.post("/admin/seo/run"), (r) =>
+    r.configured
+      ? `Synced with Google: ${r.submitted} submitted, ${r.checked} checked${r.failed ? `, ${r.failed} failed` : ""}.`
+      : `Google is not connected — ${r.tracked} new page(s) tracked, nothing submitted.`,
+  ),
+);
+$$("[data-seo-check]").forEach((button) =>
+  button.addEventListener("click", () =>
+    seoAction(button, "Checking…", () => api.post(`/admin/seo/pages/${button.dataset.seoCheck}/check`), (page) =>
+      page.indexStatus === "INDEXED" ? "The page is on Google." : `Not on Google yet: ${page.coverageState ?? "no details"}.`,
+    ),
+  ),
+);
+$$("[data-seo-submit]").forEach((button) =>
+  button.addEventListener("click", () =>
+    seoAction(button, "Sending…", () => api.post(`/admin/seo/pages/${button.dataset.seoSubmit}/submit`), () => "Sent to Google — it usually crawls within a day or two."),
+  ),
+);

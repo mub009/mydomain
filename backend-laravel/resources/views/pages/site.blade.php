@@ -1,13 +1,12 @@
 @extends('layouts.bare')
 
-@section('title', $site['business']['name'].' — Website')
+@section('title', ($site['business']['seoTitle'] ?? null) ?: $site['business']['name'].' — Website')
+@section('description', \App\Support\Seo\SeoMeta::description($site['business']))
 
 @push('head')
   {{-- Served at both <slug>.<domain> and /site/<slug>; search engines are
-       told the subdomain is the one to list. --}}
-  @if (config('sites.domain'))
-    <link rel="canonical" href="{{ \App\Support\SiteUrl::for($site['business']['slug']) }}/" />
-  @endif
+       told the subdomain (when there is one) is the one to list. --}}
+  @include('partials.seo-tags', ['biz' => $site['business'], 'url' => \App\Support\Seo\SeoTracker::websiteUrl($site['business']['slug'])])
   @if ($fontUrl = \App\Support\SiteBuilder\TemplateRegistry::fontUrl($site['templateId'] ?? null))
     <link rel="stylesheet" href="{{ $fontUrl }}" />
   @endif

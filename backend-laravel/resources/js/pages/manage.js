@@ -310,6 +310,48 @@ $$("[data-board-channel-select]").forEach((select) =>
   }),
 );
 
+// --- SEO --------------------------------------------------------------------
+// Character counters and a live Google-result preview while typing; an
+// empty box previews the text written from the listing.
+const seoForm = $("[data-seo-form]");
+if (seoForm) {
+  const preview = {
+    seoTitle: $("[data-preview-title]", seoForm),
+    seoDescription: $("[data-preview-description]", seoForm),
+  };
+  const sync = () => {
+    $$("[data-counter]", seoForm).forEach((counter) => {
+      const length = seoForm[counter.dataset.counter].value.trim().length;
+      const max = Number(counter.dataset.max);
+      counter.textContent = `${length}/${max}`;
+      counter.classList.toggle("text-red-600", length > max);
+    });
+    Object.entries(preview).forEach(([name, el]) => {
+      el.textContent = seoForm[name].value.trim() || el.dataset.fallback;
+    });
+  };
+  ["seoTitle", "seoDescription"].forEach((name) => seoForm[name].addEventListener("input", sync));
+  sync();
+
+  seoForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const f = Object.fromEntries(new FormData(seoForm));
+    showError(errorBox, "");
+    try {
+      await busy($("[data-save]", seoForm), "Saving…", () =>
+        api.patch(base, {
+          seoTitle: f.seoTitle.trim() || null,
+          seoDescription: f.seoDescription.trim() || null,
+          seoKeywords: f.seoKeywords.trim() || null,
+        }),
+      );
+      reloadWithFlash("SEO saved.");
+    } catch (err) {
+      fail(err);
+    }
+  });
+}
+
 // --- Products ---------------------------------------------------------------
 function openProductForm(product) {
   const template = $("#product-form-template");

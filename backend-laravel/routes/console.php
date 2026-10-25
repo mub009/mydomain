@@ -12,3 +12,6 @@ Artisan::command('inspire', function () {
 // `php artisan schedule:run` every minute — see README "Deploying (shared
 // hosting / cPanel)" for how to wire that up on cPanel.
 Schedule::command('classifieds:expire')->daily();
+// New listings/websites go to Google within minutes of going live, and the
+// admin's SEO report is refreshed (App\Support\Seo\SeoTracker).
+Schedule::command('seo:sync')->everyTenMinutes()->withoutOverlapping();

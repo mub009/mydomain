@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\HasUuid;
+use App\Support\Seo\SeoTracker;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -18,7 +19,7 @@ class Business extends Model
     protected $table = 'businesses';
 
     protected $fillable = [
-        'ownerId', 'createdById', 'name', 'slug', 'description', 'categoryId',
+        'ownerId', 'createdById', 'name', 'slug', 'description', 'seoTitle', 'seoDescription', 'seoKeywords', 'categoryId',
         'status', 'subscriptionPlan', 'businessType', 'email', 'phone', 'website',
         'addressLine1', 'addressLine2', 'city', 'state', 'postalCode', 'country',
         'latitude', 'longitude', 'googlePlaceId', 'googleReviewUrl',
@@ -108,5 +109,22 @@ class Business extends Model
     public function reviewScans(): HasMany
     {
         return $this->hasMany(ReviewScan::class, 'businessId');
+    }
+
+    public function seoPages(): HasMany
+    {
+        return $this->hasMany(SeoPage::class, 'businessId');
+    }
+
+    // Going live, coming down, a new address or new SEO text all change what
+    // Google should have, so the tracked pages follow (App\Support\Seo\SeoTracker).
+    protected static function booted(): void
+    {
+        static::saved(function (Business $business) {
+            if ($business->wasRecentlyCreated || $business->wasChanged(['status', 'slug', 'name', 'description', 'seoTitle', 'seoDescription', 'seoKeywords'])) {
+                SeoTracker::sync($business);
+            }
+        });
+        static::deleted(fn (Business $business) => SeoPage::where('businessId', $business->id)->delete());
     }
 }

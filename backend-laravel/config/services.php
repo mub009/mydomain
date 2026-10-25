@@ -42,6 +42,25 @@ return [
         'ca_bundle' => env('HTTP_CA_BUNDLE'),
     ],
 
+    // Google Search Console + Indexing API, for getting new listings and
+    // websites into Google quickly and reporting which ones are in
+    // (App\Support\Seo\GoogleSearch; set-up steps in README "SEO and Google").
+    'google_search' => [
+        // A service account's JSON key: a path to the .json file, or the
+        // JSON itself. Empty leaves Google switched off — the sitemap still
+        // works, but nothing is submitted or checked.
+        'credentials' => env('GOOGLE_SEARCH_CREDENTIALS'),
+        // The Search Console property the service account was added to as
+        // an Owner. "sc-domain:mydomainbook.com" (a Domain property) covers
+        // the main site and every business subdomain at once.
+        'property' => env('GOOGLE_SEARCH_PROPERTY'),
+        // How many pages one `seo:sync` run may submit / inspect — Google's
+        // free quotas are 200 Indexing API notices and 2,000 inspections a day.
+        'submit_per_run' => (int) env('GOOGLE_SEARCH_SUBMIT_PER_RUN', 20),
+        'inspect_per_run' => (int) env('GOOGLE_SEARCH_INSPECT_PER_RUN', 60),
+        'ca_bundle' => env('HTTP_CA_BUNDLE'),
+    ],
+
     // Anthropic Claude (paid).
     'anthropic' => [
         'key' => env('ANTHROPIC_API_KEY'),

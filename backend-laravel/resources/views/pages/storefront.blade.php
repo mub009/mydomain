@@ -28,14 +28,13 @@
     $days = \App\Http\Controllers\Web\BusinessPageController::DAY_NAMES;
 @endphp
 
-@section('title', $business['name'].' — Order online')
+@section('title', ($business['seoTitle'] ?? null) ?: $business['name'].' — Order online')
+@section('description', \App\Support\Seo\SeoMeta::description($business))
 
 @push('head')
   {{-- Served at both <slug>.<domain> and /site/<slug>; search engines are
-       told the subdomain is the one to list. --}}
-  @if (config('sites.domain'))
-    <link rel="canonical" href="{{ \App\Support\SiteUrl::for($business['slug']) }}/" />
-  @endif
+       told the subdomain (when there is one) is the one to list. --}}
+  @include('partials.seo-tags', ['biz' => $business, 'url' => \App\Support\Seo\SeoTracker::websiteUrl($business['slug'])])
   @vite('resources/css/storefront.css')
 @endpush
 

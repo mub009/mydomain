@@ -27,6 +27,7 @@
 <html lang="en">
   <head>
     @include('partials.head')
+    @stack('head')
   </head>
   <body>
     <div class="min-h-screen flex flex-col bg-gray-50">

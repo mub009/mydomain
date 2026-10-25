@@ -87,6 +87,7 @@
       ]) @break
       @case('Reviews & QR') @include('pages.dashboard.sections.reviews-qr') @break
       @case('Website') @include('pages.dashboard.sections.website') @break
+      @case('SEO') @include('pages.dashboard.sections.seo') @break
       @case('Products') @include('pages.dashboard.sections.products') @break
       @case('Orders') @include('pages.dashboard.sections.orders') @break
       @case('Customers') @include('pages.dashboard.sections.customers') @break

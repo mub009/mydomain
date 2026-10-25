@@ -34,6 +34,8 @@ class ApiResponse
                 'pageSize' => $pageSize,
                 'total' => $total,
                 'totalPages' => $pageSize > 0 ? (int) ceil($total / $pageSize) ?: 1 : 1,
+                // Anything else the list wants to say about itself (totals, flags).
+                ...array_diff_key($meta, array_flip(['page', 'pageSize', 'total'])),
             ],
         ]);
     }

@@ -1,6 +1,11 @@
 @extends('layouts.app')
 
-@section('title', $biz['name'])
+@section('title', \App\Support\Seo\SeoMeta::title($biz))
+@section('description', \App\Support\Seo\SeoMeta::description($biz))
+
+@push('head')
+  @include('partials.seo-tags', ['url' => \App\Support\Seo\SeoTracker::listingUrl($biz['slug'])])
+@endpush
 
 @php
     use App\Http\Controllers\Web\BusinessPageController as P;

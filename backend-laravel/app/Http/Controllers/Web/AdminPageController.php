@@ -7,6 +7,7 @@ use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\QrCodeController;
+use App\Http\Controllers\SeoController;
 use App\Http\Controllers\VisitorController;
 use App\Support\InternalApi;
 use Illuminate\Http\Request;
@@ -16,7 +17,7 @@ use Illuminate\Http\Request;
 class AdminPageController extends Controller
 {
     // Poster Studio is not part of the Laravel backend yet (see README).
-    public const TABS = ['Overview', 'Users', 'Businesses', 'Approvals', 'QR Boards', 'Visitors', 'Analytics', 'Reports'];
+    public const TABS = ['Overview', 'Users', 'Businesses', 'Approvals', 'QR Boards', 'Visitors', 'Analytics', 'SEO', 'Reports'];
 
     public const ROLES = ['CUSTOMER', 'BUSINESS_OWNER', 'DEALER', 'ADMIN'];
 
@@ -68,6 +69,11 @@ class AdminPageController extends Controller
                 $data['range'] = $range;
                 $data['online'] = InternalApi::tryCall([AnalyticsController::class, 'online'], [], [], true)['data'] ?? null;
                 $data['pageStats'] = InternalApi::tryCall([AnalyticsController::class, 'pages'], ['range' => $range], [], true)['data'] ?? null;
+                break;
+            case 'SEO':
+                $data['seo'] = InternalApi::tryCall([SeoController::class, 'adminIndex'], array_filter([
+                    'search' => $q('search'), 'stage' => $q('stage'), 'kind' => $q('kind'), 'page' => $page,
+                ]), [], true);
                 break;
             case 'Reports':
                 $data['report'] = InternalApi::tryCall([AdminController::class, 'businessCreatorsReport'], [], [], true)['data'] ?? null;

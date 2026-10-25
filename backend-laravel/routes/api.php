@@ -23,6 +23,7 @@ use App\Http\Controllers\QrCodeController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\ReviewLinkController;
 use App\Http\Controllers\SearchController;
+use App\Http\Controllers\SeoController;
 use App\Http\Controllers\SiteController;
 use App\Http\Controllers\StorefrontController;
 use App\Http\Controllers\UploadController;
@@ -182,6 +183,9 @@ Route::prefix('businesses')->group(function () {
         Route::get('/{id}/review-links', [ReviewLinkController::class, 'show']);
         Route::patch('/{id}/review-links', [ReviewLinkController::class, 'update'])->middleware('privilege:MANAGE_LISTINGS');
         Route::get('/{id}/qr-codes', [QrCodeController::class, 'businessQrCodes']);
+        // SEO: what Google is shown, a checklist, and whether the pages are
+        // in Google yet. The SEO text itself saves through PATCH /{id}.
+        Route::get('/{id}/seo', [SeoController::class, 'forBusiness']);
         Route::patch('/{id}/qr-codes/{qrId}', [QrCodeController::class, 'setBoardChannel'])->middleware('privilege:MANAGE_LISTINGS');
     });
 });
@@ -280,4 +284,9 @@ Route::prefix('admin')->middleware(['auth.jwt', 'role:ADMIN'])->group(function (
     Route::patch('/classifieds/reports/{id}', [ClassifiedReportController::class, 'updateStatus']);
 
     Route::get('/classifieds/stats', [ClassifiedStatsController::class, 'overview']);
+    // Which business pages are in Google, against the two-day target.
+    Route::get('/seo', [SeoController::class, 'adminIndex']);
+    Route::post('/seo/run', [SeoController::class, 'adminRun'])->middleware('throttle:10,1');
+    Route::post('/seo/pages/{id}/submit', [SeoController::class, 'adminSubmit']);
+    Route::post('/seo/pages/{id}/check', [SeoController::class, 'adminCheck']);
 });

@@ -166,7 +166,7 @@ class WebPagesTest extends TestCase
         $this->get('/dashboard?tab=leads')->assertOk()->assertSee('No leads yet.');
         $this->get('/dashboard?tab=bookings')->assertOk()->assertSee('No bookings yet.');
 
-        foreach (['Contact', 'Hours', 'Services', 'Photos', 'Slider', 'Our Gallery', 'Reviews & QR', 'Website', 'Products', 'Orders', 'Customers'] as $section) {
+        foreach (['Contact', 'Hours', 'Services', 'Photos', 'Slider', 'Our Gallery', 'Reviews & QR', 'Website', 'SEO', 'Products', 'Orders', 'Customers'] as $section) {
             $this->get("/dashboard/businesses/{$business->id}?section=".urlencode($section))
                 ->assertOk()->assertDontSee('Could not', false);
         }
@@ -196,7 +196,7 @@ class WebPagesTest extends TestCase
         $this->business($this->user(['role' => 'DEALER']), ['status' => 'PENDING_APPROVAL']);
         $this->signIn($admin);
 
-        foreach (['Overview', 'Users', 'Businesses', 'Approvals', 'QR Boards', 'Visitors', 'Analytics', 'Reports'] as $tab) {
+        foreach (['Overview', 'Users', 'Businesses', 'Approvals', 'QR Boards', 'Visitors', 'Analytics', 'SEO', 'Reports'] as $tab) {
             $this->get('/admin?tab='.urlencode($tab))->assertOk()->assertDontSee('Could not load', false);
         }
         $this->get('/admin?tab=Users&role=DEALER&search=Test')->assertOk();

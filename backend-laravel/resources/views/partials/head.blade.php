@@ -10,4 +10,9 @@
   <meta name="auth-user" content="{{ json_encode(['id' => $authUser->id, 'role' => $authUser->role, 'firstName' => $authUser->firstName, 'privileges' => \App\Support\Privileges::normalize($authUser->privileges)]) }}" />
 @endif
 <title>@hasSection('title')@yield('title') · Markkito @else Markkito — Local Business Directory &amp; Marketplace @endif</title>
+<meta name="description" content="@yield('description', 'Find trusted local businesses near you — phone numbers, addresses, opening hours, photos and verified reviews on Markkito.')" />
+{{-- Work screens and sign-in pages stay out of search results. --}}
+@if (request()->is('dashboard', 'dashboard/*', 'admin', 'admin/*', 'login', 'register'))
+  <meta name="robots" content="noindex, nofollow" />
+@endif
 @vite(['resources/css/app.css', 'resources/js/app.js'])

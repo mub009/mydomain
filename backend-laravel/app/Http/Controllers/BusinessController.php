@@ -36,6 +36,11 @@ class BusinessController extends Controller
             // Optional on create — generated from the name when left out.
             'slug' => ['sometimes', 'string', 'min:2', 'max:56', 'regex:/^[a-z0-9-]+$/'],
             'description' => ['nullable', 'string', 'max:2000'],
+            // What Google shows (the dashboard's SEO section); empty falls
+            // back to text written from the listing (App\Support\Seo\SeoMeta).
+            'seoTitle' => ['nullable', 'string', 'max:70'],
+            'seoDescription' => ['nullable', 'string', 'max:170'],
+            'seoKeywords' => ['nullable', 'string', 'max:255'],
             'categoryId' => [$required, 'uuid'],
             // A label for discovery, not a different feature set — B2B
             // businesses are ordinary listings, just filterable by this.

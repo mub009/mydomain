@@ -277,10 +277,12 @@ class SiteController extends Controller
         $business = Business::where('slug', $slug)->with([
             'photos' => fn ($q) => $q->orderBy('sortOrder')->select(['businessId', 'url', 'caption']),
             'hours' => fn ($q) => $q->orderBy('dayOfWeek')->select(['businessId', 'dayOfWeek', 'openTime', 'closeTime', 'isClosed']),
+            'category:id,name',
         ])->first([
             'id', 'name', 'slug', 'status', 'city', 'description', 'phone', 'email', 'logoUrl',
             'addressLine1', 'addressLine2', 'state', 'postalCode', 'latitude', 'longitude',
             'instagramUsername', 'avgRating', 'reviewCount',
+            'categoryId', 'country', 'coverImageUrl', 'seoTitle', 'seoDescription', 'seoKeywords',
         ]);
         if (! $business) {
             throw ApiException::notFound('Business not found');
@@ -299,7 +301,10 @@ class SiteController extends Controller
                 'id', 'name', 'slug', 'city', 'description', 'phone', 'email', 'logoUrl',
                 'addressLine1', 'addressLine2', 'state', 'postalCode', 'latitude', 'longitude',
                 'instagramUsername', 'avgRating', 'reviewCount',
+                'country', 'coverImageUrl', 'seoTitle', 'seoDescription', 'seoKeywords',
             ]),
+            // For the page's search tags (App\Support\Seo\SeoMeta).
+            'category' => $business->category?->only(['id', 'name']),
             'photos' => $business->photos->map->only(['url', 'caption']),
             'hours' => $business->hours->map->only(['dayOfWeek', 'openTime', 'closeTime', 'isClosed']),
         ];
