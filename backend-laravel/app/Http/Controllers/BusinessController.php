@@ -138,14 +138,19 @@ class BusinessController extends Controller
         if ($existing && in_array($existing->role, ['ADMIN', 'DEALER'], true)) {
             throw ApiException::badRequest("This username belongs to a staff account and can't be used as a business login");
         }
-        if (! empty($owner['phone']) && (! $existing || $existing->phone !== $owner['phone'])) {
-            $phoneTaken = User::where('phone', $owner['phone'])->first();
-            if ($phoneTaken && $phoneTaken->id !== $existing?->id) {
-                throw ApiException::conflict('That phone number is already registered to another account');
+        foreach (['email' => $ownerEmail, 'phone' => $ownerPhone] as $field => $value) {
+            if (! $value) {
+                continue;
+            }
+            $taken = User::where($field, $value)->first();
+            if ($taken && $taken->id !== $existing?->id) {
+                throw ApiException::conflict(
+                    ($field === 'email' ? 'That email' : 'That phone number').' is already registered to another account'
+                );
             }
         }
 
-        $result = DB::transaction(function () use ($data, $actor, $initialStatus, $isStaff, $owner, $existing) {
+        $result = DB::transaction(function () use ($data, $actor, $initialStatus, $isStaff, $owner, $existing, $ownerEmail, $ownerPhone) {
             $ownerRecord = $existing;
 
             if ($ownerRecord) {
@@ -155,8 +160,8 @@ class BusinessController extends Controller
                 }
             } else {
                 $ownerRecord = User::create([
-                    'email' => $owner['email'],
-                    'phone' => $owner['phone'] ?? null,
+                    'email' => $ownerEmail,
+                    'phone' => $ownerPhone,
                     'passwordHash' => Hash::make($owner['password']),
                     'firstName' => $owner['firstName'],
                     'lastName' => $owner['lastName'],

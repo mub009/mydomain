@@ -75,12 +75,14 @@ class AuthController extends Controller
     public function login(Request $request)
     {
         $data = $request->validate([
-            // Email or mobile number — business logins can use either.
-            'email' => ['required', 'string', 'max:255'],
+            // A business login handed out by a dealer may only have a phone
+            // number, so the "email" field here doubles as a username — it's
+            // matched against either column rather than validated as email.
+            'email' => ['required', 'string', 'max:190'],
             'password' => ['required', 'string', 'min:1'],
         ]);
 
-        $user = User::findByLogin($data['email']);
+        $user = User::where('email', $data['email'])->orWhere('phone', $data['email'])->first();
         if (! $user || ! Hash::check($data['password'], $user->passwordHash)) {
             throw ApiException::unauthorized('Invalid username or password');
         }

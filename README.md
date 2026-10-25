@@ -21,10 +21,23 @@ module boundaries.
 
 ```
 backend/          Express API — modular monolith, one folder per domain module
+<<<<<<< HEAD
 backend-laravel/  Laravel 11 port of backend/, plus the Blade frontend
+=======
+backend-laravel/  Laravel 11 port of backend/ (core modules only — see its README)
+frontend/         React SPA — the full app: auth, dashboards, admin, classifieds, etc.
+frontend-next/    Next.js SSR app — only the public/SEO-crawlable pages (see its README)
+>>>>>>> f57c1d28a19e4258da265a745323b259bb77d17f
 docs/             Architecture notes
 docker-compose.yml   MySQL + Redis + backend for local dev
 ```
+
+`frontend-next/` exists specifically so Google can index business/search
+pages (the SPA renders everything client-side, so a crawler sees an empty
+shell). It runs alongside `frontend/`, not instead of it — everything
+behind login is still the SPA. See `frontend-next/README.md` for the full
+scope boundary and how the two apps talk to the same Laravel backend
+without needing CORS.
 
 ## Getting started
 

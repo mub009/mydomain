@@ -1,0 +1,141 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-gray-50 text-ink-900 antialiased;
+  font-feature-settings: "cv11", "ss01";
+}
+
+::selection {
+  @apply bg-brand-100 text-brand-800;
+}
+
+/* Component classes live in the components layer so per-element utility
+   overrides (e.g. `input pl-11`) always win over the base styles. */
+@layer components {
+  .container-page {
+    @apply max-w-6xl w-full mx-auto px-4 sm:px-6;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg font-semibold transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-primary {
+    @apply btn bg-brand-600 text-white hover:bg-brand-700 shadow-sm;
+  }
+
+  .btn-secondary {
+    @apply btn bg-white text-ink-900 border border-gray-300 hover:bg-gray-50;
+  }
+
+  .btn-ghost {
+    @apply btn text-ink-700 hover:bg-gray-100;
+  }
+
+  .input {
+    @apply w-full rounded-lg border border-gray-300 bg-white px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition;
+  }
+
+  .card {
+    @apply bg-white border border-gray-200 rounded-xl2 shadow-card;
+  }
+
+  .badge {
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold;
+  }
+
+  /* Legal/policy pages: plain semantic HTML (h2/h3/p/ul/ol) styled once here
+     instead of repeating utility classes in every section of every page. */
+  .legal-content h2 {
+    @apply mt-8 mb-2 text-lg font-bold text-ink-900 first:mt-0;
+  }
+
+  .legal-content h3 {
+    @apply mt-4 mb-1.5 text-sm font-bold text-ink-900;
+  }
+
+  .legal-content p {
+    @apply mb-3 text-sm leading-relaxed text-ink-700;
+  }
+
+  .legal-content ul {
+    @apply mb-3 list-disc space-y-1 pl-5 text-sm text-ink-700;
+  }
+
+  .legal-content ol {
+    @apply mb-3 list-decimal space-y-1 pl-5 text-sm text-ink-700;
+  }
+
+  .legal-content a {
+    @apply text-brand-600 underline hover:text-brand-700;
+  }
+
+  .legal-content strong {
+    @apply font-semibold text-ink-900;
+  }
+}
+
+/* Promo carousel animations */
+@keyframes kenburns {
+  0% {
+    transform: scale(1) translate(0, 0);
+  }
+  100% {
+    transform: scale(1.12) translate(-1.5%, -1.5%);
+  }
+}
+
+@keyframes slide-fade-up {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-kenburns {
+  animation: kenburns 18s ease-in-out infinite alternate;
+}
+
+.animate-slide-fade-up {
+  animation: slide-fade-up 0.6s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-kenburns,
+  .animate-slide-fade-up {
+    animation: none;
+  }
+}
+
+/* Printing from the QR board screen should produce just the board itself,
+   centred on the page — not the whole dashboard around it. */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #qr-board,
+  #qr-board * {
+    visibility: visible;
+  }
+  #qr-board {
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    width: 90mm;
+    height: fit-content;
+    border: none !important;
+    padding: 0 !important;
+  }
+}

@@ -132,10 +132,10 @@ class BookingController extends Controller
 
         $isOwner = BusinessAccess::canManage($auth, $booking->business);
         $isCustomer = $booking->customerId === $auth['sub'];
-        if (! $isOwner && ! $isCustomer && $auth['role'] !== 'ADMIN') {
+        if (! $isManager && ! $isCustomer) {
             throw ApiException::forbidden();
         }
-        if ($isCustomer && ! $isOwner && $data['status'] !== 'CANCELLED') {
+        if ($isCustomer && ! $isManager && $data['status'] !== 'CANCELLED') {
             throw ApiException::forbidden('Customers may only cancel bookings');
         }
 

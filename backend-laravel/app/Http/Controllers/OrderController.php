@@ -91,7 +91,7 @@ class OrderController extends Controller
     public function show(Request $request, string $id, string $orderId)
     {
         $actor = $request->attributes->get('auth');
-        $order = Order::with(['items', 'business:id,ownerId,name'])->find($orderId);
+        $order = Order::with(['items', 'business:id,ownerId,createdById,name'])->find($orderId);
         if (! $order) {
             throw ApiException::notFound('Order not found');
         }
@@ -105,7 +105,7 @@ class OrderController extends Controller
         $actor = $request->attributes->get('auth');
         $data = $request->validate(['status' => ['required', 'in:'.implode(',', self::STATUSES)]]);
 
-        $order = Order::with(['items', 'business:id,ownerId,name'])->find($orderId);
+        $order = Order::with(['items', 'business:id,ownerId,createdById,name'])->find($orderId);
         if (! $order) {
             throw ApiException::notFound('Order not found');
         }

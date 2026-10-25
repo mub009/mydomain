@@ -243,4 +243,79 @@ class BusinessTest extends TestCase
         $this->getJson('/api/v1/search?q=Visible')->assertStatus(200)->assertJsonPath('meta.total', 1);
         $this->getJson('/api/v1/businesses/visible-shop')->assertStatus(200)->assertJsonPath('data.name', 'Visible Shop');
     }
+
+    public function test_dealer_can_manage_a_business_created_for_a_client_login(): void
+    {
+        [$dealer, $dealerToken] = $this->actingToken(['role' => 'DEALER', 'privileges' => ['MANAGE_LISTINGS'], 'points' => 5]);
+        [, $otherDealerToken] = $this->actingToken(['role' => 'DEALER', 'privileges' => ['MANAGE_LISTINGS'], 'points' => 5]);
+        $category = $this->category();
+
+        $created = $this->postJson('/api/v1/businesses', [
+            'name' => 'Client Shop', 'slug' => 'client-shop', 'categoryId' => $category->id,
+            'phone' => '9998887777', 'addressLine1' => '1 Main St', 'city' => 'Pune', 'state' => 'MH',
+            'postalCode' => '411001', 'latitude' => 18.5, 'longitude' => 73.8,
+            'owner' => [
+                'email' => 'client@example.com', 'password' => 'ClientPass123!',
+                'firstName' => 'Client', 'lastName' => 'Owner',
+            ],
+        ], ['Authorization' => "Bearer {$dealerToken}"]);
+        $created->assertStatus(201);
+        $id = $created->json('data.id');
+
+        // The business is assigned to the fresh client login, not the dealer.
+        $client = User::where('email', 'client@example.com')->first();
+        $this->assertSame($client->id, $created->json('data.ownerId'));
+        $this->assertNotSame($dealer->id, $created->json('data.ownerId'));
+
+        // The dealer who created it (via createdById, not ownerId) can still manage it.
+        $this->getJson("/api/v1/businesses/{$id}/manage", ['Authorization' => "Bearer {$dealerToken}"])
+            ->assertStatus(200)->assertJsonPath('data.id', $id);
+        $this->patchJson("/api/v1/businesses/{$id}", ['name' => 'Client Shop Renamed'], ['Authorization' => "Bearer {$dealerToken}"])
+            ->assertStatus(200)->assertJsonPath('data.name', 'Client Shop Renamed');
+
+        // A dealer who did not create it still cannot.
+        $this->getJson("/api/v1/businesses/{$id}/manage", ['Authorization' => "Bearer {$otherDealerToken}"])
+            ->assertStatus(403);
+    }
+
+    public function test_a_client_login_can_be_a_phone_number_with_no_email(): void
+    {
+        [, $dealerToken] = $this->actingToken(['role' => 'DEALER', 'privileges' => ['MANAGE_LISTINGS'], 'points' => 5]);
+        $category = $this->category();
+
+        $created = $this->postJson('/api/v1/businesses', [
+            'name' => 'Phone Login Shop', 'slug' => 'phone-login-shop', 'categoryId' => $category->id,
+            'phone' => '9998887777', 'addressLine1' => '1 Main St', 'city' => 'Pune', 'state' => 'MH',
+            'postalCode' => '411001', 'latitude' => 18.5, 'longitude' => 73.8,
+            'owner' => [
+                'phone' => '9123456780', 'password' => 'ClientPass123!',
+                'firstName' => 'Client', 'lastName' => 'Owner',
+            ],
+        ], ['Authorization' => "Bearer {$dealerToken}"]);
+
+        $created->assertStatus(201);
+        $this->assertSame('9123456780', $created->json('data.ownerAccount.username'));
+        $client = User::where('phone', '9123456780')->first();
+        $this->assertNull($client->email);
+        $this->assertSame($client->id, $created->json('data.ownerId'));
+
+        // The phone-only account can sign in using its phone as the username.
+        $this->postJson('/api/v1/auth/login', ['email' => '9123456780', 'password' => 'ClientPass123!'])
+            ->assertStatus(200)->assertJsonPath('data.user.id', $client->id);
+    }
+
+    public function test_creating_a_client_login_requires_an_email_or_a_phone(): void
+    {
+        [, $dealerToken] = $this->actingToken(['role' => 'DEALER', 'privileges' => ['MANAGE_LISTINGS'], 'points' => 5]);
+        $category = $this->category();
+
+        $this->postJson('/api/v1/businesses', [
+            'name' => 'No Login Shop', 'slug' => 'no-login-shop', 'categoryId' => $category->id,
+            'phone' => '9998887777', 'addressLine1' => '1 Main St', 'city' => 'Pune', 'state' => 'MH',
+            'postalCode' => '411001', 'latitude' => 18.5, 'longitude' => 73.8,
+            'owner' => [
+                'password' => 'ClientPass123!', 'firstName' => 'Client', 'lastName' => 'Owner',
+            ],
+        ], ['Authorization' => "Bearer {$dealerToken}"])->assertStatus(400);
+    }
 }
