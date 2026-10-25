@@ -143,6 +143,8 @@ Route::prefix('businesses')->group(function () {
         Route::get('/{id}/site', [SiteController::class, 'show']);
         Route::put('/{id}/site', [SiteController::class, 'save']);
         Route::get('/{id}/site/templates/{templateId}', [SiteController::class, 'previewTemplate']);
+        Route::get('/{id}/site/slider', [SiteController::class, 'slider']);
+        Route::put('/{id}/site/slider', [SiteController::class, 'updateSlider']);
         Route::patch('/{id}/site/type', [SiteController::class, 'updateType']);
         Route::post('/{id}/site/publish', [SiteController::class, 'publish']);
     });

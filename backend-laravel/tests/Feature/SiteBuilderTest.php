@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\Business;
+use App\Models\BusinessPhoto;
+use App\Models\BusinessSite;
 use App\Models\Category;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -162,5 +164,71 @@ class SiteBuilderTest extends TestCase
 
         $this->getJson("/api/v1/businesses/{$business->id}/site", ['Authorization' => "Bearer {$token}"])->assertStatus(403);
         $this->putJson("/api/v1/businesses/{$business->id}/site", ['html' => '<h1>x</h1>'], ['Authorization' => "Bearer {$token}"])->assertStatus(403);
+    }
+
+    public function test_owner_picks_slider_photos_and_the_templates_use_them(): void
+    {
+        $owner = $this->user(['role' => 'BUSINESS_OWNER']);
+        $business = $this->business($owner);
+        BusinessPhoto::create(['businessId' => $business->id, 'url' => 'https://cdn.example.com/listing.jpg', 'sortOrder' => 0]);
+        $auth = ['Authorization' => "Bearer {$this->token($owner)}"];
+        $url = "/api/v1/businesses/{$business->id}/site/slider";
+
+        // With nothing picked, the slider falls back to the listing photos.
+        $this->getJson($url, $auth)->assertOk()->assertJsonPath('data.sliderImages', []);
+        $this->getJson("/api/v1/businesses/{$business->id}/site", $auth)->assertJsonPath('data.businessData.slideCount', 1);
+
+        $picked = ['https://cdn.example.com/a.jpg', 'https://cdn.example.com/b.jpg'];
+        $this->putJson($url, ['images' => $picked], $auth)->assertOk()->assertJsonPath('data.sliderImages', $picked);
+        $this->getJson($url, $auth)->assertJsonPath('data.sliderImages', $picked);
+
+        foreach (['classic', 'showcase', 'standard'] as $id) {
+            $html = $this->getJson("/api/v1/businesses/{$business->id}/site/templates/{$id}", $auth)->json('data.html');
+            $this->assertStringContainsString('b.jpg', $html);
+            $this->assertStringNotContainsString('listing.jpg', $html);
+        }
+
+        // Clearing the list goes back to the listing photos.
+        $this->putJson($url, ['images' => []], $auth)->assertOk()->assertJsonPath('data.sliderImages', []);
+        $this->assertNull(BusinessSite::where('businessId', $business->id)->first()->sliderImages);
+
+        $this->putJson($url, ['images' => ['javascript:alert(1)']], $auth)->assertStatus(400);
+        $this->putJson($url, ['images' => array_fill(0, 9, 'https://cdn.example.com/x.jpg')], $auth)->assertStatus(400);
+
+        $stranger = $this->user(['role' => 'BUSINESS_OWNER']);
+        $this->putJson($url, ['images' => $picked], ['Authorization' => "Bearer {$this->token($stranger)}"])->assertStatus(403);
+    }
+
+    public function test_a_published_site_follows_the_listing_without_a_rebuild(): void
+    {
+        $owner = $this->user(['role' => 'BUSINESS_OWNER']);
+        $business = $this->business($owner);
+        $auth = ['Authorization' => "Bearer {$this->token($owner)}"];
+
+        foreach (['classic', 'showcase', 'modern', 'elegant', 'vibrant', 'fresh', 'standard'] as $id) {
+            // Saved as the builder would, plus a block the owner added themselves.
+            $starter = $this->getJson("/api/v1/businesses/{$business->id}/site/templates/{$id}", $auth)->json('data');
+            $this->putJson("/api/v1/businesses/{$business->id}/site", [
+                'html' => $starter['html'].'<section class="my-own"><p>Our own words</p></section>',
+                'css' => $starter['css'], 'templateId' => $id,
+            ], $auth)->assertOk();
+            $this->postJson("/api/v1/businesses/{$business->id}/site/publish", ['isPublished' => true], $auth)->assertOk();
+
+            $business->update(['phone' => '+91 90000 11111', 'email' => 'new@example.com']);
+            $this->putJson("/api/v1/businesses/{$business->id}/site/slider", ['images' => ['https://cdn.example.com/new-slide.jpg']], $auth)->assertOk();
+
+            $site = $this->getJson("/api/v1/sites/{$business->slug}")->assertOk()->json('data');
+            $this->assertStringContainsString('+91 90000 11111', $site['html'], $id);
+            $this->assertStringNotContainsString('98765 43210', $site['html'], $id);
+            $this->assertStringContainsString('new-slide.jpg', $site['html'], $id);
+            $this->assertStringContainsString('Our own words', $site['html'], $id);
+            $this->assertStringContainsString('new@example.com', $site['html'], $id);
+
+            // The builder opens on the same up-to-date page.
+            $this->assertStringContainsString('new-slide.jpg', $this->getJson("/api/v1/businesses/{$business->id}/site", $auth)->json('data.liveHtml'), $id);
+
+            $business->update(['phone' => '+91 98765 43210', 'email' => null]);
+            $this->putJson("/api/v1/businesses/{$business->id}/site/slider", ['images' => []], $auth);
+        }
     }
 }

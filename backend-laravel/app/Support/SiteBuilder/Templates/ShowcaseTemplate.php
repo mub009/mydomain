@@ -233,7 +233,7 @@ class ShowcaseTemplate
         @media(prefers-reduced-motion:reduce){.mk-hero-caption{animation:none}.mk-tile-img img,.mk-tile-img::after{transition:none}}
         CSS;
 
-        return ['html' => trim($html), 'css' => trim($css)];
+        return ['html' => trim($html), 'css' => trim($css), 'liveCss' => trim($heroCss)];
     }
 
     /**
@@ -266,7 +266,8 @@ class ShowcaseTemplate
             : '<div class="mk-slide mk-slide-empty"></div>';
 
         if ($count <= 1) {
-            return ['html' => "<div class=\"mk-slides\">{$slidesHtml}</div>{$caption}", 'css' => ''];
+            // Spelled out so it also switches off a longer slider's saved animation.
+            return ['html' => "<div class=\"mk-slides\">{$slidesHtml}</div>{$caption}", 'css' => '.mk-slide,.mk-arrows,.mk-dot{animation:none}'];
         }
 
         $prevIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>';

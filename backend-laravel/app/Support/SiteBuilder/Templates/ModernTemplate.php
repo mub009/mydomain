@@ -307,6 +307,6 @@ class ModernTemplate
         @media(prefers-reduced-motion:reduce){.mk-track{animation:none}.mk-tile img,.mk-btn{transition:none}}
         CSS;
 
-        return ['html' => trim($html), 'css' => trim($css)];
+        return ['html' => trim($html), 'css' => trim($css), 'liveCss' => trim($slidesCss)];
     }
 }

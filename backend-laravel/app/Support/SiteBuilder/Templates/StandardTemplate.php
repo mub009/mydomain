@@ -289,7 +289,7 @@ class StandardTemplate
 
         $css = self::scope(self::css($banner['css']), '.mkd-site');
 
-        return ['html' => trim($html), 'css' => trim($css)];
+        return ['html' => trim($html), 'css' => trim($css), 'liveCss' => trim(self::scope($banner['css'], '.mkd-site'))];
     }
 
     /**
@@ -301,12 +301,12 @@ class StandardTemplate
         $slides = collect($ctx['slides'])->values();
         $count = $slides->count();
         if ($count === 0) {
-            return ['html' => '<div class="owl-item owl-empty"></div>', 'css' => ''];
+            return ['html' => '<div class="owl-item owl-empty"></div>', 'css' => '.owl-item{animation:none}'];
         }
 
         $items = $slides->map(fn ($s, $i) => "<div class=\"owl-item owl-item-".($i + 1)."\"><img src=\"{$s['url']}\" alt=\"\"></div>")->implode('');
         if ($count === 1) {
-            return ['html' => $items, 'css' => '.owl-item{opacity:1}'];
+            return ['html' => $items, 'css' => '.owl-item{opacity:1;animation:none}'];
         }
 
         $dots = $slides->map(fn ($_, $i) => '<span class="owl-dot owl-dot-'.($i + 1).'"><span></span></span>')->implode('');

@@ -8,6 +8,7 @@ use App\Models\BusinessSite;
 use App\Models\Product;
 use App\Support\ApiResponse;
 use App\Support\BusinessAccess;
+use App\Support\SiteBuilder\LiveSite;
 use App\Support\SiteBuilder\Sanitizer;
 use App\Support\SiteBuilder\TemplateRegistry;
 use App\Support\SiteThemes;
@@ -17,6 +18,8 @@ use Illuminate\Http\Request;
 // builder (starter/preview rendering, save, publish).
 class SiteController extends Controller
 {
+    private const MAX_SLIDER_IMAGES = 8;
+
     // Everything the builder needs to seed a first draft from what the
     // owner already entered in their listing.
     private function loadBusinessForTemplate(string $businessId): Business
@@ -26,6 +29,7 @@ class SiteController extends Controller
             'photos' => fn ($q) => $q->orderBy('sortOrder'),
             'hours' => fn ($q) => $q->orderBy('dayOfWeek'),
             'services' => fn ($q) => $q->where('isActive', true)->orderBy('createdAt'),
+            'site',
         ])->find($businessId);
         if (! $business) {
             throw ApiException::notFound('Business not found');
@@ -69,16 +73,22 @@ class SiteController extends Controller
         $site = BusinessSite::where('businessId', $id)->first();
         $selectedId = $data['templateId'] ?? $site->templateId ?? TemplateRegistry::DEFAULT_TEMPLATE_ID;
         $starter = TemplateRegistry::buildTemplate($business, $selectedId);
+        // The saved page as visitors see it, kept in step with the listing.
+        $live = $site && $site->html ? LiveSite::render($business, $site) : null;
 
         return ApiResponse::ok([
             'businessId' => $id,
             'slug' => $business->slug,
             // Null until the owner saves for the first time.
             'projectData' => $site->projectData ?? null,
+            'liveHtml' => $live['html'] ?? null,
+            'liveCss' => $live['css'] ?? null,
             'isPublished' => $site->isPublished ?? false,
             'publishedAt' => $site->publishedAt ?? null,
             'updatedAt' => $site->updatedAt ?? null,
             'hasSavedDraft' => (bool) $site,
+            // Photos picked for the hero slider; empty means the listing's own.
+            'sliderImages' => $site->sliderImages ?? [],
             // Brochure website or storefront. A storefront is rendered by
             // the app, so the builder document is only used by WEBSITE.
             'siteType' => $site->siteType ?? 'WEBSITE',
@@ -154,6 +164,32 @@ class SiteController extends Controller
         }
 
         return ApiResponse::ok(['savedAt' => $site->updatedAt, 'isPublished' => $site->isPublished, 'templateId' => $site->templateId]);
+    }
+
+    public function slider(Request $request, string $id)
+    {
+        $actor = $request->attributes->get('auth');
+        $this->ownedBusiness($actor, $id);
+
+        return ApiResponse::ok(['sliderImages' => BusinessSite::where('businessId', $id)->value('sliderImages') ?? [], 'max' => self::MAX_SLIDER_IMAGES]);
+    }
+
+    // The photos for the website's hero slider, in order. An empty list
+    // goes back to the listing's own photos. The website picks them up the
+    // next time it is shown (see LiveSite) — no rebuild or publish needed.
+    public function updateSlider(Request $request, string $id)
+    {
+        $actor = $request->attributes->get('auth');
+        $this->ownedBusiness($actor, $id);
+
+        $data = $request->validate([
+            'images' => ['present', 'array', 'max:'.self::MAX_SLIDER_IMAGES],
+            'images.*' => ['required', 'string', 'url:http,https', 'max:2048'],
+        ]);
+
+        $site = BusinessSite::updateOrCreate(['businessId' => $id], ['sliderImages' => array_values($data['images']) ?: null]);
+
+        return ApiResponse::ok(['sliderImages' => $site->sliderImages ?? []]);
     }
 
     // Switching between a brochure website and a storefront, plus the
@@ -267,6 +303,7 @@ class SiteController extends Controller
         if (! $site->html) {
             throw ApiException::notFound('This business has not published a website yet');
         }
+        $live = LiveSite::render($this->loadBusinessForTemplate($business->id), $site);
 
         return ApiResponse::ok([
             'siteType' => 'WEBSITE',
@@ -274,8 +311,8 @@ class SiteController extends Controller
             'theme' => SiteThemes::resolve($site->templateId),
             'templateId' => $site->templateId,
             'storefront' => null,
-            'html' => $site->html,
-            'css' => $site->css ?? '',
+            'html' => $live['html'],
+            'css' => $live['css'],
             'publishedAt' => $site->publishedAt,
         ]);
     }

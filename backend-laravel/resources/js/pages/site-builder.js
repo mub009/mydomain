@@ -224,7 +224,12 @@ function mountEditor() {
     },
   });
 
-  if (site.projectData) {
+  if (site.liveHtml) {
+    // The saved page with the parts drawn from the listing (contact details,
+    // slider, photos, hours…) brought up to date, as visitors see it.
+    editor.setComponents(site.liveHtml);
+    editor.setStyle(site.liveCss);
+  } else if (site.projectData) {
     editor.loadProjectData(site.projectData);
   } else {
     // First visit: seed from the starter built out of their account data.

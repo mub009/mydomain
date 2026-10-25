@@ -266,6 +266,6 @@ class ClassicTemplate
         @media(prefers-reduced-motion:reduce){.mk-track{animation:none}.mk-card,.mk-card-img img,.mk-btn{transition:none}}
         CSS;
 
-        return ['html' => trim($html), 'css' => trim($css)];
+        return ['html' => trim($html), 'css' => trim($css), 'liveCss' => trim($slidesCss)];
     }
 }

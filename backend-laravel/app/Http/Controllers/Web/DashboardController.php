@@ -32,7 +32,7 @@ class DashboardController extends Controller
 
     // WhatsApp broadcasts and Poster Studio are not part of the Laravel
     // backend yet (see README), so the manager doesn't offer them.
-    public const SECTIONS = ['Details', 'Hours', 'Services', 'Photos', 'Reviews & QR', 'Website', 'Products', 'Orders', 'Customers'];
+    public const SECTIONS = ['Details', 'Hours', 'Services', 'Photos', 'Slider', 'Reviews & QR', 'Website', 'Products', 'Orders', 'Customers'];
 
     public const LEAD_STATUSES = ['NEW', 'CONTACTED', 'QUALIFIED', 'CONVERTED', 'LOST'];
 
@@ -128,6 +128,9 @@ class DashboardController extends Controller
             case 'Reviews & QR':
                 $data['links'] = InternalApi::tryCall([ReviewLinkController::class, 'show'], [], ['id' => $id], true)['data'] ?? null;
                 $data['boards'] = InternalApi::tryCall([QrCodeController::class, 'businessQrCodes'], [], ['id' => $id], true)['data'] ?? [];
+                break;
+            case 'Slider':
+                $data['slider'] = InternalApi::tryCall([SiteController::class, 'slider'], [], ['id' => $id], true)['data'] ?? null;
                 break;
             case 'Website':
                 $data['site'] = InternalApi::tryCall([SiteController::class, 'show'], [], ['id' => $id], true)['data'] ?? null;

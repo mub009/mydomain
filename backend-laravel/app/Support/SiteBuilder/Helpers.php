@@ -88,8 +88,8 @@ class Helpers
     /**
      * Every value a template needs, derived once from the business record so
      * the individual designs only deal with presentation. $business must
-     * have category, photos (sortOrder asc), hours (dayOfWeek asc), and
-     * services (active, createdAt asc) already loaded.
+     * have category, photos (sortOrder asc), hours (dayOfWeek asc),
+     * services (active, createdAt asc) and site already loaded.
      */
     public static function buildContext(Business $business): array
     {
@@ -101,7 +101,11 @@ class Helpers
         $name = self::escapeHtml($business->name);
         $phoneDigits = preg_replace('/[^0-9]/', '', $business->phone);
 
-        $slides = $business->photos->take(5)->map(fn ($p) => ['url' => self::escapeHtml($p->url)])->values();
+        // The hero slider shows the photos the owner picked for it in the
+        // builder, or else the listing's first few photos.
+        $picked = $business->site?->sliderImages ?? [];
+        $slides = ($picked ? collect($picked) : $business->photos->take(5)->pluck('url'))
+            ->map(fn ($url) => ['url' => self::escapeHtml($url)])->values();
 
         return [
             'name' => $name,
@@ -167,7 +171,7 @@ class Helpers
         if ($count <= 1) {
             return [
                 'html' => $slidesHtml,
-                'css' => '.mk-track{display:flex;width:100%;height:100%}.mk-slide{width:100%;height:100%}',
+                'css' => '.mk-track{display:flex;width:100%;height:100%;animation:none;transform:none}.mk-slide{width:100%;height:100%}',
             ];
         }
 

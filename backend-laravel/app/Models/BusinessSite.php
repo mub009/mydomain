@@ -16,7 +16,7 @@ class BusinessSite extends Model
     protected $table = 'business_sites';
 
     protected $fillable = [
-        'businessId', 'siteType', 'templateId', 'projectData', 'html', 'css',
+        'businessId', 'siteType', 'templateId', 'projectData', 'html', 'css', 'sliderImages',
         'isPublished', 'publishedAt', 'deliveryFeeCents', 'freeDeliveryAboveCents', 'acceptsOnlinePayment',
     ];
 
@@ -24,6 +24,7 @@ class BusinessSite extends Model
     {
         return [
             'projectData' => 'array',
+            'sliderImages' => 'array',
             'isPublished' => 'boolean',
             'publishedAt' => 'datetime',
             'deliveryFeeCents' => 'integer',

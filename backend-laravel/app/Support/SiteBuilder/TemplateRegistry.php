@@ -88,6 +88,9 @@ class TemplateRegistry
             'templateId' => $class::ID,
             'html' => $built['html'],
             'css' => $built['css'],
+            // The rules that depend on the listing's data (the slider's
+            // timing), for LiveSite to lay over a saved page.
+            'liveCss' => $built['liveCss'] ?? '',
             // Echoed back to the editor so it can show what it drew the page from.
             'data' => [
                 'name' => $business->name,

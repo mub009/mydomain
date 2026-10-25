@@ -308,6 +308,6 @@ class ElegantTemplate
         @media(prefers-reduced-motion:reduce){.mk-track{animation:none}}
         CSS;
 
-        return ['html' => trim($html), 'css' => trim($css)];
+        return ['html' => trim($html), 'css' => trim($css), 'liveCss' => trim($slidesCss)];
     }
 }

@@ -52,6 +52,7 @@
       @case('Hours') @include('pages.dashboard.sections.hours') @break
       @case('Services') @include('pages.dashboard.sections.services') @break
       @case('Photos') @include('pages.dashboard.sections.photos') @break
+      @case('Slider') @include('pages.dashboard.sections.slider') @break
       @case('Reviews & QR') @include('pages.dashboard.sections.reviews-qr') @break
       @case('Website') @include('pages.dashboard.sections.website') @break
       @case('Products') @include('pages.dashboard.sections.products') @break

@@ -1,4 +1,4 @@
-import { api, errorMessage } from "../lib/api";
+import { api, errorMessage, uploadImage } from "../lib/api";
 import { CHANNEL_LABELS, boardUrl, downloadDataUrl, renderQrDataUrl } from "../lib/channels";
 import { $, $$, openModal, pageData } from "../lib/ui";
 import { boardPreviewModal, initUploadFields, reloadWithFlash, showError, showFlash } from "../lib/widgets";
@@ -199,6 +199,64 @@ $$("[data-delete-photo]").forEach((button) =>
     }
   }),
 );
+
+// --- Slider -----------------------------------------------------------------
+// Every change saves the whole list straight away; the website picks it up
+// on its next visit.
+const sliderData = pageData("slider-data");
+if (sliderData) {
+  const images = [...sliderData.images];
+  const saveSlider = async (message) => {
+    try {
+      await api.put(`${base}/site/slider`, { images });
+      reloadWithFlash(message);
+    } catch (err) {
+      fail(err);
+    }
+  };
+
+  $("[data-slider-upload]")?.addEventListener("change", async (e) => {
+    const files = [...e.target.files].slice(0, sliderData.max - images.length);
+    if (!files.length) return;
+    const label = $("[data-slider-label]");
+    $("[data-slider-drop]").classList.add("pointer-events-none", "opacity-60");
+    let added = 0;
+    for (const file of files) {
+      label.textContent = `Uploading ${added + 1} of ${files.length}…`;
+      try {
+        images.push(await uploadImage(file, "site-slider"));
+        added += 1;
+      } catch (err) {
+        showError(errorBox, `${file.name}: ${errorMessage(err)}`);
+      }
+    }
+    if (added) await saveSlider(`${added} photo${added === 1 ? "" : "s"} added to your slider.`);
+    else {
+      label.textContent = "Upload photos";
+      $("[data-slider-drop]").classList.remove("pointer-events-none", "opacity-60");
+    }
+  });
+  $$("[data-slide-add]").forEach((button) =>
+    button.addEventListener("click", () => {
+      images.push(button.dataset.slideAdd);
+      saveSlider("Photo added to your slider.");
+    }),
+  );
+  $$("[data-slide-move]").forEach((button) =>
+    button.addEventListener("click", () => {
+      const from = Number(button.dataset.slideMove);
+      const to = Number(button.dataset.to);
+      [images[from], images[to]] = [images[to], images[from]];
+      saveSlider("Slider order saved.");
+    }),
+  );
+  $$("[data-slide-remove]").forEach((button) =>
+    button.addEventListener("click", () => {
+      images.splice(Number(button.dataset.slideRemove), 1);
+      saveSlider("Photo removed from your slider.");
+    }),
+  );
+}
 
 // --- Reviews & QR -----------------------------------------------------------
 $("[data-review-links-form]")?.addEventListener("submit", async (e) => {
