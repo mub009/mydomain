@@ -67,7 +67,13 @@ slug). It is off until `SITE_DOMAIN` is set; until then sites stay at
    `APP_URL=https://mydomainbook.com`, which links from a business site back
    to Markkito use). Optionally `SESSION_DOMAIN=.mydomainbook.com`, so a
    visitor signed in on Markkito stays signed in on business sites (e.g. at
-   a shop's checkout). Then `php artisan config:clear` (or `config:cache`).
+   a shop's checkout). Writing it as `https://www.mydomainbook.com/` or
+   `*.mydomainbook.com` works too.
+5. **Clear Laravel's caches**, since a cached config ignores `.env` and a
+   route cache built before step 4 has no subdomain route:
+   `php artisan config:clear && php artisan route:clear`.
+6. **Check:** `php artisan sites:check cafe-kapichino-2.mydomainbook.com`
+   says what that host shows and, if it's the home page, why.
 
 With it on, `<slug>.mydomainbook.com/` shows the website, every link the app
 hands out (website builder, share buttons, the publish response) uses the
