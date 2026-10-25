@@ -217,6 +217,51 @@ Since this tracks every visitor passively rather than only those who
 opt in, it has a bigger privacy footprint than the existing Visitors
 capture — worth a line in your privacy policy.
 
+### SEO and Google (dashboard "SEO" section, admin "SEO" tab)
+
+- **Business owners** get an **SEO** section in the business manager. It has an SEO title, a meta
+  description, keywords, a live preview of the Google result, a 0–100 checklist score, and whether
+  each of their pages (listing page and website) is on Google yet. If a field is left empty, the
+  text is written from the listing (`App\Support\Seo\SeoMeta`).
+- **Public pages** (`/business/<slug>`, the website and the shop) have a meta description, keywords,
+  a canonical URL, Open Graph/Twitter tags and schema.org `LocalBusiness` data (address, hours,
+  rating). Dashboards and sign-in pages are `noindex`.
+- **`/sitemap.xml`** lists every live listing and website, and **`/robots.txt`** points to it. The
+  old static `public/robots.txt` has been removed because it would hide the route.
+- **Tracking:** when a listing goes live, or its website is published, its pages are added to
+  `seo_pages`. Unpublishing or suspending removes them.
+- **`php artisan seo:sync`** runs from the scheduler every 10 minutes, so it needs the cron entry
+  above. Each run:
+  - sends queued pages to Google's Indexing API;
+  - asks Search Console's URL Inspection API whether each page is indexed;
+  - sends a page again if it still isn't on Google after 48 hours;
+  - sends the sitemap to Google once a day.
+- The **admin SEO tab** shows every page as *On Google*, *Waiting (< 2 days)* or *Overdue (> 2
+  days)*, with Google's own reason, how long indexing took, and Check / Resubmit buttons.
+
+Google always makes the final decision on whether and when to index a page; nothing can guarantee
+it. Asking Google directly usually gets new pages crawled within hours to about two days. The
+48-hour target is something the report measures and flags; it is not a promise.
+
+To connect Google (without this, everything works except submitting and checking):
+
+1. In Google Cloud Console, create a project and enable the **Web Search Indexing API** and the
+   **Google Search Console API**.
+2. Create a **service account**, add a **JSON key**, and download it to the server, outside
+   `public/`.
+3. In Search Console, add a **Domain property** for `mydomainbook.com`. This covers the main site
+   and every business subdomain. Then go to **Settings → Users and permissions** and add the
+   service account's email as an **Owner**.
+4. Set these in `.env`, then run `php artisan config:clear`:
+   ```
+   GOOGLE_SEARCH_CREDENTIALS=/home/you/keys/markkito-indexer.json
+   GOOGLE_SEARCH_PROPERTY=sc-domain:mydomainbook.com
+   ```
+5. Run `php artisan seo:sync` once to check the setup. It should report pages submitted, not
+   errors. Google's default free quotas are 200 Indexing API requests and 2,000 inspections a day.
+   The per-run limits are `GOOGLE_SEARCH_SUBMIT_PER_RUN` and `GOOGLE_SEARCH_INSPECT_PER_RUN`. When
+   the quota runs out, the rest of the queue simply waits for the next run.
+
 ## Scope of this port
 
 This is a **core-first** conversion. Ported and tested:
