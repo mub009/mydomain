@@ -97,6 +97,7 @@
         <h2 class="font-semibold text-ink-900">Listings <span class="ml-1 text-sm font-normal text-ink-400">{{ $bizMeta['total'] }}</span></h2>
         <form method="GET" action="/dashboard" class="relative w-full sm:w-72">
           <input type="hidden" name="tab" value="businesses" />
+          <input type="hidden" name="perPage" value="{{ $perPage }}" />
           <x-icon name="search" :size="15" class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
           <input name="search" value="{{ $search }}" placeholder="Search by name, city or phone" autocomplete="off" class="input py-2 pl-9 text-sm" data-live-search />
         </form>
@@ -151,6 +152,11 @@
           </div>
         @endforelse
       </div>
+      @if ($bizMeta['total'] > 0)
+        <div class="border-t border-gray-100">
+          <x-per-page :total="$bizMeta['total']" :page="$bizMeta['page']" :per-page="$perPage" :options="D::PER_PAGE_OPTIONS" />
+        </div>
+      @endif
     </div>
     <x-pager :page="$bizMeta['page']" :total-pages="$bizMeta['totalPages']" />
   @endif
@@ -168,6 +174,7 @@
         </div>
         <form method="GET" action="/dashboard" class="relative w-full sm:w-72">
           <input type="hidden" name="tab" value="logins" />
+          <input type="hidden" name="perPage" value="{{ $perPage }}" />
           <x-icon name="search" :size="15" class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
           <input name="search" value="{{ $search }}" placeholder="Search by name, phone, email or business" autocomplete="off" class="input py-2 pl-9 text-sm" data-live-search />
         </form>
@@ -222,6 +229,9 @@
               </button>
             </div>
           @endforeach
+        </div>
+        <div class="border-t border-gray-100">
+          <x-per-page :total="$loginsMeta['total']" :page="$loginsMeta['page']" :per-page="$perPage" :options="D::PER_PAGE_OPTIONS" />
         </div>
       @endif
     </div>

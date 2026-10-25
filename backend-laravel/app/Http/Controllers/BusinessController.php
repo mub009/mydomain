@@ -277,7 +277,8 @@ class BusinessController extends Controller
                 ->orWhere('phone', 'like', "%{$search}%"));
         }
         $total = (clone $query)->count();
-        $items = $query->orderByDesc('createdAt')
+        // id breaks ties, so listings made in the same second page steadily.
+        $items = $query->orderByDesc('createdAt')->orderByDesc('id')
             ->skip($pagination['skip'])->take($pagination['take'])
             ->with('category')->get();
 

@@ -34,7 +34,11 @@ class DashboardController extends Controller
         'logins' => ['label' => 'Business logins', 'icon' => 'key-round', 'privilege' => 'MANAGE_LISTINGS', 'dealerOnly' => true],
     ];
 
-    public const LOGINS_PAGE_SIZE = 20;
+    // "Show 5 / 10 / 20 / 50" on the Listings and Business logins lists
+    // (?perPage=); 50 is the API's own ceiling.
+    public const PER_PAGE_OPTIONS = [5, 10, 20, 50];
+
+    public const DEFAULT_PER_PAGE = 20;
 
     // WhatsApp broadcasts and Poster Studio are not part of the Laravel
     // backend yet (see README), so the manager doesn't offer them.
@@ -79,9 +83,11 @@ class DashboardController extends Controller
         $tab = in_array($request->query('tab'), $visibleTabs, true) ? $request->query('tab') : ($visibleTabs[0] ?? null);
 
         $bizPage = max(1, (int) $request->query('page', 1));
+        $perPage = in_array((int) $request->query('perPage'), self::PER_PAGE_OPTIONS, true) ? (int) $request->query('perPage') : self::DEFAULT_PER_PAGE;
         $search = in_array($tab, ['businesses', 'logins'], true) ? trim((string) $request->query('search')) : '';
         $mine = InternalApi::call([BusinessController::class, 'mine'], array_filter([
             'page' => $tab === 'businesses' ? $bizPage : 1,
+            'pageSize' => $tab === 'businesses' ? $perPage : self::DEFAULT_PER_PAGE,
             'search' => $tab === 'businesses' ? $search : '',
         ]), [], true);
         $businesses = $mine['data'];
@@ -108,7 +114,7 @@ class DashboardController extends Controller
         $accounts = null;
         if ($tab === 'logins') {
             $accounts = InternalApi::tryCall([UserController::class, 'listCreated'], array_filter([
-                'page' => $bizPage, 'pageSize' => self::LOGINS_PAGE_SIZE, 'search' => $search,
+                'page' => $bizPage, 'pageSize' => $perPage, 'search' => $search,
             ]), [], true);
         }
 
@@ -132,6 +138,7 @@ class DashboardController extends Controller
             'businesses' => $businesses,
             'bizMeta' => $mine['meta'],
             'search' => $search,
+            'perPage' => $perPage,
             'stats' => $stats,
             'points' => $points,
             'outOfPoints' => $isDealer && $points !== null && $points['points'] <= 0,

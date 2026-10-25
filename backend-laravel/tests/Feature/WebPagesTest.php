@@ -224,6 +224,26 @@ class WebPagesTest extends TestCase
         $this->get('/dashboard?tab=logins')->assertOk()->assertDontSee('Reset password');
     }
 
+    public function test_listings_show_as_many_per_page_as_chosen(): void
+    {
+        $owner = $this->user(['role' => 'BUSINESS_OWNER']);
+        foreach (range(1, 7) as $i) {
+            $this->business($owner, ['name' => "Shop {$i}"]);
+        }
+        $this->signIn($owner);
+
+        $this->get('/dashboard')->assertOk()->assertSee('Showing 1–7 of 7')->assertDontSee('page=2', false);
+        $this->get('/dashboard?perPage=5')->assertOk()
+            ->assertSee('Showing 1–5 of 7')
+            ->assertSee('<option value="5" selected>', false)
+            // The pager and the search keep the choice.
+            ->assertSee('perPage=5&amp;page=2', false)
+            ->assertSee('name="perPage" value="5"', false);
+        $this->get('/dashboard?perPage=5&page=2')->assertOk()->assertSee('Showing 6–7 of 7');
+        // Anything off the menu falls back to 20.
+        $this->get('/dashboard?perPage=1000')->assertOk()->assertSee('<option value="20" selected>', false);
+    }
+
     public function test_admin_console_tabs_render(): void
     {
         $admin = $this->user(['role' => 'ADMIN']);
