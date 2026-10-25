@@ -5,6 +5,30 @@ import { $, $$, alertBox, esc, openModal, spinner } from "./ui";
 
 // Widgets shared by the dashboard pages.
 
+// --- Live search ------------------------------------------------------------
+// Typing in an <input data-live-search> reloads its list after a short pause,
+// with no Enter needed. The form is a plain GET, so any change starts again
+// from page 1 (the form drops `page`).
+export function initLiveSearch() {
+  $$("[data-live-search]").forEach((input) => {
+    let timer;
+    let last = input.value.trim();
+    input.addEventListener("input", () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        if (input.value.trim() === last) return;
+        last = input.value.trim();
+        input.form.submit();
+      }, 400);
+    });
+    // After the reload, carry on typing where you left off.
+    if (input.value && document.activeElement === document.body && new URL(window.location.href).searchParams.has("search")) {
+      input.focus();
+      input.setSelectionRange(input.value.length, input.value.length);
+    }
+  });
+}
+
 // --- Flash notices that survive a reload ----------------------------------
 // Most dashboard actions save through the API and then reload the page so
 // it re-renders from the server; the message to show goes along for the ride.

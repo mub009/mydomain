@@ -98,7 +98,7 @@
         <form method="GET" action="/dashboard" class="relative w-full sm:w-72">
           <input type="hidden" name="tab" value="businesses" />
           <x-icon name="search" :size="15" class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
-          <input name="search" value="{{ $search }}" placeholder="Search by name, city or phone" class="input py-2 pl-9 text-sm" />
+          <input name="search" value="{{ $search }}" placeholder="Search by name, city or phone" autocomplete="off" class="input py-2 pl-9 text-sm" data-live-search />
         </form>
       </div>
 
@@ -169,7 +169,7 @@
         <form method="GET" action="/dashboard" class="relative w-full sm:w-72">
           <input type="hidden" name="tab" value="logins" />
           <x-icon name="search" :size="15" class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
-          <input name="search" value="{{ $search }}" placeholder="Search by name, phone, email or business" class="input py-2 pl-9 text-sm" />
+          <input name="search" value="{{ $search }}" placeholder="Search by name, phone, email or business" autocomplete="off" class="input py-2 pl-9 text-sm" data-live-search />
         </form>
       </div>
 

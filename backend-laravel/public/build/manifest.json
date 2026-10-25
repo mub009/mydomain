@@ -34,8 +34,8 @@
     "file": "assets/ui-BchMeLp1.js",
     "name": "ui"
   },
-  "_widgets-Ces1tCk-.js": {
-    "file": "assets/widgets-Ces1tCk-.js",
+  "_widgets-Dk-vsi5p.js": {
+    "file": "assets/widgets-Dk-vsi5p.js",
     "name": "widgets",
     "imports": [
       "_api-3HrlSN3j.js",
@@ -64,7 +64,7 @@
     ]
   },
   "resources/js/pages/admin.js": {
-    "file": "assets/admin-C1cDPhHR.js",
+    "file": "assets/admin-AgxY9kwQ.js",
     "name": "admin",
     "src": "resources/js/pages/admin.js",
     "isEntry": true,
@@ -72,7 +72,7 @@
       "_api-3HrlSN3j.js",
       "_channels-e-xcKH2w.js",
       "_ui-BchMeLp1.js",
-      "_widgets-Ces1tCk-.js",
+      "_widgets-Dk-vsi5p.js",
       "__commonjsHelpers-CqkleIqs.js"
     ]
   },
@@ -87,7 +87,7 @@
     ]
   },
   "resources/js/pages/dashboard.js": {
-    "file": "assets/dashboard-tzZFiXdz.js",
+    "file": "assets/dashboard-ByfEbBwJ.js",
     "name": "dashboard",
     "src": "resources/js/pages/dashboard.js",
     "isEntry": true,
@@ -95,7 +95,7 @@
       "_ai-describe-PyYVODhO.js",
       "_api-3HrlSN3j.js",
       "_ui-BchMeLp1.js",
-      "_widgets-Ces1tCk-.js",
+      "_widgets-Dk-vsi5p.js",
       "_channels-e-xcKH2w.js",
       "__commonjsHelpers-CqkleIqs.js"
     ]
@@ -112,7 +112,7 @@
     ]
   },
   "resources/js/pages/manage.js": {
-    "file": "assets/manage-BF67s7-3.js",
+    "file": "assets/manage-yZfzlMnp.js",
     "name": "manage",
     "src": "resources/js/pages/manage.js",
     "isEntry": true,
@@ -120,7 +120,7 @@
       "_ai-describe-PyYVODhO.js",
       "_api-3HrlSN3j.js",
       "_ui-BchMeLp1.js",
-      "_widgets-Ces1tCk-.js",
+      "_widgets-Dk-vsi5p.js",
       "_channels-e-xcKH2w.js",
       "__commonjsHelpers-CqkleIqs.js"
     ]

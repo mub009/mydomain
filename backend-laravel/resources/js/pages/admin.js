@@ -2,7 +2,7 @@ import { api, errorMessage } from "../lib/api";
 import { boardHeadline, boardUrl, downloadDataUrl, renderQrDataUrl } from "../lib/channels";
 import { icon } from "../lib/icons";
 import { $, $$, alertBox, esc, formatDateTime, openModal, pageData } from "../lib/ui";
-import { reloadWithFlash, resetPasswordModal, showError, showFlash } from "../lib/widgets";
+import { initLiveSearch, reloadWithFlash, resetPasswordModal, showError, showFlash } from "../lib/widgets";
 
 // The admin console. Lists are server-rendered per tab; these handlers run
 // the actions through /api/v1/admin and reload to show the result.
@@ -18,21 +18,7 @@ const fail = (err) => showError(errorBox, errorMessage(err));
 showFlash();
 
 // --- Filters ------------------------------------------------------------------
-// Typing in a search box reloads the list after a short pause, the way the
-// old live search did. Any filter change starts again from page 1 (the form
-// GET drops `page`).
-$$("[data-live-search]").forEach((input) => {
-  let timer;
-  input.addEventListener("input", () => {
-    clearTimeout(timer);
-    timer = setTimeout(() => input.form.submit(), 400);
-  });
-  // Keep the caret where it was after the reload.
-  if (input.value && document.activeElement === document.body && new URL(window.location.href).searchParams.has("search")) {
-    input.focus();
-    input.setSelectionRange(input.value.length, input.value.length);
-  }
-});
+initLiveSearch();
 $$("[data-autosubmit-check]").forEach((box) => box.addEventListener("change", () => box.form.submit()));
 
 // --- Shared form bits ---------------------------------------------------------
