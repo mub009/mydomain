@@ -4,13 +4,12 @@
 @php
     $images = $slider['sliderImages'] ?? [];
     $max = $slider['max'] ?? 8;
-    $listingPhotos = array_values(array_filter(array_column($biz['photos'] ?? [], 'url'), fn ($url) => ! in_array($url, $images, true)));
     $sliderData = ['images' => $images, 'max' => $max];
 @endphp
 <div class="space-y-4">
   <div class="card p-5">
     <h3 class="font-bold text-ink-900 flex items-center gap-1.5"><x-icon name="image" :size="16" class="text-brand-600" /> Slider photos</h3>
-    <p class="mt-0.5 mb-3 text-xs text-ink-500">These photos slide across the banner at the top of your website, in this order (up to {{ $max }}). Changes show on your website straight away.</p>
+    <p class="mt-0.5 mb-3 text-xs text-ink-500">These photos slide across the banner at the top of your website, in this order (up to {{ $max }}). They are kept separate from your Photos. Changes show on your website straight away.</p>
     @if (count($images) > 0)
       <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
         @foreach ($images as $i => $url)
@@ -26,7 +25,7 @@
         @endforeach
       </div>
     @else
-      <p class="text-sm text-ink-500">No slider photos yet, so your website shows your first 5 listing photos. Upload photos below to choose your own.</p>
+      <p class="text-sm text-ink-500">No slider photos yet. Upload some below — they are separate from your Photos and only appear in the slider.</p>
     @endif
   </div>
 
@@ -39,18 +38,6 @@
         <span class="text-xs font-normal text-ink-400">PNG, JPG, GIF or WebP. Wide photos look best.</span>
         <input type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple class="hidden" data-slider-upload />
       </label>
-      @if (count($listingPhotos) > 0)
-        <div>
-          <p class="text-xs font-semibold text-ink-700">Or add one of your listing photos</p>
-          <div class="mt-1.5 flex flex-wrap gap-2">
-            @foreach ($listingPhotos as $url)
-              <button type="button" data-slide-add="{{ $url }}" class="h-14 w-20 overflow-hidden rounded-md border border-gray-200 hover:ring-2 hover:ring-brand-500" title="Add to slider">
-                <img src="{{ $url }}" alt="" class="h-full w-full object-cover" />
-              </button>
-            @endforeach
-          </div>
-        </div>
-      @endif
     </div>
   @endif
 </div>

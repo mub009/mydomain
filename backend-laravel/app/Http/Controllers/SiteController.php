@@ -87,7 +87,7 @@ class SiteController extends Controller
             'publishedAt' => $site->publishedAt ?? null,
             'updatedAt' => $site->updatedAt ?? null,
             'hasSavedDraft' => (bool) $site,
-            // Photos picked for the hero slider; empty means the listing's own.
+            // The hero slider's own photos, separate from the listing's gallery.
             'sliderImages' => $site->sliderImages ?? [],
             // Brochure website or storefront. A storefront is rendered by
             // the app, so the builder document is only used by WEBSITE.
@@ -174,8 +174,8 @@ class SiteController extends Controller
         return ApiResponse::ok(['sliderImages' => BusinessSite::where('businessId', $id)->value('sliderImages') ?? [], 'max' => self::MAX_SLIDER_IMAGES]);
     }
 
-    // The photos for the website's hero slider, in order. An empty list
-    // goes back to the listing's own photos. The website picks them up the
+    // The photos for the website's hero slider, in order — its own set,
+    // separate from the listing's photo gallery. The website picks them up the
     // next time it is shown (see LiveSite) — no rebuild or publish needed.
     public function updateSlider(Request $request, string $id)
     {

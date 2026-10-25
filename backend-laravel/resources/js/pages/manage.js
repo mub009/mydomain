@@ -236,12 +236,6 @@ if (sliderData) {
       $("[data-slider-drop]").classList.remove("pointer-events-none", "opacity-60");
     }
   });
-  $$("[data-slide-add]").forEach((button) =>
-    button.addEventListener("click", () => {
-      images.push(button.dataset.slideAdd);
-      saveSlider("Photo added to your slider.");
-    }),
-  );
   $$("[data-slide-move]").forEach((button) =>
     button.addEventListener("click", () => {
       const from = Number(button.dataset.slideMove);

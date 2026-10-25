@@ -101,10 +101,10 @@ class Helpers
         $name = self::escapeHtml($business->name);
         $phoneDigits = preg_replace('/[^0-9]/', '', $business->phone);
 
-        // The hero slider shows the photos the owner picked for it in the
-        // builder, or else the listing's first few photos.
-        $picked = $business->site?->sliderImages ?? [];
-        $slides = ($picked ? collect($picked) : $business->photos->take(5)->pluck('url'))
+        // The hero slider has its own photos (the Slider section), kept
+        // apart from the listing's photo gallery. With none, the templates
+        // draw their plain banner.
+        $slides = collect($business->site?->sliderImages ?? [])
             ->map(fn ($url) => ['url' => self::escapeHtml($url)])->values();
 
         return [

@@ -6,8 +6,8 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    // Photos the owner picked for the website's hero slider. Null means
-    // "use the listing's own photos".
+    // The website's hero slider photos — their own set, separate from the
+    // listing's photo gallery. Null means none yet.
     public function up(): void
     {
         Schema::table('business_sites', function (Blueprint $table) {

@@ -174,9 +174,9 @@ class SiteBuilderTest extends TestCase
         $auth = ['Authorization' => "Bearer {$this->token($owner)}"];
         $url = "/api/v1/businesses/{$business->id}/site/slider";
 
-        // With nothing picked, the slider falls back to the listing photos.
+        // The slider never borrows the listing's photos.
         $this->getJson($url, $auth)->assertOk()->assertJsonPath('data.sliderImages', []);
-        $this->getJson("/api/v1/businesses/{$business->id}/site", $auth)->assertJsonPath('data.businessData.slideCount', 1);
+        $this->getJson("/api/v1/businesses/{$business->id}/site", $auth)->assertJsonPath('data.businessData.slideCount', 0);
 
         $picked = ['https://cdn.example.com/a.jpg', 'https://cdn.example.com/b.jpg'];
         $this->putJson($url, ['images' => $picked], $auth)->assertOk()->assertJsonPath('data.sliderImages', $picked);
@@ -185,10 +185,9 @@ class SiteBuilderTest extends TestCase
         foreach (['classic', 'showcase', 'standard'] as $id) {
             $html = $this->getJson("/api/v1/businesses/{$business->id}/site/templates/{$id}", $auth)->json('data.html');
             $this->assertStringContainsString('b.jpg', $html);
-            $this->assertStringNotContainsString('listing.jpg', $html);
         }
 
-        // Clearing the list goes back to the listing photos.
+        // Clearing the list leaves the slider empty.
         $this->putJson($url, ['images' => []], $auth)->assertOk()->assertJsonPath('data.sliderImages', []);
         $this->assertNull(BusinessSite::where('businessId', $business->id)->first()->sliderImages);
 
