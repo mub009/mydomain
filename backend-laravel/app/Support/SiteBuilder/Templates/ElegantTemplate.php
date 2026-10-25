@@ -38,10 +38,9 @@ class ElegantTemplate
         $mail = Icons::MAIL;
         $instagram = Icons::INSTAGRAM;
 
-        $galleryHtml = collect($ctx['photos'])->map(fn ($p) => <<<HTML
+        $galleryHtml = collect($ctx['gallery'])->map(fn ($p) => <<<HTML
                 <figure class="mk-frame">
                   <img src="{$p['url']}" alt="{$p['caption']}" loading="lazy"/>
-                  <figcaption>{$p['caption']}</figcaption>
                 </figure>
             HTML)->implode('');
 
@@ -67,7 +66,7 @@ class ElegantTemplate
         })->implode('');
 
         $categoryLine = $ctx['category'] ? '<small>'.$ctx['category'].($ctx['city'] ? " · {$ctx['city']}" : '').'</small>' : '';
-        $navGallery = count($ctx['photos']) ? '<a href="#gallery">Gallery</a>' : '';
+        $navGallery = count($ctx['gallery']) ? '<a href="#gallery">Gallery</a>' : '';
         $navServices = count($ctx['services']) ? '<a href="#services">Menu</a>' : '';
         $heroEyebrow = $ctx['category'] ? '<span class="mk-eyebrow">'.$ctx['category'].($ctx['city'] ? " · {$ctx['city']}" : '').'</span>' : '';
         $heroHours = $ctx['workingTime'] ? "<p class=\"mk-hero-hours\">{$clock}<span>{$ctx['workingTime']}</span></p>" : '';
@@ -76,7 +75,7 @@ class ElegantTemplate
         $gallerySection = $galleryHtml ? <<<HTML
             <section class="mk-section mk-section-alt mk-section-wide" id="gallery">
               <span class="mk-kicker">Gallery</span>
-              <h2>A look inside</h2>
+              <h2>Our Gallery</h2>
               <span class="mk-flourish mk-center"></span>
               <div class="mk-frames">{$galleryHtml}</div>
             </section>

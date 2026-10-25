@@ -99,7 +99,7 @@ class StandardTemplate
                     <div class="title">
                         <h2>Our Services</h2>
                     </div>
-                    <section id="gallery">
+                    <section class="service-gallery">
                         <div class="container">
                             <div id="image-gallery">
                                 <div class="row">
@@ -108,6 +108,18 @@ class StandardTemplate
                             </div>
                         </div>
                     </section>
+                </div>
+            </div>
+            HTML;
+
+        $galleryItems = collect($ctx['gallery'])->map(fn ($g) => "<div class=\"col-lg-3 col-md-4 col-6 g-item\"><a href=\"{$g['url']}\" target=\"_blank\" rel=\"noreferrer\"><img src=\"{$g['url']}\" alt=\"{$g['caption']}\" loading=\"lazy\"></a></div>")->implode('');
+        $gallerySection = $galleryItems === '' ? '' : <<<HTML
+            <div class="popular_sec our_gallery" id="gallery">
+                <div class="container">
+                    <div class="title">
+                        <h2>Our Gallery</h2>
+                    </div>
+                    <div class="row">{$galleryItems}</div>
                 </div>
             </div>
             HTML;
@@ -198,6 +210,8 @@ class StandardTemplate
         </div>
 
         {$servicesSection}
+
+        {$gallerySection}
 
         {$socialSection}
 
@@ -417,8 +431,10 @@ class StandardTemplate
         .title{text-transform:uppercase}
         .popular_sec{padding-bottom:50px;padding-top:50px;background:#f1f7ff}
         .popular_sec .title{text-align:center;margin-bottom:30px}
-        #gallery{padding-top:0}
-        #gallery .container{padding:0}
+        .service-gallery{padding-top:0}
+        .service-gallery .container{padding:0}
+        .our_gallery .g-item{padding:8px}
+        .our_gallery img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:4px;display:block}
         .image{margin-bottom:25px}
         .w-box{background:#fff;width:100%;border-radius:5px;box-shadow:0 5px 15px rgba(0,0,0,.1);margin-bottom:5px;overflow:hidden}
         .w-box p{margin-top:5px;margin-bottom:0;padding:5px}

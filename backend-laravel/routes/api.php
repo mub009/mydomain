@@ -143,8 +143,9 @@ Route::prefix('businesses')->group(function () {
         Route::get('/{id}/site', [SiteController::class, 'show']);
         Route::put('/{id}/site', [SiteController::class, 'save']);
         Route::get('/{id}/site/templates/{templateId}', [SiteController::class, 'previewTemplate']);
-        Route::get('/{id}/site/slider', [SiteController::class, 'slider']);
-        Route::put('/{id}/site/slider', [SiteController::class, 'updateSlider']);
+        // The website's own photo sets (hero slider, "Our Gallery").
+        Route::get('/{id}/site/{kind}', [SiteController::class, 'images'])->whereIn('kind', ['slider', 'gallery']);
+        Route::put('/{id}/site/{kind}', [SiteController::class, 'updateImages'])->whereIn('kind', ['slider', 'gallery']);
         Route::patch('/{id}/site/type', [SiteController::class, 'updateType']);
         Route::post('/{id}/site/publish', [SiteController::class, 'publish']);
     });

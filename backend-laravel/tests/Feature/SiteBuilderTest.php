@@ -175,12 +175,12 @@ class SiteBuilderTest extends TestCase
         $url = "/api/v1/businesses/{$business->id}/site/slider";
 
         // The slider never borrows the listing's photos.
-        $this->getJson($url, $auth)->assertOk()->assertJsonPath('data.sliderImages', []);
+        $this->getJson($url, $auth)->assertOk()->assertJsonPath('data.images', []);
         $this->getJson("/api/v1/businesses/{$business->id}/site", $auth)->assertJsonPath('data.businessData.slideCount', 0);
 
         $picked = ['https://cdn.example.com/a.jpg', 'https://cdn.example.com/b.jpg'];
-        $this->putJson($url, ['images' => $picked], $auth)->assertOk()->assertJsonPath('data.sliderImages', $picked);
-        $this->getJson($url, $auth)->assertJsonPath('data.sliderImages', $picked);
+        $this->putJson($url, ['images' => $picked], $auth)->assertOk()->assertJsonPath('data.images', $picked);
+        $this->getJson($url, $auth)->assertJsonPath('data.images', $picked);
 
         foreach (['classic', 'showcase', 'standard'] as $id) {
             $html = $this->getJson("/api/v1/businesses/{$business->id}/site/templates/{$id}", $auth)->json('data.html');
@@ -188,11 +188,16 @@ class SiteBuilderTest extends TestCase
         }
 
         // Clearing the list leaves the slider empty.
-        $this->putJson($url, ['images' => []], $auth)->assertOk()->assertJsonPath('data.sliderImages', []);
+        $this->putJson($url, ['images' => []], $auth)->assertOk()->assertJsonPath('data.images', []);
         $this->assertNull(BusinessSite::where('businessId', $business->id)->first()->sliderImages);
 
         $this->putJson($url, ['images' => ['javascript:alert(1)']], $auth)->assertStatus(400);
         $this->putJson($url, ['images' => array_fill(0, 9, 'https://cdn.example.com/x.jpg')], $auth)->assertStatus(400);
+
+        $this->putJson("/api/v1/businesses/{$business->id}/site/gallery", ['images' => ['https://cdn.example.com/g.jpg']], $auth)->assertOk();
+        $this->getJson($url, $auth)->assertJsonPath('data.images', []);
+        $this->getJson("/api/v1/businesses/{$business->id}/site/gallery", $auth)->assertJsonPath('data.images', ['https://cdn.example.com/g.jpg'])->assertJsonPath('data.max', 24);
+        $this->getJson("/api/v1/businesses/{$business->id}/site/other", $auth)->assertStatus(404);
 
         $stranger = $this->user(['role' => 'BUSINESS_OWNER']);
         $this->putJson($url, ['images' => $picked], ['Authorization' => "Bearer {$this->token($stranger)}"])->assertStatus(403);
@@ -215,12 +220,16 @@ class SiteBuilderTest extends TestCase
 
             $business->update(['phone' => '+91 90000 11111', 'email' => 'new@example.com']);
             $this->putJson("/api/v1/businesses/{$business->id}/site/slider", ['images' => ['https://cdn.example.com/new-slide.jpg']], $auth)->assertOk();
+            // The page was saved with no gallery; uploading some adds the section.
+            $this->putJson("/api/v1/businesses/{$business->id}/site/gallery", ['images' => ['https://cdn.example.com/gallery-1.jpg']], $auth)->assertOk();
 
             $site = $this->getJson("/api/v1/sites/{$business->slug}")->assertOk()->json('data');
             $this->assertStringContainsString('+91 90000 11111', $site['html'], $id);
             $this->assertStringNotContainsString('98765 43210', $site['html'], $id);
             $this->assertStringContainsString('new-slide.jpg', $site['html'], $id);
             $this->assertStringContainsString('Our own words', $site['html'], $id);
+            $this->assertStringContainsString('gallery-1.jpg', $site['html'], $id);
+            $this->assertStringContainsString('Our Gallery', $site['html'], $id);
             $this->assertStringContainsString('new@example.com', $site['html'], $id);
 
             // The builder opens on the same up-to-date page.
@@ -228,6 +237,7 @@ class SiteBuilderTest extends TestCase
 
             $business->update(['phone' => '+91 98765 43210', 'email' => null]);
             $this->putJson("/api/v1/businesses/{$business->id}/site/slider", ['images' => []], $auth);
+            $this->putJson("/api/v1/businesses/{$business->id}/site/gallery", ['images' => []], $auth);
         }
     }
 }

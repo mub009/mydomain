@@ -200,54 +200,57 @@ $$("[data-delete-photo]").forEach((button) =>
   }),
 );
 
-// --- Slider -----------------------------------------------------------------
-// Every change saves the whole list straight away; the website picks it up
-// on its next visit.
-const sliderData = pageData("slider-data");
-if (sliderData) {
-  const images = [...sliderData.images];
-  const saveSlider = async (message) => {
+// --- Slider / Our Gallery ----------------------------------------------------
+// The website's own photo sets. Every change saves the whole list straight
+// away; the website picks it up on its next visit.
+const imageSet = pageData("image-set-data");
+if (imageSet) {
+  const { kind, max } = imageSet;
+  const images = [...imageSet.images];
+  const where = kind === "slider" ? "your slider" : "your gallery";
+  const save = async (message) => {
     try {
-      await api.put(`${base}/site/slider`, { images });
+      await api.put(`${base}/site/${kind}`, { images });
       reloadWithFlash(message);
     } catch (err) {
       fail(err);
     }
   };
 
-  $("[data-slider-upload]")?.addEventListener("change", async (e) => {
-    const files = [...e.target.files].slice(0, sliderData.max - images.length);
+  $("[data-image-upload]")?.addEventListener("change", async (e) => {
+    const files = [...e.target.files].slice(0, max - images.length);
     if (!files.length) return;
-    const label = $("[data-slider-label]");
-    $("[data-slider-drop]").classList.add("pointer-events-none", "opacity-60");
+    const label = $("[data-image-label]");
+    const drop = $("[data-image-drop]");
+    drop.classList.add("pointer-events-none", "opacity-60");
     let added = 0;
-    for (const file of files) {
-      label.textContent = `Uploading ${added + 1} of ${files.length}…`;
+    for (const [i, file] of files.entries()) {
+      label.textContent = `Uploading ${i + 1} of ${files.length}…`;
       try {
-        images.push(await uploadImage(file, "site-slider"));
+        images.push(await uploadImage(file, `site-${kind}`));
         added += 1;
       } catch (err) {
         showError(errorBox, `${file.name}: ${errorMessage(err)}`);
       }
     }
-    if (added) await saveSlider(`${added} photo${added === 1 ? "" : "s"} added to your slider.`);
+    if (added) await save(`${added} photo${added === 1 ? "" : "s"} added to ${where}.`);
     else {
       label.textContent = "Upload photos";
-      $("[data-slider-drop]").classList.remove("pointer-events-none", "opacity-60");
+      drop.classList.remove("pointer-events-none", "opacity-60");
     }
   });
-  $$("[data-slide-move]").forEach((button) =>
+  $$("[data-image-move]").forEach((button) =>
     button.addEventListener("click", () => {
-      const from = Number(button.dataset.slideMove);
+      const from = Number(button.dataset.imageMove);
       const to = Number(button.dataset.to);
       [images[from], images[to]] = [images[to], images[from]];
-      saveSlider("Slider order saved.");
+      save("Order saved.");
     }),
   );
-  $$("[data-slide-remove]").forEach((button) =>
+  $$("[data-image-remove]").forEach((button) =>
     button.addEventListener("click", () => {
-      images.splice(Number(button.dataset.slideRemove), 1);
-      saveSlider("Photo removed from your slider.");
+      images.splice(Number(button.dataset.imageRemove), 1);
+      save(`Photo removed from ${where}.`);
     }),
   );
 }

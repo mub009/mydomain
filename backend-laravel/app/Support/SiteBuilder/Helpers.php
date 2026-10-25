@@ -141,6 +141,12 @@ class Helpers
                 'caption' => self::escapeHtml($p->caption ?: $business->name),
             ])->values(),
             'slides' => $slides,
+            // The "Our Gallery" section's own photos (the Our Gallery
+            // section of the panel), separate from the listing's photos.
+            'gallery' => collect($business->site?->galleryImages ?? [])->map(fn ($url) => [
+                'url' => self::escapeHtml($url),
+                'caption' => $name,
+            ])->values(),
             'services' => $business->services->map(fn ($s) => [
                 'name' => self::escapeHtml($s->name),
                 'description' => self::escapeHtml($s->description ?? ''),

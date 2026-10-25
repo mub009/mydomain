@@ -27,6 +27,7 @@ class UploadController extends Controller
         'business-logo' => ['folder' => 'businesses/logos', 'roles' => ['BUSINESS_OWNER', 'DEALER', 'ADMIN']],
         'business-cover' => ['folder' => 'businesses/covers', 'roles' => ['BUSINESS_OWNER', 'DEALER', 'ADMIN']],
         'site-slider' => ['folder' => 'businesses/slider', 'roles' => ['BUSINESS_OWNER', 'DEALER', 'ADMIN']],
+        'site-gallery' => ['folder' => 'businesses/gallery', 'roles' => ['BUSINESS_OWNER', 'DEALER', 'ADMIN']],
         'products' => ['folder' => 'products', 'roles' => ['BUSINESS_OWNER', 'DEALER', 'ADMIN']],
         // Any signed-in role can post a classified listing — sellers aren't
         // just business owners here.

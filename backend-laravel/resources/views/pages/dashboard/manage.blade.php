@@ -52,7 +52,18 @@
       @case('Hours') @include('pages.dashboard.sections.hours') @break
       @case('Services') @include('pages.dashboard.sections.services') @break
       @case('Photos') @include('pages.dashboard.sections.photos') @break
-      @case('Slider') @include('pages.dashboard.sections.slider') @break
+      @case('Slider') @include('pages.dashboard.sections.image-set', [
+          'title' => 'Slider photos',
+          'blurb' => 'These photos slide across the banner at the top of your website, in this order.',
+          'empty' => 'No slider photos yet. Upload some below — they only appear in the slider.',
+          'hint' => 'Wide photos look best.',
+      ]) @break
+      @case('Our Gallery') @include('pages.dashboard.sections.image-set', [
+          'title' => 'Our Gallery',
+          'blurb' => 'These photos make up the “Our Gallery” section of your website, in this order.',
+          'empty' => 'No gallery photos yet. Upload some below to add an Our Gallery section to your website.',
+          'hint' => 'Square or landscape photos look best.',
+      ]) @break
       @case('Reviews & QR') @include('pages.dashboard.sections.reviews-qr') @break
       @case('Website') @include('pages.dashboard.sections.website') @break
       @case('Products') @include('pages.dashboard.sections.products') @break

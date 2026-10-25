@@ -39,10 +39,9 @@ class ModernTemplate
         $instagram = Icons::INSTAGRAM;
         $star = Icons::STAR;
 
-        $galleryHtml = collect($ctx['photos'])->map(fn ($p) => <<<HTML
+        $galleryHtml = collect($ctx['gallery'])->map(fn ($p) => <<<HTML
                 <figure class="mk-tile">
                   <img src="{$p['url']}" alt="{$p['caption']}" loading="lazy"/>
-                  <figcaption>{$p['caption']}</figcaption>
                 </figure>
             HTML)->implode('');
 
@@ -69,7 +68,7 @@ class ModernTemplate
         })->implode('');
 
         $categoryLine = $ctx['category'] ? '<small>'.$ctx['category'].($ctx['city'] ? " · {$ctx['city']}" : '').'</small>' : '';
-        $navGallery = count($ctx['photos']) ? '<a href="#gallery">Work</a>' : '';
+        $navGallery = count($ctx['gallery']) ? '<a href="#gallery">Gallery</a>' : '';
         $navServices = count($ctx['services']) ? '<a href="#services">Services</a>' : '';
         $heroEyebrow = $ctx['category'] ? '<span class="mk-eyebrow">'.$ctx['category'].($ctx['city'] ? " · {$ctx['city']}" : '').'</span>' : '';
         $reviewWord = $ctx['reviewCount'] === 1 ? '' : 's';
@@ -78,7 +77,7 @@ class ModernTemplate
         $gallerySection = $galleryHtml ? <<<HTML
             <section class="mk-section mk-section-wide" id="gallery">
               <span class="mk-kicker">Gallery</span>
-              <h2>Our work</h2>
+              <h2>Our Gallery</h2>
               <div class="mk-mosaic">{$galleryHtml}</div>
             </section>
             HTML : '';

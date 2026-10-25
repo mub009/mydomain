@@ -56,6 +56,14 @@ class ShowcaseTemplate
         })->implode('');
 
         $navServices = ($tilesHtml || $pricesHtml) ? '<a href="#services">Services</a>' : '';
+        $galleryHtml = collect($ctx['gallery'])->map(fn ($g) => "<figure><img src=\"{$g['url']}\" alt=\"{$g['caption']}\" loading=\"lazy\"/></figure>")->implode('');
+        $navGallery = $galleryHtml ? '<a href="#gallery">Gallery</a>' : '';
+        $gallerySection = $galleryHtml ? <<<HTML
+            <section class="mk-section" id="gallery">
+              <div class="mk-title"><h2>Our Gallery</h2></div>
+              <div class="mk-gallery">{$galleryHtml}</div>
+            </section>
+            HTML : '';
         $categoryLine = $ctx['category'] ? '<h3 class="mk-about-sub">'.$ctx['category'].($ctx['city'] ? " · {$ctx['city']}" : '').'</h3>' : '';
         $tilesGrid = $tilesHtml ? "<div class=\"mk-tiles\">{$tilesHtml}</div>" : '';
         $pricesList = $pricesHtml ? "<div class=\"mk-prices\">{$pricesHtml}</div>" : '';
@@ -90,6 +98,7 @@ class ShowcaseTemplate
               <a href="#home">Home</a>
               <a href="#about">About Us</a>
               {$navServices}
+              {$navGallery}
               <a href="#contact">Contact Us</a>
             </nav>
           </div>
@@ -106,6 +115,8 @@ class ShowcaseTemplate
         </section>
 
         {$servicesSection}
+
+        {$gallerySection}
 
         {$socialSection}
 
@@ -196,6 +207,10 @@ class ShowcaseTemplate
         .mk-price-row h3{margin:0 0 4px;font-size:16px;color:var(--mk-dark)}
         .mk-price-row p{margin:0;color:var(--mk-muted);font-size:14px}
         .mk-price{color:var(--mk-accent);font-weight:700;font-size:17px;white-space:nowrap}
+        .mk-gallery{max-width:1140px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+        .mk-gallery figure{margin:0;overflow:hidden;border-radius:4px;box-shadow:0 2px 12px rgba(0,0,0,.08)}
+        .mk-gallery img{width:100%;aspect-ratio:1;object-fit:cover;display:block;transition:transform .4s}
+        .mk-gallery figure:hover img{transform:scale(1.06)}
         .mk-social{padding:40px 15px;text-align:center}
         .mk-social h5{margin:0 0 14px;font-size:18px;font-weight:600;color:var(--mk-dark)}
         .mk-social a{display:inline-flex;align-items:center;justify-content:center;width:50px;height:50px;border-radius:12px;color:#fff;background:radial-gradient(circle at 30% 107%,#fdf497 0%,#fd5949 45%,#d6249f 60%,#285aeb 90%)}
@@ -223,7 +238,7 @@ class ShowcaseTemplate
         .mk-footer{background:var(--mk-dark);color:#adb5bd;text-align:center;padding:18px 15px;font-size:14px}
         .mk-footer p{margin:0}
         {$floatsCss}
-        @media(max-width:991px){.mk-tiles{grid-template-columns:repeat(2,1fr);gap:20px}
+        @media(max-width:991px){.mk-tiles,.mk-gallery{grid-template-columns:repeat(2,1fr);gap:20px}
         .mk-burger{display:flex}
         .mk-nav{display:none;position:absolute;top:100%;left:0;right:0;flex-direction:column;gap:0;background:#fff;box-shadow:0 8px 16px rgba(0,0,0,.1);padding:8px 15px}
         .mk-nav a{padding:12px 6px;border-bottom:1px solid #f1f3f5}

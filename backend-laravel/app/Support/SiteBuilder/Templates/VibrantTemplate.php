@@ -39,10 +39,9 @@ class VibrantTemplate
         $instagram = Icons::INSTAGRAM;
         $star = Icons::STAR;
 
-        $galleryHtml = collect($ctx['photos'])->map(fn ($p) => <<<HTML
+        $galleryHtml = collect($ctx['gallery'])->map(fn ($p) => <<<HTML
                 <figure class="mk-bubble">
                   <img src="{$p['url']}" alt="{$p['caption']}" loading="lazy"/>
-                  <figcaption>{$p['caption']}</figcaption>
                 </figure>
             HTML)->implode('');
 
@@ -66,7 +65,7 @@ class VibrantTemplate
         })->implode('');
 
         $categoryLine = $ctx['category'] ? '<small>'.$ctx['category'].($ctx['city'] ? " · {$ctx['city']}" : '').'</small>' : '';
-        $navGallery = count($ctx['photos']) ? '<a href="#gallery">Gallery</a>' : '';
+        $navGallery = count($ctx['gallery']) ? '<a href="#gallery">Gallery</a>' : '';
         $navServices = count($ctx['services']) ? '<a href="#services">Services</a>' : '';
         $eyebrow = $ctx['category'] ? '<span class="mk-eyebrow">'.$ctx['category'].($ctx['city'] ? " in {$ctx['city']}" : '').'</span>' : '';
         $reviewWord = $ctx['reviewCount'] === 1 ? '' : 's';
@@ -76,7 +75,7 @@ class VibrantTemplate
         $gallerySection = $galleryHtml ? <<<HTML
             <section class="mk-section mk-section-wide" id="gallery">
               <span class="mk-kicker">Gallery</span>
-              <h2>Have a look around</h2>
+              <h2>Our Gallery</h2>
               <div class="mk-bubbles">{$galleryHtml}</div>
             </section>
             HTML : '';

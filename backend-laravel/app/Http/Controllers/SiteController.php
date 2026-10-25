@@ -18,7 +18,11 @@ use Illuminate\Http\Request;
 // builder (starter/preview rendering, save, publish).
 class SiteController extends Controller
 {
-    private const MAX_SLIDER_IMAGES = 8;
+    // The website's own photo sets: where each is stored and how many it holds.
+    public const IMAGE_SETS = [
+        'slider' => ['column' => 'sliderImages', 'max' => 8],
+        'gallery' => ['column' => 'galleryImages', 'max' => 24],
+    ];
 
     // Everything the builder needs to seed a first draft from what the
     // owner already entered in their listing.
@@ -166,30 +170,33 @@ class SiteController extends Controller
         return ApiResponse::ok(['savedAt' => $site->updatedAt, 'isPublished' => $site->isPublished, 'templateId' => $site->templateId]);
     }
 
-    public function slider(Request $request, string $id)
+    // The website's own photo sets, each separate from the listing's photos
+    // and from each other: the hero slider and the "Our Gallery" section.
+    public function images(Request $request, string $id, string $kind)
     {
         $actor = $request->attributes->get('auth');
         $this->ownedBusiness($actor, $id);
+        $set = self::IMAGE_SETS[$kind];
 
-        return ApiResponse::ok(['sliderImages' => BusinessSite::where('businessId', $id)->value('sliderImages') ?? [], 'max' => self::MAX_SLIDER_IMAGES]);
+        return ApiResponse::ok(['images' => BusinessSite::where('businessId', $id)->value($set['column']) ?? [], 'max' => $set['max']]);
     }
 
-    // The photos for the website's hero slider, in order — its own set,
-    // separate from the listing's photo gallery. The website picks them up the
-    // next time it is shown (see LiveSite) — no rebuild or publish needed.
-    public function updateSlider(Request $request, string $id)
+    // Replaces one set, in order. The website picks it up the next time it
+    // is shown (see LiveSite) — no rebuild or publish needed.
+    public function updateImages(Request $request, string $id, string $kind)
     {
         $actor = $request->attributes->get('auth');
         $this->ownedBusiness($actor, $id);
+        $set = self::IMAGE_SETS[$kind];
 
         $data = $request->validate([
-            'images' => ['present', 'array', 'max:'.self::MAX_SLIDER_IMAGES],
+            'images' => ['present', 'array', 'max:'.$set['max']],
             'images.*' => ['required', 'string', 'url:http,https', 'max:2048'],
         ]);
 
-        $site = BusinessSite::updateOrCreate(['businessId' => $id], ['sliderImages' => array_values($data['images']) ?: null]);
+        $site = BusinessSite::updateOrCreate(['businessId' => $id], [$set['column'] => array_values($data['images']) ?: null]);
 
-        return ApiResponse::ok(['sliderImages' => $site->sliderImages ?? []]);
+        return ApiResponse::ok(['images' => $site->{$set['column']} ?? []]);
     }
 
     // Switching between a brochure website and a storefront, plus the

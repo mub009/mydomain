@@ -35,10 +35,9 @@ class ClassicTemplate
         $mail = Icons::MAIL;
         $instagram = Icons::INSTAGRAM;
 
-        $galleryHtml = collect($ctx['photos'])->map(fn ($p) => <<<HTML
+        $galleryHtml = collect($ctx['gallery'])->map(fn ($p) => <<<HTML
                 <figure class="mk-card">
                   <div class="mk-card-img"><img src="{$p['url']}" alt="{$p['caption']}" loading="lazy"/></div>
-                  <figcaption>{$p['caption']}</figcaption>
                 </figure>
             HTML)->implode('');
 
@@ -54,7 +53,7 @@ class ClassicTemplate
         })->implode('');
 
         $categoryLine = $ctx['category'] ? '<small>'.$ctx['category'].($ctx['city'] ? " · {$ctx['city']}" : '').'</small>' : '';
-        $navGallery = count($ctx['photos']) ? '<a href="#gallery">Gallery</a>' : '';
+        $navGallery = count($ctx['gallery']) ? '<a href="#gallery">Gallery</a>' : '';
         $navServices = count($ctx['services']) ? '<a href="#services">Services</a>' : '';
         $heroEyebrow = $ctx['category'] ? '<span class="mk-eyebrow">'.$ctx['category'].($ctx['city'] ? " in {$ctx['city']}" : '').'</span>' : '';
         $heroHours = $ctx['workingTime'] ? "<p class=\"mk-hero-hours\">{$clock}<span>Open {$ctx['workingTime']}</span></p>" : '';
