@@ -71,10 +71,12 @@
 
   {{-- Sections --}}
   @if (count($visibleTabs) > 1)
-    <div class="mb-5 inline-flex rounded-lg bg-gray-100 p-1">
+    {{-- Scrolls sideways on its own when the tabs outgrow a phone screen,
+         rather than widening the whole page. --}}
+    <div class="mb-5 flex w-fit max-w-full overflow-x-auto rounded-lg bg-gray-100 p-1">
       @foreach ($visibleTabs as $t)
         <a href="/dashboard?tab={{ $t }}" @class([
-            'flex items-center gap-1.5 rounded-md px-4 py-1.5 text-sm font-semibold transition-colors',
+            'flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-semibold transition-colors sm:px-4',
             'bg-white text-ink-900 shadow-sm' => $tab === $t,
             'text-ink-500 hover:text-ink-900' => $tab !== $t,
         ])><x-icon :name="D::TABS[$t]['icon']" :size="15" /> {{ D::TABS[$t]['label'] }}</a>
@@ -128,7 +130,7 @@
             </div>
             <span class="hidden text-right text-sm tabular-nums text-ink-700 md:block">{{ number_format($b['viewCount'] ?? 0) }}</span>
             <span class="hidden text-right text-sm tabular-nums text-ink-700 md:block">{{ number_format($b['leadCount'] ?? 0) }}</span>
-            <div class="flex items-center gap-2 md:w-[232px] md:justify-end">
+            <div class="flex flex-wrap items-center gap-2 md:w-[232px] md:flex-nowrap md:justify-end">
               {{-- First on phones; last on wide screens, so it lines up down the list. --}}
               <a href="/dashboard/businesses/{{ $b['id'] }}" class="btn-primary px-3 py-1.5 text-sm md:order-last"><x-icon name="settings-2" :size="14" /> Manage</a>
               @if ($b['status'] === 'PUBLISHED')

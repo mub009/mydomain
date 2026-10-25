@@ -123,8 +123,8 @@ form?.addEventListener("submit", async (e) => {
   if (!creds || !target) return;
   target.innerHTML = `<div class="rounded-xl border border-emerald-200 bg-emerald-50 p-4 mb-4">
     <div class="flex items-start justify-between gap-3">
-      <p class="font-bold text-emerald-800 flex items-center gap-1.5">${icon("key-round", { size: 16 })} Login for “${esc(creds.businessName)}”</p>
-      <button type="button" data-dismiss-creds class="text-xs text-emerald-700/70 hover:text-emerald-900 underline">Dismiss</button>
+      <p class="min-w-0 break-words font-bold text-emerald-800 flex items-start gap-1.5"><span class="mt-0.5 shrink-0">${icon("key-round", { size: 16 })}</span> <span class="min-w-0">Login for “${esc(creds.businessName)}”</span></p>
+      <button type="button" data-dismiss-creds class="shrink-0 text-xs text-emerald-700/70 hover:text-emerald-900 underline">Dismiss</button>
     </div>
     <p class="text-xs text-emerald-700/90 mt-1 mb-3">${
       creds.created
