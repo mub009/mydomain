@@ -76,10 +76,12 @@ class TemplateRegistry
      * produces. $business must have category, photos (sortOrder asc), hours
      * (dayOfWeek asc), and services (active, createdAt asc) already loaded.
      */
-    public static function buildTemplate(Business $business, ?string $templateId = null): array
+    // $placeholders: see Helpers::buildContext — on for the builder and
+    // previews, off for what visitors see.
+    public static function buildTemplate(Business $business, ?string $templateId = null, bool $placeholders = false): array
     {
         $class = self::resolve($templateId);
-        $ctx = Helpers::buildContext($business);
+        $ctx = Helpers::buildContext($business, $placeholders);
         $built = $class::build($ctx);
 
         $category = $business->category?->name;

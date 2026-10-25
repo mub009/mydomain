@@ -178,6 +178,9 @@ class SiteBuilderTest extends TestCase
         $this->getJson($url, $auth)->assertOk()->assertJsonPath('data.images', []);
         $this->getJson("/api/v1/businesses/{$business->id}/site", $auth)->assertJsonPath('data.businessData.slideCount', 0);
 
+        // An empty gallery shows sample tiles in the builder and previews only.
+        $this->assertStringContainsString('gallery-placeholder.svg', $this->getJson("/api/v1/businesses/{$business->id}/site/templates/classic", $auth)->json('data.html'));
+
         $picked = ['https://cdn.example.com/a.jpg', 'https://cdn.example.com/b.jpg'];
         $this->putJson($url, ['images' => $picked], $auth)->assertOk()->assertJsonPath('data.images', $picked);
         $this->getJson($url, $auth)->assertJsonPath('data.images', $picked);
@@ -228,6 +231,7 @@ class SiteBuilderTest extends TestCase
             $this->assertStringNotContainsString('98765 43210', $site['html'], $id);
             $this->assertStringContainsString('new-slide.jpg', $site['html'], $id);
             $this->assertStringContainsString('Our own words', $site['html'], $id);
+            $this->assertStringNotContainsString('gallery-placeholder.svg', $site['html'], $id);
             $this->assertStringContainsString('gallery-1.jpg', $site['html'], $id);
             $this->assertStringContainsString('Our Gallery', $site['html'], $id);
             $this->assertStringContainsString('new@example.com', $site['html'], $id);

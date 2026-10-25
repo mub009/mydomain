@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 450" width="600" height="450">
+  <rect width="600" height="450" fill="#eef1f5"/>
+  <rect x="12" y="12" width="576" height="426" rx="14" fill="none" stroke="#c5ccd6" stroke-width="3" stroke-dasharray="14 10"/>
+  <g transform="translate(260 150)" fill="none" stroke="#8a94a3" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="0" y="0" width="80" height="80" rx="10"/>
+    <circle cx="26" cy="26" r="8"/>
+    <path d="M80 54 58 32 10 80"/>
+  </g>
+  <text x="300" y="285" text-anchor="middle" font-family="system-ui,-apple-system,Segoe UI,Roboto,sans-serif" font-size="26" font-weight="600" fill="#5b6574">Your photo here</text>
+  <text x="300" y="320" text-anchor="middle" font-family="system-ui,-apple-system,Segoe UI,Roboto,sans-serif" font-size="18" fill="#8a94a3">Upload photos in Our Gallery</text>
+</svg>

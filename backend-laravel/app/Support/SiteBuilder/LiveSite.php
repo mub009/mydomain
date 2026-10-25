@@ -38,11 +38,12 @@ class LiveSite
 
     /**
      * The saved page with its live blocks refreshed. $business must be
-     * loaded the way Helpers::buildContext expects.
+     * loaded the way Helpers::buildContext expects; $placeholders is for
+     * the builder (see there).
      *
      * @return array{html: string, css: string}
      */
-    public static function render(Business $business, BusinessSite $site): array
+    public static function render(Business $business, BusinessSite $site, bool $placeholders = false): array
     {
         $html = (string) $site->html;
         $css = (string) $site->css;
@@ -50,7 +51,7 @@ class LiveSite
             return ['html' => $html, 'css' => $css];
         }
 
-        $fresh = TemplateRegistry::buildTemplate($business, $site->templateId);
+        $fresh = TemplateRegistry::buildTemplate($business, $site->templateId, $placeholders);
 
         return [
             'html' => Sanitizer::sanitizeSiteHtml(self::merge($html, $fresh['html'])),

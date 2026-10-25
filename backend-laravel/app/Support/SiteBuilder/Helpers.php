@@ -90,8 +90,11 @@ class Helpers
      * the individual designs only deal with presentation. $business must
      * have category, photos (sortOrder asc), hours (dayOfWeek asc),
      * services (active, createdAt asc) and site already loaded.
+     *
+     * $placeholders fills an empty gallery with sample tiles, so the builder
+     * and template previews show where it goes. Visitors never see them.
      */
-    public static function buildContext(Business $business): array
+    public static function buildContext(Business $business, bool $placeholders = false): array
     {
         // Most listings have no dedicated logo, so fall back to their first
         // photo and finally to a lettermark — a header should never look
@@ -143,10 +146,7 @@ class Helpers
             'slides' => $slides,
             // The "Our Gallery" section's own photos (the Our Gallery
             // section of the panel), separate from the listing's photos.
-            'gallery' => collect($business->site?->galleryImages ?? [])->map(fn ($url) => [
-                'url' => self::escapeHtml($url),
-                'caption' => $name,
-            ])->values(),
+            'gallery' => self::gallery($business, $name, $placeholders),
             'services' => $business->services->map(fn ($s) => [
                 'name' => self::escapeHtml($s->name),
                 'description' => self::escapeHtml($s->description ?? ''),
@@ -158,6 +158,22 @@ class Helpers
                 'closed' => $h->isClosed,
             ])->values(),
         ];
+    }
+
+    private const GALLERY_PLACEHOLDERS = 4;
+
+    private static function gallery(Business $business, string $name, bool $placeholders): \Illuminate\Support\Collection
+    {
+        $urls = collect($business->site?->galleryImages ?? []);
+        if ($urls->isEmpty() && $placeholders) {
+            return collect(array_fill(0, self::GALLERY_PLACEHOLDERS, [
+                // Relative, so it works on whichever host the builder is open on.
+                'url' => '/images/gallery-placeholder.svg',
+                'caption' => 'Upload photos in Our Gallery',
+            ]));
+        }
+
+        return $urls->map(fn ($url) => ['url' => self::escapeHtml($url), 'caption' => $name])->values();
     }
 
     /**

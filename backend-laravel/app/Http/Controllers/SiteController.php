@@ -76,9 +76,11 @@ class SiteController extends Controller
 
         $site = BusinessSite::where('businessId', $id)->first();
         $selectedId = $data['templateId'] ?? $site->templateId ?? TemplateRegistry::DEFAULT_TEMPLATE_ID;
-        $starter = TemplateRegistry::buildTemplate($business, $selectedId);
+        // The builder shows sample tiles in an empty gallery so its place is
+        // visible; the published page leaves them out.
+        $starter = TemplateRegistry::buildTemplate($business, $selectedId, true);
         // The saved page as visitors see it, kept in step with the listing.
-        $live = $site && $site->html ? LiveSite::render($business, $site) : null;
+        $live = $site && $site->html ? LiveSite::render($business, $site, true) : null;
 
         return ApiResponse::ok([
             'businessId' => $id,
@@ -124,7 +126,7 @@ class SiteController extends Controller
             throw ApiException::badRequest("Unknown website template \"{$templateId}\"");
         }
 
-        $built = TemplateRegistry::buildTemplate($business, $templateId);
+        $built = TemplateRegistry::buildTemplate($business, $templateId, true);
 
         return ApiResponse::ok(['templateId' => $built['templateId'], 'html' => $built['html'], 'css' => $built['css']]);
     }
