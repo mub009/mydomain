@@ -18,10 +18,18 @@
   @endphp
   <div class="grid gap-4 lg:grid-cols-5">
     <form class="card p-5 space-y-4 lg:col-span-3" data-seo-form>
-      <div>
-        <h3 class="font-bold text-ink-900 flex items-center gap-1.5"><x-icon name="search-check" :size="16" class="text-brand-600" /> How you appear on Google</h3>
-        <p class="text-xs text-ink-500 mt-1">Leave a box empty and we write it from your listing.</p>
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <h3 class="font-bold text-ink-900 flex items-center gap-1.5"><x-icon name="search-check" :size="16" class="text-brand-600" /> How you appear on Google</h3>
+          <p class="text-xs text-ink-500 mt-1">Written for you from your listing — edit anything, then save.</p>
+        </div>
+        {{-- Drafts all three boxes (App\Support\AiWriter); runs by itself
+             when they are all empty. --}}
+        <button type="button" data-seo-generate class="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-brand-600 hover:bg-brand-50 disabled:opacity-50">
+          <x-icon name="sparkles" :size="13" /> Generate with AI
+        </button>
       </div>
+      <p class="text-[11px] text-ink-500 -mt-2" data-seo-ai-status hidden></p>
 
       {{-- What a Google result for the listing would look like. --}}
       <div class="rounded-lg border border-gray-200 bg-white p-4" data-seo-preview>

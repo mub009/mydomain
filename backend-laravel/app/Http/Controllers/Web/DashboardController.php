@@ -30,7 +30,11 @@ class DashboardController extends Controller
         'businesses' => ['label' => 'Businesses', 'icon' => 'layout-grid', 'privilege' => 'MANAGE_LISTINGS'],
         'leads' => ['label' => 'Leads', 'icon' => 'message-square', 'privilege' => 'MANAGE_LEADS'],
         'bookings' => ['label' => 'Bookings', 'icon' => 'calendar-clock', 'privilege' => 'MANAGE_BOOKINGS'],
+        // The accounts a dealer created for business teams (dealers only).
+        'logins' => ['label' => 'Business logins', 'icon' => 'key-round', 'privilege' => 'MANAGE_LISTINGS', 'dealerOnly' => true],
     ];
+
+    public const LOGINS_PAGE_SIZE = 20;
 
     // WhatsApp broadcasts and Poster Studio are not part of the Laravel
     // backend yet (see README), so the manager doesn't offer them.
@@ -71,14 +75,14 @@ class DashboardController extends Controller
 
         // Dealers are gated by their granted privileges; business owners and
         // admins implicitly hold every privilege on their own resources.
-        $visibleTabs = array_keys(array_filter(self::TABS, fn ($t) => $this->can($t['privilege'])));
+        $visibleTabs = array_keys(array_filter(self::TABS, fn ($t) => $this->can($t['privilege']) && ($isDealer || empty($t['dealerOnly']))));
         $tab = in_array($request->query('tab'), $visibleTabs, true) ? $request->query('tab') : ($visibleTabs[0] ?? null);
 
         $bizPage = max(1, (int) $request->query('page', 1));
-        $search = $tab === 'businesses' ? trim((string) $request->query('search')) : '';
+        $search = in_array($tab, ['businesses', 'logins'], true) ? trim((string) $request->query('search')) : '';
         $mine = InternalApi::call([BusinessController::class, 'mine'], array_filter([
             'page' => $tab === 'businesses' ? $bizPage : 1,
-            'search' => $search,
+            'search' => $tab === 'businesses' ? $search : '',
         ]), [], true);
         $businesses = $mine['data'];
 
@@ -102,8 +106,10 @@ class DashboardController extends Controller
 
         $points = $isDealer ? (InternalApi::tryCall([PointsController::class, 'mine'], [], [], true)['data'] ?? null) : null;
         $accounts = null;
-        if ($isDealer && $tab === 'businesses') {
-            $accounts = InternalApi::tryCall([UserController::class, 'listCreated'], ['page' => max(1, (int) $request->query('accountsPage', 1))], [], true);
+        if ($tab === 'logins') {
+            $accounts = InternalApi::tryCall([UserController::class, 'listCreated'], array_filter([
+                'page' => $bizPage, 'pageSize' => self::LOGINS_PAGE_SIZE, 'search' => $search,
+            ]), [], true);
         }
 
         // Leads and bookings are per business, chosen from a dropdown.

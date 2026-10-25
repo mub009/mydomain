@@ -117,6 +117,54 @@ class SeoTest extends TestCase
         $this->getJson("/api/v1/businesses/{$business->id}/seo", ['Authorization' => "Bearer {$stranger}"])->assertForbidden();
     }
 
+    public function test_seo_is_drafted_by_the_built_in_writer_when_there_is_no_ai_key(): void
+    {
+        config(['services.ai.provider' => null, 'services.gemini.key' => null, 'services.anthropic.key' => null]);
+        Http::preventStrayRequests();
+        $owner = $this->user(['role' => 'BUSINESS_OWNER']);
+        $business = $this->business($owner);
+        $business->services()->create(['name' => 'Birthday Cakes', 'priceCents' => 50000]);
+        $token = $this->token($owner);
+
+        $draft = $this->postJson("/api/v1/businesses/{$business->id}/seo/generate", [], ['Authorization' => "Bearer {$token}"])
+            ->assertOk()->assertJsonPath('data.source', 'builtin')->json('data');
+
+        $this->assertStringContainsString('Sunrise Bakery', $draft['seoTitle']);
+        $this->assertLessThanOrEqual(60, mb_strlen($draft['seoTitle']));
+        $this->assertLessThanOrEqual(160, mb_strlen($draft['seoDescription']));
+        $this->assertStringContainsString('Pune', $draft['seoDescription']);
+        $this->assertStringContainsString('bakeries in pune', $draft['seoKeywords']);
+        $this->assertStringContainsString('birthday cakes pune', $draft['seoKeywords']);
+        // A draft only — nothing saved.
+        $this->assertNull($business->fresh()->seoTitle);
+
+        $stranger = $this->token($this->user(['role' => 'BUSINESS_OWNER']));
+        $this->postJson("/api/v1/businesses/{$business->id}/seo/generate", [], ['Authorization' => "Bearer {$stranger}"])->assertForbidden();
+    }
+
+    public function test_seo_is_drafted_by_gemini_and_cut_to_fit(): void
+    {
+        config(['services.ai.provider' => null, 'services.gemini.key' => 'g-test-key', 'services.anthropic.key' => null]);
+        Http::fake(['generativelanguage.googleapis.com/*' => Http::response([
+            'candidates' => [['content' => ['parts' => [['text' => json_encode([
+                'seoTitle' => 'Sunrise Bakery — fresh breads, birthday cakes and pastries made daily in Pune',
+                'seoDescription' => 'Fresh cakes and breads in Pune.',
+                'seoKeywords' => 'bakery in pune, cakes pune',
+            ])]]], 'finishReason' => 'STOP']],
+        ])]);
+        $owner = $this->user(['role' => 'BUSINESS_OWNER']);
+        $business = $this->business($owner, ['description' => 'We bake sourdough every morning.']);
+
+        $draft = $this->postJson("/api/v1/businesses/{$business->id}/seo/generate", [], ['Authorization' => 'Bearer '.$this->token($owner)])
+            ->assertOk()->assertJsonPath('data.source', 'gemini')
+            ->assertJsonPath('data.seoKeywords', 'bakery in pune, cakes pune')->json('data');
+
+        // Over 60 characters: cut back at a word.
+        $this->assertSame('Sunrise Bakery — fresh breads, birthday cakes and pastries', $draft['seoTitle']);
+        Http::assertSent(fn (HttpRequest $r) => str_contains($r['contents'][0]['parts'][0]['text'], 'Their description: We bake sourdough every morning.')
+            && array_keys($r['generationConfig']['responseSchema']['properties']) === ['seoTitle', 'seoDescription', 'seoKeywords']);
+    }
+
     public function test_public_pages_carry_search_tags(): void
     {
         $business = $this->business($this->user(['role' => 'BUSINESS_OWNER']), [

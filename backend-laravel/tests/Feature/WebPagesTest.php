@@ -190,6 +190,40 @@ class WebPagesTest extends TestCase
         $this->get('/dashboard/businesses/anything')->assertRedirect('/dashboard');
     }
 
+    public function test_dealer_business_logins_have_their_own_searchable_paged_tab(): void
+    {
+        $dealer = $this->user(['role' => 'DEALER', 'privileges' => ['MANAGE_LISTINGS'], 'points' => 3]);
+        $ravi = $this->user(['role' => 'BUSINESS_OWNER', 'createdById' => $dealer->id, 'firstName' => 'Ravi', 'lastName' => 'Kumar', 'phone' => '9876500001']);
+        $this->business($ravi, ['name' => 'Kumar Sweets']);
+        $ravi->forceFill(['createdAt' => now()->subDay()])->save();
+        // 21 more, so the list runs to a second page of 20.
+        foreach (range(1, 21) as $i) {
+            $this->user(['role' => 'BUSINESS_OWNER', 'createdById' => $dealer->id, 'firstName' => "Owner{$i}", 'lastName' => 'Test']);
+        }
+        $this->user(['role' => 'BUSINESS_OWNER', 'firstName' => 'Someone', 'lastName' => 'Else']); // another dealer's
+        $this->signIn($dealer);
+
+        // No longer squeezed under the listings.
+        $this->get('/dashboard')->assertOk()->assertSee('/dashboard?tab=logins', false)->assertDontSee('Accounts you created for business teams');
+
+        $this->get('/dashboard?tab=logins')->assertOk()
+            ->assertSee('Business logins')->assertSee('Reset password')
+            ->assertSee('?tab=logins&amp;page=2', false)
+            ->assertDontSee('Someone Else');
+        $this->get('/dashboard?tab=logins&page=2')->assertOk()->assertSee('Ravi Kumar'); // oldest last
+
+        foreach (['Ravi Kumar', '98765000', 'Kumar Sweets'] as $term) {
+            $this->get('/dashboard?tab=logins&search='.urlencode($term))->assertOk()
+                ->assertSee('Ravi Kumar')->assertDontSee('Owner1 Test');
+        }
+        $this->get('/dashboard?tab=logins&search=nobody-here')->assertOk()->assertSee('No logins match');
+
+        // Business owners don't have the tab.
+        $this->signIn($ravi);
+        $this->get('/dashboard')->assertOk()->assertDontSee('tab=logins', false);
+        $this->get('/dashboard?tab=logins')->assertOk()->assertDontSee('Reset password');
+    }
+
     public function test_admin_console_tabs_render(): void
     {
         $admin = $this->user(['role' => 'ADMIN']);

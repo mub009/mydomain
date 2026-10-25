@@ -44,7 +44,7 @@
     ]
   },
   "resources/css/app.css": {
-    "file": "assets/app-3M5N9117.css",
+    "file": "assets/app-C5Hgcmcr.css",
     "src": "resources/css/app.css",
     "isEntry": true
   },
@@ -112,7 +112,7 @@
     ]
   },
   "resources/js/pages/manage.js": {
-    "file": "assets/manage-DQLAFdz-.js",
+    "file": "assets/manage-BF67s7-3.js",
     "name": "manage",
     "src": "resources/js/pages/manage.js",
     "isEntry": true,

@@ -153,50 +153,79 @@
       </div>
     </div>
     <x-pager :page="$bizMeta['page']" :total-pages="$bizMeta['totalPages']" />
+  @endif
 
-    @if ($isDealer && $accounts && count($accounts['data']) > 0)
-      <div class="card mt-6 overflow-hidden">
-        <div class="border-b border-gray-100 px-5 py-4">
-          <h2 class="font-semibold text-ink-900">Business logins</h2>
+  @if ($tab === 'logins')
+    @php
+        $logins = $accounts['data'] ?? [];
+        $loginsMeta = $accounts['meta'] ?? ['page' => 1, 'totalPages' => 1, 'total' => 0];
+    @endphp
+    <div class="card overflow-hidden">
+      <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-5 py-4">
+        <div>
+          <h2 class="font-semibold text-ink-900">Business logins <span class="ml-1 text-sm font-normal text-ink-400">{{ $loginsMeta['total'] }}</span></h2>
           <p class="mt-0.5 text-xs text-ink-500">Accounts you created for business teams. If an owner forgets their password, reset it here and share the new one.</p>
         </div>
+        <form method="GET" action="/dashboard" class="relative w-full sm:w-72">
+          <input type="hidden" name="tab" value="logins" />
+          <x-icon name="search" :size="15" class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
+          <input name="search" value="{{ $search }}" placeholder="Search by name, phone, email or business" class="input py-2 pl-9 text-sm" />
+        </form>
+      </div>
+
+      @if ($accounts === null)
+        <p class="px-5 py-8 text-center text-sm text-red-700">Could not load your business logins.</p>
+      @elseif (count($logins) === 0)
+        <p class="px-5 py-10 text-center text-sm text-ink-500">
+          @if ($search !== '')
+            No logins match “{{ $search }}”. <a href="/dashboard?tab=logins" class="font-semibold text-brand-600 hover:underline">Show all</a>
+          @else
+            No business logins yet. When you add a business with a new owner login, it appears here.
+          @endif
+        </p>
+      @else
         <div class="divide-y divide-gray-100">
-          @foreach ($accounts['data'] as $a)
-            <div class="flex items-center justify-between gap-3 px-5 py-3">
-              <div class="flex min-w-0 items-center gap-3">
+          @foreach ($logins as $a)
+            <div class="flex flex-col gap-3 px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between">
+              <div class="flex min-w-0 items-start gap-3">
                 <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gray-100 text-ink-500"><x-icon name="user" :size="16" /></span>
                 <div class="min-w-0">
-                  <p class="truncate text-sm font-semibold text-ink-900">{{ $a['firstName'] }} {{ $a['lastName'] }}</p>
-                  <p class="truncate text-xs text-ink-500">
-                    {{ $a['phone'] ?? $a['email'] ?? '' }}
-                    @isset($a['_count'])
-                      · {{ $a['_count']['businesses'] }} {{ $a['_count']['businesses'] === 1 ? 'business' : 'businesses' }}
-                    @endisset
+                  <p class="flex flex-wrap items-center gap-2 text-sm font-semibold text-ink-900">
+                    <span class="truncate">{{ $a['firstName'] }} {{ $a['lastName'] }}</span>
+                    @if ($a['status'] !== 'ACTIVE')
+                      <span class="rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset {{ $badge($a['status']) }}">{{ $statusLabel($a['status']) }}</span>
+                    @endif
                   </p>
+                  <p class="truncate text-xs text-ink-500">
+                    {{ implode(' · ', array_filter([$a['phone'] ?? null, $a['email'] ?? null])) }}
+                    · created {{ \Illuminate\Support\Carbon::parse($a['createdAt'])->format('j M Y') }}
+                  </p>
+                  @if (count($a['businesses']) > 0)
+                    <div class="mt-1.5 flex flex-wrap gap-1.5">
+                      @foreach (array_slice($a['businesses'], 0, 4) as $b)
+                        <a href="/dashboard/businesses/{{ $b['id'] }}" class="inline-flex items-center gap-1 rounded-md bg-gray-50 px-2 py-0.5 text-xs text-ink-700 ring-1 ring-inset ring-gray-200 hover:bg-brand-50 hover:text-brand-700">
+                          <x-icon name="building-2" :size="11" /> {{ $b['name'] }}
+                          <span class="text-ink-400">· {{ $statusLabel($b['status']) }}</span>
+                        </a>
+                      @endforeach
+                      @if ($a['_count']['businesses'] > 4)
+                        <span class="px-1 py-0.5 text-xs text-ink-400">+{{ $a['_count']['businesses'] - 4 }} more</span>
+                      @endif
+                    </div>
+                  @else
+                    <p class="mt-1 text-xs text-ink-400">No businesses</p>
+                  @endif
                 </div>
               </div>
-              <button type="button" data-reset-password="{{ json_encode(['id' => $a['id'], 'email' => $a['email'] ?? null, 'phone' => $a['phone'] ?? null, 'firstName' => $a['firstName'], 'lastName' => $a['lastName']]) }}" class="btn-secondary shrink-0 whitespace-nowrap px-3 py-1.5 text-sm">
+              <button type="button" data-reset-password="{{ json_encode(['id' => $a['id'], 'email' => $a['email'] ?? null, 'phone' => $a['phone'] ?? null, 'firstName' => $a['firstName'], 'lastName' => $a['lastName']]) }}" class="btn-secondary shrink-0 self-start whitespace-nowrap px-3 py-1.5 text-sm sm:self-center">
                 <x-icon name="key-round" :size="14" /> Reset password
               </button>
             </div>
           @endforeach
         </div>
-      </div>
-      @php
-          $accountsPager = $accounts['meta'];
-      @endphp
-      @if ($accountsPager['totalPages'] > 1)
-        <div class="mt-4 flex items-center justify-center gap-2 text-sm">
-          @if ($accountsPager['page'] > 1)
-            <a class="btn-secondary px-3 py-1.5" href="{{ D::url(['accountsPage' => $accountsPager['page'] - 1]) }}"><x-icon name="chevron-left" :size="15" /></a>
-          @endif
-          <span class="text-ink-500">Page {{ $accountsPager['page'] }} of {{ $accountsPager['totalPages'] }}</span>
-          @if ($accountsPager['page'] < $accountsPager['totalPages'])
-            <a class="btn-secondary px-3 py-1.5" href="{{ D::url(['accountsPage' => $accountsPager['page'] + 1]) }}"><x-icon name="chevron-right" :size="15" /></a>
-          @endif
-        </div>
       @endif
-    @endif
+    </div>
+    <x-pager :page="$loginsMeta['page']" :total-pages="$loginsMeta['totalPages']" />
   @endif
 
   @if (in_array($tab, ['leads', 'bookings'], true))

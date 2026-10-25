@@ -113,6 +113,64 @@ class BuiltinWriter
         return trim(preg_replace('/\s+/', ' ', "{$opening} {$offer} {$close}"));
     }
 
+    /**
+     * A search snippet from the same phrases: a title of name, category and
+     * city, a description that fits Google's ~155 characters, and the search
+     * phrases people use for that kind of business in that city. AiWriter
+     * trims anything over the limits.
+     *
+     * @param  array{name: string, category: string, city?: ?string, businessType?: ?string, services?: array<int, string>}  $facts
+     * @return array{seoTitle: string, seoDescription: string, seoKeywords: string}
+     */
+    public static function seo(array $facts): array
+    {
+        $name = $facts['name'];
+        $category = $facts['category'];
+        $city = $facts['city'] ?? null;
+        $kind = self::kindOf($category, $name);
+        if ($kind === 'general' && ($facts['businessType'] ?? null) === 'B2B') {
+            $kind = 'b2b';
+        }
+        $p = self::PHRASES[$kind];
+        $pick = fn (array $options) => $options[array_rand($options)];
+        $where = $city ? " in {$city}" : '';
+
+        $title = "{$name} — {$category}{$where}";
+        if (mb_strlen($title) > 60) {
+            $title = "{$name}{$where}";
+        }
+
+        // The longest wording that still fits in a search result.
+        $description = '';
+        foreach ([$pick($p['for']), ...$p['for']] as $for) {
+            $candidate = "{$name}, {$pick($p['what'])}{$where}: {$for}. {$pick($p['why'])}";
+            if (mb_strlen($candidate) <= 160) {
+                $description = $candidate;
+                break;
+            }
+        }
+        if ($description === '') {
+            $description = "{$name} — ".mb_strtolower($category)."{$where}. {$pick($p['why'])}";
+        }
+
+        $type = mb_strtolower($category);
+        $place = $city ? mb_strtolower($city) : null;
+        $keywords = array_filter([
+            mb_strtolower($name),
+            $place ? "{$type} in {$place}" : $type,
+            $place ? "best {$type} {$place}" : null,
+            "{$type} near me",
+            ...array_map(fn ($s) => mb_strtolower($s).($place ? " {$place}" : ''), array_slice($facts['services'] ?? [], 0, 4)),
+            $place,
+        ]);
+
+        return [
+            'seoTitle' => $title,
+            'seoDescription' => $description,
+            'seoKeywords' => implode(', ', array_unique($keywords)),
+        ];
+    }
+
     private static function kindOf(string $category, string $name): string
     {
         foreach ([$category, $name] as $text) {

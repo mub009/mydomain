@@ -56,15 +56,22 @@ class UserController extends Controller
 
         $query = User::where('createdById', $auth['sub']);
         if ($search = $request->query('search')) {
-            $query->where(function ($q) use ($search) {
+            // A full name ("Ravi Kumar") matches as well as either part.
+            $fullName = $query->getConnection()->getDriverName() === 'sqlite' ? "(firstName || ' ' || lastName)" : "concat(firstName, ' ', lastName)";
+            $query->where(function ($q) use ($search, $fullName) {
                 $q->where('email', 'like', "%{$search}%")
+                    ->orWhere('phone', 'like', "%{$search}%")
                     ->orWhere('firstName', 'like', "%{$search}%")
-                    ->orWhere('lastName', 'like', "%{$search}%");
+                    ->orWhere('lastName', 'like', "%{$search}%")
+                    ->orWhereRaw($fullName.' like ?', ["%{$search}%"])
+                    // ...or the name of a business the login owns.
+                    ->orWhereHas('businesses', fn ($b) => $b->where('name', 'like', "%{$search}%"));
             });
         }
 
         $total = (clone $query)->count();
-        $items = $query->orderByDesc('createdAt')
+        // id breaks ties, so logins made in the same second page steadily.
+        $items = $query->orderByDesc('createdAt')->orderByDesc('id')
             ->skip($pagination['skip'])->take($pagination['take'])
             ->withCount('businesses')
             ->with(['businesses' => fn ($q) => $q->orderByDesc('createdAt')->select('id', 'ownerId', 'name', 'slug', 'status')])

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Exceptions\ApiException;
 use App\Models\Business;
 use App\Models\SeoPage;
+use App\Support\AiWriter;
 use App\Support\ApiResponse;
 use App\Support\BusinessAccess;
 use App\Support\Pagination;
@@ -49,6 +50,30 @@ class SeoController extends Controller
             'googleConnected' => GoogleSearch::configured(),
             'targetHours' => SeoPage::TARGET_HOURS,
         ]);
+    }
+
+    // An SEO title, description and keywords written from the listing
+    // (App\Support\AiWriter). Nothing is saved — the form shows the draft
+    // for the owner to keep or edit.
+    public function generate(Request $request, string $id)
+    {
+        $business = Business::with([
+            'category',
+            'services' => fn ($q) => $q->where('isActive', true)->orderBy('createdAt'),
+        ])->find($id);
+        if (! $business) {
+            throw ApiException::notFound('Business not found');
+        }
+        BusinessAccess::assertCanManage($request->attributes->get('auth'), $business);
+
+        return ApiResponse::ok(AiWriter::seo([
+            'name' => $business->name,
+            'category' => $business->category?->name ?? 'Local business',
+            'city' => $business->city,
+            'businessType' => $business->businessType,
+            'description' => $business->description,
+            'services' => $business->services->pluck('name')->all(),
+        ]));
     }
 
     public function adminIndex(Request $request)

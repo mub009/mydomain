@@ -131,6 +131,8 @@ Route::prefix('businesses')->group(function () {
         // The website assistant: say what to change, confirm, apply.
         Route::post('/{id}/assistant', [AssistantController::class, 'plan'])->middleware('throttle:40,60');
         Route::post('/{id}/assistant/apply', [AssistantController::class, 'apply']);
+        // Drafts the SEO title, description and keywords (AI, or the free built-in writer).
+        Route::post('/{id}/seo/generate', [SeoController::class, 'generate'])->middleware('throttle:30,60');
 
         Route::post('/{id}/services', [BusinessController::class, 'addService']);
         Route::patch('/{id}/services/{serviceId}', [BusinessController::class, 'updateService']);

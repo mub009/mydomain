@@ -333,6 +333,56 @@ if (seoForm) {
   ["seoTitle", "seoDescription"].forEach((name) => seoForm[name].addEventListener("input", sync));
   sync();
 
+  // "Generate with AI" fills all three boxes from the listing (nothing is
+  // saved until the owner presses Save), with an Undo back to what was there.
+  const fields = ["seoTitle", "seoDescription", "seoKeywords"];
+  const generateButton = $("[data-seo-generate]", seoForm);
+  const aiStatus = $("[data-seo-ai-status]", seoForm);
+  const showAi = (text, tone = "muted", undo = null) => {
+    aiStatus.hidden = !text;
+    aiStatus.className = `-mt-2 text-[11px] ${tone === "error" ? "text-red-600" : "text-ink-500"}`;
+    aiStatus.textContent = text;
+    if (undo) {
+      const link = document.createElement("button");
+      link.type = "button";
+      link.className = "ml-1 font-semibold text-brand-600 hover:underline";
+      link.textContent = "Undo";
+      link.addEventListener("click", () => {
+        fields.forEach((name) => (seoForm[name].value = undo[name]));
+        sync();
+        showAi("");
+      });
+      aiStatus.append(link);
+    }
+  };
+  async function generateSeo() {
+    const before = Object.fromEntries(fields.map((name) => [name, seoForm[name].value]));
+    generateButton.disabled = true;
+    fields.forEach((name) => (seoForm[name].readOnly = true));
+    showAi("✨ Writing your Google title, description and keywords…");
+    try {
+      const { data } = await api.post(`${base}/seo/generate`);
+      fields.forEach((name) => (seoForm[name].value = data[name]));
+      sync();
+      const hadText = fields.some((name) => before[name].trim());
+      showAi(
+        data.source === "builtin"
+          ? "Suggested from your listing — edit it, then press Save."
+          : "Written by AI — check it, edit anything that isn't right, then press Save.",
+        "muted",
+        hadText ? before : null,
+      );
+    } catch (err) {
+      showAi(errorMessage(err), "error");
+    } finally {
+      generateButton.disabled = false;
+      fields.forEach((name) => (seoForm[name].readOnly = false));
+    }
+  }
+  generateButton.addEventListener("click", generateSeo);
+  // Nothing written yet: start them off with a draft straight away.
+  if (fields.every((name) => !seoForm[name].value.trim())) generateSeo();
+
   seoForm.addEventListener("submit", async (e) => {
     e.preventDefault();
     const f = Object.fromEntries(new FormData(seoForm));
