@@ -36,7 +36,12 @@ class WebPagesTest extends TestCase
 
     private function signIn(User $user): void
     {
-        $this->post('/login', ['email' => $user->email, 'password' => 'Password123!'])->assertRedirect('/');
+        $this->post('/login', ['email' => $user->email, 'password' => 'Password123!'])
+            ->assertRedirect(match ($user->role) {
+                'ADMIN' => '/admin',
+                'DEALER', 'BUSINESS_OWNER' => '/dashboard',
+                default => '/',
+            });
     }
 
     private function business(User $owner, array $overrides = []): Business
@@ -112,6 +117,9 @@ class WebPagesTest extends TestCase
         $this->getJson('/session/token')->assertUnauthorized();
 
         $this->post('/login', ['email' => $user->email, 'password' => 'Password123!', 'next' => '//evil.test'])->assertRedirect('/');
+        // A same-site next wins over the usual landing page.
+        $this->post('/logout');
+        $this->post('/login', ['email' => $user->email, 'password' => 'Password123!', 'next' => '/search?q=x'])->assertRedirect('/search?q=x');
         $token = $this->getJson('/session/token')->assertOk()->json('accessToken');
         $this->getJson('/api/v1/auth/me', ['Authorization' => "Bearer {$token}"])->assertOk()->assertJsonPath('data.id', $user->id);
 
@@ -119,7 +127,7 @@ class WebPagesTest extends TestCase
         $this->getJson('/session/token')->assertUnauthorized();
 
         $this->post('/register', ['firstName' => 'New', 'lastName' => 'Owner', 'email' => 'new@example.com', 'password' => 'Password123!', 'role' => 'BUSINESS_OWNER'])
-            ->assertRedirect('/');
+            ->assertRedirect('/dashboard');
         $this->assertSame('BUSINESS_OWNER', User::where('email', 'new@example.com')->value('role'));
         $this->get('/dashboard')->assertOk();
     }
@@ -148,7 +156,13 @@ class WebPagesTest extends TestCase
         $other = $this->business($this->user(['role' => 'BUSINESS_OWNER']));
         $this->signIn($owner);
 
-        $this->get('/dashboard')->assertOk()->assertSee('Your listings')->assertSee("/dashboard/businesses/{$business->id}", false);
+        $this->get('/dashboard')->assertOk()->assertSee('My business')->assertSee('Add business')->assertSee("/dashboard/businesses/{$business->id}", false);
+        // Search narrows the listings; the totals still cover all of them.
+        $this->get('/dashboard?search=Diner')->assertOk()->assertSee("/dashboard/businesses/{$business->id}", false);
+        $this->get('/dashboard?search=nothing-like-it')->assertOk()->assertSee('No listings match')
+            ->assertDontSee("/dashboard/businesses/{$business->id}", false);
+        // A work screen: no big site footer, no visitor popup.
+        $this->get('/dashboard')->assertDontSee('Some of our services that will prove useful to you')->assertDontSee('id="welcome-modal"', false);
         $this->get('/dashboard?tab=leads')->assertOk()->assertSee('No leads yet.');
         $this->get('/dashboard?tab=bookings')->assertOk()->assertSee('No bookings yet.');
 
@@ -171,7 +185,7 @@ class WebPagesTest extends TestCase
         $this->signIn($dealer);
 
         // No MANAGE_LISTINGS: the listings tab and the manager are off limits.
-        $this->get('/dashboard')->assertOk()->assertSee('Points available')->assertDontSee('Your listings');
+        $this->get('/dashboard')->assertOk()->assertSee('Dealer dashboard')->assertSee('For new listings')->assertDontSee('Add business');
         $this->get('/dashboard?tab=leads')->assertOk();
         $this->get('/dashboard/businesses/anything')->assertRedirect('/dashboard');
     }

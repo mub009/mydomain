@@ -266,6 +266,11 @@ class BusinessController extends Controller
         $query = $actor['role'] === 'DEALER'
             ? Business::where(fn ($q) => $q->where('ownerId', $actor['sub'])->orWhere('createdById', $actor['sub']))
             : Business::where('ownerId', $actor['sub']);
+        if ($search = trim((string) $request->query('search'))) {
+            $query->where(fn ($q) => $q->where('name', 'like', "%{$search}%")
+                ->orWhere('city', 'like', "%{$search}%")
+                ->orWhere('phone', 'like', "%{$search}%"));
+        }
         $total = (clone $query)->count();
         $items = $query->orderByDesc('createdAt')
             ->skip($pagination['skip'])->take($pagination['take'])

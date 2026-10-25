@@ -15,6 +15,7 @@ use App\Http\Controllers\QrCodeController;
 use App\Http\Controllers\ReviewLinkController;
 use App\Http\Controllers\SiteController;
 use App\Http\Controllers\UserController;
+use App\Models\Business;
 use App\Support\InternalApi;
 use App\Support\Privileges;
 use App\Support\WebAuth;
@@ -72,17 +73,29 @@ class DashboardController extends Controller
         $tab = in_array($request->query('tab'), $visibleTabs, true) ? $request->query('tab') : ($visibleTabs[0] ?? null);
 
         $bizPage = max(1, (int) $request->query('page', 1));
-        $mine = InternalApi::call([BusinessController::class, 'mine'], ['page' => $tab === 'businesses' ? $bizPage : 1], [], true);
+        $search = $tab === 'businesses' ? trim((string) $request->query('search')) : '';
+        $mine = InternalApi::call([BusinessController::class, 'mine'], array_filter([
+            'page' => $tab === 'businesses' ? $bizPage : 1,
+            'search' => $search,
+        ]), [], true);
         $businesses = $mine['data'];
 
-        $ratedReviews = array_sum(array_column($businesses, 'reviewCount'));
-        $weighted = array_sum(array_map(fn ($b) => $b['avgRating'] * $b['reviewCount'], $businesses));
+        // Totals across every listing the user manages, not just this page.
+        $scope = $isDealer
+            ? Business::where(fn ($q) => $q->where('ownerId', $user->id)->orWhere('createdById', $user->id))
+            : Business::where('ownerId', $user->id);
+        $totals = $scope->selectRaw(
+            "count(*) as listings, sum(case when status = 'PUBLISHED' then 1 else 0 end) as live,"
+            .' coalesce(sum(viewCount), 0) as views, coalesce(sum(leadCount), 0) as leads,'
+            .' coalesce(sum(reviewCount), 0) as reviews, coalesce(sum(avgRating * reviewCount), 0) as weighted'
+        )->first();
         $stats = [
-            'listings' => count($businesses),
-            'totalViews' => array_sum(array_map(fn ($b) => $b['viewCount'] ?? 0, $businesses)),
-            'totalLeads' => array_sum(array_map(fn ($b) => $b['leadCount'] ?? 0, $businesses)),
-            'ratedReviews' => $ratedReviews,
-            'avgRating' => $ratedReviews > 0 ? $weighted / $ratedReviews : 0,
+            'listings' => (int) $totals->listings,
+            'live' => (int) $totals->live,
+            'totalViews' => (int) $totals->views,
+            'totalLeads' => (int) $totals->leads,
+            'ratedReviews' => (int) $totals->reviews,
+            'avgRating' => $totals->reviews > 0 ? $totals->weighted / $totals->reviews : 0,
         ];
 
         $points = $isDealer ? (InternalApi::tryCall([PointsController::class, 'mine'], [], [], true)['data'] ?? null) : null;
@@ -110,6 +123,7 @@ class DashboardController extends Controller
             'tab' => $tab,
             'businesses' => $businesses,
             'bizMeta' => $mine['meta'],
+            'search' => $search,
             'stats' => $stats,
             'points' => $points,
             'outOfPoints' => $isDealer && $points !== null && $points['points'] <= 0,

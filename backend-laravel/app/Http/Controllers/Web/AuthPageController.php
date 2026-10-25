@@ -20,19 +20,30 @@ class AuthPageController extends Controller
      * a freshly signed-in user off to another host. Protocol-relative values
      * ("//evil.test") are rejected along with anything not starting with "/".
      */
-    private function safeNext(?string $raw): string
+    private function safeNext(?string $raw): ?string
     {
         if (! $raw || ! str_starts_with($raw, '/') || str_starts_with($raw, '//')) {
-            return '/';
+            return null;
         }
 
         return $raw;
     }
 
+    // Where someone lands after signing in when nothing sent them to log in
+    // mid-task: their own workspace, or the directory for a customer.
+    private static function homeFor(User $user): string
+    {
+        return match ($user->role) {
+            'ADMIN' => '/admin',
+            'DEALER', 'BUSINESS_OWNER' => '/dashboard',
+            default => '/',
+        };
+    }
+
     public function showLogin(Request $request)
     {
-        if (WebAuth::user()) {
-            return redirect($this->safeNext($request->query('next')));
+        if ($user = WebAuth::user()) {
+            return redirect($this->safeNext($request->query('next')) ?? self::homeFor($user));
         }
 
         // Where to return to — set by flows that send people here mid-task,
@@ -68,13 +79,13 @@ class AuthPageController extends Controller
         WebAuth::login($user);
         session()->forget('url.intended');
 
-        return redirect($this->safeNext($data['next'] ?? null));
+        return redirect($this->safeNext($data['next'] ?? null) ?? self::homeFor($user));
     }
 
     public function showRegister()
     {
-        if (WebAuth::user()) {
-            return redirect('/');
+        if ($user = WebAuth::user()) {
+            return redirect(self::homeFor($user));
         }
 
         return view('pages.register');
@@ -105,7 +116,7 @@ class AuthPageController extends Controller
 
         WebAuth::login($user);
 
-        return redirect('/');
+        return redirect(self::homeFor($user));
     }
 
     public function logout()

@@ -1,11 +1,14 @@
 @php
     $navLinks = [['/', 'Search'], ['/b2b', 'B2B Directory']];
     if ($authUser && in_array($authUser->role, ['BUSINESS_OWNER', 'DEALER'], true)) {
-        $navLinks[] = ['/dashboard', 'My Business'];
+        $navLinks[] = ['/dashboard', $authUser->role === 'DEALER' ? 'Dashboard' : 'My Business'];
     }
     if ($authUser && $authUser->role === 'ADMIN') {
         $navLinks[] = ['/admin', 'Admin'];
     }
+    // The dashboards (dealer, business owner, admin) are work screens: they
+    // get a one-line footer and no visitor welcome popup.
+    $isPanel = request()->is('dashboard', 'dashboard/*', 'admin', 'admin/*');
     $socialLinks = [
         ['Facebook', 'facebook', 'bg-[#1877F2]'],
         ['YouTube', 'youtube', 'bg-[#FF0000]'],
@@ -97,6 +100,14 @@
         @yield('content')
       </main>
 
+      @if ($isPanel)
+      <footer class="border-t border-gray-200 bg-white">
+        <div class="container-page flex flex-wrap items-center justify-between gap-2 py-4 text-xs text-ink-500">
+          <span>&copy; {{ now()->year }} Markkito</span>
+          <a href="/" class="hover:text-brand-600">Go to the directory</a>
+        </div>
+      </footer>
+      @else
       <footer class="border-t border-gray-200 bg-white mt-8">
         <div class="container-page py-4 flex items-center justify-between border-b border-gray-100">
           <div class="flex items-center gap-3">
@@ -177,9 +188,12 @@
         </div>
         <div class="border-t border-gray-100 py-4 text-center text-xs text-ink-500">Markkito — Local Business Directory &amp; Marketplace</div>
       </footer>
+      @endif
     </div>
 
-    @include('partials.welcome-modal')
+    @unless ($isPanel)
+      @include('partials.welcome-modal')
+    @endunless
     @stack('scripts')
   </body>
 </html>
