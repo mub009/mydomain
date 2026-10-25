@@ -69,7 +69,7 @@
     @endif
 
     @switch($section)
-      @case('Details') @include('pages.dashboard.sections.details') @break
+      @case('Contact') @include('pages.dashboard.sections.details') @break
       @case('Hours') @include('pages.dashboard.sections.hours') @break
       @case('Services') @include('pages.dashboard.sections.services') @break
       @case('Photos') @include('pages.dashboard.sections.photos') @break

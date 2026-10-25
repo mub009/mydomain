@@ -58,8 +58,16 @@ function privilegeSelector(selected) {
 }
 
 // Shows the privilege picker only while the role is DEALER.
+// Dealers sign in with their mobile number, so for them the number is
+// required and the email optional; every other role needs an email.
 function wireRolePrivileges(form) {
-  const sync = () => ($("[data-privileges]", form).hidden = form.role.value !== "DEALER");
+  const sync = () => {
+    const dealer = form.role.value === "DEALER";
+    $("[data-privileges]", form).hidden = !dealer;
+    $$("[data-when-dealer]", form).forEach((el) => (el.hidden = !dealer));
+    form.phone.required = dealer;
+    form.email.required = !dealer;
+  };
   form.role.addEventListener("change", sync);
   sync();
 }
@@ -88,8 +96,15 @@ $("[data-create-user]")?.addEventListener("click", () => {
         <input required class="input" name="firstName" placeholder="First name" />
         <input required class="input" name="lastName" placeholder="Last name" />
       </div>
-      <input required class="input" type="email" name="email" placeholder="Email" />
-      <input required class="input" type="password" name="password" placeholder="Password (min 8 chars)" />
+      <div>
+        <label class="block text-xs font-semibold text-ink-700 mb-1">Mobile number <span data-when-dealer>(login username)</span></label>
+        <input class="input" type="tel" name="phone" inputmode="numeric" maxlength="14" placeholder="9876543210" />
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-ink-700 mb-1">Email <span data-when-dealer>(optional)</span></label>
+        <input class="input" type="email" name="email" placeholder="name@example.com" />
+      </div>
+      <input required minlength="8" class="input" type="password" name="password" placeholder="Password (min 8 chars)" />
       <div>
         <label class="block text-xs font-semibold text-ink-700 mb-1">Role</label>
         <select class="input" name="role">${options(ROLES, "DEALER")}</select>
@@ -109,12 +124,13 @@ $("[data-create-user]")?.addEventListener("click", () => {
       await api.post("/admin/users", {
         firstName: f.firstName,
         lastName: f.lastName,
-        email: f.email,
+        email: f.email.trim() || null,
+        phone: f.phone.trim() || null,
         password: f.password,
         role: f.role,
         ...(f.role === "DEALER" ? { privileges } : {}),
       });
-      reloadWithFlash("User created.");
+      reloadWithFlash(f.role === "DEALER" ? `Dealer created — they sign in with ${f.phone.trim()}.` : "User created.");
     });
   });
 });
@@ -130,7 +146,14 @@ $$("[data-edit-user]").forEach((button) =>
           <input class="input" name="firstName" value="${esc(user.firstName)}" placeholder="First name" />
           <input class="input" name="lastName" value="${esc(user.lastName)}" placeholder="Last name" />
         </div>
-        <input class="input" type="email" name="email" value="${esc(user.email)}" placeholder="Email" />
+        <div>
+          <label class="block text-xs font-semibold text-ink-700 mb-1">Mobile number <span data-when-dealer>(login username)</span></label>
+          <input class="input" type="tel" name="phone" inputmode="numeric" maxlength="14" value="${esc(user.phone ?? "")}" placeholder="9876543210" />
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-ink-700 mb-1">Email <span data-when-dealer>(optional)</span></label>
+          <input class="input" type="email" name="email" value="${esc(user.email ?? "")}" placeholder="name@example.com" />
+        </div>
         <div class="flex gap-3">
           <div class="w-1/2">
             <label class="block text-xs font-semibold text-ink-700 mb-1">Role</label>
@@ -155,7 +178,8 @@ $$("[data-edit-user]").forEach((button) =>
         await api.patch(`/admin/users/${user.id}`, {
           firstName: f.firstName,
           lastName: f.lastName,
-          email: f.email,
+          email: f.email.trim() || null,
+          phone: f.phone.trim() || null,
           role: f.role,
           status: f.status,
           ...(f.role === "DEALER" ? { privileges } : {}),

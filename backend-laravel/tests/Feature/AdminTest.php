@@ -91,13 +91,40 @@ class AdminTest extends TestCase
         $token = $this->token($this->user(['role' => 'ADMIN']));
 
         $response = $this->postJson('/api/v1/admin/users', [
-            'email' => 'dealer@example.com', 'password' => 'Password123!',
+            'email' => 'dealer@example.com', 'phone' => '9876543210', 'password' => 'Password123!',
             'firstName' => 'D', 'lastName' => 'D', 'role' => 'DEALER',
         ], ['Authorization' => "Bearer {$token}"]);
 
         $response->assertStatus(201)
             ->assertJsonPath('data.privileges', ['MANAGE_LISTINGS'])
             ->assertJsonPath('data.points', 0);
+    }
+
+    public function test_a_dealer_signs_in_with_the_mobile_number_the_admin_gave_them(): void
+    {
+        $auth = ['Authorization' => "Bearer {$this->token($this->user(['role' => 'ADMIN']))}"];
+        $dealer = ['password' => 'Password123!', 'firstName' => 'Ravi', 'lastName' => 'K', 'role' => 'DEALER'];
+
+        // The mobile number is the username, so it is required and must be real.
+        $this->postJson('/api/v1/admin/users', [...$dealer, 'email' => 'ravi@example.com'], $auth)->assertStatus(400);
+        $this->postJson('/api/v1/admin/users', [...$dealer, 'phone' => '12345'], $auth)->assertStatus(400);
+
+        // No email needed; the number is stored in its plain 10-digit form.
+        $this->postJson('/api/v1/admin/users', [...$dealer, 'phone' => '+91 98765 43210'], $auth)
+            ->assertStatus(201)
+            ->assertJsonPath('data.phone', '9876543210')
+            ->assertJsonPath('data.email', null);
+        $this->postJson('/api/v1/auth/login', ['email' => '9876543210', 'password' => 'Password123!'])->assertOk();
+        $this->post('/login', ['email' => '98765 43210', 'password' => 'Password123!'])->assertRedirect('/');
+
+        $this->postJson('/api/v1/admin/users', [...$dealer, 'phone' => '9876543210'], $auth)->assertStatus(409);
+        // Other roles still sign in with an email.
+        $this->postJson('/api/v1/admin/users', [...$dealer, 'role' => 'CUSTOMER', 'phone' => '9123456780'], $auth)->assertStatus(400);
+
+        // A dealer can't be left without their number.
+        $id = User::where('phone', '9876543210')->value('id');
+        $this->patchJson("/api/v1/admin/users/{$id}", ['phone' => null], $auth)->assertStatus(400);
+        $this->patchJson("/api/v1/admin/users/{$id}", ['phone' => '9000011111', 'email' => null], $auth)->assertOk()->assertJsonPath('data.phone', '9000011111');
     }
 
     public function test_admin_grants_points_and_they_show_in_the_transaction_log(): void

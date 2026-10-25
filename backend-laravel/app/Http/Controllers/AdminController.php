@@ -99,6 +99,7 @@ class AdminController extends Controller
         if ($search = $request->query('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('email', 'like', "%{$search}%")
+                    ->orWhere('phone', 'like', "%{$search}%")
                     ->orWhere('firstName', 'like', "%{$search}%")
                     ->orWhere('lastName', 'like', "%{$search}%");
             });
@@ -117,7 +118,7 @@ class AdminController extends Controller
     public function createUser(Request $request)
     {
         $data = $request->validate([
-            'email' => ['required', 'email'],
+            'email' => ['nullable', 'email'],
             'password' => ['required', 'string', 'min:8', 'max:72'],
             'firstName' => ['required', 'string', 'min:1', 'max:80'],
             'lastName' => ['required', 'string', 'min:1', 'max:80'],
@@ -127,9 +128,26 @@ class AdminController extends Controller
             'privileges.*' => ['in:'.implode(',', Privileges::ALL)],
         ]);
         $role = $data['role'] ?? 'DEALER';
+        $email = ! empty($data['email']) ? strtolower($data['email']) : null;
+        $phone = ! empty($data['phone']) ? User::normalizePhone($data['phone']) : null;
 
-        if (User::where('email', $data['email'])->exists()) {
+        // Dealers sign in with their mobile number, so it is required and
+        // must be a real 10-digit number; their email is optional. Everyone
+        // else still needs an email.
+        if ($role === 'DEALER' && ! $phone) {
+            throw ApiException::badRequest('Enter the dealer\'s 10-digit mobile number — it is their login username');
+        }
+        if ($role !== 'DEALER' && ! $email) {
+            throw ApiException::badRequest('An email address is required');
+        }
+        if (! empty($data['phone']) && ! $phone) {
+            throw ApiException::badRequest('Enter a valid 10-digit mobile number');
+        }
+        if ($email && User::where('email', $email)->exists()) {
             throw ApiException::conflict('A user with this email already exists');
+        }
+        if ($phone && User::where('phone', $phone)->exists()) {
+            throw ApiException::conflict('A user with this mobile number already exists');
         }
 
         // Only dealers carry a privilege list; default it if none was provided.
@@ -137,11 +155,11 @@ class AdminController extends Controller
 
         $actor = $request->attributes->get('auth');
         $user = User::create([
-            'email' => $data['email'],
+            'email' => $email,
             'passwordHash' => Hash::make($data['password']),
             'firstName' => $data['firstName'],
             'lastName' => $data['lastName'],
-            'phone' => $data['phone'] ?? null,
+            'phone' => $phone,
             'role' => $role,
             'status' => 'ACTIVE',
             'privileges' => $privileges,
@@ -157,8 +175,8 @@ class AdminController extends Controller
         $data = $request->validate([
             'firstName' => ['sometimes', 'string', 'min:1', 'max:80'],
             'lastName' => ['sometimes', 'string', 'min:1', 'max:80'],
-            'email' => ['sometimes', 'email'],
-            'phone' => ['sometimes', 'string', 'min:7', 'max:20'],
+            'email' => ['sometimes', 'nullable', 'email'],
+            'phone' => ['sometimes', 'nullable', 'string', 'min:7', 'max:20'],
             'role' => ['sometimes', 'in:CUSTOMER,BUSINESS_OWNER,DEALER,ADMIN'],
             'status' => ['sometimes', 'in:ACTIVE,SUSPENDED,PENDING_VERIFICATION'],
             'privileges' => ['sometimes', 'array'],
@@ -168,6 +186,31 @@ class AdminController extends Controller
         $user = User::find($id);
         if (! $user) {
             throw ApiException::notFound('User not found');
+        }
+
+        if (array_key_exists('email', $data)) {
+            $data['email'] = ! empty($data['email']) ? strtolower($data['email']) : null;
+            if ($data['email'] && User::where('email', $data['email'])->where('id', '!=', $id)->exists()) {
+                throw ApiException::conflict('A user with this email already exists');
+            }
+        }
+        if (array_key_exists('phone', $data)) {
+            $raw = $data['phone'];
+            $data['phone'] = ! empty($raw) ? User::normalizePhone($raw) : null;
+            if (! empty($raw) && ! $data['phone']) {
+                throw ApiException::badRequest('Enter a valid 10-digit mobile number');
+            }
+            if ($data['phone'] && User::where('phone', $data['phone'])->where('id', '!=', $id)->exists()) {
+                throw ApiException::conflict('A user with this mobile number already exists');
+            }
+        }
+        // Every account needs something to sign in with; a dealer's is their number.
+        $effective = ['role' => $data['role'] ?? $user->role, 'email' => array_key_exists('email', $data) ? $data['email'] : $user->email, 'phone' => array_key_exists('phone', $data) ? $data['phone'] : $user->phone];
+        if ($effective['role'] === 'DEALER' && ! $effective['phone']) {
+            throw ApiException::badRequest('A dealer needs a 10-digit mobile number — it is their login username');
+        }
+        if (! $effective['email'] && ! $effective['phone']) {
+            throw ApiException::badRequest('Enter an email address or a mobile number');
         }
 
         // Guard against removing the last remaining admin.

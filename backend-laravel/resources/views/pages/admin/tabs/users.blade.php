@@ -8,7 +8,7 @@
     <input type="hidden" name="tab" value="Users" />
     <div class="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 flex-1">
       <x-icon name="search" :size="16" class="text-gray-400" />
-      <input name="search" value="{{ request('search') }}" placeholder="Search by name or email…" class="w-full py-2.5 text-sm focus:outline-none" data-live-search />
+      <input name="search" value="{{ request('search') }}" placeholder="Search by name, email or mobile…" class="w-full py-2.5 text-sm focus:outline-none" data-live-search />
     </div>
     <select name="role" class="input sm:w-44" data-autosubmit>
       <option value="">All roles</option>
@@ -30,7 +30,8 @@
           <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-100 text-brand-700 text-sm font-bold">{{ mb_strtoupper(mb_substr($u['firstName'], 0, 1)) }}</span>
           <div class="min-w-0">
             <p class="font-semibold text-sm text-ink-900 truncate">{{ $u['firstName'] }} {{ $u['lastName'] }}</p>
-            <p class="text-xs text-ink-500 truncate">{{ $u['email'] ?? $u['phone'] ?? '' }}</p>
+            {{-- Dealers sign in with their mobile number, so it comes first for them. --}}
+            <p class="text-xs text-ink-500 truncate">{{ $u['role'] === 'DEALER' ? ($u['phone'] ?? $u['email'] ?? '') : ($u['email'] ?? $u['phone'] ?? '') }}</p>
             @if ($u['role'] === 'DEALER')
               <p class="text-[11px] text-violet-600 truncate mt-0.5">
                 {{ ! empty($u['privileges']) ? implode(' · ', array_map(fn ($p) => A::PRIVILEGE_LABELS[$p] ?? $p, $u['privileges'])) : 'No privileges granted' }}

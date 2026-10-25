@@ -1,5 +1,5 @@
 <form class="card p-5 space-y-3" data-details-form>
-  <h3 class="font-bold text-ink-900 flex items-center gap-1.5"><x-icon name="info" :size="16" class="text-brand-600" /> Business details</h3>
+  <h3 class="font-bold text-ink-900 flex items-center gap-1.5"><x-icon name="phone" :size="16" class="text-brand-600" /> Contact</h3>
   <div>
     <label class="block text-xs font-semibold text-ink-700 mb-1">Business name</label>
     <input required name="name" value="{{ $biz['name'] }}" class="input" />

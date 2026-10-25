@@ -32,12 +32,12 @@ class DashboardController extends Controller
 
     // WhatsApp broadcasts and Poster Studio are not part of the Laravel
     // backend yet (see README), so the manager doesn't offer them.
-    public const SECTIONS = ['Details', 'Hours', 'Services', 'Photos', 'Slider', 'Our Gallery', 'Reviews & QR', 'Website', 'Products', 'Orders', 'Customers'];
+    public const SECTIONS = ['Contact', 'Hours', 'Services', 'Photos', 'Slider', 'Our Gallery', 'Reviews & QR', 'Website', 'Products', 'Orders', 'Customers'];
 
     // How each section appears on the business's menu page: its icon, the
     // icon's colours, and one line on what it is for.
     public const SECTION_TILES = [
-        'Details' => ['icon' => 'info', 'tint' => 'bg-blue-50 text-blue-600', 'blurb' => 'Name, category, contact details and address'],
+        'Contact' => ['icon' => 'phone', 'tint' => 'bg-blue-50 text-blue-600', 'blurb' => 'Name, category, contact details and address'],
         'Hours' => ['icon' => 'clock', 'tint' => 'bg-amber-50 text-amber-600', 'blurb' => 'Opening and closing times for each day'],
         'Services' => ['icon' => 'wrench', 'tint' => 'bg-violet-50 text-violet-600', 'blurb' => 'What you offer, with prices'],
         'Photos' => ['icon' => 'image-plus', 'tint' => 'bg-pink-50 text-pink-600', 'blurb' => 'Photos on your listing page'],
@@ -139,7 +139,7 @@ class DashboardController extends Controller
 
         // Each section loads only what it shows.
         switch ($section) {
-            case 'Details':
+            case 'Contact':
                 $data['categories'] = InternalApi::tryCall([CategoryController::class, 'index'])['data'] ?? [];
                 break;
             case 'Reviews & QR':
