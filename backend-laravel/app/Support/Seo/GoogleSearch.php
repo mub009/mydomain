@@ -41,7 +41,9 @@ class GoogleSearch
     public static function submitSitemap(string $sitemapUrl): void
     {
         $property = rawurlencode((string) config('services.google_search.property'));
-        $response = self::client()->put("https://www.googleapis.com/webmasters/v3/sites/{$property}/sitemaps/".rawurlencode($sitemapUrl));
+        // An empty body: put() with no data sends "[]", which Google rejects.
+        $response = self::client()->withBody('', 'application/json')
+            ->put("https://www.googleapis.com/webmasters/v3/sites/{$property}/sitemaps/".rawurlencode($sitemapUrl));
         self::check($response, 'Sitemap submit');
     }
 
