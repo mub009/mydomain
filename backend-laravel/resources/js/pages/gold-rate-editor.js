@@ -1,4 +1,4 @@
-import { api, errorMessage, uploadImage } from "../lib/api";
+import { api, errorMessage } from "../lib/api";
 import {
   DETAILS,
   PURITIES,
@@ -27,7 +27,6 @@ import { reloadWithFlash, showError, showFlash } from "../lib/widgets";
 
 const boot = pageData("gold-rate-editor-data");
 const { template, fonts, weights } = boot;
-let logos = boot.logos;
 const W = template.imageWidth;
 const H = template.imageHeight;
 const MIN_SIZE = 4;
@@ -55,7 +54,7 @@ showFlash();
 // --- State and history ------------------------------------------------------
 // `doc` is what Save stores and what undo/redo steps through. Rates are
 // shared by every template, so they sit outside the history.
-let doc = { name: template.name, logoId: template.logoId, businessId: template.businessId, layout: structuredClone(template.layout) };
+let doc = { name: template.name, businessId: template.businessId, layout: structuredClone(template.layout) };
 // Layouts saved before the style keys existed get their defaults.
 for (const p of PURITIES) doc.layout.fields[p] = fieldWithDefaults(doc.layout.fields[p]);
 for (const k of DETAILS) doc.layout.details[k] = fieldWithDefaults(doc.layout.details[k]);
@@ -74,10 +73,9 @@ let background = null;
 const logoImages = new Map();
 
 const box = (key) => (key === "logo" ? doc.layout.logo : isBusiness(key) ? doc.layout.details[key] : doc.layout.fields[key]);
-const currentLogo = () => logos.find((l) => l.id === doc.logoId) ?? null;
 const card = () => (doc.businessId ? cards.get(doc.businessId) ?? null : null);
-// The logo drawn: the business's own, or the chosen library logo.
-const logoUrl = () => (doc.layout.logo.source === "business" ? card()?.logoUrl ?? null : currentLogo()?.url ?? null);
+// The logo drawn is always the linked business's own.
+const logoUrl = () => card()?.logoUrl ?? null;
 const clamp = (v, min, max) => Math.min(Math.max(v, min), max);
 const round = (v) => Math.round(v * 100) / 100;
 const dirty = () => snapshot() !== savedDoc || JSON.stringify(rates) !== savedRates;
@@ -400,9 +398,11 @@ function syncElements() {
     $(`[data-element="${key}"]`).classList.toggle("bg-brand-50", key === selected);
     $(`[data-element-note="${key}"]`).textContent =
       key === "logo"
-        ? doc.layout.logo.source === "business"
-          ? "business logo"
-          : currentLogo()?.name ?? "none chosen"
+        ? c
+          ? c.logoUrl
+            ? "business logo"
+            : "business has none"
+          : "link a business"
         : isBusiness(key) && !c
           ? ""
           : box(key).visible
@@ -424,7 +424,6 @@ $$("[data-element-select]").forEach((button) => button.addEventListener("click",
 $("[data-business-link]").addEventListener("click", businessModal);
 $("[data-business-unlink]").addEventListener("click", () => {
   doc.businessId = null;
-  if (doc.layout.logo.source === "business") doc.layout.logo.source = "library";
   commit();
   renderProps();
 });
@@ -471,6 +470,7 @@ function businessModal() {
           }
           modal.close();
           doc.businessId = button.dataset.businessPick;
+          loadLogo(logoUrl());
           commit();
           renderProps();
         }),
@@ -513,35 +513,22 @@ function positionControls() {
 }
 
 function logoControls() {
-  const options = logos.map((l) => `<option value="${l.id}">${esc(l.name)}</option>`).join("");
   const c = card();
-  const businessOption = c
-    ? `<option value="__business" ${c.logoUrl ? "" : "disabled"}>Business logo — ${esc(c.name)}${c.logoUrl ? "" : " (none yet)"}</option>`
-    : "";
   return `<h3 class="text-sm font-bold text-ink-900">Logo</h3>
-    ${label("Logo image", `<select data-logo-select class="input px-2.5 py-1.5"><option value="">No logo</option>${businessOption}${options}</select>`)}
-    ${
+    <p class="rounded-lg border border-gray-200 bg-gray-50/60 p-2.5 text-[11px] text-ink-600">${
       c
-        ? `<div class="rounded-lg border border-gray-200 bg-gray-50/60 p-2.5">
-        <p class="text-[11px] text-ink-600">${
-          c.logoUrl
-            ? `Using <strong>${esc(c.name)}</strong>'s own logo keeps the poster in step with the business.`
-            : `<strong>${esc(c.name)}</strong> has no logo yet. Upload one to use it here.`
-        } It is saved as the business's logo, so it also shows on its listing and website.</p>
-        <label class="btn-secondary mt-2 w-full cursor-pointer px-3 py-1.5 text-sm">${icon("upload", { size: 14 })} <span data-business-logo-text>${c.logoUrl ? "Replace business logo" : "Upload business logo"}</span>
-          <input type="file" data-business-logo-upload accept="image/png,image/webp,image/jpeg" class="hidden" /></label>
-      </div>`
-        : `<p class="-mt-1 text-[11px] text-ink-400">Link a business under Elements to use its own logo.</p>`
-    }
-    <label class="btn-secondary w-full cursor-pointer px-3 py-1.5 text-sm">${icon("upload", { size: 14 })} Upload new logo
-      <input type="file" data-logo-upload accept="image/png,image/webp,image/jpeg" class="hidden" /></label>
+        ? c.logoUrl
+          ? `Shows <strong>${esc(c.name)}</strong>'s own logo, so the poster stays in step with the business.`
+          : `<strong>${esc(c.name)}</strong> has no logo yet. Add one from the business's dashboard and it shows here.`
+        : "Link a business under Elements — its logo is placed here."
+    }</p>
     <div>
       <span class="mb-1 block text-[11px] font-semibold text-ink-600">Logo area</span>
       <div class="flex gap-2">
         <button type="button" data-logo-draw class="btn-secondary flex-1 px-3 py-1.5 text-sm">${icon("pencil", { size: 14 })}<span>Draw logo area</span></button>
         <button type="button" data-logo-fit class="btn-secondary px-3 py-1.5 text-sm" title="Shrink the area to the logo's own shape">Fit to logo</button>
       </div>
-      <p class="mt-1 text-[11px] text-ink-400">Drag a rectangle on the image to mark where the logo goes. Any logo you pick is fitted inside it, centred, keeping its shape and transparency — changing the logo never moves the area.</p>
+      <p class="mt-1 text-[11px] text-ink-400">Drag a rectangle on the image to mark where the logo goes. The business's logo is fitted inside it, centred, keeping its shape and transparency — changing the logo never moves the area.</p>
     </div>
     ${positionControls()}`;
 }
@@ -932,13 +919,10 @@ function bindProps() {
   $$("[data-preset-delete]", props).forEach((button) =>
     button.addEventListener("click", () => deletePresetModal(customPresets.find((p) => p.id === button.dataset.presetDelete))),
   );
-  $("[data-logo-select]", props)?.addEventListener("change", (e) => setLogo(e.target.value || null));
   $("[data-logo-fit]", props)?.addEventListener("click", () => {
     fitLogoBox();
     commit();
   });
-  $("[data-logo-upload]", props)?.addEventListener("change", (e) => uploadLogo(e.target));
-  $("[data-business-logo-upload]", props)?.addEventListener("change", (e) => uploadBusinessLogo(e.target));
   $("[data-logo-draw]", props)?.addEventListener("click", () => (drawMode ? cancelDraw() : setDrawMode(true)));
 }
 
@@ -966,8 +950,6 @@ function syncProps(all = false) {
   $$("[data-color-toggle]", props).forEach((toggle) => (toggle.checked = Boolean(b[toggle.dataset.colorToggle])));
   const splitOnly = $("[data-split-only]", props);
   if (splitOnly) splitOnly.hidden = b.design !== "split";
-  const logoSelect = $("[data-logo-select]", props);
-  if (logoSelect) logoSelect.value = doc.layout.logo.source === "business" ? "__business" : doc.logoId ?? "";
   const fitButton = $("[data-logo-fit]", props);
   if (fitButton) fitButton.disabled = !logoUrl();
   const qrUrl = $("[data-qr-url]", props);
@@ -979,8 +961,7 @@ function syncProps(all = false) {
 // it fits.
 function fitLogoBox() {
   const img = logoImages.get(logoUrl());
-  const logo = currentLogo();
-  const ratio = img ? img.naturalWidth / img.naturalHeight : doc.layout.logo.source !== "business" && logo ? logo.width / logo.height : null;
+  const ratio = img ? img.naturalWidth / img.naturalHeight : null;
   if (!ratio) return;
   const b = doc.layout.logo;
   let width = b.width;
@@ -991,65 +972,6 @@ function fitLogoBox() {
   }
   width = Math.min(width, W - b.x);
   Object.assign(b, { width: round(Math.max(width, MIN_SIZE)), height: round(Math.max(width / ratio, MIN_SIZE)) });
-}
-
-// The logo goes into the area as it is; the area itself stays put.
-// "__business" is the linked business's own logo.
-function setLogo(id) {
-  if (id === "__business") {
-    doc.layout.logo.source = "business";
-  } else {
-    doc.layout.logo.source = "library";
-    doc.logoId = id;
-  }
-  if (logoUrl()) {
-    loadLogo(logoUrl());
-    doc.layout.logo.visible = true;
-  }
-  commit();
-}
-
-async function uploadLogo(input) {
-  const file = input.files?.[0];
-  if (!file) return;
-  const body = new FormData();
-  body.append("file", file);
-  showError(errorBox, "");
-  try {
-    const { data: logo } = await api.post("/admin/gold-rates/logos", body);
-    logos = [logo, ...logos];
-    renderProps();
-    setLogo(logo.id);
-  } catch (err) {
-    fail(err);
-  } finally {
-    input.value = "";
-  }
-}
-
-// Sets the linked business's own logo (as its dashboard would) and uses it.
-async function uploadBusinessLogo(input) {
-  const file = input.files?.[0];
-  const id = doc.businessId;
-  if (!file || !id) return;
-  const text = $("[data-business-logo-text]", props);
-  const before = text.textContent;
-  text.textContent = "Uploading…";
-  showError(errorBox, "");
-  try {
-    const url = await uploadImage(file, "business-logo");
-    await api.patch(`/businesses/${id}`, { logoUrl: url });
-    cards.delete(id);
-    await ensureCard(id);
-    renderProps();
-    setLogo("__business");
-    flash(`Saved as ${card()?.name ?? "the business"}'s logo and placed on the poster.`);
-  } catch (err) {
-    fail(err);
-    text.textContent = before;
-  } finally {
-    input.value = "";
-  }
 }
 
 // --- Rates ------------------------------------------------------------------
@@ -1136,7 +1058,7 @@ async function save() {
       // Anything changed while the requests are out stays unsaved.
       const sent = snapshot();
       const sentRates = JSON.stringify(rates);
-      await api.patch(`/admin/gold-rates/templates/${template.id}`, { name: doc.name.trim(), logoId: doc.logoId, businessId: doc.businessId, layout: doc.layout });
+      await api.patch(`/admin/gold-rates/templates/${template.id}`, { name: doc.name.trim(), businessId: doc.businessId, layout: doc.layout });
       savedDoc = sent;
       if (sentRates !== savedRates) {
         await api.put("/admin/gold-rates/rates", { rates: JSON.parse(sentRates) });

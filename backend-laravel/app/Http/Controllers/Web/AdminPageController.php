@@ -79,7 +79,6 @@ class AdminPageController extends Controller
             case 'Gold Rates':
                 $data['goldRates'] = InternalApi::tryCall([GoldRateController::class, 'rates'], [], [], true)['data'] ?? null;
                 $data['goldTemplates'] = InternalApi::tryCall([GoldRateController::class, 'templates'], [], [], true)['data'] ?? null;
-                $data['goldLogos'] = InternalApi::tryCall([GoldRateController::class, 'logos'], [], [], true)['data'] ?? null;
                 break;
             case 'Reports':
                 $data['report'] = InternalApi::tryCall([AdminController::class, 'businessCreatorsReport'], [], [], true)['data'] ?? null;

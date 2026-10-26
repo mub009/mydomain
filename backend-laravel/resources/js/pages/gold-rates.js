@@ -3,7 +3,7 @@ import { PURITIES, downloadSavedTemplate } from "../lib/gold-rate-render";
 import { $, $$, esc, openModal, pageData } from "../lib/ui";
 import { reloadWithFlash, showError } from "../lib/widgets";
 
-// The admin "Gold Rates" tab: today's rates, uploading templates and logos,
+// The admin "Gold Rates" tab: today's rates, uploading templates,
 // and the per-template actions. Editing happens on the template's own page
 // (gold-rate-editor.js).
 
@@ -61,12 +61,11 @@ const templateForm = $("[data-new-template]");
 templateForm?.addEventListener("submit", async (e) => {
   e.preventDefault();
   const body = new FormData(templateForm);
-  if (!body.get("logoId")) body.delete("logoId");
   try {
     const { data: created } = await busy($("[data-upload-template]", templateForm), "Uploading…", () =>
       api.post("/admin/gold-rates/templates", body),
     );
-    reloadWithFlash("Template uploaded. Drag the logo and rates into place, then save.", `/admin/gold-rates/templates/${created.id}`);
+    reloadWithFlash("Template uploaded. Link a business for its logo, drag the logo and rates into place, then save.", `/admin/gold-rates/templates/${created.id}`);
   } catch (err) {
     showError($("[data-template-error]"), errorMessage(err));
   }
@@ -101,7 +100,7 @@ $$("[data-delete-template]").forEach((button) =>
     const template = JSON.parse(button.dataset.deleteTemplate);
     confirmModal(
       "Delete template",
-      `Delete <strong>${esc(template.name)}</strong>? Its master PNG and saved layout are removed for good. Logos stay in the library.`,
+      `Delete <strong>${esc(template.name)}</strong>? Its master PNG and saved layout are removed for good.`,
       "Delete template",
       async () => {
         await api.delete(`/admin/gold-rates/templates/${template.id}`);
@@ -111,27 +110,3 @@ $$("[data-delete-template]").forEach((button) =>
   }),
 );
 
-// --- Logos --------------------------------------------------------------------
-const logoForm = $("[data-new-logo]");
-logoForm?.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  try {
-    await busy($("button", logoForm), "Uploading…", () => api.post("/admin/gold-rates/logos", new FormData(logoForm)));
-    reloadWithFlash("Logo uploaded. Choose it in a template's editor.");
-  } catch (err) {
-    showError($("[data-logo-error]"), errorMessage(err));
-  }
-});
-
-$$("[data-delete-logo]").forEach((button) =>
-  button.addEventListener("click", () => {
-    const logo = JSON.parse(button.dataset.deleteLogo);
-    const used = logo.used
-      ? ` ${logo.used} template${logo.used === 1 ? " uses" : "s use"} it and will show no logo until you pick another — their layouts are kept.`
-      : "";
-    confirmModal("Delete logo", `Delete <strong>${esc(logo.name)}</strong>?${used}`, "Delete logo", async () => {
-      await api.delete(`/admin/gold-rates/logos/${logo.id}`);
-      reloadWithFlash(`Deleted “${logo.name}”.`);
-    });
-  }),
-);

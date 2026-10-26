@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Exceptions\ApiException;
 use App\Models\Business;
 use App\Models\GoldRate;
-use App\Models\GoldRateLogo;
 use App\Models\GoldRatePreset;
 use App\Models\GoldRateTemplate;
 use App\Support\ApiResponse;
@@ -16,8 +15,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Throwable;
 
-// The admin's gold-rate poster maker: today's rates, the logo library and
-// the templates (master PNG + layout). Admin-only (routes/api.php). The
+// The admin's gold-rate poster maker: today's rates and the templates
+// (master PNG + layout; the logo is the linked business's own). Admin-only (routes/api.php). The
 // poster itself is drawn and downloaded in the browser
 // (resources/js/lib/gold-rate-render.js), so nothing here renders images.
 class GoldRateController extends Controller
@@ -52,43 +51,6 @@ class GoldRateController extends Controller
         });
 
         return ApiResponse::ok(GoldRate::current());
-    }
-
-    // ---------------------------------------------------------------
-    // Logos
-    // ---------------------------------------------------------------
-
-    public function logos()
-    {
-        return ApiResponse::ok(GoldRateLogo::withCount('templates')->orderByDesc('createdAt')->get());
-    }
-
-    public function storeLogo(Request $request)
-    {
-        $data = $request->validate(['name' => ['nullable', 'string', 'max:100']]);
-        $file = $request->file('file');
-        $stored = GoldRateFiles::storeLogo($file);
-        $name = trim($data['name'] ?? '') ?: mb_substr(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME), 0, 100);
-
-        try {
-            $logo = GoldRateLogo::create(['name' => $name ?: 'Logo', ...$stored]);
-        } catch (Throwable $e) {
-            GoldRateFiles::delete($stored['path']);
-            throw $e;
-        }
-
-        return ApiResponse::created($logo);
-    }
-
-    // Templates using it keep their layout and just show no logo until
-    // another is picked.
-    public function destroyLogo(string $id)
-    {
-        $logo = GoldRateLogo::find($id) ?? throw ApiException::notFound('Logo not found');
-        $logo->delete();
-        GoldRateFiles::delete($logo->path);
-
-        return ApiResponse::noContent();
     }
 
     // ---------------------------------------------------------------
@@ -137,24 +99,20 @@ class GoldRateController extends Controller
 
     public function templates()
     {
-        return ApiResponse::ok(GoldRateTemplate::with(['logo', 'business.hours'])->orderByDesc('updatedAt')->get());
+        return ApiResponse::ok(GoldRateTemplate::with('business.hours')->orderByDesc('updatedAt')->get());
     }
 
     public function showTemplate(string $id)
     {
-        return ApiResponse::ok($this->findTemplate($id)->load('logo'));
+        return ApiResponse::ok($this->findTemplate($id));
     }
 
     // Upload a master PNG. It starts with a default layout to adjust in the
     // editor.
     public function storeTemplate(Request $request)
     {
-        $data = $request->validate([
-            'name' => ['required', 'string', 'min:1', 'max:100'],
-            'logoId' => ['nullable', 'uuid', 'exists:gold_rate_logos,id'],
-        ]);
+        $data = $request->validate(['name' => ['required', 'string', 'min:1', 'max:100']]);
         $stored = GoldRateFiles::storeTemplate($request->file('file'));
-        $logo = isset($data['logoId']) ? GoldRateLogo::find($data['logoId']) : null;
 
         try {
             $template = GoldRateTemplate::create([
@@ -163,8 +121,7 @@ class GoldRateController extends Controller
                 'thumbPath' => $stored['thumbPath'],
                 'imageWidth' => $stored['width'],
                 'imageHeight' => $stored['height'],
-                'logoId' => $data['logoId'] ?? null,
-                'layout' => TemplateLayout::default($stored['width'], $stored['height'], $logo ? $logo->width / $logo->height : null),
+                'layout' => TemplateLayout::default($stored['width'], $stored['height']),
                 'createdById' => $request->attributes->get('auth')['sub'],
             ]);
         } catch (Throwable $e) {
@@ -172,17 +129,16 @@ class GoldRateController extends Controller
             throw $e;
         }
 
-        return ApiResponse::created($template->load('logo'));
+        return ApiResponse::created($template);
     }
 
-    // Name, logo and/or layout. A new master image goes through
+    // Name, business and/or layout. A new master image goes through
     // replaceTemplateImage().
     public function updateTemplate(Request $request, string $id)
     {
         $template = $this->findTemplate($id);
         $rules = [
             'name' => ['sometimes', 'string', 'min:1', 'max:100'],
-            'logoId' => ['sometimes', 'nullable', 'uuid', 'exists:gold_rate_logos,id'],
             'businessId' => ['sometimes', 'nullable', 'uuid', 'exists:businesses,id'],
         ];
         if ($request->has('layout')) {
@@ -198,7 +154,7 @@ class GoldRateController extends Controller
         }
         $template->update($data);
 
-        return ApiResponse::ok($template->fresh('logo'));
+        return ApiResponse::ok($template->fresh());
     }
 
     // A new master image for the template. The new PNG is stored as
@@ -225,10 +181,10 @@ class GoldRateController extends Controller
         }
         GoldRateFiles::delete(...$old);
 
-        return ApiResponse::ok($template->fresh('logo'));
+        return ApiResponse::ok($template->fresh());
     }
 
-    // A copy with the same background, logo and layout, to adapt without
+    // A copy with the same background, business and layout, to adapt without
     // touching the original.
     public function duplicateTemplate(Request $request, string $id)
     {
@@ -243,7 +199,6 @@ class GoldRateController extends Controller
                 'thumbPath' => $thumbPath,
                 'imageWidth' => $source->imageWidth,
                 'imageHeight' => $source->imageHeight,
-                'logoId' => $source->logoId,
                 'businessId' => $source->businessId,
                 'layout' => $source->layout,
                 'createdById' => $request->attributes->get('auth')['sub'],
@@ -253,7 +208,7 @@ class GoldRateController extends Controller
             throw $e;
         }
 
-        return ApiResponse::created($copy->load('logo'));
+        return ApiResponse::created($copy);
     }
 
     public function destroyTemplate(string $id)

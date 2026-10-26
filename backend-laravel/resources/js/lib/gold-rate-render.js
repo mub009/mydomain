@@ -382,9 +382,9 @@ export function saveBlob(blob, fileName) {
 
 // Loads a saved template's images and downloads it with today's rates —
 // for the template list, without opening the editor.
-// The logo a template draws: its business's own, or the chosen library logo.
+// The logo a template draws: always its linked business's own.
 export function templateLogoUrl(template) {
-  return template.layout.logo.source === "business" ? template.businessCard?.logoUrl ?? null : template.logo?.url ?? null;
+  return template.businessCard?.logoUrl ?? null;
 }
 
 export async function downloadSavedTemplate(template, rates) {

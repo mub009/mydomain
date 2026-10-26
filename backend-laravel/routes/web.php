@@ -64,7 +64,6 @@ Route::middleware('web.role:ADMIN')->group(function () {
     Route::get('/admin/gold-rates/templates/{id}', [GoldRatePageController::class, 'editor']);
     Route::get('/admin/gold-rates/templates/{id}/image', [GoldRatePageController::class, 'templateImage']);
     Route::get('/admin/gold-rates/templates/{id}/thumb', [GoldRatePageController::class, 'templateThumb']);
-    Route::get('/admin/gold-rates/logos/{id}/image', [GoldRatePageController::class, 'logoImage']);
     Route::get('/admin/gold-rates/businesses/{id}/logo', [GoldRatePageController::class, 'businessLogo']);
 });
 

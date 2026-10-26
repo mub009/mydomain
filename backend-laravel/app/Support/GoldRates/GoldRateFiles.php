@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Throwable;
 
-// Template PNGs and logos for the gold-rate poster maker. Unlike
+// Template PNGs for the gold-rate poster maker. Unlike
 // UploadController (which shrinks and converts to WebP), these are kept
 // byte for byte as uploaded — the master PNG is the poster's background and
 // must never change. They live on the private local disk and reach the
@@ -22,11 +22,7 @@ class GoldRateFiles
 
     private const THUMB_FOLDER = 'gold-rates/thumbs';
 
-    private const LOGO_FOLDER = 'gold-rates/logos';
-
     private const MAX_TEMPLATE_BYTES = 30 * 1024 * 1024;
-
-    private const MAX_LOGO_BYTES = 5 * 1024 * 1024;
 
     // Browsers refuse to draw (or export) canvases much past this; Safari
     // on iPhone is the tightest.
@@ -35,8 +31,6 @@ class GoldRateFiles
     private const MAX_PIXELS = 25_000_000;
 
     private const THUMB_WIDTH = 480;
-
-    private const LOGO_TYPES = ['image/png' => 'png', 'image/webp' => 'webp', 'image/jpeg' => 'jpg'];
 
     /**
      * @return array{path: string, thumbPath: ?string, width: int, height: int}
@@ -57,17 +51,6 @@ class GoldRateFiles
             'width' => $width,
             'height' => $height,
         ];
-    }
-
-    /**
-     * @return array{path: string, mime: string, width: int, height: int}
-     */
-    public static function storeLogo(?UploadedFile $file): array
-    {
-        [$width, $height, $mime] = self::check($file, self::LOGO_TYPES, self::MAX_LOGO_BYTES, 'The logo must be a PNG, WebP or JPEG image');
-        $path = self::put(self::LOGO_FOLDER, Str::uuid().'.'.self::LOGO_TYPES[$mime], $file);
-
-        return ['path' => $path, 'mime' => $mime, 'width' => $width, 'height' => $height];
     }
 
     // A copy for a duplicated template, so deleting one never removes the

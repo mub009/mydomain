@@ -18,7 +18,7 @@ class GoldRateTemplate extends Model
 
     protected $table = 'gold_rate_templates';
 
-    protected $fillable = ['name', 'imagePath', 'thumbPath', 'imageWidth', 'imageHeight', 'logoId', 'businessId', 'layout', 'createdById'];
+    protected $fillable = ['name', 'imagePath', 'thumbPath', 'imageWidth', 'imageHeight', 'businessId', 'layout', 'createdById'];
 
     protected $hidden = ['imagePath', 'thumbPath', 'business'];
 
@@ -32,19 +32,14 @@ class GoldRateTemplate extends Model
         ];
     }
 
-    // Read with anything newer than the saved layout (business detail boxes,
-    // the logo source) filled in, so every template has the full set.
+    // Read with anything newer than the saved layout (business detail boxes)
+    // filled in, so every template has the full set.
     protected function layout(): Attribute
     {
         return Attribute::make(
             get: fn (?string $value) => TemplateLayout::complete(json_decode((string) $value, true) ?: [], (int) $this->imageWidth, (int) $this->imageHeight),
             set: fn (array $value) => json_encode($value, JSON_UNESCAPED_UNICODE),
         );
-    }
-
-    public function logo(): BelongsTo
-    {
-        return $this->belongsTo(GoldRateLogo::class, 'logoId');
     }
 
     public function business(): BelongsTo

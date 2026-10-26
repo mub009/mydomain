@@ -12,7 +12,7 @@ use App\Models\GoldRate;
 // it — keep FONTS and the keys in step with that file.
 //
 // {
-//   "logo":    { "visible": true, "source": "library", "x": 40, "y": 40, "width": 240, "height": 120 },
+//   "logo":    { "visible": true, "x": 40, "y": 40, "width": 240, "height": 120 },
 //   "fields":  { "24K": { "visible": true, "label": "24K Gold", "text": "{label}: {currency}{rate}",
 //                         "currency": "₹", "fontFamily": "Poppins", "fontSize": 48, "fontWeight": 700,
 //                         "color": "#111111", "align": "center", "background": null, …style keys,
@@ -21,9 +21,8 @@ use App\Models\GoldRate;
 //                "qr": { "visible": false, "target": "page", "color": "#000000", "background": "#ffffff", "x", "y", "width", "height" } }
 // }
 //
-// logo.source "business" draws the linked business's own logo instead of
-// the chosen library logo. Business details are filled in from the linked
-// business when the poster is drawn (BusinessCard).
+// The logo and the business details are the linked business's own, filled
+// in when the poster is drawn (BusinessCard).
 class TemplateLayout
 {
     // System fonts plus the Google Fonts the editor page loads.
@@ -86,12 +85,10 @@ class TemplateLayout
     // A starting layout for a freshly uploaded template: a logo in the top
     // corner and the rates stacked in the lower half. 24K and 22K show by
     // default; the admin turns the others, and any business details, on as
-    // needed. $logoRatio (width ÷ height) shapes the logo box to the logo
-    // chosen at upload, so its outline fits the logo.
-    public static function default(int $width, int $height, ?float $logoRatio = null): array
+    // needed.
+    public static function default(int $width, int $height): array
     {
         $logoWidth = round(min($width, $height) * 0.2, 2);
-        $logoHeight = $logoRatio ? round($logoWidth / $logoRatio, 2) : $logoWidth;
         $margin = round(min($width, $height) * 0.05, 2);
         $rowHeight = round($height * 0.08, 2);
         $fields = [];
@@ -109,21 +106,22 @@ class TemplateLayout
         }
 
         return [
-            'logo' => ['visible' => true, 'source' => 'library', 'x' => $margin, 'y' => $margin, 'width' => $logoWidth,
-                'height' => min($logoHeight, $height - $margin)],
+            'logo' => ['visible' => true, 'x' => $margin, 'y' => $margin, 'width' => $logoWidth,
+                'height' => min($logoWidth, $height - $margin)],
             'fields' => $fields,
             'details' => self::defaultDetails($width, $height),
         ];
     }
 
-    // Any part a layout saved earlier is missing (business details, the
-    // logo source), filled in with its default.
+    // Any part a layout saved earlier is missing (business details), filled
+    // in with its default. The old logo "source" (library or business) is
+    // dropped: the logo is always the business's now.
     public static function complete(array $layout, int $width, int $height): array
     {
         if (! $layout) {
             return self::default($width, $height);
         }
-        $layout['logo']['source'] ??= 'library';
+        unset($layout['logo']['source']);
         $layout['details'] = ($layout['details'] ?? []) + self::defaultDetails($width, $height);
 
         return $layout;
@@ -212,9 +210,8 @@ class TemplateLayout
 
         $rules = [
             'layout' => ['required', 'array:logo,fields,details'],
-            'layout.logo' => ['required', 'array:visible,source,x,y,width,height'],
+            'layout.logo' => ['required', 'array:visible,x,y,width,height'],
             'layout.logo.visible' => ['required', 'boolean'],
-            'layout.logo.source' => ['sometimes', 'string', 'in:library,business'],
             ...$box('layout.logo'),
             'layout.fields' => ['required', 'array:'.implode(',', GoldRate::PURITIES), 'required_array_keys:'.implode(',', GoldRate::PURITIES)],
             'layout.details' => ['sometimes', 'array:'.implode(',', [...array_keys(self::DETAILS), 'qr'])],
@@ -437,7 +434,6 @@ class TemplateLayout
         return [
             'logo' => [
                 'visible' => (bool) $layout['logo']['visible'],
-                'source' => $layout['logo']['source'] ?? 'library',
                 ...$box($layout['logo'], 'logo'),
             ],
             'fields' => $fields,

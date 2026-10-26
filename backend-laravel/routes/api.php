@@ -293,15 +293,11 @@ Route::prefix('admin')->middleware(['auth.jwt', 'role:ADMIN'])->group(function (
     Route::post('/seo/pages/{id}/submit', [SeoController::class, 'adminSubmit']);
     Route::post('/seo/pages/{id}/check', [SeoController::class, 'adminCheck']);
 
-    // Gold-rate poster maker: today's rates, logos, and templates (a master
-    // PNG plus where the logo and rates go on it).
+    // Gold-rate poster maker: today's rates and templates (a master PNG plus
+    // where the business's logo and the rates go on it).
     Route::prefix('gold-rates')->group(function () {
         Route::get('/rates', [GoldRateController::class, 'rates']);
         Route::put('/rates', [GoldRateController::class, 'updateRates']);
-
-        Route::get('/logos', [GoldRateController::class, 'logos']);
-        Route::post('/logos', [GoldRateController::class, 'storeLogo']);
-        Route::delete('/logos/{id}', [GoldRateController::class, 'destroyLogo']);
 
         Route::get('/businesses/{id}/card', [GoldRateController::class, 'businessCard']);
 

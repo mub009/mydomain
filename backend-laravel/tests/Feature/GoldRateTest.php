@@ -13,7 +13,7 @@ use Tests\TestCase;
 
 // The admin's gold-rate poster maker: templates kept exactly as uploaded,
 // layouts saved and validated against the template's size, shared rates,
-// logos, duplicating and deleting — and none of it open to anyone else.
+// duplicating and deleting — and none of it open to anyone else.
 class GoldRateTest extends TestCase
 {
     use RefreshDatabase;
@@ -251,7 +251,7 @@ class GoldRateTest extends TestCase
         $bytes = file_get_contents($file->getRealPath());
         $same = $this->post("/api/v1/admin/gold-rates/templates/{$template['id']}/image", ['file' => $file], $auth)
             ->assertOk()->json('data');
-        $this->assertEquals([...$layout['logo'], 'source' => 'library'], $same['layout']['logo']);
+        $this->assertEquals($layout['logo'], $same['layout']['logo']);
         $this->assertNotSame($template['imageUrl'], $same['imageUrl']);
         Storage::disk(GoldRateFiles::DISK)->assertMissing($oldPath);
         $this->assertSame($bytes, Storage::disk(GoldRateFiles::DISK)->get(GoldRateTemplate::find($template['id'])->imagePath));
@@ -260,7 +260,7 @@ class GoldRateTest extends TestCase
         $big = $this->post("/api/v1/admin/gold-rates/templates/{$template['id']}/image", [
             'file' => UploadedFile::fake()->image('big.png', 1600, 1200),
         ], $auth)->assertOk()->assertJsonPath('data.imageWidth', 1600)->json('data.layout');
-        $this->assertEquals(['visible' => true, 'source' => 'library', 'x' => 1200, 'y' => 40, 'width' => 360, 'height' => 180], $big['logo']);
+        $this->assertEquals(['visible' => true, 'x' => 1200, 'y' => 40, 'width' => 360, 'height' => 180], $big['logo']);
         $this->assertEquals(80, $big['fields']['22K']['fontSize']);
         $this->assertEquals(20, $big['fields']['22K']['radius']);
         $this->assertEquals(4, $big['fields']['22K']['borderWidth']);
@@ -323,13 +323,11 @@ class GoldRateTest extends TestCase
         $this->getJson('/api/v1/admin/gold-rates/businesses/00000000-0000-0000-0000-000000000000/card', $auth)->assertStatus(404);
 
         $layout = $template['layout'];
-        $layout['logo']['source'] = 'business';
         $layout['details']['phone'] = [...$layout['details']['phone'], 'visible' => true, 'design' => 'split', 'label' => 'Call'];
         $layout['details']['qr'] = [...$layout['details']['qr'], 'visible' => true, 'target' => 'website'];
         $saved = $this->patchJson("/api/v1/admin/gold-rates/templates/{$template['id']}", ['businessId' => $business->id, 'layout' => $layout], $auth)
             ->assertOk()
             ->assertJsonPath('data.businessCard.name', 'Lakshmi Jewellers')
-            ->assertJsonPath('data.layout.logo.source', 'business')
             ->assertJsonPath('data.layout.details.phone.visible', true)
             ->assertJsonPath('data.layout.details.qr.target', 'website')
             ->json('data');
@@ -360,11 +358,14 @@ class GoldRateTest extends TestCase
         $auth = $this->auth($this->user('ADMIN'));
         $template = $this->uploadTemplate($auth, 800, 600);
         $old = $template['layout'];
-        unset($old['details'], $old['logo']['source']);
+        unset($old['details']);
+        // Layouts from when a logo could come from an uploaded library.
+        $old['logo']['source'] = 'library';
         \Illuminate\Support\Facades\DB::table('gold_rate_templates')->where('id', $template['id'])->update(['layout' => json_encode($old)]);
 
         $loaded = $this->getJson("/api/v1/admin/gold-rates/templates/{$template['id']}", $auth)->assertOk()->json('data.layout');
-        $this->assertSame('library', $loaded['logo']['source']);
+        $this->assertArrayNotHasKey('source', $loaded['logo']);
+        unset($old['logo']['source']);
         $this->assertArrayHasKey('qr', $loaded['details']);
         // Saving without details keeps their defaults.
         $this->patchJson("/api/v1/admin/gold-rates/templates/{$template['id']}", ['layout' => $old], $auth)
@@ -429,41 +430,5 @@ class GoldRateTest extends TestCase
         Storage::disk(GoldRateFiles::DISK)->assertMissing($originalPath);
         Storage::disk(GoldRateFiles::DISK)->assertExists($copyPath);
         $this->assertNull(GoldRateTemplate::find($template['id']));
-    }
-
-    public function test_logos_are_uploaded_chosen_and_deleted(): void
-    {
-        $auth = $this->auth($this->user('ADMIN'));
-        $file = UploadedFile::fake()->image('shop-logo.png', 300, 100);
-        $original = file_get_contents($file->getRealPath());
-
-        $logo = $this->post('/api/v1/admin/gold-rates/logos', ['file' => $file], $auth)
-            ->assertStatus(201)
-            ->assertJsonPath('data.name', 'shop-logo')
-            ->assertJsonPath('data.width', 300)
-            ->json('data');
-        $this->post('/api/v1/admin/gold-rates/logos', ['file' => UploadedFile::fake()->create('logo.svg', 2, 'image/svg+xml')], $auth)
-            ->assertStatus(400);
-
-        // Picked at upload, the logo box takes the logo's 3:1 shape.
-        $withLogo = $this->post('/api/v1/admin/gold-rates/templates', [
-            'name' => 'With logo', 'logoId' => $logo['id'], 'file' => UploadedFile::fake()->image('m.png', 800, 600),
-        ], $auth)->assertStatus(201)->json('data.layout.logo');
-        $this->assertEqualsWithDelta(3, $withLogo['width'] / $withLogo['height'], 0.01);
-
-        $template = $this->uploadTemplate($auth);
-        $this->patchJson("/api/v1/admin/gold-rates/templates/{$template['id']}", ['logoId' => $logo['id']], $auth)
-            ->assertOk()->assertJsonPath('data.logo.id', $logo['id']);
-        $this->getJson('/api/v1/admin/gold-rates/logos', $auth)->assertJsonPath('data.0.templates_count', 2);
-
-        $admin = User::where('role', 'ADMIN')->first();
-        $this->post('/login', ['email' => $admin->email, 'password' => 'Password123!']);
-        $served = $this->get("/admin/gold-rates/logos/{$logo['id']}/image")->assertOk();
-        $this->assertSame($original, $served->streamedContent());
-
-        // Deleting it leaves the template, its layout intact, with no logo.
-        $this->deleteJson("/api/v1/admin/gold-rates/logos/{$logo['id']}", [], $auth)->assertStatus(204);
-        $this->getJson("/api/v1/admin/gold-rates/templates/{$template['id']}", $auth)
-            ->assertOk()->assertJsonPath('data.logoId', null)->assertJsonPath('data.layout.logo.visible', true);
     }
 }
