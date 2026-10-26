@@ -136,7 +136,11 @@ class GoogleSearch
             return null;
         }
         if (! str_starts_with($value, '{')) {
-            $path = str_starts_with($value, '/') || preg_match('#^[A-Za-z]:[\\\\/]#', $value) ? $value : base_path($value);
+            // A relative path is a file in storage/app/private (falling back to
+            // the project root, for older set-ups).
+            $path = str_starts_with($value, '/') || preg_match('#^[A-Za-z]:[\\\\/]#', $value)
+                ? $value
+                : (is_file(storage_path('app/private/'.$value)) ? storage_path('app/private/'.$value) : base_path($value));
             $value = is_file($path) ? (string) file_get_contents($path) : '';
         }
         $json = json_decode($value, true);

@@ -46,8 +46,9 @@ return [
     // websites into Google quickly and reporting which ones are in
     // (App\Support\Seo\GoogleSearch; set-up steps in README "SEO and Google").
     'google_search' => [
-        // A service account's JSON key: a path to the .json file, or the
-        // JSON itself. Empty leaves Google switched off — the sitemap still
+        // A service account's JSON key: a path to the .json file (relative
+        // paths are read from storage/app/private), or the JSON itself.
+        // Empty leaves Google switched off — the sitemap still
         // works, but nothing is submitted or checked.
         'credentials' => env('GOOGLE_SEARCH_CREDENTIALS'),
         // The Search Console property the service account was added to as

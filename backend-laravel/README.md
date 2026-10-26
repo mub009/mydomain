@@ -247,14 +247,14 @@ To connect Google (without this, everything works except submitting and checking
 
 1. In Google Cloud Console, create a project and enable the **Web Search Indexing API** and the
    **Google Search Console API**.
-2. Create a **service account**, add a **JSON key**, and download it to the server, outside
-   `public/`.
+2. Create a **service account**, add a **JSON key**, and save it on the server as
+   `storage/app/private/google-key.json` (that folder is git-ignored and not public).
 3. In Search Console, add a **Domain property** for `mydomainbook.com`. This covers the main site
    and every business subdomain. Then go to **Settings → Users and permissions** and add the
    service account's email as an **Owner**.
 4. Set these in `.env`, then run `php artisan config:clear`:
    ```
-   GOOGLE_SEARCH_CREDENTIALS=/home/you/keys/markkito-indexer.json
+   GOOGLE_SEARCH_CREDENTIALS=google-key.json
    GOOGLE_SEARCH_PROPERTY=sc-domain:mydomainbook.com
    ```
 5. Run `php artisan seo:sync` once to check the setup. It should report pages submitted, not
