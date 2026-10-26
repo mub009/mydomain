@@ -21,7 +21,8 @@ class PointsController extends Controller
             throw ApiException::notFound('User not found');
         }
 
-        $spent = (int) abs(PointTransaction::where('userId', $user->id)->where('type', 'BUSINESS_CREATED')->sum('amount'));
+        // Net of refunds for listings the dealer deleted.
+        $spent = (int) -PointTransaction::where('userId', $user->id)->whereIn('type', ['BUSINESS_CREATED', 'BUSINESS_DELETED'])->sum('amount');
 
         return ApiResponse::ok([
             'points' => $user->points,

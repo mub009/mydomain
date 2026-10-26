@@ -140,7 +140,7 @@ class ReviewQrTest extends TestCase
         $qr = ReviewQrCode::create(['code' => 'MK-RELEAS', 'status' => 'ASSIGNED', 'businessId' => $business->id, 'assignedAt' => now(), 'scanCount' => 0]);
 
         $token = $this->token($owner);
-        $this->deleteJson("/api/v1/businesses/{$business->id}", [], ['Authorization' => "Bearer {$token}"])->assertStatus(204);
+        $this->deleteJson("/api/v1/businesses/{$business->id}", [], ['Authorization' => "Bearer {$token}"])->assertStatus(200);
 
         $qr->refresh();
         $this->assertSame('UNASSIGNED', $qr->status);

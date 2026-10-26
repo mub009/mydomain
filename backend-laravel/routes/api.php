@@ -15,6 +15,7 @@ use App\Http\Controllers\ClassifiedFollowController;
 use App\Http\Controllers\ClassifiedListingController;
 use App\Http\Controllers\ClassifiedReportController;
 use App\Http\Controllers\ClassifiedStatsController;
+use App\Http\Controllers\GoldRateController;
 use App\Http\Controllers\LeadController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PointsController;
@@ -291,4 +292,29 @@ Route::prefix('admin')->middleware(['auth.jwt', 'role:ADMIN'])->group(function (
     Route::post('/seo/run', [SeoController::class, 'adminRun'])->middleware('throttle:10,1');
     Route::post('/seo/pages/{id}/submit', [SeoController::class, 'adminSubmit']);
     Route::post('/seo/pages/{id}/check', [SeoController::class, 'adminCheck']);
+
+    // Gold-rate poster maker: today's rates, logos, and templates (a master
+    // PNG plus where the logo and rates go on it).
+    Route::prefix('gold-rates')->group(function () {
+        Route::get('/rates', [GoldRateController::class, 'rates']);
+        Route::put('/rates', [GoldRateController::class, 'updateRates']);
+
+        Route::get('/logos', [GoldRateController::class, 'logos']);
+        Route::post('/logos', [GoldRateController::class, 'storeLogo']);
+        Route::delete('/logos/{id}', [GoldRateController::class, 'destroyLogo']);
+
+        Route::get('/businesses/{id}/card', [GoldRateController::class, 'businessCard']);
+
+        Route::get('/presets', [GoldRateController::class, 'presets']);
+        Route::post('/presets', [GoldRateController::class, 'storePreset']);
+        Route::delete('/presets/{id}', [GoldRateController::class, 'destroyPreset']);
+
+        Route::get('/templates', [GoldRateController::class, 'templates']);
+        Route::post('/templates', [GoldRateController::class, 'storeTemplate']);
+        Route::get('/templates/{id}', [GoldRateController::class, 'showTemplate']);
+        Route::patch('/templates/{id}', [GoldRateController::class, 'updateTemplate']);
+        Route::post('/templates/{id}/image', [GoldRateController::class, 'replaceTemplateImage']);
+        Route::post('/templates/{id}/duplicate', [GoldRateController::class, 'duplicateTemplate']);
+        Route::delete('/templates/{id}', [GoldRateController::class, 'destroyTemplate']);
+    });
 });

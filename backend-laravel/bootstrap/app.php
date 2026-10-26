@@ -127,6 +127,17 @@ return Application::configure(basePath: dirname(__DIR__))
             ], 500);
         });
 
+        // A body over PHP's post_max_size arrives empty; name the limit.
+        $exceptions->render(function (\Illuminate\Http\Exceptions\PostTooLargeException $e, $request) {
+            if ($request->is('api/*')) {
+                return response()->json([
+                    'success' => false,
+                    'error' => ['code' => 'PAYLOAD_TOO_LARGE', 'message' => 'That file is larger than this server accepts (PHP post_max_size is '
+                        .ini_get('post_max_size').'). Raise upload_max_filesize and post_max_size in php.ini.'],
+                ], 413);
+            }
+        });
+
         $exceptions->render(function (HttpExceptionInterface $e, $request) {
             if ($request->is('api/*')) {
                 return response()->json([

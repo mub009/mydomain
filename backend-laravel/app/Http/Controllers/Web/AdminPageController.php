@@ -6,6 +6,7 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\GoldRateController;
 use App\Http\Controllers\QrCodeController;
 use App\Http\Controllers\SeoController;
 use App\Http\Controllers\VisitorController;
@@ -17,7 +18,7 @@ use Illuminate\Http\Request;
 class AdminPageController extends Controller
 {
     // Poster Studio is not part of the Laravel backend yet (see README).
-    public const TABS = ['Overview', 'Users', 'Businesses', 'Approvals', 'QR Boards', 'Visitors', 'Analytics', 'SEO', 'Reports'];
+    public const TABS = ['Overview', 'Users', 'Businesses', 'Approvals', 'QR Boards', 'Visitors', 'Analytics', 'SEO', 'Reports', 'Gold Rates'];
 
     public const ROLES = ['CUSTOMER', 'BUSINESS_OWNER', 'DEALER', 'ADMIN'];
 
@@ -74,6 +75,11 @@ class AdminPageController extends Controller
                 $data['seo'] = InternalApi::tryCall([SeoController::class, 'adminIndex'], array_filter([
                     'search' => $q('search'), 'stage' => $q('stage'), 'kind' => $q('kind'), 'page' => $page,
                 ]), [], true);
+                break;
+            case 'Gold Rates':
+                $data['goldRates'] = InternalApi::tryCall([GoldRateController::class, 'rates'], [], [], true)['data'] ?? null;
+                $data['goldTemplates'] = InternalApi::tryCall([GoldRateController::class, 'templates'], [], [], true)['data'] ?? null;
+                $data['goldLogos'] = InternalApi::tryCall([GoldRateController::class, 'logos'], [], [], true)['data'] ?? null;
                 break;
             case 'Reports':
                 $data['report'] = InternalApi::tryCall([AdminController::class, 'businessCreatorsReport'], [], [], true)['data'] ?? null;

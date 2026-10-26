@@ -266,6 +266,24 @@ To connect Google (without this, everything works except submitting and checking
    The per-run limits are `GOOGLE_SEARCH_SUBMIT_PER_RUN` and `GOOGLE_SEARCH_INSPECT_PER_RUN`. When
    the quota runs out, the rest of the queue simply waits for the next run.
 
+### Gold rate templates (admin "Gold Rates" tab)
+
+The admin uploads a master PNG, places the logo and the 24K/22K/21K/18K rates on it in the
+editor (`/admin/gold-rates/templates/<id>`), and downloads the finished PNG. The poster is drawn
+in the browser (`resources/js/lib/gold-rate-render.js`) at the master's exact size; nothing
+generated is stored.
+
+- **Files.** Templates and logos are kept exactly as uploaded (not through `UploadController`,
+  which converts to WebP) in `storage/app/private/gold-rates/`, and served only to admins. That
+  folder must be writable.
+- **Upload size.** Templates can be up to 30MB, but PHP's defaults are often 2MB. If an upload
+  fails with "larger than this server accepts", raise both limits:
+  - **cPanel:** *MultiPHP INI Editor* → choose the domain → set `upload_max_filesize` to `32M` and
+    `post_max_size` to `40M`.
+  - **WAMP:** left-click the tray icon → *PHP* → *php.ini*, set the same two values, then
+    *Restart All Services*.
+- **Rates** are entered by hand and shared by every template.
+
 ## Scope of this port
 
 This is a **core-first** conversion. Ported and tested:

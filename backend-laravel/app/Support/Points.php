@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Exceptions\ApiException;
+use App\Models\Business;
 use App\Models\PointTransaction;
 use App\Models\User;
 
@@ -55,6 +56,41 @@ class Points
             'businessId' => $businessId,
             'note' => 'Business registration',
         ]);
+    }
+
+    // A dealer deleting a listing they paid for gets the point back, so a
+    // listing made by mistake costs nothing. Only the dealer who was charged
+    // is refunded, and only when they delete it themselves. Must run inside
+    // the caller's transaction, before the business row goes. Returns the
+    // points refunded.
+    public static function refundForBusiness(array $actor, Business $business): int
+    {
+        if ($actor['role'] !== 'DEALER') {
+            return 0;
+        }
+
+        $charge = PointTransaction::where('userId', $actor['sub'])
+            ->where('businessId', $business->id)
+            ->where('type', 'BUSINESS_CREATED')
+            ->first();
+        $dealer = User::where('id', $actor['sub'])->lockForUpdate()->first();
+        if (! $charge || ! $dealer) {
+            return 0;
+        }
+
+        $amount = abs($charge->amount);
+        $dealer->increment('points', $amount);
+
+        PointTransaction::create([
+            'userId' => $actor['sub'],
+            'type' => 'BUSINESS_DELETED',
+            'amount' => $amount,
+            'balanceAfter' => $dealer->points,
+            'businessId' => $business->id,
+            'note' => "Deleted “{$business->name}” — point returned",
+        ]);
+
+        return $amount;
     }
 
     // Admin adjusts a dealer's balance. A positive amount grants points, a

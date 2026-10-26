@@ -356,24 +356,25 @@ class BusinessController extends Controller
     {
         $actor = $request->attributes->get('auth');
         $business = $this->findOrFail($id);
-        // Deleting stays with the owner and admins — a dealer can edit the
-        // listings they created but not remove them.
-        if ($actor['role'] !== 'ADMIN' && $actor['sub'] !== $business->ownerId) {
-            throw ApiException::forbidden('You do not own this business');
-        }
+        // Whoever manages it can delete it — the owner, an admin, or the
+        // dealer who created it (so they can undo a listing made by mistake).
+        $this->assertOwnerOrAdmin($actor, $business);
 
         // Return any issued QR boards to the unassigned pool first. Without
         // this the board keeps its "assigned" status while losing the
         // business behind it, leaving a printed board that can neither be
         // scanned nor re-claimed.
-        DB::transaction(function () use ($business, $id) {
+        $refunded = DB::transaction(function () use ($actor, $business, $id) {
             ReviewQrCode::where('businessId', $id)->update([
                 'businessId' => null, 'status' => 'UNASSIGNED', 'assignedAt' => null, 'assignedById' => null, 'channel' => null,
             ]);
+            $refunded = Points::refundForBusiness($actor, $business);
             $business->delete();
+
+            return $refunded;
         });
 
-        return ApiResponse::noContent();
+        return ApiResponse::ok(['refundedPoints' => $refunded]);
     }
 
     // Dealers only: a draft copy of a listing they manage, as a head start on

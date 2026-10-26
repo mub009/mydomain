@@ -2,7 +2,7 @@ import { initAiDescription } from "../lib/ai-describe";
 import { initAssistant } from "../lib/assistant";
 import { api, errorMessage, uploadImage } from "../lib/api";
 import { CHANNEL_LABELS, boardUrl, downloadDataUrl, renderQrDataUrl } from "../lib/channels";
-import { $, $$, openModal, pageData } from "../lib/ui";
+import { $, $$, esc, openModal, pageData } from "../lib/ui";
 import { boardPreviewModal, initCloneButtons, initUploadFields, reloadWithFlash, showError, showFlash } from "../lib/widgets";
 
 // Managing one business: each section is server-rendered; these handlers
@@ -44,6 +44,43 @@ $("[data-submit-approval]")?.addEventListener("click", async (e) => {
   } catch (err) {
     fail(err);
   }
+});
+
+// --- Delete business --------------------------------------------------------
+// Can't be undone, so the name has to be typed before the button unlocks.
+$("[data-delete-business]")?.addEventListener("click", () => {
+  const modal = openModal(
+    "Delete business",
+    `<form class="space-y-3">
+      <p class="text-sm text-ink-700">This permanently deletes <strong>${esc(biz.name)}</strong> with its website, photos, reviews, leads, bookings and orders. Any QR boards go back to the unassigned pool.</p>
+      <div>
+        <label class="block text-xs font-semibold text-ink-700 mb-1">Type the business name to confirm</label>
+        <input name="confirmName" class="input" autocomplete="off" />
+      </div>
+      <p class="text-sm text-red-700 bg-red-50 rounded-md px-3 py-2" data-delete-error hidden></p>
+      <div class="flex justify-end gap-2">
+        <button type="button" data-close class="btn-secondary px-4 py-2 text-sm">Keep it</button>
+        <button disabled data-confirm class="btn-primary !bg-red-600 hover:!bg-red-700 px-4 py-2 text-sm disabled:opacity-50">Delete for good</button>
+      </div>
+    </form>`,
+  );
+  const form = $("form", modal.body);
+  const confirm = $("[data-confirm]", form);
+  form.confirmName.focus();
+  form.confirmName.addEventListener("input", () => {
+    confirm.disabled = form.confirmName.value.trim().toLowerCase() !== biz.name.trim().toLowerCase();
+  });
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (confirm.disabled) return;
+    try {
+      const { data } = await busy(confirm, "Deleting…", () => api.delete(base));
+      const refund = data?.refundedPoints ? ` ${data.refundedPoints} point${data.refundedPoints === 1 ? "" : "s"} returned to your balance.` : "";
+      reloadWithFlash(`Deleted “${biz.name}”.${refund}`, "/dashboard");
+    } catch (err) {
+      showError($("[data-delete-error]", form), errorMessage(err));
+    }
+  });
 });
 
 // --- Details ----------------------------------------------------------------

@@ -55,6 +55,20 @@
           </a>
         @endforeach
       </div>
+
+      {{-- For undoing a listing made by mistake. --}}
+      <div class="card flex flex-col gap-3 border border-red-100 p-5 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p class="font-semibold text-ink-900">Delete this business</p>
+          <p class="mt-0.5 text-sm text-ink-500">
+            Removes the listing, its website, photos, reviews, leads, bookings and orders for good.
+            @if ($authUser?->role === 'DEALER')
+              If you were charged a point for it, you get it back.
+            @endif
+          </p>
+        </div>
+        <button type="button" data-delete-business class="btn-secondary shrink-0 px-3 py-2 text-sm !text-red-700 hover:!bg-red-50"><x-icon name="trash-2" :size="15" /> Delete business</button>
+      </div>
     @else
       {{-- Section tabs, for hopping between sections. --}}
       <div class="flex gap-1 overflow-x-auto border-b border-gray-200">

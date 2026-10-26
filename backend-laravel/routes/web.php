@@ -5,6 +5,7 @@ use App\Http\Controllers\Web\AdminPageController;
 use App\Http\Controllers\Web\AuthPageController;
 use App\Http\Controllers\Web\BusinessPageController;
 use App\Http\Controllers\Web\DashboardController;
+use App\Http\Controllers\Web\GoldRatePageController;
 use App\Http\Controllers\Web\HomeController;
 use App\Http\Controllers\Web\SearchPageController;
 use App\Http\Controllers\Web\SitePageController;
@@ -58,6 +59,13 @@ Route::middleware('web.role:BUSINESS_OWNER,DEALER,ADMIN')->group(function () {
 Route::middleware('web.role:ADMIN')->group(function () {
     Route::get('/admin', AdminPageController::class);
     Route::get('/admin/online', [AdminPageController::class, 'online']);
+    // The gold-rate template editor, and the stored images it draws on —
+    // kept off public URLs, so they're served here to admins only.
+    Route::get('/admin/gold-rates/templates/{id}', [GoldRatePageController::class, 'editor']);
+    Route::get('/admin/gold-rates/templates/{id}/image', [GoldRatePageController::class, 'templateImage']);
+    Route::get('/admin/gold-rates/templates/{id}/thumb', [GoldRatePageController::class, 'templateThumb']);
+    Route::get('/admin/gold-rates/logos/{id}/image', [GoldRatePageController::class, 'logoImage']);
+    Route::get('/admin/gold-rates/businesses/{id}/logo', [GoldRatePageController::class, 'businessLogo']);
 });
 
 Route::get('/login', [AuthPageController::class, 'showLogin']);

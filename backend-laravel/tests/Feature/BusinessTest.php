@@ -197,7 +197,50 @@ class BusinessTest extends TestCase
 
         $this->patchJson("/api/v1/businesses/{$id}", ['name' => 'Not mine'], ['Authorization' => "Bearer {$otherDealer}"])
             ->assertStatus(403);
-        $this->deleteJson("/api/v1/businesses/{$id}", [], $auth)->assertStatus(403);
+        $this->deleteJson("/api/v1/businesses/{$id}", [], ['Authorization' => "Bearer {$otherDealer}"])->assertStatus(403);
+    }
+
+    public function test_dealer_deletes_a_listing_made_by_mistake_and_gets_the_point_back(): void
+    {
+        [$dealer, $token] = $this->actingToken(['role' => 'DEALER', 'privileges' => ['MANAGE_LISTINGS'], 'points' => 5]);
+        $category = $this->category();
+        $auth = ['Authorization' => "Bearer {$token}"];
+
+        $id = $this->postJson('/api/v1/businesses', [
+            'name' => 'Wrong Shop', 'categoryId' => $category->id,
+            'phone' => '9998887777', 'addressLine1' => '1 Main St', 'city' => 'Pune', 'state' => 'MH',
+            'postalCode' => '411001', 'latitude' => 18.5, 'longitude' => 73.8,
+            'owner' => ['firstName' => 'Ravi', 'lastName' => 'K', 'username' => '9876543210', 'password' => 'Secret123!'],
+        ], $auth)->assertStatus(201)->json('data.id');
+        $this->assertSame(4, $dealer->fresh()->points);
+
+        $this->deleteJson("/api/v1/businesses/{$id}", [], $auth)
+            ->assertStatus(200)->assertJsonPath('data.refundedPoints', 1);
+
+        $this->assertDatabaseMissing('businesses', ['id' => $id]);
+        $this->assertSame(5, $dealer->fresh()->points);
+        $this->assertDatabaseHas('point_transactions', ['userId' => $dealer->id, 'type' => 'BUSINESS_DELETED', 'amount' => 1, 'balanceAfter' => 5]);
+        $this->getJson('/api/v1/points/mine', $auth)->assertJsonPath('data.totalSpent', 0);
+    }
+
+    public function test_owner_deleting_a_dealer_made_listing_does_not_refund_the_dealer(): void
+    {
+        [$dealer, $token] = $this->actingToken(['role' => 'DEALER', 'privileges' => ['MANAGE_LISTINGS'], 'points' => 5]);
+        $category = $this->category();
+
+        $id = $this->postJson('/api/v1/businesses', [
+            'name' => 'Handed Over', 'categoryId' => $category->id,
+            'phone' => '9998887777', 'addressLine1' => '1 Main St', 'city' => 'Pune', 'state' => 'MH',
+            'postalCode' => '411001', 'latitude' => 18.5, 'longitude' => 73.8,
+            'owner' => ['firstName' => 'Ravi', 'lastName' => 'K', 'username' => 'ravi@example.com', 'password' => 'Secret123!'],
+        ], ['Authorization' => "Bearer {$token}"])->assertStatus(201)->json('data.id');
+
+        $ownerToken = $this->postJson('/api/v1/auth/login', ['email' => 'ravi@example.com', 'password' => 'Secret123!'])->json('data.accessToken');
+        $this->deleteJson("/api/v1/businesses/{$id}", [], ['Authorization' => "Bearer {$ownerToken}"])
+            ->assertStatus(200)->assertJsonPath('data.refundedPoints', 0);
+
+        $this->assertDatabaseMissing('businesses', ['id' => $id]);
+        $this->assertSame(4, $dealer->fresh()->points);
     }
 
     public function test_a_customer_cannot_create_a_business(): void

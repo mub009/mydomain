@@ -186,6 +186,7 @@ const POINT_TYPES = {
   ADMIN_GRANT: ["Granted", "bg-emerald-50 text-emerald-700"],
   ADMIN_DEDUCTION: ["Deducted", "bg-red-50 text-red-700"],
   BUSINESS_CREATED: ["Business registered", "bg-brand-50 text-brand-700"],
+  BUSINESS_DELETED: ["Business deleted (refund)", "bg-gray-100 text-gray-600"],
 };
 
 $$("[data-points]").forEach((button) =>
