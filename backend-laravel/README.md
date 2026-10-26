@@ -257,6 +257,10 @@ To connect Google (without this, everything works except submitting and checking
    GOOGLE_SEARCH_CREDENTIALS=google-key.json
    GOOGLE_SEARCH_PROPERTY=sc-domain:mydomainbook.com
    ```
+   For more than one domain, add a Domain property for each in Search Console (with the same
+   service account as Owner) and list them comma-separated:
+   `GOOGLE_SEARCH_PROPERTY=sc-domain:mydomainbook.com,sc-domain:markkito.com`. Each page is
+   checked against the property that covers its domain.
 5. Run `php artisan seo:sync` once to check the setup. It should report pages submitted, not
    errors. Google's default free quotas are 200 Indexing API requests and 2,000 inspections a day.
    The per-run limits are `GOOGLE_SEARCH_SUBMIT_PER_RUN` and `GOOGLE_SEARCH_INSPECT_PER_RUN`. When

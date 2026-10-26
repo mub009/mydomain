@@ -22,7 +22,47 @@ class GoogleSearch
 
     public static function configured(): bool
     {
-        return self::credentials() !== null && (bool) config('services.google_search.property');
+        return self::credentials() !== null && self::properties() !== [];
+    }
+
+    /**
+     * Every Search Console property the service account owns, from the
+     * comma-separated GOOGLE_SEARCH_PROPERTY.
+     *
+     * @return list<string>
+     */
+    public static function properties(): array
+    {
+        $value = config('services.google_search.property');
+        $list = is_array($value) ? $value : explode(',', (string) $value);
+
+        return array_values(array_filter(array_map('trim', $list), 'strlen'));
+    }
+
+    // The property that covers the URL: "sc-domain:example.com" covers that
+    // domain and all its subdomains, "https://example.com/" covers addresses
+    // under that prefix. The closest match wins; with none, the first one
+    // listed (Google then says the URL isn't part of it).
+    public static function propertyFor(string $url): ?string
+    {
+        $host = strtolower((string) parse_url($url, PHP_URL_HOST));
+        $best = null;
+        $bestLength = -1;
+        foreach (self::properties() as $property) {
+            if (str_starts_with($property, 'sc-domain:')) {
+                $domain = strtolower(substr($property, 10));
+                $covers = $host === $domain || str_ends_with($host, '.'.$domain);
+                $length = strlen($domain);
+            } else {
+                $covers = str_starts_with(strtolower($url), strtolower($property));
+                $length = strlen($property);
+            }
+            if ($covers && $length > $bestLength) {
+                [$best, $bestLength] = [$property, $length];
+            }
+        }
+
+        return $best ?? (self::properties()[0] ?? null);
     }
 
     // Asks Google to crawl the URL soon — new and changed pages usually get
@@ -40,7 +80,7 @@ class GoogleSearch
 
     public static function submitSitemap(string $sitemapUrl): void
     {
-        $property = rawurlencode((string) config('services.google_search.property'));
+        $property = rawurlencode((string) self::propertyFor($sitemapUrl));
         // An empty body: put() with no data sends "[]", which Google rejects.
         $response = self::client()->withBody('', 'application/json')
             ->put("https://www.googleapis.com/webmasters/v3/sites/{$property}/sitemaps/".rawurlencode($sitemapUrl));
@@ -62,7 +102,7 @@ class GoogleSearch
     {
         $response = self::client()->post('https://searchconsole.googleapis.com/v1/urlInspection/index:inspect', [
             'inspectionUrl' => $url,
-            'siteUrl' => config('services.google_search.property'),
+            'siteUrl' => self::propertyFor($url),
         ]);
         self::check($response, 'URL Inspection');
 
@@ -100,7 +140,7 @@ class GoogleSearch
     private static function accessToken(): string
     {
         $key = self::credentials();
-        if (! $key || ! config('services.google_search.property')) {
+        if (! $key || self::properties() === []) {
             throw new RuntimeException('Google Search is not set up (GOOGLE_SEARCH_CREDENTIALS / GOOGLE_SEARCH_PROPERTY)');
         }
 

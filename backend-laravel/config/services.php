@@ -53,7 +53,10 @@ return [
         'credentials' => env('GOOGLE_SEARCH_CREDENTIALS'),
         // The Search Console property the service account was added to as
         // an Owner. "sc-domain:mydomainbook.com" (a Domain property) covers
-        // the main site and every business subdomain at once.
+        // the main site and every business subdomain at once. For several
+        // domains, list them comma-separated
+        // ("sc-domain:mydomainbook.com,sc-domain:markkito.com"); each page
+        // is checked against the property that covers its domain.
         'property' => env('GOOGLE_SEARCH_PROPERTY'),
         // How many pages one `seo:sync` run may submit / inspect — Google's
         // free quotas are 200 Indexing API notices and 2,000 inspections a day.

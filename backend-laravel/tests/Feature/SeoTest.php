@@ -7,6 +7,7 @@ use App\Models\BusinessSite;
 use App\Models\Category;
 use App\Models\SeoPage;
 use App\Models\User;
+use App\Support\Seo\GoogleSearch;
 use App\Support\Seo\SeoTracker;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request as HttpRequest;
@@ -341,5 +342,22 @@ class SeoTest extends TestCase
                 && str_contains($claims['scope'], 'auth/indexing');
         });
         Http::assertSent(fn (HttpRequest $r) => str_contains($r->url(), 'urlNotifications') && $r->hasHeader('Authorization', 'Bearer fresh-token'));
+    }
+
+    public function test_each_url_is_checked_against_the_property_for_its_domain(): void
+    {
+        $this->connectGoogle();
+        config(['services.google_search.property' => ' sc-domain:mydomainbook.test , sc-domain:markkito.test,https://shop.markkito.test/ ']);
+
+        $this->assertSame(['sc-domain:mydomainbook.test', 'sc-domain:markkito.test', 'https://shop.markkito.test/'], GoogleSearch::properties());
+        $this->assertSame('sc-domain:markkito.test', GoogleSearch::propertyFor('https://markkito.test/business/a'));
+        $this->assertSame('sc-domain:markkito.test', GoogleSearch::propertyFor('https://acme.markkito.test/'));
+        $this->assertSame('https://shop.markkito.test/', GoogleSearch::propertyFor('https://shop.markkito.test/x'));
+        $this->assertSame('sc-domain:mydomainbook.test', GoogleSearch::propertyFor('https://acme.mydomainbook.test/'));
+        // Not a subdomain, just a similar name — falls back to the first.
+        $this->assertSame('sc-domain:mydomainbook.test', GoogleSearch::propertyFor('https://notmarkkito.test/'));
+
+        GoogleSearch::inspect('https://acme.markkito.test/');
+        Http::assertSent(fn (HttpRequest $r) => str_contains($r->url(), 'urlInspection') && $r['siteUrl'] === 'sc-domain:markkito.test');
     }
 }
