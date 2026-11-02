@@ -74,7 +74,7 @@
     ]
   },
   "resources/css/app.css": {
-    "file": "assets/app-Dhx1SMPf.css",
+    "file": "assets/app-GGxFW85g.css",
     "src": "resources/css/app.css",
     "isEntry": true
   },
@@ -136,7 +136,7 @@
     ]
   },
   "resources/js/pages/card-manager.js": {
-    "file": "assets/card-manager-gVOOhAH4.js",
+    "file": "assets/card-manager-BNT7nXlB.js",
     "name": "card-manager",
     "src": "resources/js/pages/card-manager.js",
     "isEntry": true,
@@ -150,7 +150,7 @@
     ]
   },
   "resources/js/pages/card-template-editor.js": {
-    "file": "assets/card-template-editor-BGHLasMI.js",
+    "file": "assets/card-template-editor-0JZpeKuP.js",
     "name": "card-template-editor",
     "src": "resources/js/pages/card-template-editor.js",
     "isEntry": true,

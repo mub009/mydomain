@@ -304,8 +304,13 @@ touches business data.
   so it stays when the business switches designs. It uses Gemini's image
   model (`GEMINI_API_KEY`, `GEMINI_IMAGE_MODEL`, default
   `gemini-2.5-flash-image`; Google bills image generation). With no key, or
-  if Gemini fails, a free built-in generator draws an abstract backdrop in
-  the design's colours instead. Images go to the Spaces disk; owners are
+  if Gemini fails, the free built-in poster artist (`App\Support\Cards\PosterArt`,
+  GD only) paints one in the design's colours instead. Owners and admins pick
+  a style: Poster, Photo, Illustration, Festive or Luxury (each layout has a
+  natural default). For Gemini, each style comes with its own art direction,
+  plus subject matter matched to the category (plated dishes for
+  restaurants, gold on velvet for jewellery, gadgets for electronics, and
+  so on), and the image keeps a calm area free for the printed details. Images go to the Spaces disk; owners are
   limited to 12 generations an hour.
 - **PDF download.** `/card/<slug>.pdf` (live cards; also a "PDF" button on
   the card) and, for the people managing the business, Manage → Visiting
