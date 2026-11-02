@@ -149,6 +149,25 @@ class DashboardController extends Controller
         ]);
     }
 
+    // The "Add a business" form, on its own page.
+    public function create()
+    {
+        $user = WebAuth::user();
+        $isDealer = $user->role === 'DEALER';
+        if (! $this->can('MANAGE_LISTINGS')) {
+            return redirect('/dashboard');
+        }
+        $points = $isDealer ? (InternalApi::tryCall([PointsController::class, 'mine'], [], [], true)['data'] ?? null) : null;
+
+        return view('pages.dashboard.create', [
+            'isDealer' => $isDealer,
+            'canAssignOwner' => $isDealer || $user->role === 'ADMIN',
+            'points' => $points,
+            'outOfPoints' => $isDealer && $points !== null && $points['points'] <= 0,
+            'categories' => InternalApi::tryCall([CategoryController::class, 'index'])['data'] ?? [],
+        ]);
+    }
+
     public function manage(Request $request, string $id)
     {
         if (! $this->can('MANAGE_LISTINGS')) {

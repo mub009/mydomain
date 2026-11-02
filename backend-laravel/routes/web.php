@@ -57,6 +57,8 @@ Route::get('/qr/{code?}', fn (\Illuminate\Http\Request $request, ?string $code =
 
 Route::middleware('web.role:BUSINESS_OWNER,DEALER,ADMIN')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index']);
+    // Before {id}, so "new" isn't taken for a business id.
+    Route::get('/dashboard/businesses/new', [DashboardController::class, 'create']);
     Route::get('/dashboard/businesses/{id}', [DashboardController::class, 'manage']);
 });
 
