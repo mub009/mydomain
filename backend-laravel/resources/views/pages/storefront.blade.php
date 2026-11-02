@@ -8,8 +8,8 @@
     $money = fn ($cents) => ($currency === 'INR' ? '₹' : '').rtrim(rtrim(number_format($cents / 100, 2), '0'), '.');
     $baseFee = $storefront['deliveryFeeCents'] ?? 0;
     $freeAbove = $storefront['freeDeliveryAboveCents'] ?? null;
-    $address = implode(', ', array_filter([$business['addressLine1'], $business['addressLine2'], $business['city'], $business['state'], $business['postalCode']]));
-    $whatsapp = 'https://wa.me/'.preg_replace('/[^0-9]/', '', $business['phone']);
+    $address = implode(', ', array_filter([$business['addressLine1'] ?? null, $business['addressLine2'] ?? null, $business['city'], $business['state'], $business['postalCode']]));
+    $whatsapp = 'https://wa.me/'.preg_replace('/[^0-9]/', '', (string) ($business['phone'] ?? ''));
     $directions = "https://www.google.com/maps/dir/?api=1&destination={$business['latitude']},{$business['longitude']}";
     $banner = $business['photos'][0]['url'] ?? null;
     $to12 = function (string $time) {

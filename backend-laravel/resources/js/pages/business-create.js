@@ -47,10 +47,11 @@ form?.addEventListener("submit", async (e) => {
       name: f.name,
       categoryId: f.categoryId,
       businessType: f.businessType,
+      // Not on the dealer's form (added later from Manage).
       description: f.description?.trim() || undefined,
-      phone: f.phone,
+      phone: f.phone?.trim() || undefined,
       website: f.website || undefined,
-      addressLine1: f.addressLine1,
+      addressLine1: f.addressLine1?.trim() || undefined,
       city: f.city,
       state: f.state,
       postalCode: f.postalCode?.trim() || null,

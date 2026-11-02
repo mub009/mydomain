@@ -172,8 +172,15 @@ class BusinessController extends Controller
 
     public function store(Request $request)
     {
-        $data = $request->validate($this->businessRules());
         $actor = $request->attributes->get('auth');
+        $rules = $this->businessRules();
+        if ($actor['role'] === 'DEALER') {
+            // A dealer adds the basics; the phone and address are filled in
+            // later from the business's Manage page.
+            $rules['phone'] = ['nullable', 'string', 'min:7', 'max:20'];
+            $rules['addressLine1'] = ['nullable', 'string', 'max:200'];
+        }
+        $data = $request->validate($rules);
         $owner = $data['owner'] ?? null;
         unset($data['owner']);
         $data['country'] = $data['country'] ?? 'IN';

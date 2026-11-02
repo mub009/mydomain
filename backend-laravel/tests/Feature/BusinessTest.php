@@ -157,6 +157,33 @@ class BusinessTest extends TestCase
             ->assertStatus(200);
     }
 
+    public function test_dealer_adds_a_business_without_phone_or_address(): void
+    {
+        [, $token] = $this->actingToken(['role' => 'DEALER', 'privileges' => ['MANAGE_LISTINGS'], 'points' => 5]);
+        $category = $this->category();
+
+        $id = $this->postJson('/api/v1/businesses', [
+            'name' => 'Basics Only', 'categoryId' => $category->id,
+            'city' => 'Pune', 'state' => 'Maharashtra', 'latitude' => 18.5, 'longitude' => 73.8,
+        ], ['Authorization' => "Bearer {$token}"])->assertStatus(201)->json('data.id');
+
+        $this->assertDatabaseHas('businesses', ['id' => $id, 'phone' => null, 'addressLine1' => null]);
+        // The public page and website still render without them.
+        $this->get('/business/basics-only')->assertOk();
+    }
+
+    public function test_owner_still_needs_phone_and_address_to_add_a_business(): void
+    {
+        [, $token] = $this->actingToken(['role' => 'BUSINESS_OWNER']);
+        $category = $this->category();
+
+        $this->postJson('/api/v1/businesses', [
+            'name' => 'Owner Basics', 'categoryId' => $category->id,
+            'city' => 'Pune', 'state' => 'Maharashtra', 'latitude' => 18.5, 'longitude' => 73.8,
+        ], ['Authorization' => "Bearer {$token}"])
+            ->assertStatus(400);
+    }
+
     public function test_business_login_without_contact_names_is_named_after_the_business(): void
     {
         [, $token] = $this->actingToken(['role' => 'DEALER', 'privileges' => ['MANAGE_LISTINGS'], 'points' => 5]);

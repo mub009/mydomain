@@ -1,7 +1,11 @@
 {{-- "Add a business" form (pages/dashboard/create.blade.php). Submitted by
      resources/js/pages/business-create.js. --}}
 <form class="card p-4 sm:p-5 space-y-3 mb-6" data-create-business>
-  <p class="text-xs text-ink-500">Create the listing, then add hours, services, and photos.</p>
+  <p class="text-xs text-ink-500">
+    {{ $isDealer
+        ? 'Add the basics now. The phone, address, description, hours, services and photos are added afterwards from the business’s Manage page.'
+        : 'Create the listing, then add hours, services, and photos.' }}
+  </p>
   @if ($isDealer && $points)
     <p class="text-xs text-amber-700 bg-amber-50 rounded-md px-3 py-2">
       <x-icon name="coins" :size="12" class="inline -mt-0.5 mr-1" />
@@ -37,17 +41,23 @@
     </div>
   </div>
 
-  <x-ai-description />
+  {{-- Dealers add just the basics; the description, phone, website and
+       address are filled in afterwards from the business's Manage page. --}}
+  @unless ($isDealer)
+    <x-ai-description />
 
-  <input required type="tel" inputmode="tel" autocomplete="tel" minlength="7" maxlength="20" name="phone" placeholder="Phone" class="input" />
-  <input type="url" name="website" placeholder="Website (optional) — https://…" class="input" />
-  <input required name="addressLine1" placeholder="Address line 1" class="input" />
+    <input required type="tel" inputmode="tel" autocomplete="tel" minlength="7" maxlength="20" name="phone" placeholder="Phone" class="input" />
+    <input type="url" name="website" placeholder="Website (optional) — https://…" class="input" />
+    <input required name="addressLine1" placeholder="Address line 1" class="input" />
+  @endunless
   {{-- Side by side from tablet width; stacked on phones, where two text
        inputs in a row are wider than the screen. --}}
   <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
     <x-state-city />
   </div>
-  <input inputmode="numeric" autocomplete="postal-code" maxlength="20" name="postalCode" placeholder="Postal code (optional)" class="input" />
+  @unless ($isDealer)
+    <input inputmode="numeric" autocomplete="postal-code" maxlength="20" name="postalCode" placeholder="Postal code (optional)" class="input" />
+  @endunless
   <div>
     <div class="grid grid-cols-2 gap-3">
       <input required inputmode="decimal" name="latitude" placeholder="Latitude" class="input min-w-0" />

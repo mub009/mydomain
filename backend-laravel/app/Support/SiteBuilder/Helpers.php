@@ -102,7 +102,7 @@ class Helpers
         $logoSrc = self::escapeHtml($business->logoUrl ?? $business->photos->first()?->url ?? '');
         $initial = self::escapeHtml(strtoupper(mb_substr(trim($business->name), 0, 1) ?: 'M'));
         $name = self::escapeHtml($business->name);
-        $phoneDigits = preg_replace('/[^0-9]/', '', $business->phone);
+        $phoneDigits = preg_replace('/[^0-9]/', '', (string) $business->phone);
 
         // The hero slider has its own photos (the Slider section), kept
         // apart from the listing's photo gallery. With none, the templates
