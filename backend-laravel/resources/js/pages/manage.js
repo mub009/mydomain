@@ -103,6 +103,26 @@ if (details) {
   details.logoUrl.addEventListener("input", syncLogo);
   details.name.addEventListener("input", syncLogo);
 
+  // An uploaded logo or cover is saved at once — no need to press Save.
+  $$("[data-upload-field]", details).forEach((field) => {
+    const input = $("[data-upload-url]", field);
+    if (!["logoUrl", "coverImageUrl"].includes(input.name)) return;
+    const saved = $("[data-upload-saved]", field);
+    const error = $("[data-upload-error]", field);
+    field.addEventListener("upload:done", async (e) => {
+      saved.hidden = false;
+      saved.textContent = "Saving…";
+      try {
+        await api.patch(base, { [input.name]: e.detail.url });
+        saved.textContent = input.name === "logoUrl" ? "Logo saved." : "Cover image saved.";
+      } catch (err) {
+        saved.hidden = true;
+        error.textContent = `Uploaded, but not saved: ${errorMessage(err)} — press Save details.`;
+        error.hidden = false;
+      }
+    });
+  });
+
   const detectButton = $("[data-detect-location]", details);
   const locationError = $("[data-location-error]", details);
   detectButton.addEventListener("click", () => {

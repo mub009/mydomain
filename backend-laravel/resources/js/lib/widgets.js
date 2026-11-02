@@ -84,6 +84,8 @@ export function initUploadFields(root = document) {
       try {
         url.value = await uploadImage(picked, field.dataset.uploadField);
         url.dispatchEvent(new Event("input", { bubbles: true }));
+        // Lets a page save the new image straight away (see manage.js).
+        field.dispatchEvent(new CustomEvent("upload:done", { detail: { url: url.value } }));
       } catch (err) {
         error.textContent = errorMessage(err);
         error.hidden = false;

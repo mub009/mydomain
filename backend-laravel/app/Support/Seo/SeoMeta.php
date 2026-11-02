@@ -53,9 +53,42 @@ class SeoMeta
         return implode(', ', array_filter([$biz['name'], $biz['category']['name'] ?? null, $biz['city'] ?? null]));
     }
 
+    /**
+     * The share/preview picture. With a logo it is the JPEG logo card
+     * (ShareImageController) — uploads are WebP, which WhatsApp and others
+     * won't preview; otherwise the cover or first photo. Always absolute,
+     * since crawlers can't resolve a relative og:image.
+     */
     public static function image(array $biz): ?string
     {
-        return $biz['coverImageUrl'] ?? $biz['logoUrl'] ?? ($biz['photos'][0]['url'] ?? null);
+        if (! empty($biz['logoUrl']) && ! empty($biz['slug'])) {
+            $version = substr(md5($biz['logoUrl']), 0, 10);
+
+            return rtrim((string) config('app.url'), '/')."/share/{$biz['slug']}.jpg?v={$version}";
+        }
+
+        return self::absoluteUrl(($biz['coverImageUrl'] ?? null) ?: ($biz['photos'][0]['url'] ?? null));
+    }
+
+    /** Whether image() is the 1200x630 logo card (so its size is known). */
+    public static function imageIsShareCard(array $biz): bool
+    {
+        return ! empty($biz['logoUrl']) && ! empty($biz['slug']);
+    }
+
+    public static function absoluteUrl(?string $url): ?string
+    {
+        if (! $url) {
+            return null;
+        }
+        if (str_starts_with($url, '//')) {
+            return 'https:'.$url;
+        }
+        if (str_starts_with($url, '/')) {
+            return rtrim((string) config('app.url'), '/').$url;
+        }
+
+        return $url;
     }
 
     /** @return array<string, mixed> schema.org LocalBusiness */

@@ -18,6 +18,16 @@
 <meta property="og:url" content="{{ $url }}" />
 @if ($seoImage)
   <meta property="og:image" content="{{ $seoImage }}" />
+  @if (str_starts_with($seoImage, 'https://'))
+    <meta property="og:image:secure_url" content="{{ $seoImage }}" />
+  @endif
+  @if (SeoMeta::imageIsShareCard($biz))
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="{{ \App\Http\Controllers\Web\ShareImageController::WIDTH }}" />
+    <meta property="og:image:height" content="{{ \App\Http\Controllers\Web\ShareImageController::HEIGHT }}" />
+  @endif
+  <meta property="og:image:alt" content="{{ $biz['name'] }}{{ SeoMeta::imageIsShareCard($biz) ? ' logo' : '' }}" />
+  <meta name="twitter:image" content="{{ $seoImage }}" />
 @endif
 <meta name="twitter:card" content="{{ $seoImage ? 'summary_large_image' : 'summary' }}" />
 <meta name="twitter:title" content="{{ $seoTitle }}" />

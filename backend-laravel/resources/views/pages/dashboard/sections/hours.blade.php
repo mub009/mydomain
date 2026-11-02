@@ -3,7 +3,7 @@
     $saved = collect($biz['hours'] ?? [])->keyBy('dayOfWeek');
     $hours = collect(range(0, 6))->map(fn ($day) => $saved->has($day)
         ? ['dayOfWeek' => $day, 'openTime' => $saved[$day]['openTime'], 'closeTime' => $saved[$day]['closeTime'], 'isClosed' => (bool) $saved[$day]['isClosed']]
-        : ['dayOfWeek' => $day, 'openTime' => '09:00', 'closeTime' => '18:00', 'isClosed' => $day === 0]);
+        : \App\Models\BusinessHours::defaultWeek()[$day]);
     $days = \App\Http\Controllers\Web\BusinessPageController::DAY_NAMES;
 @endphp
 <form class="card p-5 space-y-3" data-hours-form>

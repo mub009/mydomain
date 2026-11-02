@@ -197,7 +197,7 @@ class BusinessController extends Controller
         // then assigned to that account so the business can sign in and
         // manage it themselves.
         if (! $owner || ! $isStaff) {
-            return DB::transaction(function () use ($data, $actor, $initialStatus, $isStaff) {
+            $business = DB::transaction(function () use ($data, $actor, $initialStatus, $isStaff) {
                 $business = Business::create([
                     ...$data,
                     'ownerId' => $actor['sub'],
@@ -205,10 +205,14 @@ class BusinessController extends Controller
                     'status' => $initialStatus,
                     'isVerified' => $isStaff,
                 ]);
+                BusinessHours::createDefaultsFor($business->id);
                 Points::spendForBusiness($actor, $business->id);
 
-                return ApiResponse::created($business);
+                return $business;
             });
+            SeoController::fillMissingSeo($business);
+
+            return ApiResponse::created($business->fresh());
         }
 
         $login = $this->checkOwnerLogin($owner);
@@ -223,11 +227,15 @@ class BusinessController extends Controller
                 'status' => $initialStatus,
                 'isVerified' => $isStaff,
             ]);
+            BusinessHours::createDefaultsFor($business->id);
 
             Points::spendForBusiness($actor, $business->id);
 
-            return [...$business->toArray(), 'ownerAccount' => $this->ownerAccountPayload($ownerRecord, $login)];
+            return [$business, $this->ownerAccountPayload($ownerRecord, $login)];
         });
+        [$business, $ownerAccount] = $result;
+        SeoController::fillMissingSeo($business);
+        $result = [...$business->fresh()->toArray(), 'ownerAccount' => $ownerAccount];
 
         // A welcome email with the new login (when a fresh account was
         // created) would be sent here — mailer is not part of this
@@ -340,6 +348,11 @@ class BusinessController extends Controller
 
         $data = $request->validate($this->businessRulesForUpdate());
         $business->update($data);
+        // Saving the details (which carry the description) also fills any
+        // empty SEO fields; the SEO section's own save doesn't send it.
+        if (array_key_exists('description', $data)) {
+            SeoController::fillMissingSeo($business);
+        }
 
         return ApiResponse::ok($business);
     }
@@ -422,6 +435,7 @@ class BusinessController extends Controller
             foreach ($source->hours as $hours) {
                 BusinessHours::create([...$hours->only(['dayOfWeek', 'openTime', 'closeTime', 'isClosed']), 'businessId' => $copy->id]);
             }
+            BusinessHours::createDefaultsFor($copy->id);
             foreach ($source->services as $service) {
                 Service::create([...$service->only(['name', 'description', 'priceCents', 'currency', 'durationMins', 'isActive']), 'businessId' => $copy->id]);
             }

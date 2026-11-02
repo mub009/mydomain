@@ -57,23 +57,52 @@ class SeoController extends Controller
     // for the owner to keep or edit.
     public function generate(Request $request, string $id)
     {
-        $business = Business::with([
-            'category',
-            'services' => fn ($q) => $q->where('isActive', true)->orderBy('createdAt'),
-        ])->find($id);
+        $business = Business::find($id);
         if (! $business) {
             throw ApiException::notFound('Business not found');
         }
         BusinessAccess::assertCanManage($request->attributes->get('auth'), $business);
 
-        return ApiResponse::ok(AiWriter::seo([
+        return ApiResponse::ok(AiWriter::seo(self::seoFacts($business)));
+    }
+
+    /** What the SEO writer is told about a listing. */
+    public static function seoFacts(Business $business): array
+    {
+        $business->loadMissing([
+            'category',
+            'services' => fn ($q) => $q->where('isActive', true)->orderBy('createdAt'),
+        ]);
+
+        return [
             'name' => $business->name,
             'category' => $business->category?->name ?? 'Local business',
             'city' => $business->city,
             'businessType' => $business->businessType,
             'description' => $business->description,
             'services' => $business->services->pluck('name')->all(),
-        ]));
+        ];
+    }
+
+    /**
+     * Fills whichever SEO fields are still empty — so saving the details
+     * with a description sets up Google's title, description and keywords
+     * without a trip to the SEO section. Never overwrites the owner's own
+     * text, and never fails the save that called it.
+     */
+    public static function fillMissingSeo(Business $business): void
+    {
+        $fields = ['seoTitle', 'seoDescription', 'seoKeywords'];
+        $empty = array_filter($fields, fn ($f) => trim((string) $business->{$f}) === '');
+        if (! $empty || trim((string) $business->description) === '') {
+            return;
+        }
+        try {
+            $seo = AiWriter::seo(self::seoFacts($business));
+            $business->update(array_intersect_key($seo, array_flip($empty)));
+        } catch (\Throwable $e) {
+            report($e);
+        }
     }
 
     public function adminIndex(Request $request)

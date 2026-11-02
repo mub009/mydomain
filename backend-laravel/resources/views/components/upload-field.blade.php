@@ -17,4 +17,5 @@
     <p class="mt-1 text-[11px] text-ink-400">{{ $hint }}</p>
   @endif
   <p class="mt-1 text-xs text-red-600" data-upload-error hidden></p>
+  <p class="mt-1 text-xs font-medium text-emerald-600" data-upload-saved hidden></p>
 </div>

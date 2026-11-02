@@ -8,6 +8,7 @@ use App\Http\Controllers\Web\DashboardController;
 use App\Http\Controllers\Web\GoldRatePageController;
 use App\Http\Controllers\Web\HomeController;
 use App\Http\Controllers\Web\SearchPageController;
+use App\Http\Controllers\Web\ShareImageController;
 use App\Http\Controllers\Web\SitePageController;
 use App\Http\Controllers\Web\SitemapController;
 use App\Support\SiteUrl;
@@ -30,6 +31,9 @@ Route::get('/health', function () {
 Route::get('/sitemap.xml', [SitemapController::class, 'index']);
 Route::get('/sitemap-{n}.xml', [SitemapController::class, 'page'])->whereNumber('n');
 Route::get('/robots.txt', [SitemapController::class, 'robots']);
+
+// The logo card shown when a business link is shared on WhatsApp/Facebook/etc.
+Route::get('/share/{slug}.jpg', ShareImageController::class)->where('slug', '[A-Za-z0-9_-]+');
 
 // Short public path encoded on a printed QR board: /r/q/<code>
 Route::get('/r/q/{code}', [QrCodeController::class, 'scan']);
