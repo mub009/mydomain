@@ -8,6 +8,8 @@
     "require": {
         "php": "^8.2",
         "anthropic-ai/sdk": "^1.3",
+        "chillerlan/php-qrcode": "^6.0",
+        "dompdf/dompdf": "^3.1",
         "firebase/php-jwt": "*",
         "laravel/framework": "^11.31",
         "laravel/tinker": "^2.9",

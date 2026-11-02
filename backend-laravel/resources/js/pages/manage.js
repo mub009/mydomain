@@ -172,6 +172,7 @@ if (details) {
           categoryId: f.categoryId,
           businessType: f.businessType,
           phone: f.phone,
+          whatsappNumber: f.whatsappNumber?.trim() || null,
           addressLine1: f.addressLine1,
           city: f.city,
           state: f.state,

@@ -23,6 +23,18 @@
     @endforeach
   </select>
 
+  {{-- Step 2–3: the digital visiting card designs for the chosen category,
+       filled in by business-create.js. The pick is saved on the new
+       business's card; it can be changed any time from Manage → Visiting Card. --}}
+  <div class="rounded-lg border border-gray-200 bg-gray-50/60 p-3" data-card-picker hidden>
+    <div class="mb-2 flex items-center justify-between gap-2">
+      <p class="text-xs font-semibold text-ink-700"><x-icon name="layout-template" :size="13" class="-mt-0.5 mr-1 inline" />Choose a visiting card design</p>
+      <span class="text-[11px] text-ink-500">Tap a design to preview it</span>
+    </div>
+    <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5" data-card-options></div>
+    <input type="hidden" name="cardTemplateId" data-card-template />
+  </div>
+
   <div>
     <p class="mb-1.5 text-xs font-semibold text-ink-700">Who does this business serve?</p>
     <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -47,6 +59,7 @@
     <x-ai-description />
 
     <input required type="tel" inputmode="tel" autocomplete="tel" minlength="7" maxlength="20" name="phone" placeholder="Phone" class="input" />
+    <input type="tel" inputmode="tel" minlength="7" maxlength="20" name="whatsappNumber" placeholder="WhatsApp number (optional — the phone is used if empty)" class="input" />
     <input type="url" name="website" placeholder="Website (optional) — https://…" class="input" />
     <input required name="addressLine1" placeholder="Address line 1" class="input" />
   @endunless
@@ -96,6 +109,8 @@
       <p class="text-[11px] text-ink-500" data-owner-off @if ($isDealer) hidden @endif>The listing stays under your own account.</p>
     </div>
   @endif
+
+  <x-upload-field name="logoUrl" purpose="business-logo" label="Logo (optional)" placeholder="https://…/logo.png" hint="Shown on your visiting card, website and listing. Square images work best." />
 
   <p class="text-sm text-red-700 bg-red-50 rounded-md px-3 py-2" data-create-error hidden></p>
   <button class="btn-primary w-full py-2.5">Create listing</button>

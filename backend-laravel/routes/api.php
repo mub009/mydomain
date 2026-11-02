@@ -7,6 +7,8 @@ use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BookingController;
 use App\Http\Controllers\BusinessController;
+use App\Http\Controllers\CardController;
+use App\Http\Controllers\CardTemplateController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\ClassifiedCategoryController;
 use App\Http\Controllers\ClassifiedConversationController;
@@ -113,6 +115,10 @@ Route::prefix('classifieds')->group(function () {
 Route::post('/ai/business-description', [AiController::class, 'businessDescription'])
     ->middleware(['auth.jwt', 'role:BUSINESS_OWNER,DEALER,ADMIN', 'throttle:30,60']);
 
+// The visiting-card designs offered for a category (the "Add a business" picker).
+Route::get('/card-templates', [CardController::class, 'templates'])
+    ->middleware(['auth.jwt', 'role:BUSINESS_OWNER,DEALER,ADMIN']);
+
 Route::prefix('businesses')->group(function () {
     Route::get('/', [BusinessController::class, 'index']);
     Route::get('/mine', [BusinessController::class, 'mine'])
@@ -157,6 +163,15 @@ Route::prefix('businesses')->group(function () {
     // Storefront settings (site type, delivery fee, publish) and the
     // drag-and-drop brochure-website builder (starter page, template
     // preview, save-with-sanitization).
+    // The digital visiting card: its design and whether it's live.
+    Route::middleware(['auth.jwt', 'privilege:MANAGE_LISTINGS'])->group(function () {
+        Route::get('/{id}/card', [CardController::class, 'show']);
+        Route::put('/{id}/card', [CardController::class, 'update']);
+        Route::post('/{id}/card/publish', [CardController::class, 'publish']);
+        // Image generation is slow and may be billed: kept to a few an hour.
+        Route::post('/{id}/card/background', [CardController::class, 'generateBackground'])->middleware('throttle:12,60');
+    });
+
     Route::middleware('auth.jwt')->group(function () {
         Route::get('/{id}/site', [SiteController::class, 'show']);
         Route::put('/{id}/site', [SiteController::class, 'save']);
@@ -298,6 +313,19 @@ Route::prefix('admin')->middleware(['auth.jwt', 'role:ADMIN'])->group(function (
 
     // Gold-rate poster maker: today's rates and templates (a master PNG plus
     // where the business's logo and the rates go on it).
+    Route::prefix('card-templates')->group(function () {
+        Route::get('/', [CardTemplateController::class, 'index']);
+        Route::get('/options', [CardTemplateController::class, 'options']);
+        Route::post('/', [CardTemplateController::class, 'store']);
+        Route::post('/preview', [CardTemplateController::class, 'preview']);
+        Route::post('/starter', [CardTemplateController::class, 'installStarters']);
+        Route::post('/background', [CardTemplateController::class, 'generateBackground'])->middleware('throttle:30,60');
+        Route::get('/{id}', [CardTemplateController::class, 'show']);
+        Route::patch('/{id}', [CardTemplateController::class, 'update']);
+        Route::post('/{id}/duplicate', [CardTemplateController::class, 'duplicate']);
+        Route::delete('/{id}', [CardTemplateController::class, 'destroy']);
+    });
+
     Route::prefix('gold-rates')->group(function () {
         Route::get('/rates', [GoldRateController::class, 'rates']);
         Route::put('/rates', [GoldRateController::class, 'updateRates']);

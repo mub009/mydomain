@@ -47,6 +47,8 @@ class BusinessController extends Controller
             'businessType' => ['sometimes', 'nullable', 'in:B2C,B2B'],
             'email' => ['nullable', 'email'],
             'phone' => [$required, 'string', 'min:7', 'max:20'],
+            // The visiting card's WhatsApp button; the phone is used when empty.
+            'whatsappNumber' => ['sometimes', 'nullable', 'string', 'min:7', 'max:20'],
             'website' => ['nullable', 'url'],
             'addressLine1' => [$required, 'string', 'min:1', 'max:200'],
             'addressLine2' => ['nullable', 'string', 'max:200'],

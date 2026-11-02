@@ -4,6 +4,7 @@ use App\Http\Controllers\QrCodeController;
 use App\Http\Controllers\Web\AdminPageController;
 use App\Http\Controllers\Web\AuthPageController;
 use App\Http\Controllers\Web\BusinessPageController;
+use App\Http\Controllers\Web\CardPageController;
 use App\Http\Controllers\Web\DashboardController;
 use App\Http\Controllers\Web\GoldRatePageController;
 use App\Http\Controllers\Web\HomeController;
@@ -35,6 +36,12 @@ Route::get('/robots.txt', [SitemapController::class, 'robots']);
 // The logo card shown when a business link is shared on WhatsApp/Facebook/etc.
 Route::get('/share/{slug}.jpg', ShareImageController::class)->where('slug', '[A-Za-z0-9_-]+');
 
+// A business's digital visiting card (what its card QR code opens), and the
+// card's "Save contact" file.
+Route::get('/card/{slug}.vcf', [CardPageController::class, 'vcard'])->where('slug', '[A-Za-z0-9_-]+');
+Route::get('/card/{slug}.pdf', [CardPageController::class, 'pdf'])->where('slug', '[A-Za-z0-9_-]+')->middleware('throttle:30,1');
+Route::get('/card/{slug}', [CardPageController::class, 'show'])->where('slug', '[A-Za-z0-9_-]+');
+
 // Short public path encoded on a printed QR board: /r/q/<code>
 Route::get('/r/q/{code}', [QrCodeController::class, 'scan']);
 
@@ -60,11 +67,14 @@ Route::middleware('web.role:BUSINESS_OWNER,DEALER,ADMIN')->group(function () {
     // Before {id}, so "new" isn't taken for a business id.
     Route::get('/dashboard/businesses/new', [DashboardController::class, 'create']);
     Route::get('/dashboard/businesses/{id}', [DashboardController::class, 'manage']);
+    Route::get('/dashboard/businesses/{id}/card.pdf', [CardPageController::class, 'ownerPdf']);
 });
 
 Route::middleware('web.role:ADMIN')->group(function () {
     Route::get('/admin', AdminPageController::class);
     Route::get('/admin/online', [AdminPageController::class, 'online']);
+    // The digital-visiting-card template editor.
+    Route::get('/admin/card-templates/{id}', [AdminPageController::class, 'cardTemplate']);
     // The gold-rate template editor, and the stored images it draws on —
     // kept off public URLs, so they're served here to admins only.
     Route::get('/admin/gold-rates/templates/{id}', [GoldRatePageController::class, 'editor']);

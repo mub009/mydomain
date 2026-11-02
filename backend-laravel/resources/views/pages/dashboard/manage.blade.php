@@ -104,6 +104,7 @@
           'hint' => 'Square or landscape photos look best.',
       ]) @break
       @case('Reviews & QR') @include('pages.dashboard.sections.reviews-qr') @break
+      @case('Visiting Card') @include('pages.dashboard.sections.card') @break
       @case('Website') @include('pages.dashboard.sections.website') @break
       @case('SEO') @include('pages.dashboard.sections.seo') @break
       @case('Products') @include('pages.dashboard.sections.products') @break
@@ -124,5 +125,8 @@
   @vite('resources/js/pages/manage.js')
   @if ($section === 'Website')
     @vite('resources/js/pages/site-builder.js')
+  @endif
+  @if ($section === 'Visiting Card')
+    @vite('resources/js/pages/card-manager.js')
   @endif
 @endpush

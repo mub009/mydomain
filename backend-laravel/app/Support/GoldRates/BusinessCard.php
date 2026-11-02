@@ -101,7 +101,7 @@ class BusinessCard
 
     // The CDN and bucket hosts of the image storage (config/filesystems.php
     // "spaces"), and the app itself.
-    private static function allowedHost(string $url): bool
+    public static function allowedHost(string $url): bool
     {
         $parts = parse_url($url);
         if (! in_array(strtolower($parts['scheme'] ?? ''), ['http', 'https'], true) || empty($parts['host'])) {

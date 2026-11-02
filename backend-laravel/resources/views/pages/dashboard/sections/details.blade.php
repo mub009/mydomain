@@ -31,6 +31,10 @@
       <input required name="phone" value="{{ $biz['phone'] }}" class="input" />
     </div>
     <div>
+      <label class="block text-xs font-semibold text-ink-700 mb-1">WhatsApp number <span class="font-normal text-ink-400">(optional — the phone is used if empty)</span></label>
+      <input type="tel" inputmode="tel" maxlength="20" name="whatsappNumber" value="{{ $biz['whatsappNumber'] ?? '' }}" class="input" placeholder="e.g. 98765 43210" />
+    </div>
+    <div>
       <label class="block text-xs font-semibold text-ink-700 mb-1">Email</label>
       <input type="email" name="email" value="{{ $biz['email'] ?? '' }}" class="input" />
     </div>

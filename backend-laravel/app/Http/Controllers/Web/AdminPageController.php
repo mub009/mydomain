@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AnalyticsController;
+use App\Http\Controllers\CardTemplateController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\GoldRateController;
@@ -18,7 +19,7 @@ use Illuminate\Http\Request;
 class AdminPageController extends Controller
 {
     // Poster Studio is not part of the Laravel backend yet (see README).
-    public const TABS = ['Overview', 'Users', 'Businesses', 'Approvals', 'QR Boards', 'Visitors', 'Analytics', 'SEO', 'Reports', 'Gold Rates'];
+    public const TABS = ['Overview', 'Users', 'Businesses', 'Approvals', 'QR Boards', 'Visitors', 'Analytics', 'SEO', 'Reports', 'Gold Rates', 'Card Templates'];
 
     public const ROLES = ['CUSTOMER', 'BUSINESS_OWNER', 'DEALER', 'ADMIN'];
 
@@ -80,12 +81,34 @@ class AdminPageController extends Controller
                 $data['goldRates'] = InternalApi::tryCall([GoldRateController::class, 'rates'], [], [], true)['data'] ?? null;
                 $data['goldTemplates'] = InternalApi::tryCall([GoldRateController::class, 'templates'], [], [], true)['data'] ?? null;
                 break;
+            case 'Card Templates':
+                $data['cardTemplates'] = InternalApi::tryCall([CardTemplateController::class, 'index'], array_filter([
+                    'categoryId' => $q('category'), 'status' => $q('status'), 'search' => $q('search'),
+                ]), [], true)['data'] ?? null;
+                $data['categories'] = InternalApi::tryCall([CategoryController::class, 'index'])['data'] ?? [];
+                break;
             case 'Reports':
                 $data['report'] = InternalApi::tryCall([AdminController::class, 'businessCreatorsReport'], [], [], true)['data'] ?? null;
                 break;
         }
 
         return view('pages.admin.index', ['tab' => $tab, 'page' => $page, ...$data]);
+    }
+
+    // The card-template editor: /admin/card-templates/<id>, or /new for a blank one.
+    public function cardTemplate(string $id)
+    {
+        $template = null;
+        if ($id !== 'new') {
+            $template = InternalApi::tryCall([CardTemplateController::class, 'show'], [], ['id' => $id], true)['data'] ?? null;
+            abort_unless($template, 404);
+        }
+
+        return view('pages.admin.card-template-editor', [
+            'template' => $template,
+            'options' => InternalApi::call([CardTemplateController::class, 'options'], [], [], true)['data'],
+            'categories' => InternalApi::tryCall([CategoryController::class, 'index'])['data'] ?? [],
+        ]);
     }
 
     // The "Online now" list alone, for the Analytics tab's 15-second refresh.

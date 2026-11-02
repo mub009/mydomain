@@ -35,6 +35,8 @@ return [
     'gemini' => [
         'key' => env('GEMINI_API_KEY'),
         'model' => env('GEMINI_MODEL', 'gemini-3.5-flash-lite'),
+        // Draws AI backgrounds for visiting cards (App\Support\Cards\BackgroundGenerator).
+        'image_model' => env('GEMINI_IMAGE_MODEL', 'gemini-2.5-flash-image'),
         'base_url' => env('GEMINI_BASE_URL', 'https://generativelanguage.googleapis.com'),
         // A trusted-certificates file for HTTPS, for a PHP that has none
         // configured (e.g. WAMP on Windows: "cURL error 60"). Servers

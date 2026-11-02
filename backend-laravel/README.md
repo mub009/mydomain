@@ -266,6 +266,62 @@ To connect Google (without this, everything works except submitting and checking
    The per-run limits are `GOOGLE_SEARCH_SUBMIT_PER_RUN` and `GOOGLE_SEARCH_INSPECT_PER_RUN`. When
    the quota runs out, the rest of the queue simply waits for the next run.
 
+### Digital visiting cards (dashboard "Visiting Card" section, admin "Card Templates" tab)
+
+Every business gets a mobile visiting card at `/card/<slug>` (plus
+`/card/<slug>.vcf`, its "Save contact" file), live while the card is
+published and the listing is `PUBLISHED`. The design and the business's
+details are stored apart: `card_templates` holds only layout, background,
+fonts, colours and button style; `business_cards` only records which
+template a business picked and whether it's published; the name, logo,
+phone, WhatsApp (`businesses.whatsappNumber`, falling back to the phone),
+address and social links are read live from the business at render time
+(`App\Support\Cards\CardEngine`). Switching templates therefore never
+touches business data.
+
+- A business is offered its category's active templates (and its parent
+  category's), default first, topped up to five with the general
+  (category-less) ones. Premium templates need a plan other than `FREE`.
+- The "Add a business" form shows the category's designs right after the
+  category is picked and saves the pick; after creating, owners land on the
+  Visiting Card section to preview, publish, copy the link and download the
+  QR code.
+- Admins create/edit templates at `/admin/card-templates/<id>` (live
+  preview), set one default per category, activate/deactivate, mark free or
+  premium, duplicate and delete (cards on a deleted design fall back to the
+  default). Every design value is checked against allow-lists, so template
+  CSS can only contain known fonts, `#rrggbb` colours and fixed keywords.
+- Starter designs — five each for Restaurants, Electronics & Appliances,
+  Hospitals, Clinics & Doctors and Jewellery, plus five general ones — are
+  installed by `php artisan db:seed --class=CardTemplateSeeder` or the tab's
+  "Install starter designs" button. Both only add missing ones.
+- **AI backgrounds.** Owners press "Generate with AI" in Manage → Visiting
+  Card (admins have the same button in the template editor). The image is
+  made from the business's category, name, city and description (plus
+  optional style notes) in the design's colours, with no text in it, since
+  the card prints the live details over it. It's previewed first, and once
+  kept it is stored on the business's card (`business_cards.backgroundImageUrl`),
+  so it stays when the business switches designs. It uses Gemini's image
+  model (`GEMINI_API_KEY`, `GEMINI_IMAGE_MODEL`, default
+  `gemini-2.5-flash-image`; Google bills image generation). With no key, or
+  if Gemini fails, a free built-in generator draws an abstract backdrop in
+  the design's colours instead. Images go to the Spaces disk; owners are
+  limited to 12 generations an hour.
+- **PDF download.** `/card/<slug>.pdf` (live cards; also a "PDF" button on
+  the card) and, for the people managing the business, Manage → Visiting
+  Card → "Download PDF" / "View / print PDF"
+  (`/dashboard/businesses/<id>/card.pdf`, which works before publishing,
+  minus the QR code and online-card links). Every action is a real PDF
+  link: Call, WhatsApp, Directions, Email, Website, the social profiles,
+  "Open card", "Save contact", and the QR code itself. Drawn by dompdf
+  (`App\Support\Cards\CardPdf`, view `cards/pdf.blade.php`), so it needs
+  no Chrome on the server. dompdf only reads simple CSS, so the PDF has its
+  own table-based layout in each design's colours, with fonts mapped to
+  DejaVu Sans or Serif. dompdf never fetches anything itself; logos and
+  backgrounds are read only from the app's own storage and prepared with GD.
+  Content that doesn't fit on one page is re-drawn smaller, and only then
+  on a taller page. Its font cache lives in `storage/fonts` (writable).
+
 ### Gold rate templates (admin "Gold Rates" tab)
 
 The admin uploads a master PNG, places the logo and the 24K/22K/21K/18K rates on it in the

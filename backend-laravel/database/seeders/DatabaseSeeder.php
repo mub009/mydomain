@@ -92,6 +92,6 @@ class DatabaseSeeder extends Seeder
             );
         }
 
-        $this->call([CategorySeeder::class, StateCitySeeder::class]);
+        $this->call([CategorySeeder::class, StateCitySeeder::class, CardTemplateSeeder::class]);
     }
 }

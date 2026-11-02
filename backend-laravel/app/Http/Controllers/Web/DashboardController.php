@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Web;
 use App\Exceptions\ApiException;
 use App\Http\Controllers\BookingController;
 use App\Http\Controllers\BusinessController;
+use App\Http\Controllers\CardController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\LeadController;
@@ -42,7 +43,7 @@ class DashboardController extends Controller
 
     // WhatsApp broadcasts and Poster Studio are not part of the Laravel
     // backend yet (see README), so the manager doesn't offer them.
-    public const SECTIONS = ['Contact', 'Hours', 'Services', 'Photos', 'Slider', 'Our Gallery', 'Reviews & QR', 'Website', 'SEO', 'Products', 'Orders', 'Customers'];
+    public const SECTIONS = ['Contact', 'Hours', 'Services', 'Photos', 'Slider', 'Our Gallery', 'Reviews & QR', 'Visiting Card', 'Website', 'SEO', 'Products', 'Orders', 'Customers'];
 
     // How each section appears on the business's menu page: its icon, the
     // icon's colours, and one line on what it is for.
@@ -54,6 +55,7 @@ class DashboardController extends Controller
         'Slider' => ['icon' => 'play', 'tint' => 'bg-orange-50 text-orange-600', 'blurb' => 'Banner photos that slide on your website'],
         'Our Gallery' => ['icon' => 'layout-grid', 'tint' => 'bg-teal-50 text-teal-600', 'blurb' => 'The gallery section of your website'],
         'Reviews & QR' => ['icon' => 'qr-code', 'tint' => 'bg-yellow-50 text-yellow-600', 'blurb' => 'Review links and QR boards'],
+        'Visiting Card' => ['icon' => 'layout-template', 'tint' => 'bg-fuchsia-50 text-fuchsia-600', 'blurb' => 'Your digital visiting card, its design, link and QR code'],
         'Website' => ['icon' => 'globe', 'tint' => 'bg-sky-50 text-sky-600', 'blurb' => 'Design and publish your website'],
         'SEO' => ['icon' => 'search-check', 'tint' => 'bg-lime-50 text-lime-700', 'blurb' => 'How you appear on Google, and whether you are listed'],
         'Products' => ['icon' => 'package', 'tint' => 'bg-emerald-50 text-emerald-600', 'blurb' => 'Items for your online shop'],
@@ -198,6 +200,9 @@ class DashboardController extends Controller
             case 'Our Gallery':
                 $kind = $section === 'Slider' ? 'slider' : 'gallery';
                 $data['imageSet'] = ['kind' => $kind, ...InternalApi::tryCall([SiteController::class, 'images'], [], ['id' => $id, 'kind' => $kind], true)['data'] ?? []];
+                break;
+            case 'Visiting Card':
+                $data['card'] = InternalApi::tryCall([CardController::class, 'show'], [], ['id' => $id], true)['data'] ?? null;
                 break;
             case 'Website':
                 $data['site'] = InternalApi::tryCall([SiteController::class, 'show'], [], ['id' => $id], true)['data'] ?? null;
