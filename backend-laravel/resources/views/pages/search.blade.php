@@ -69,7 +69,7 @@
         <option value="{{ $value }}" @selected($filters['minRating'] === (string) $value)>{{ $label }}</option>
       @endforeach
     </select>
-    <select name="category" class="{{ $selectClass }}">
+    <select name="category" class="{{ $selectClass }}" data-search-select="all" data-search-placeholder="Search category…">
       <option value="">All categories</option>
       @foreach ($categories as $c)
         <option value="{{ $c['slug'] }}" @selected($filters['category'] === $c['slug'])>{{ $c['name'] }}</option>

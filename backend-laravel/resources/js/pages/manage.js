@@ -2,6 +2,7 @@ import { initAiDescription } from "../lib/ai-describe";
 import { initAssistant } from "../lib/assistant";
 import { api, errorMessage, uploadImage } from "../lib/api";
 import { CHANNEL_LABELS, boardUrl, downloadDataUrl, renderQrDataUrl } from "../lib/channels";
+import { initSearchableSelects } from "../lib/searchable-select";
 import { initStateCity } from "../lib/state-city";
 import { $, $$, esc, openModal, pageData } from "../lib/ui";
 import { boardPreviewModal, initCloneButtons, initUploadFields, reloadWithFlash, showError, showFlash } from "../lib/widgets";
@@ -17,6 +18,7 @@ const fail = (err) => showError(errorBox, errorMessage(err));
 showFlash();
 initUploadFields();
 initStateCity();
+initSearchableSelects();
 initAssistant(biz.id);
 initCloneButtons();
 

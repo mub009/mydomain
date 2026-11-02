@@ -37,11 +37,19 @@
       "_ui-DIxCFilW.js"
     ]
   },
-  "_state-city-B4xh9Onx.js": {
-    "file": "assets/state-city-B4xh9Onx.js",
+  "_searchable-select-Ci9s0_RU.js": {
+    "file": "assets/searchable-select-Ci9s0_RU.js",
+    "name": "searchable-select",
+    "imports": [
+      "_ui-DIxCFilW.js"
+    ]
+  },
+  "_state-city-D2K26BbD.js": {
+    "file": "assets/state-city-D2K26BbD.js",
     "name": "state-city",
     "imports": [
       "_api-3HrlSN3j.js",
+      "_searchable-select-Ci9s0_RU.js",
       "_ui-DIxCFilW.js"
     ]
   },
@@ -59,7 +67,7 @@
     ]
   },
   "resources/css/app.css": {
-    "file": "assets/app-BJNqhFIa.css",
+    "file": "assets/app-BxOF-Hno.css",
     "src": "resources/css/app.css",
     "isEntry": true
   },
@@ -79,7 +87,7 @@
     ]
   },
   "resources/js/pages/admin.js": {
-    "file": "assets/admin-sSyDJRnx.js",
+    "file": "assets/admin-DThn_tD-.js",
     "name": "admin",
     "src": "resources/js/pages/admin.js",
     "isEntry": true,
@@ -87,7 +95,8 @@
       "_api-3HrlSN3j.js",
       "_channels-CvUWVcU_.js",
       "_ui-DIxCFilW.js",
-      "_state-city-B4xh9Onx.js",
+      "_searchable-select-Ci9s0_RU.js",
+      "_state-city-D2K26BbD.js",
       "_widgets-CAvTWC7Y.js",
       "__commonjsHelpers-CqkleIqs.js"
     ]
@@ -103,7 +112,7 @@
     ]
   },
   "resources/js/pages/dashboard.js": {
-    "file": "assets/dashboard-j4e4TTv8.js",
+    "file": "assets/dashboard-B-dLI28q.js",
     "name": "dashboard",
     "src": "resources/js/pages/dashboard.js",
     "isEntry": true,
@@ -111,7 +120,8 @@
       "_ai-describe-2vIi5hGC.js",
       "_api-3HrlSN3j.js",
       "_ui-DIxCFilW.js",
-      "_state-city-B4xh9Onx.js",
+      "_searchable-select-Ci9s0_RU.js",
+      "_state-city-D2K26BbD.js",
       "_widgets-CAvTWC7Y.js",
       "_channels-CvUWVcU_.js",
       "__commonjsHelpers-CqkleIqs.js"
@@ -157,7 +167,7 @@
     ]
   },
   "resources/js/pages/manage.js": {
-    "file": "assets/manage-8tpkl47H.js",
+    "file": "assets/manage-BdNcVR4-.js",
     "name": "manage",
     "src": "resources/js/pages/manage.js",
     "isEntry": true,
@@ -167,7 +177,8 @@
       "_ui-DIxCFilW.js",
       "_widgets-CAvTWC7Y.js",
       "_channels-CvUWVcU_.js",
-      "_state-city-B4xh9Onx.js",
+      "_searchable-select-Ci9s0_RU.js",
+      "_state-city-D2K26BbD.js",
       "__commonjsHelpers-CqkleIqs.js"
     ]
   },
@@ -184,13 +195,14 @@
     ]
   },
   "resources/js/pages/search.js": {
-    "file": "assets/search-Cju-yVSc.js",
+    "file": "assets/search-BpTCatlN.js",
     "name": "search",
     "src": "resources/js/pages/search.js",
     "isEntry": true,
     "imports": [
       "_api-3HrlSN3j.js",
       "_location-input-yTiNja3C.js",
+      "_searchable-select-Ci9s0_RU.js",
       "_ui-DIxCFilW.js"
     ]
   },

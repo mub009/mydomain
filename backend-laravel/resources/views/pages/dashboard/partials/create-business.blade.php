@@ -12,7 +12,7 @@
     <input required name="name" placeholder="Business name" class="input" data-slug-source />
     <p class="mt-1 text-[11px] text-ink-500" data-slug-preview hidden>Page link: <span class="font-mono text-ink-700">/business/<span data-slug-value></span></span></p>
   </div>
-  <select required name="categoryId" class="input">
+  <select required name="categoryId" class="input" data-search-select data-search-placeholder="Search category…">
     <option value="">Select category</option>
     @foreach ($categories as $c)
       <option value="{{ $c['id'] }}">{{ $c['name'] }}</option>

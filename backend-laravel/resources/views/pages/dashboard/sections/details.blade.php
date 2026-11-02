@@ -8,7 +8,7 @@
   <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
     <div>
       <label class="block text-xs font-semibold text-ink-700 mb-1">Category</label>
-      <select required name="categoryId" class="input">
+      <select required name="categoryId" class="input" data-search-select data-search-placeholder="Search category…">
         <option value="">Select category</option>
         @foreach ($categories as $c)
           <option value="{{ $c['id'] }}" @selected(($biz['category']['id'] ?? null) === $c['id'])>{{ $c['name'] }}</option>

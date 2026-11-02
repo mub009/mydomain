@@ -1,12 +1,18 @@
 import { icon } from "./icons";
-import { esc } from "./ui";
+import { $$, esc } from "./ui";
 
 // Turns a native <select> into a drop-down with a search box. The select
 // stays in the form (invisible, under the button) so it still submits its
 // value and shows the browser's "please select" bubble when required.
 // Call refresh() after changing the select's options or disabled state.
 
-export function searchableSelect(select, { placeholder = "Search…" } = {}) {
+// includeEmpty: the empty-value option is a real choice ("All categories")
+// rather than a "Select …" prompt.
+export function searchableSelect(select, { placeholder = "Search…", includeEmpty = false } = {}) {
+  if (select.dataset.searchable) return select._searchable;
+  select.dataset.searchable = "1";
+  // The button takes the select's own look (form input or filter pill).
+  const look = select.className;
   const wrap = document.createElement("div");
   wrap.className = "relative min-w-0";
   select.parentNode.insertBefore(wrap, select);
@@ -17,11 +23,11 @@ export function searchableSelect(select, { placeholder = "Search…" } = {}) {
 
   wrap.insertAdjacentHTML(
     "beforeend",
-    `<button type="button" class="input flex w-full min-w-0 items-center justify-between gap-2 text-left disabled:cursor-not-allowed disabled:opacity-60" aria-haspopup="listbox" aria-expanded="false" data-ss-trigger>
+    `<button type="button" class="${esc(look)} flex w-full min-w-0 items-center justify-between gap-2 text-left disabled:cursor-not-allowed disabled:opacity-60" aria-haspopup="listbox" aria-expanded="false" data-ss-trigger>
       <span class="truncate" data-ss-label></span>
       ${icon("chevron-down", { size: 16, className: "shrink-0 text-ink-400" })}
     </button>
-    <div class="absolute left-0 right-0 z-50 mt-1 rounded-lg border border-gray-200 bg-white shadow-lg" data-ss-panel hidden>
+    <div class="absolute left-0 right-0 z-50 mt-1 min-w-[14rem] rounded-lg border border-gray-200 bg-white shadow-lg" data-ss-panel hidden>
       <div class="flex items-center gap-2 border-b border-gray-100 px-3">
         ${icon("search", { size: 15, className: "shrink-0 text-ink-400" })}
         <input type="text" class="w-full py-2 text-sm focus:outline-none" placeholder="${esc(placeholder)}" autocomplete="off" data-ss-search />
@@ -38,12 +44,12 @@ export function searchableSelect(select, { placeholder = "Search…" } = {}) {
   let active = 0;
 
   // The empty "Select …" option is the prompt, not a choice.
-  const choices = () => [...select.options].filter((o) => o.value !== "");
+  const choices = () => [...select.options].filter((o) => includeEmpty || o.value !== "");
   const prompt = () => [...select.options].find((o) => o.value === "")?.textContent ?? "Select";
 
   function refresh() {
     const current = select.selectedOptions[0];
-    const chosen = current && current.value !== "";
+    const chosen = current && (includeEmpty || current.value !== "");
     label.textContent = chosen ? current.textContent : prompt();
     label.classList.toggle("text-ink-400", !chosen);
     trigger.disabled = select.disabled;
@@ -162,5 +168,17 @@ export function searchableSelect(select, { placeholder = "Search…" } = {}) {
   select.addEventListener("change", refresh);
 
   refresh();
-  return { refresh };
+  select._searchable = { refresh };
+  return select._searchable;
+}
+
+// Every <select data-search-select> under root. data-search-select="all"
+// keeps the empty option ("All categories") as a choice.
+export function initSearchableSelects(root = document) {
+  $$("select[data-search-select]", root).forEach((select) =>
+    searchableSelect(select, {
+      placeholder: select.dataset.searchPlaceholder || "Search…",
+      includeEmpty: select.dataset.searchSelect === "all",
+    }),
+  );
 }

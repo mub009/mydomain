@@ -1,6 +1,7 @@
 import { api, errorMessage } from "../lib/api";
 import { boardHeadline, boardUrl, downloadDataUrl, renderQrDataUrl } from "../lib/channels";
 import { icon } from "../lib/icons";
+import { initSearchableSelects } from "../lib/searchable-select";
 import { initStateCity, stateCityFields } from "../lib/state-city";
 import { $, $$, alertBox, esc, formatDateTime, openModal, pageData } from "../lib/ui";
 import { initLiveSearch, reloadWithFlash, resetPasswordModal, showError, showFlash } from "../lib/widgets";
@@ -338,7 +339,7 @@ $$("[data-edit-business]").forEach((button) =>
       `<form class="space-y-3">
         <div data-form-error></div>
         <input class="input" name="name" value="${esc(b.name)}" placeholder="Business name" />
-        <select class="input" name="categoryId">
+        <select class="input" name="categoryId" data-search-select data-search-placeholder="Search category…">
           <option value="">Select category</option>
           ${categories.map((c) => `<option value="${esc(c.id)}" ${c.id === b.category?.id ? "selected" : ""}>${esc(c.name)}</option>`).join("")}
         </select>
@@ -360,6 +361,7 @@ $$("[data-edit-business]").forEach((button) =>
     );
     const form = $("form", modal.body);
     initStateCity(form);
+    initSearchableSelects(form);
     form.addEventListener("submit", (e) => {
       e.preventDefault();
       submitModalForm(form, $("[data-submit]", form), "Saving…", async () => {

@@ -1,10 +1,12 @@
 import { api, errorMessage } from "../lib/api";
 import { initLocationInput } from "../lib/location-input";
+import { initSearchableSelects } from "../lib/searchable-select";
 import { $, $$, alertBox, esc, openModal, setLocation } from "../lib/ui";
 
 // Filters reload the page with the new value (any change restarts at page 1,
 // which the form's GET naturally does).
 const filters = $("[data-filters]");
+initSearchableSelects(filters ?? document);
 filters?.addEventListener("change", (e) => {
   if (e.target.matches("select")) {
     // Leave default values out of the URL.
