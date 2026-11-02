@@ -1,4 +1,5 @@
 import { api } from "./api";
+import { searchableSelect } from "./searchable-select";
 import { $, $$, esc } from "./ui";
 
 // State and City drop-downs (resources/views/components/state-city.blade.php,
@@ -64,6 +65,10 @@ export function initStateCity(root = document) {
       (savedState && !names.includes(savedState) ? option(savedState, savedState, true) : "") +
       names.map((name) => option(name, name, name === savedState)).join("");
 
+    // Drop-downs with a search box (the selects stay in the form).
+    searchableSelect(stateSelect, { placeholder: "Search state…" });
+    const cityPicker = searchableSelect(citySelect, { placeholder: "Search city…" });
+
     const useOther = (on, value = "") => {
       other.hidden = !on;
       other.required = on && required;
@@ -84,8 +89,9 @@ export function initStateCity(root = document) {
       citySelect.innerHTML =
         option("", stateSelect.value ? "Select city" : "Select state first") +
         cities.map((name) => option(name, name, name === selected)).join("") +
-        option(OTHER, "Other — type it", !listed);
+        `<option value="${OTHER}" data-pinned="1"${listed ? "" : " selected"}>Other — type it</option>`;
       useOther(!listed, listed ? "" : selected);
+      cityPicker.refresh();
     };
 
     stateSelect.addEventListener("change", () => fillCities(""));
