@@ -47,7 +47,6 @@
   <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
     <x-state-city />
   </div>
-  <input required inputmode="numeric" autocomplete="postal-code" name="postalCode" placeholder="Postal code" class="input" />
   <div class="grid grid-cols-2 gap-3">
     <input required inputmode="decimal" name="latitude" placeholder="Latitude" class="input min-w-0" />
     <input required inputmode="decimal" name="longitude" placeholder="Longitude" class="input min-w-0" />

@@ -167,7 +167,6 @@ if (details) {
           addressLine1: f.addressLine1,
           city: f.city,
           state: f.state,
-          postalCode: f.postalCode,
           latitude: Number(f.latitude),
           longitude: Number(f.longitude),
           email: f.email || undefined,

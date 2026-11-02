@@ -52,7 +52,8 @@ class BusinessController extends Controller
             'addressLine2' => ['nullable', 'string', 'max:200'],
             'city' => [$required, 'string', 'min:1', 'max:100'],
             'state' => [$required, 'string', 'min:1', 'max:50'],
-            'postalCode' => [$required, 'string', 'min:1', 'max:20'],
+            // No longer asked for on the forms; kept for older listings.
+            'postalCode' => ['sometimes', 'nullable', 'string', 'max:20'],
             'country' => ['sometimes', 'string', 'size:2'],
             'latitude' => [$required, 'numeric', 'min:-90', 'max:90'],
             'longitude' => [$required, 'numeric', 'min:-180', 'max:180'],

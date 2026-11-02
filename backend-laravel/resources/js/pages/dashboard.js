@@ -68,7 +68,6 @@ form?.addEventListener("submit", async (e) => {
       addressLine1: f.addressLine1,
       city: f.city,
       state: f.state,
-      postalCode: f.postalCode,
       latitude: Number(f.latitude),
       longitude: Number(f.longitude),
       country: "IN",

@@ -336,7 +336,7 @@ class AdminController extends Controller
             'addressLine2' => ['sometimes', 'nullable', 'string', 'max:200'],
             'city' => ['sometimes', 'string', 'min:1', 'max:100'],
             'state' => ['sometimes', 'string', 'min:1', 'max:50'],
-            'postalCode' => ['sometimes', 'string', 'min:1', 'max:20'],
+            'postalCode' => ['sometimes', 'nullable', 'string', 'max:20'],
             'latitude' => ['sometimes', 'numeric', 'min:-90', 'max:90'],
             'longitude' => ['sometimes', 'numeric', 'min:-180', 'max:180'],
             'isVerified' => ['sometimes', 'boolean'],
