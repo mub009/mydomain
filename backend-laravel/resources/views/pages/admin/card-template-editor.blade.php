@@ -71,6 +71,14 @@
         <div>
           <p class="mb-2 text-xs font-bold uppercase tracking-wide text-ink-500">Background image</p>
           <x-upload-field name="backgroundImageUrl" purpose="card-backgrounds" :value="$template['backgroundImageUrl'] ?? ''" placeholder="https://…/background.jpg" hint="Optional. Used in the card's header (or behind it, for the luxury layout). Without one, a gradient of the template colours is used — or the business's own cover photo." clearable />
+          <div class="mt-2 flex flex-wrap gap-1.5">
+            @foreach ($options['aiStyles'] as $value => $label)
+              <label class="cursor-pointer">
+                <input type="radio" name="aiStyle" value="{{ $value }}" class="peer sr-only" @checked($value === \App\Support\Cards\BackgroundGenerator::defaultStyle($template['layout'] ?? 'classic')) />
+                <span class="block rounded-full border border-gray-300 px-3 py-1 text-xs font-semibold text-ink-700 transition-colors hover:bg-gray-50 peer-checked:border-violet-500 peer-checked:bg-violet-50 peer-checked:text-violet-800">{{ $label }}</span>
+              </label>
+            @endforeach
+          </div>
           <div class="mt-2 flex flex-col gap-2 sm:flex-row">
             <input maxlength="200" class="input min-w-0 flex-1 text-sm" placeholder="AI style ideas (optional), e.g. soft bokeh of gold jewellery" data-ai-hint />
             <button type="button" class="btn-secondary shrink-0 px-3 py-2 text-sm" data-generate-background><x-icon name="sparkles" :size="14" /> <span>Generate with AI</span></button>

@@ -87,6 +87,7 @@ generateBtn?.addEventListener("click", async () => {
       categoryId: v.categoryId,
       design: v.design,
       hint: $("[data-ai-hint]", form).value.trim() || undefined,
+      style: $('[name="aiStyle"]:checked', form)?.value,
     });
     const field = form.backgroundImageUrl;
     field.value = data.url;

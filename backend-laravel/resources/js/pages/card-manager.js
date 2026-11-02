@@ -107,6 +107,7 @@ if (root && card) {
       const { data } = await api.post(`${base}/background`, {
         templateId: card.templateId,
         hint: hintInput.value.trim() || undefined,
+        style: $('[name="aiStyle"]:checked', root)?.value,
       });
       const note = data.source === "builtin" ? `<p class="text-center text-xs text-ink-500">Made with the built-in generator.</p>` : "";
       const modal = cardPreviewModal("Your new background", data.previewHtml, {

@@ -84,10 +84,18 @@
               @if ($card['backgroundImageUrl'])
                 Your card uses its own background, whichever design you pick.
               @else
-                Let AI paint a background made for {{ $biz['name'] }} — from your category, city and description, in your design's colours.
+                Let AI design a poster-style background for {{ $biz['name'] }} — from your category, city and description, in your design's colours. Pick a style below.
               @endif
               Your name and contact details are printed over it, never inside the picture.
             </p>
+          </div>
+          <div class="flex flex-wrap gap-1.5" data-ai-styles>
+            @foreach ($card['aiStyles'] as $value => $label)
+              <label class="cursor-pointer">
+                <input type="radio" name="aiStyle" value="{{ $value }}" class="peer sr-only" @checked($value === $card['aiDefaultStyle']) />
+                <span class="block rounded-full border border-gray-300 px-3 py-1 text-xs font-semibold text-ink-700 transition-colors hover:bg-gray-50 peer-checked:border-violet-500 peer-checked:bg-violet-50 peer-checked:text-violet-800">{{ $label }}</span>
+              </label>
+            @endforeach
           </div>
           <div class="flex flex-col gap-2 sm:flex-row">
             <input maxlength="200" class="input min-w-0 flex-1" placeholder="Optional style ideas, e.g. warm spices on a wooden table" data-ai-hint />

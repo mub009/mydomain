@@ -187,6 +187,7 @@ class CardTemplateController extends Controller
             'layout' => ['required', 'in:'.implode(',', array_keys(CardEngine::LAYOUTS))],
             'categoryId' => ['nullable', 'uuid'],
             'hint' => ['nullable', 'string', 'max:200'],
+            'style' => ['nullable', 'in:'.implode(',', array_keys(BackgroundGenerator::STYLES))],
             ...CardEngine::designRules(),
         ]);
         $category = ! empty($data['categoryId']) ? \App\Models\Category::whereKey($data['categoryId'])->value('name') : null;
@@ -197,9 +198,10 @@ class CardTemplateController extends Controller
             $data['layout'],
             $data['hint'] ?? null,
             'cards/backgrounds',
+            $data['style'] ?? null,
         );
 
-        return ApiResponse::ok(['url' => $result['url'], 'source' => $result['source']]);
+        return ApiResponse::ok(['url' => $result['url'], 'source' => $result['source'], 'style' => $result['style']]);
     }
 
     public function installStarters()
@@ -216,6 +218,7 @@ class CardTemplateController extends Controller
             'fonts' => CardEngine::FONTS,
             'colorKeys' => CardEngine::COLOR_KEYS,
             'defaultDesign' => CardEngine::defaultDesign(),
+            'aiStyles' => BackgroundGenerator::STYLES,
         ]);
     }
 }

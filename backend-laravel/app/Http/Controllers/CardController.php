@@ -72,6 +72,8 @@ class CardController extends Controller
             'templateId' => $current?->id,
             'backgroundImageUrl' => $card?->backgroundImageUrl,
             'aiProvider' => BackgroundGenerator::provider(),
+            'aiStyles' => BackgroundGenerator::STYLES,
+            'aiDefaultStyle' => BackgroundGenerator::defaultStyle($current?->layout ?? 'classic'),
             'isPublished' => (bool) $card?->isPublished,
             'live' => self::isLive($business, $card),
             'listingLive' => $business->status === 'PUBLISHED',
@@ -138,6 +140,7 @@ class CardController extends Controller
         $data = $request->validate([
             'templateId' => ['nullable', 'uuid'],
             'hint' => ['nullable', 'string', 'max:200'],
+            'style' => ['nullable', 'in:'.implode(',', array_keys(BackgroundGenerator::STYLES))],
         ]);
         $template = (! empty($data['templateId']) ? CardTemplate::where('isActive', true)->find($data['templateId']) : null)
             ?? CardEngine::templateFor($business);
@@ -148,13 +151,14 @@ class CardController extends Controller
             'category' => $business->category?->name,
             'city' => $business->city,
             'description' => $business->description,
-        ], $design, $template?->layout ?? 'classic', $data['hint'] ?? null);
+        ], $design, $template?->layout ?? 'classic', $data['hint'] ?? null, style: $data['style'] ?? null);
 
         $details = ['cardBackgroundUrl' => $result['url']] + CardEngine::details($business);
 
         return ApiResponse::ok([
             'url' => $result['url'],
             'source' => $result['source'],
+            'style' => $result['style'],
             'previewHtml' => CardEngine::render($template, $details, true),
         ]);
     }

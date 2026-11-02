@@ -143,4 +143,42 @@ class CardBackgroundTest extends TestCase
         $this->assertNotEmpty($res->json('data.url'));
         $this->assertCount(1, Storage::disk('spaces')->allFiles('cards/backgrounds'));
     }
+
+    public function test_owners_pick_a_poster_style_and_the_prompt_follows_it(): void
+    {
+        config(['services.gemini.key' => 'test-key', 'services.ai.provider' => null]);
+        Http::fake(['generativelanguage.googleapis.com/*' => Http::response([
+            'candidates' => [['content' => ['parts' => [['inlineData' => ['mimeType' => 'image/png', 'data' => $this->pngBase64()]]]]]],
+        ])]);
+
+        $this->postJson("/api/v1/businesses/{$this->business->id}/card/background", ['style' => 'festive'], $this->auth)
+            ->assertOk()->assertJsonPath('data.style', 'festive');
+        Http::assertSent(function (HttpRequest $request) {
+            $prompt = $request['contents'][0]['parts'][0]['text'];
+
+            // The festive look, and a restaurant's own subject matter.
+            return str_contains($prompt, 'poster-style') && str_contains($prompt, 'diyas')
+                && str_contains($prompt, 'plated signature dishes') && str_contains($prompt, 'negative space');
+        });
+
+        $this->postJson("/api/v1/businesses/{$this->business->id}/card/background", ['style' => 'cartoon'], $this->auth)->assertStatus(400);
+        $this->getJson("/api/v1/businesses/{$this->business->id}/card", $this->auth)
+            ->assertJsonPath('data.aiStyles.luxury', 'Luxury')->assertJsonPath('data.aiDefaultStyle', 'photo');
+    }
+
+    public function test_every_offline_style_paints_its_own_picture(): void
+    {
+        $colors = ['primary' => '#7c2d12', 'accent' => '#f59e0b'];
+        $images = [];
+        foreach (\App\Support\Cards\PosterArt::STYLES as $style) {
+            $png = \App\Support\Cards\PosterArt::render($style, $colors, 'Spice Garden', false);
+            $this->assertSame([1280, 720], array_slice(getimagesizefromstring($png), 0, 2), $style);
+            $images[$style] = md5($png);
+        }
+        $this->assertCount(count($images), array_unique($images));
+        // Same business, same picture; another business, another one.
+        $this->assertSame($images['poster'], md5(\App\Support\Cards\PosterArt::render('poster', $colors, 'Spice Garden', false)));
+        $this->assertNotSame($images['poster'], md5(\App\Support\Cards\PosterArt::render('poster', $colors, 'Other Cafe', false)));
+        $this->assertSame([900, 1200], array_slice(getimagesizefromstring(\App\Support\Cards\PosterArt::render('luxury', $colors, 'x', true)), 0, 2));
+    }
 }
