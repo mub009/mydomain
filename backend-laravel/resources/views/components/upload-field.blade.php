@@ -1,4 +1,4 @@
-@props(['name', 'purpose', 'value' => '', 'label' => null, 'hint' => null, 'placeholder' => 'https://… or upload a file'])
+@props(['name', 'purpose', 'value' => '', 'label' => null, 'hint' => null, 'placeholder' => 'https://… or upload a file', 'clearable' => false])
 {{-- A URL field with an "Upload" button next to it: the picked file goes to
      /uploads/image and the returned URL lands in the same field. Wired up by
      initUploadFields() in resources/js/lib/widgets.js. --}}
@@ -11,6 +11,11 @@
     <button type="button" class="btn-secondary shrink-0 px-3 py-2 text-sm" data-upload-button>
       <x-icon name="upload" :size="14" /> <span>Upload</span>
     </button>
+    @if ($clearable)
+      <button type="button" class="btn-secondary shrink-0 px-3 py-2 text-sm text-red-600" data-upload-clear title="Remove image" @if ($value === '' || $value === null) hidden @endif>
+        <x-icon name="trash-2" :size="14" /> <span>Remove</span>
+      </button>
+    @endif
     <input type="file" accept="image/png,image/jpeg,image/gif,image/webp" class="hidden" data-upload-file />
   </div>
   @if ($hint)

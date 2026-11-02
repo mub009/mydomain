@@ -75,6 +75,19 @@ export function initUploadFields(root = document) {
     const file = $("[data-upload-file]", field);
     const error = $("[data-upload-error]", field);
     button.addEventListener("click", () => file.click());
+    // Optional "Remove" button: empties the field and tells the page,
+    // which may save the removal straight away (see manage.js).
+    const clear = $("[data-upload-clear]", field);
+    if (clear) {
+      const syncClear = () => (clear.hidden = !url.value.trim());
+      url.addEventListener("input", syncClear);
+      clear.addEventListener("click", () => {
+        url.value = "";
+        error.hidden = true;
+        url.dispatchEvent(new Event("input", { bubbles: true }));
+        field.dispatchEvent(new CustomEvent("upload:cleared"));
+      });
+    }
     file.addEventListener("change", async () => {
       const picked = file.files?.[0];
       if (!picked) return;

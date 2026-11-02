@@ -45,8 +45,8 @@
     <p class="mb-2 text-xs font-bold uppercase tracking-wide text-ink-500">Branding</p>
     <div class="flex gap-3">
       <div class="flex-1 space-y-3">
-        <x-upload-field name="logoUrl" purpose="business-logo" label="Logo image" :value="$biz['logoUrl'] ?? ''" placeholder="https://…/logo.png" hint="Shown in your website header and next to your name. Square images work best." />
-        <x-upload-field name="coverImageUrl" purpose="business-cover" label="Cover image" :value="$biz['coverImageUrl'] ?? ''" placeholder="https://…/cover.jpg" />
+        <x-upload-field name="logoUrl" purpose="business-logo" label="Logo image" :value="$biz['logoUrl'] ?? ''" placeholder="https://…/logo.png" hint="Shown in your website header and next to your name. Square images work best." clearable />
+        <x-upload-field name="coverImageUrl" purpose="business-cover" label="Cover image" :value="$biz['coverImageUrl'] ?? ''" placeholder="https://…/cover.jpg" clearable />
       </div>
       <div class="shrink-0 text-center">
         <p class="mb-1 text-[11px] font-medium text-ink-500">Preview</p>
