@@ -48,9 +48,13 @@
     <x-state-city />
   </div>
   <input inputmode="numeric" autocomplete="postal-code" maxlength="20" name="postalCode" placeholder="Postal code (optional)" class="input" />
-  <div class="grid grid-cols-2 gap-3">
-    <input required inputmode="decimal" name="latitude" placeholder="Latitude" class="input min-w-0" />
-    <input required inputmode="decimal" name="longitude" placeholder="Longitude" class="input min-w-0" />
+  <div>
+    <div class="grid grid-cols-2 gap-3">
+      <input required inputmode="decimal" name="latitude" placeholder="Latitude" class="input min-w-0" />
+      <input required inputmode="decimal" name="longitude" placeholder="Longitude" class="input min-w-0" />
+    </div>
+    <button type="button" data-detect-location class="btn-secondary mt-2 px-3 py-1.5 text-sm"><x-icon name="locate-fixed" :size="14" /> <span>Use my current location</span></button>
+    <p class="mt-1 text-xs text-red-600" data-location-error hidden></p>
   </div>
 
   @if ($canAssignOwner)

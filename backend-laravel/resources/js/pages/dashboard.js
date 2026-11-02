@@ -4,7 +4,7 @@ import { icon } from "../lib/icons";
 import { initSearchableSelects } from "../lib/searchable-select";
 import { initStateCity } from "../lib/state-city";
 import { $, $$, esc, pageData } from "../lib/ui";
-import { copyField, generatePassword, initCloneButtons, initLiveSearch, reloadWithFlash, resetPasswordModal, showError, showFlash, statusBadgeClass } from "../lib/widgets";
+import { copyField, generatePassword, initCloneButtons, initDetectLocation, initLiveSearch, reloadWithFlash, resetPasswordModal, showError, showFlash, statusBadgeClass } from "../lib/widgets";
 
 const data = pageData("dashboard-data") ?? {};
 showFlash();
@@ -17,6 +17,7 @@ initLiveSearch();
 // --- Add business -----------------------------------------------------------
 const form = $("[data-create-business]");
 const toggle = $("[data-toggle-create]");
+initDetectLocation(form);
 
 function setCreateOpen(open) {
   form.hidden = !open;

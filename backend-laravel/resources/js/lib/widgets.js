@@ -343,3 +343,46 @@ export function initCloneButtons() {
     }),
   );
 }
+
+// --- Location ---------------------------------------------------------------
+// "Use my current location" next to a form's latitude/longitude boxes: fills
+// them from the device's GPS (handy for a dealer standing at the shop).
+// Expects [data-detect-location] and [data-location-error] inside the form.
+export function initDetectLocation(form) {
+  const button = form && $("[data-detect-location]", form);
+  if (!button || button.dataset.wired) return;
+  button.dataset.wired = "1";
+  const errorBox = $("[data-location-error]", form);
+  const label = $("span", button);
+  const idle = label.textContent;
+  const done = (text = idle) => {
+    button.disabled = false;
+    label.textContent = text;
+  };
+  button.addEventListener("click", () => {
+    showError(errorBox, "");
+    if (!navigator.geolocation) return showError(errorBox, "Location isn't supported by this browser.");
+    if (!window.isSecureContext) return showError(errorBox, "Location only works on an https:// address.");
+    button.disabled = true;
+    label.textContent = "Fetching location…";
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        form.latitude.value = position.coords.latitude.toFixed(6);
+        form.longitude.value = position.coords.longitude.toFixed(6);
+        form.latitude.dispatchEvent(new Event("input", { bubbles: true }));
+        done("Location updated ✓");
+        setTimeout(() => (label.textContent = idle), 2500);
+      },
+      (err) => {
+        done();
+        showError(
+          errorBox,
+          err.code === err.PERMISSION_DENIED
+            ? "Location access is blocked. Allow location for this site in the browser, then try again."
+            : "Couldn't fetch your location. Turn on GPS / location and try again.",
+        );
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
+    );
+  });
+}

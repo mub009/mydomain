@@ -5,7 +5,7 @@ import { CHANNEL_LABELS, boardUrl, downloadDataUrl, renderQrDataUrl } from "../l
 import { initSearchableSelects } from "../lib/searchable-select";
 import { initStateCity } from "../lib/state-city";
 import { $, $$, esc, openModal, pageData } from "../lib/ui";
-import { boardPreviewModal, initCloneButtons, initUploadFields, reloadWithFlash, showError, showFlash } from "../lib/widgets";
+import { boardPreviewModal, initCloneButtons, initDetectLocation, initUploadFields, reloadWithFlash, showError, showFlash } from "../lib/widgets";
 
 // Managing one business: each section is server-rendered; these handlers
 // save through the API and reload so the page shows the saved state.
@@ -131,28 +131,7 @@ if (details) {
     field.addEventListener("upload:cleared", () => save(null, `${what} removed.`, "Could not remove"));
   });
 
-  const detectButton = $("[data-detect-location]", details);
-  const locationError = $("[data-location-error]", details);
-  detectButton.addEventListener("click", () => {
-    showError(locationError, "");
-    if (!navigator.geolocation) return showError(locationError, "Geolocation isn't supported by this browser.");
-    detectButton.disabled = true;
-    $("span", detectButton).textContent = "Detecting…";
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        detectButton.disabled = false;
-        $("span", detectButton).textContent = "Use my current location";
-        details.latitude.value = String(position.coords.latitude);
-        details.longitude.value = String(position.coords.longitude);
-      },
-      (err) => {
-        detectButton.disabled = false;
-        $("span", detectButton).textContent = "Use my current location";
-        showError(locationError, err.code === err.PERMISSION_DENIED ? "Location access denied." : "Couldn't detect your location.");
-      },
-      { enableHighAccuracy: false, timeout: 8000 },
-    );
-  });
+  initDetectLocation(details);
 
   details.addEventListener("submit", async (e) => {
     e.preventDefault();

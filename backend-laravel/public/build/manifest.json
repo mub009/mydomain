@@ -57,8 +57,8 @@
     "file": "assets/ui-DIxCFilW.js",
     "name": "ui"
   },
-  "_widgets-CAvTWC7Y.js": {
-    "file": "assets/widgets-CAvTWC7Y.js",
+  "_widgets-B6_oMxBZ.js": {
+    "file": "assets/widgets-B6_oMxBZ.js",
     "name": "widgets",
     "imports": [
       "_api-3HrlSN3j.js",
@@ -87,7 +87,7 @@
     ]
   },
   "resources/js/pages/admin.js": {
-    "file": "assets/admin-DThn_tD-.js",
+    "file": "assets/admin-Czr9x3Du.js",
     "name": "admin",
     "src": "resources/js/pages/admin.js",
     "isEntry": true,
@@ -97,7 +97,7 @@
       "_ui-DIxCFilW.js",
       "_searchable-select-Ci9s0_RU.js",
       "_state-city-D2K26BbD.js",
-      "_widgets-CAvTWC7Y.js",
+      "_widgets-B6_oMxBZ.js",
       "__commonjsHelpers-CqkleIqs.js"
     ]
   },
@@ -112,7 +112,7 @@
     ]
   },
   "resources/js/pages/dashboard.js": {
-    "file": "assets/dashboard-B-dLI28q.js",
+    "file": "assets/dashboard-CzwLk1fa.js",
     "name": "dashboard",
     "src": "resources/js/pages/dashboard.js",
     "isEntry": true,
@@ -122,13 +122,13 @@
       "_ui-DIxCFilW.js",
       "_searchable-select-Ci9s0_RU.js",
       "_state-city-D2K26BbD.js",
-      "_widgets-CAvTWC7Y.js",
+      "_widgets-B6_oMxBZ.js",
       "_channels-CvUWVcU_.js",
       "__commonjsHelpers-CqkleIqs.js"
     ]
   },
   "resources/js/pages/gold-rate-editor.js": {
-    "file": "assets/gold-rate-editor-DvQ2cXjq.js",
+    "file": "assets/gold-rate-editor-JoKxB_aK.js",
     "name": "gold-rate-editor",
     "src": "resources/js/pages/gold-rate-editor.js",
     "isEntry": true,
@@ -136,13 +136,13 @@
       "_api-3HrlSN3j.js",
       "_gold-rate-render-CpH5EuEg.js",
       "_ui-DIxCFilW.js",
-      "_widgets-CAvTWC7Y.js",
+      "_widgets-B6_oMxBZ.js",
       "_channels-CvUWVcU_.js",
       "__commonjsHelpers-CqkleIqs.js"
     ]
   },
   "resources/js/pages/gold-rates.js": {
-    "file": "assets/gold-rates-BILQyz6w.js",
+    "file": "assets/gold-rates-W3vjjmXq.js",
     "name": "gold-rates",
     "src": "resources/js/pages/gold-rates.js",
     "isEntry": true,
@@ -150,7 +150,7 @@
       "_api-3HrlSN3j.js",
       "_gold-rate-render-CpH5EuEg.js",
       "_ui-DIxCFilW.js",
-      "_widgets-CAvTWC7Y.js",
+      "_widgets-B6_oMxBZ.js",
       "_channels-CvUWVcU_.js",
       "__commonjsHelpers-CqkleIqs.js"
     ]
@@ -167,7 +167,7 @@
     ]
   },
   "resources/js/pages/manage.js": {
-    "file": "assets/manage-BdNcVR4-.js",
+    "file": "assets/manage-BY-LNV-U.js",
     "name": "manage",
     "src": "resources/js/pages/manage.js",
     "isEntry": true,
@@ -175,7 +175,7 @@
       "_ai-describe-2vIi5hGC.js",
       "_api-3HrlSN3j.js",
       "_ui-DIxCFilW.js",
-      "_widgets-CAvTWC7Y.js",
+      "_widgets-B6_oMxBZ.js",
       "_channels-CvUWVcU_.js",
       "_searchable-select-Ci9s0_RU.js",
       "_state-city-D2K26BbD.js",
