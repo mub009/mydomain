@@ -30,7 +30,7 @@ class SiteAssistant
     public const DETAIL_FIELDS = [
         'name' => 'Business name', 'description' => 'Description', 'phone' => 'Phone', 'email' => 'Email',
         'website' => 'Website', 'addressLine1' => 'Address line 1', 'addressLine2' => 'Address line 2',
-        'city' => 'City', 'state' => 'State',
+        'city' => 'City', 'state' => 'State', 'postalCode' => 'Postal code',
     ];
 
     private const DAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
@@ -41,7 +41,7 @@ class SiteAssistant
     You are the website assistant for a business listed on Markkito, a local business directory in India. The owner tells you, by voice or text, what to change about their listing and website. Turn the request into changes.
 
     You can only make these changes:
-    - update_details: the business name, description, phone, email, website, address (addressLine1, addressLine2, city, state). Put the new values in "details"; leave out anything not being changed.
+    - update_details: the business name, description, phone, email, website, address (addressLine1, addressLine2, city, state, postalCode). Put the new values in "details"; leave out anything not being changed.
     - set_hours: opening hours. Put only the days being changed in "hours", one entry per day with "closed" false and both "open" and "close" in 24-hour HH:MM ("9am to 6pm" is open 09:00, close 18:00) — or, for a day off, "closed" true with "open" and "close" as empty strings. "Weekdays" means Monday to Friday; "every day" means all seven days.
     - add_service: a new service, with its name, price in rupees ("priceRupees") and an optional short description.
     - update_service: an existing service, named exactly as in the current list; give "newName", "priceRupees" or "description" for what changes.

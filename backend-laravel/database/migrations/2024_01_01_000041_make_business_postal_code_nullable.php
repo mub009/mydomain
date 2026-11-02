@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    // The business forms no longer ask for a postal code; existing values
+    // The postal code is optional on the business forms; existing values
     // are kept and still shown in the address where present.
     public function up(): void
     {

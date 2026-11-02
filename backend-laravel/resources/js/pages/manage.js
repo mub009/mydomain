@@ -167,6 +167,8 @@ if (details) {
           addressLine1: f.addressLine1,
           city: f.city,
           state: f.state,
+          // Optional: an emptied box clears it.
+          postalCode: f.postalCode?.trim() || null,
           latitude: Number(f.latitude),
           longitude: Number(f.longitude),
           email: f.email || undefined,

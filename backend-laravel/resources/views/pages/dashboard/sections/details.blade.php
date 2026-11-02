@@ -63,8 +63,12 @@
     <label class="block text-xs font-semibold text-ink-700 mb-1">Address line 2</label>
     <input name="addressLine2" value="{{ $biz['addressLine2'] ?? '' }}" class="input" />
   </div>
-  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
     <x-state-city :state="$biz['state'] ?? ''" :city="$biz['city'] ?? ''" labels />
+    <div>
+      <label class="block text-xs font-semibold text-ink-700 mb-1">Postal code <span class="font-normal text-ink-400">(optional)</span></label>
+      <input inputmode="numeric" autocomplete="postal-code" maxlength="20" name="postalCode" value="{{ $biz['postalCode'] ?? '' }}" class="input" />
+    </div>
   </div>
   <div>
     <div class="grid grid-cols-2 gap-3">
