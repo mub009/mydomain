@@ -41,8 +41,8 @@
     "file": "assets/ui-DIxCFilW.js",
     "name": "ui"
   },
-  "_widgets-Bk8uLQoD.js": {
-    "file": "assets/widgets-Bk8uLQoD.js",
+  "_widgets-CAvTWC7Y.js": {
+    "file": "assets/widgets-CAvTWC7Y.js",
     "name": "widgets",
     "imports": [
       "_api-3HrlSN3j.js",
@@ -71,7 +71,7 @@
     ]
   },
   "resources/js/pages/admin.js": {
-    "file": "assets/admin-jOYQfJqI.js",
+    "file": "assets/admin-DY4dFv7U.js",
     "name": "admin",
     "src": "resources/js/pages/admin.js",
     "isEntry": true,
@@ -79,7 +79,7 @@
       "_api-3HrlSN3j.js",
       "_channels-CvUWVcU_.js",
       "_ui-DIxCFilW.js",
-      "_widgets-Bk8uLQoD.js",
+      "_widgets-CAvTWC7Y.js",
       "__commonjsHelpers-CqkleIqs.js"
     ]
   },
@@ -94,7 +94,7 @@
     ]
   },
   "resources/js/pages/dashboard.js": {
-    "file": "assets/dashboard-MxriYKDV.js",
+    "file": "assets/dashboard-CYOLt8b4.js",
     "name": "dashboard",
     "src": "resources/js/pages/dashboard.js",
     "isEntry": true,
@@ -102,13 +102,13 @@
       "_ai-describe-2vIi5hGC.js",
       "_api-3HrlSN3j.js",
       "_ui-DIxCFilW.js",
-      "_widgets-Bk8uLQoD.js",
+      "_widgets-CAvTWC7Y.js",
       "_channels-CvUWVcU_.js",
       "__commonjsHelpers-CqkleIqs.js"
     ]
   },
   "resources/js/pages/gold-rate-editor.js": {
-    "file": "assets/gold-rate-editor-I4I-Hnuh.js",
+    "file": "assets/gold-rate-editor-DvQ2cXjq.js",
     "name": "gold-rate-editor",
     "src": "resources/js/pages/gold-rate-editor.js",
     "isEntry": true,
@@ -116,13 +116,13 @@
       "_api-3HrlSN3j.js",
       "_gold-rate-render-CpH5EuEg.js",
       "_ui-DIxCFilW.js",
-      "_widgets-Bk8uLQoD.js",
+      "_widgets-CAvTWC7Y.js",
       "_channels-CvUWVcU_.js",
       "__commonjsHelpers-CqkleIqs.js"
     ]
   },
   "resources/js/pages/gold-rates.js": {
-    "file": "assets/gold-rates-BjPd3w_U.js",
+    "file": "assets/gold-rates-BILQyz6w.js",
     "name": "gold-rates",
     "src": "resources/js/pages/gold-rates.js",
     "isEntry": true,
@@ -130,7 +130,7 @@
       "_api-3HrlSN3j.js",
       "_gold-rate-render-CpH5EuEg.js",
       "_ui-DIxCFilW.js",
-      "_widgets-Bk8uLQoD.js",
+      "_widgets-CAvTWC7Y.js",
       "_channels-CvUWVcU_.js",
       "__commonjsHelpers-CqkleIqs.js"
     ]
@@ -147,7 +147,7 @@
     ]
   },
   "resources/js/pages/manage.js": {
-    "file": "assets/manage-DkaKieiy.js",
+    "file": "assets/manage-CWglqtnY.js",
     "name": "manage",
     "src": "resources/js/pages/manage.js",
     "isEntry": true,
@@ -155,7 +155,7 @@
       "_ai-describe-2vIi5hGC.js",
       "_api-3HrlSN3j.js",
       "_ui-DIxCFilW.js",
-      "_widgets-Bk8uLQoD.js",
+      "_widgets-CAvTWC7Y.js",
       "_channels-CvUWVcU_.js",
       "__commonjsHelpers-CqkleIqs.js"
     ]

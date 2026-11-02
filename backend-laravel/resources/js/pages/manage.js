@@ -109,18 +109,22 @@ if (details) {
     if (!["logoUrl", "coverImageUrl"].includes(input.name)) return;
     const saved = $("[data-upload-saved]", field);
     const error = $("[data-upload-error]", field);
-    field.addEventListener("upload:done", async (e) => {
+    const what = input.name === "logoUrl" ? "Logo" : "Cover image";
+    const save = async (value, done, failed) => {
+      error.hidden = true;
       saved.hidden = false;
       saved.textContent = "Saving…";
       try {
-        await api.patch(base, { [input.name]: e.detail.url });
-        saved.textContent = input.name === "logoUrl" ? "Logo saved." : "Cover image saved.";
+        await api.patch(base, { [input.name]: value });
+        saved.textContent = done;
       } catch (err) {
         saved.hidden = true;
-        error.textContent = `Uploaded, but not saved: ${errorMessage(err)} — press Save details.`;
+        error.textContent = `${failed}: ${errorMessage(err)} — press Save details.`;
         error.hidden = false;
       }
-    });
+    };
+    field.addEventListener("upload:done", (e) => save(e.detail.url, `${what} saved.`, "Uploaded, but not saved"));
+    field.addEventListener("upload:cleared", () => save(null, `${what} removed.`, "Could not remove"));
   });
 
   const detectButton = $("[data-detect-location]", details);
@@ -166,8 +170,9 @@ if (details) {
           longitude: Number(f.longitude),
           email: f.email || undefined,
           website: f.website || undefined,
-          logoUrl: f.logoUrl || undefined,
-          coverImageUrl: f.coverImageUrl || undefined,
+          // null (not undefined) so an emptied field is actually cleared.
+          logoUrl: f.logoUrl.trim() || null,
+          coverImageUrl: f.coverImageUrl.trim() || null,
           addressLine2: f.addressLine2 || undefined,
         }),
       );
