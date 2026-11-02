@@ -222,12 +222,16 @@ class DashboardController extends Controller
                 break;
         }
 
-        // What the header's "Share" button can hand out: the website once
-        // it's published, and the listing page once the listing is live.
+        // What the header's "Share" button can hand out: the website (its
+        // <slug>.<domain> subdomain) and the listing page, whenever they're
+        // live — the same rule SiteController::published() serves by: a
+        // website is up once the listing is published; an online shop only
+        // once the shop itself is published.
+        $site = \App\Models\BusinessSite::where('businessId', $id)->first(['siteType', 'isPublished']);
+        $websiteLive = $site?->siteType === 'ECOMMERCE' ? (bool) $site->isPublished : $biz['status'] === 'PUBLISHED';
         $share = array_filter([
             'name' => $biz['name'],
-            'website' => \App\Models\BusinessSite::where('businessId', $id)->where('isPublished', true)->exists()
-                ? \App\Support\Seo\SeoTracker::websiteUrl($biz['slug']) : null,
+            'website' => $websiteLive ? \App\Support\SiteUrl::for($biz['slug']) : null,
             'listing' => $biz['status'] === 'PUBLISHED' ? \App\Support\Seo\SeoTracker::listingUrl($biz['slug']) : null,
         ]);
 

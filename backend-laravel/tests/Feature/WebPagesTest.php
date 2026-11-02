@@ -155,10 +155,16 @@ class WebPagesTest extends TestCase
         $business = $this->business($owner);
         $this->signIn($owner);
 
-        $page = $this->get("/dashboard/businesses/{$business->id}")->assertOk()->assertSee('data-share-business', false);
-        if ($business->status === 'PUBLISHED') {
-            $page->assertSee(e(json_encode(\App\Support\Seo\SeoTracker::listingUrl($business->slug))), false);
-        }
+        $business->update(['status' => 'PUBLISHED']);
+
+        // A live listing's website is shareable straight away — no separate
+        // website publish step — at its subdomain when one is configured.
+        config(['sites.domain' => 'markkito.test', 'sites.scheme' => 'https']);
+        $this->get("/dashboard/businesses/{$business->id}")->assertOk()
+            ->assertSee('data-share-business', false)
+            ->assertSee(e(json_encode("https://{$business->slug}.markkito.test")), false)
+            ->assertSee(e(json_encode(\App\Support\Seo\SeoTracker::listingUrl($business->slug))), false)
+            ->assertSee('Open website');
     }
 
     public function test_add_business_has_its_own_page(): void
