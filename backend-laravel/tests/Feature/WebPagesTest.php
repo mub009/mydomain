@@ -149,6 +149,19 @@ class WebPagesTest extends TestCase
         $this->get('/admin')->assertRedirect('/');
     }
 
+    public function test_add_business_has_its_own_page(): void
+    {
+        $this->signIn($this->user(['role' => 'DEALER', 'privileges' => ['MANAGE_LISTINGS'], 'points' => 3]));
+
+        $this->get('/dashboard')->assertOk()
+            ->assertSee('href="/dashboard/businesses/new"', false)
+            ->assertDontSee('data-create-business', false);
+        $this->get('/dashboard/businesses/new')->assertOk()
+            ->assertSee('Add a business')
+            ->assertSee('data-create-business', false)
+            ->assertSee('Create a login for the business team');
+    }
+
     public function test_owner_dashboard_and_every_manage_section_render(): void
     {
         $owner = $this->user(['role' => 'BUSINESS_OWNER']);
