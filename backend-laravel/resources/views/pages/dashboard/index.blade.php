@@ -42,10 +42,11 @@
             <x-icon name="coins" :size="15" /> {{ $points['points'] }} {{ $points['points'] === 1 ? 'point' : 'points' }}
           </span>
         @endif
-        <button type="button" data-toggle-create @disabled($outOfPoints) title="{{ $outOfPoints ? 'No points left — contact the admin to add more' : '' }}" class="btn-primary px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50">
-          <span data-when="closed" class="inline-flex items-center gap-2"><x-icon name="plus" :size="15" /> Add business</span>
-          <span data-when="open" class="inline-flex items-center gap-2" hidden><x-icon name="x" :size="15" /> Cancel</span>
-        </button>
+        @if ($outOfPoints)
+          <span title="No points left — contact the admin to add more" class="btn-primary cursor-not-allowed px-4 py-2 text-sm opacity-50"><x-icon name="plus" :size="15" /> Add business</span>
+        @else
+          <a href="/dashboard/businesses/new" class="btn-primary px-4 py-2 text-sm"><x-icon name="plus" :size="15" /> Add business</a>
+        @endif
       </div>
     @endif
   </div>
@@ -91,8 +92,6 @@
   @if ($tab === 'businesses')
     <p class="mb-4 rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-700" data-flash hidden></p>
     <div data-owner-creds></div>
-
-    @include('pages.dashboard.partials.create-business')
 
     <div class="card overflow-hidden">
       <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-5 py-4">

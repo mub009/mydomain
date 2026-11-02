@@ -1,7 +1,7 @@
-{{-- "Add a business" form. Submitted by resources/js/pages/dashboard.js. --}}
-<form class="card p-4 sm:p-5 space-y-3 mb-6" data-create-business hidden>
-  <h3 class="font-bold text-ink-900">Add a business</h3>
-  <p class="text-xs text-ink-500 -mt-2">Create the listing, then add hours, services, and photos.</p>
+{{-- "Add a business" form (pages/dashboard/create.blade.php). Submitted by
+     resources/js/pages/business-create.js. --}}
+<form class="card p-4 sm:p-5 space-y-3 mb-6" data-create-business>
+  <p class="text-xs text-ink-500">Create the listing, then add hours, services, and photos.</p>
   @if ($isDealer && $points)
     <p class="text-xs text-amber-700 bg-amber-50 rounded-md px-3 py-2">
       <x-icon name="coins" :size="12" class="inline -mt-0.5 mr-1" />

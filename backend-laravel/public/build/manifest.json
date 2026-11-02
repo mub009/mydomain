@@ -57,8 +57,8 @@
     "file": "assets/ui-DIxCFilW.js",
     "name": "ui"
   },
-  "_widgets-W7tXyX0H.js": {
-    "file": "assets/widgets-W7tXyX0H.js",
+  "_widgets-C8CkmAH9.js": {
+    "file": "assets/widgets-C8CkmAH9.js",
     "name": "widgets",
     "imports": [
       "_api-3HrlSN3j.js",
@@ -67,7 +67,7 @@
     ]
   },
   "resources/css/app.css": {
-    "file": "assets/app-BxOF-Hno.css",
+    "file": "assets/app-BedQPDv_.css",
     "src": "resources/css/app.css",
     "isEntry": true
   },
@@ -87,7 +87,7 @@
     ]
   },
   "resources/js/pages/admin.js": {
-    "file": "assets/admin-C9hsfurA.js",
+    "file": "assets/admin-BMjXW7RK.js",
     "name": "admin",
     "src": "resources/js/pages/admin.js",
     "isEntry": true,
@@ -97,7 +97,23 @@
       "_ui-DIxCFilW.js",
       "_searchable-select-Ci9s0_RU.js",
       "_state-city-D2K26BbD.js",
-      "_widgets-W7tXyX0H.js",
+      "_widgets-C8CkmAH9.js",
+      "__commonjsHelpers-CqkleIqs.js"
+    ]
+  },
+  "resources/js/pages/business-create.js": {
+    "file": "assets/business-create-CVpkVHiX.js",
+    "name": "business-create",
+    "src": "resources/js/pages/business-create.js",
+    "isEntry": true,
+    "imports": [
+      "_ai-describe-2vIi5hGC.js",
+      "_api-3HrlSN3j.js",
+      "_searchable-select-Ci9s0_RU.js",
+      "_state-city-D2K26BbD.js",
+      "_ui-DIxCFilW.js",
+      "_widgets-C8CkmAH9.js",
+      "_channels-CvUWVcU_.js",
       "__commonjsHelpers-CqkleIqs.js"
     ]
   },
@@ -112,23 +128,20 @@
     ]
   },
   "resources/js/pages/dashboard.js": {
-    "file": "assets/dashboard-BaOVYpjS.js",
+    "file": "assets/dashboard-BsjcP8YC.js",
     "name": "dashboard",
     "src": "resources/js/pages/dashboard.js",
     "isEntry": true,
     "imports": [
-      "_ai-describe-2vIi5hGC.js",
       "_api-3HrlSN3j.js",
       "_ui-DIxCFilW.js",
-      "_searchable-select-Ci9s0_RU.js",
-      "_state-city-D2K26BbD.js",
-      "_widgets-W7tXyX0H.js",
+      "_widgets-C8CkmAH9.js",
       "_channels-CvUWVcU_.js",
       "__commonjsHelpers-CqkleIqs.js"
     ]
   },
   "resources/js/pages/gold-rate-editor.js": {
-    "file": "assets/gold-rate-editor-BQVsA0G7.js",
+    "file": "assets/gold-rate-editor-DjREKg_T.js",
     "name": "gold-rate-editor",
     "src": "resources/js/pages/gold-rate-editor.js",
     "isEntry": true,
@@ -136,13 +149,13 @@
       "_api-3HrlSN3j.js",
       "_gold-rate-render-CpH5EuEg.js",
       "_ui-DIxCFilW.js",
-      "_widgets-W7tXyX0H.js",
+      "_widgets-C8CkmAH9.js",
       "_channels-CvUWVcU_.js",
       "__commonjsHelpers-CqkleIqs.js"
     ]
   },
   "resources/js/pages/gold-rates.js": {
-    "file": "assets/gold-rates-B-a5_MB1.js",
+    "file": "assets/gold-rates-BFkqGQrN.js",
     "name": "gold-rates",
     "src": "resources/js/pages/gold-rates.js",
     "isEntry": true,
@@ -150,7 +163,7 @@
       "_api-3HrlSN3j.js",
       "_gold-rate-render-CpH5EuEg.js",
       "_ui-DIxCFilW.js",
-      "_widgets-W7tXyX0H.js",
+      "_widgets-C8CkmAH9.js",
       "_channels-CvUWVcU_.js",
       "__commonjsHelpers-CqkleIqs.js"
     ]
@@ -167,7 +180,7 @@
     ]
   },
   "resources/js/pages/manage.js": {
-    "file": "assets/manage-kPyw-mwT.js",
+    "file": "assets/manage-DIEl0ZXM.js",
     "name": "manage",
     "src": "resources/js/pages/manage.js",
     "isEntry": true,
@@ -175,7 +188,7 @@
       "_ai-describe-2vIi5hGC.js",
       "_api-3HrlSN3j.js",
       "_ui-DIxCFilW.js",
-      "_widgets-W7tXyX0H.js",
+      "_widgets-C8CkmAH9.js",
       "_channels-CvUWVcU_.js",
       "_searchable-select-Ci9s0_RU.js",
       "_state-city-D2K26BbD.js",
