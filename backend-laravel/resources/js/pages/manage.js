@@ -4,8 +4,9 @@ import { api, errorMessage, uploadImage } from "../lib/api";
 import { CHANNEL_LABELS, boardUrl, downloadDataUrl, renderQrDataUrl } from "../lib/channels";
 import { initSearchableSelects } from "../lib/searchable-select";
 import { initStateCity } from "../lib/state-city";
+import { icon } from "../lib/icons";
 import { $, $$, esc, openModal, pageData } from "../lib/ui";
-import { boardPreviewModal, initCloneButtons, initDetectLocation, initUploadFields, reloadWithFlash, showError, showFlash } from "../lib/widgets";
+import { boardPreviewModal, copyField, initCloneButtons, initDetectLocation, initUploadFields, reloadWithFlash, showError, showFlash } from "../lib/widgets";
 
 // Managing one business: each section is server-rendered; these handlers
 // save through the API and reload so the page shows the saved state.
@@ -21,6 +22,32 @@ initStateCity();
 initSearchableSelects();
 initAssistant(biz.id);
 initCloneButtons();
+
+// --- Share ------------------------------------------------------------------
+// The header's "Share" button: the website (once published) and the listing
+// page (once live), to copy or send on WhatsApp / Facebook — or the phone's
+// own share sheet. Shared links show the logo card (ShareImageController).
+$("[data-share-business]")?.addEventListener("click", (e) => {
+  const share = JSON.parse(e.currentTarget.dataset.shareBusiness);
+  const links = [
+    share.website && { label: "Website", url: share.website },
+    share.listing && { label: "Markkito listing page", url: share.listing },
+  ].filter(Boolean);
+  const main = links[0]?.url;
+  const message = [`*${share.name}*`, ...links.map((l) => `${l.label}: ${l.url}`)].join("\n");
+  const body = links.length
+    ? `<div class="space-y-3">
+        <div class="space-y-2.5 rounded-xl border border-emerald-200 bg-emerald-50 p-3">${links.map((l) => copyField(l.label, l.url)).join("")}</div>
+        <a href="https://wa.me/?text=${encodeURIComponent(message)}" target="_blank" rel="noopener" class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#25D366] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#1ebe5b]">${icon("message-square", { size: 16 })} Share on WhatsApp</a>
+        <a href="https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(main)}" target="_blank" rel="noopener" class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#1877F2] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#166fe0]">${icon("facebook", { size: 16 })} Share on Facebook</a>
+        ${navigator.share ? `<button type="button" data-native-share class="btn-secondary w-full py-2.5">${icon("share-2", { size: 15 })} More apps (Instagram, Telegram…)</button>` : ""}
+      </div>`
+    : `<p class="text-sm text-ink-600">Nothing to share yet. <strong>Publish</strong> the listing, or publish the website from the <strong>Website</strong> section — then its link can be shared from here.</p>`;
+  const modal = openModal(`Share ${share.name}`, body);
+  $("[data-native-share]", modal.body)?.addEventListener("click", () =>
+    navigator.share({ title: share.name, text: share.name, url: main }).catch(() => {}),
+  );
+});
 
 // Runs an API call with the button showing a busy label.
 async function busy(button, label, work) {

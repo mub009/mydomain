@@ -222,8 +222,18 @@ class DashboardController extends Controller
                 break;
         }
 
+        // What the header's "Share" button can hand out: the website once
+        // it's published, and the listing page once the listing is live.
+        $share = array_filter([
+            'name' => $biz['name'],
+            'website' => \App\Models\BusinessSite::where('businessId', $id)->where('isPublished', true)->exists()
+                ? \App\Support\Seo\SeoTracker::websiteUrl($biz['slug']) : null,
+            'listing' => $biz['status'] === 'PUBLISHED' ? \App\Support\Seo\SeoTracker::listingUrl($biz['slug']) : null,
+        ]);
+
         return view('pages.dashboard.manage', [
             'biz' => $biz,
+            'share' => $share,
             'section' => $section,
             ...$data,
         ]);

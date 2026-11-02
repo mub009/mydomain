@@ -149,6 +149,18 @@ class WebPagesTest extends TestCase
         $this->get('/admin')->assertRedirect('/');
     }
 
+    public function test_manage_page_offers_sharing_the_listing(): void
+    {
+        $owner = $this->user(['role' => 'BUSINESS_OWNER']);
+        $business = $this->business($owner);
+        $this->signIn($owner);
+
+        $page = $this->get("/dashboard/businesses/{$business->id}")->assertOk()->assertSee('data-share-business', false);
+        if ($business->status === 'PUBLISHED') {
+            $page->assertSee(e(json_encode(\App\Support\Seo\SeoTracker::listingUrl($business->slug))), false);
+        }
+    }
+
     public function test_add_business_has_its_own_page(): void
     {
         $this->signIn($this->user(['role' => 'DEALER', 'privileges' => ['MANAGE_LISTINGS'], 'points' => 3]));
