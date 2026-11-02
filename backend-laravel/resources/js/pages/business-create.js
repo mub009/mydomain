@@ -77,6 +77,7 @@ form?.addEventListener("submit", async (e) => {
         businessName: created.name,
         username: created.ownerAccount?.username ?? f.ownerUsername,
         password: f.ownerPassword,
+        phone: f.ownerPhone || "",
         created: created.ownerAccount?.created ?? true,
       };
       try {

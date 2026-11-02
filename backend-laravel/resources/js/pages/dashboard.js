@@ -1,7 +1,7 @@
 import { api, errorMessage } from "../lib/api";
 import { icon } from "../lib/icons";
 import { $, $$, esc } from "../lib/ui";
-import { copyField, initCloneButtons, initLiveSearch, resetPasswordModal, showFlash, statusBadgeClass } from "../lib/widgets";
+import { copyField, initCloneButtons, initLiveSearch, resetPasswordModal, showFlash, statusBadgeClass, whatsappShareButton } from "../lib/widgets";
 
 showFlash();
 initCloneButtons();
@@ -32,6 +32,12 @@ initLiveSearch();
     <div class="space-y-2.5">
       ${copyField("Username", creds.username)}
       ${creds.created ? copyField("Password", creds.password) : ""}
+      ${whatsappShareButton({
+        businessName: creds.businessName,
+        username: creds.username,
+        password: creds.created ? creds.password : "",
+        phone: creds.phone,
+      })}
     </div>
   </div>`;
   $("[data-dismiss-creds]", target).addEventListener("click", () => (target.innerHTML = ""));

@@ -186,7 +186,14 @@ export function resetPasswordModal(user) {
         <p class="text-sm text-emerald-800 bg-emerald-50 rounded-md px-3 py-2">Password reset. Their old sessions are signed out — share the new login below. The password won't be shown again.</p>
         ${copyField("Username", user.email ?? user.phone)}
         ${copyField("New password", password)}
-        <button type="button" class="btn-primary w-full py-2.5" data-close>Done</button>
+        ${whatsappShareButton({
+          businessName: [user.firstName, user.lastName].filter(Boolean).join(" "),
+          username: user.email ?? user.phone,
+          password,
+          phone: user.phone,
+          reset: true,
+        })}
+        <button type="button" class="btn-secondary w-full py-2.5" data-close>Done</button>
       </div>`;
     } catch (err) {
       $("[data-error]", form).innerHTML = alertBox(errorMessage(err));
@@ -328,6 +335,12 @@ export function initCloneButtons() {
             <div class="space-y-2.5">
               ${copyField("Username", account.username)}
               ${account.created ? copyField("Password", owner.password) : ""}
+              ${whatsappShareButton({
+                businessName: copy.name.replace(/ \(Copy\)$/, ""),
+                username: account.username,
+                password: account.created ? owner.password : "",
+                phone: owner.phone,
+              })}
             </div>
           </div>
           <div class="mt-4 flex justify-end">
@@ -379,4 +392,43 @@ export function initDetectLocation(form) {
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
     );
   });
+}
+
+// --- Share a login on WhatsApp --------------------------------------------
+// A "Share on WhatsApp" link with the login page, username and password
+// written out, for a dealer handing a new (or reset) login to the business.
+// Opens a chat with the business's mobile number when there is one (the
+// username itself, or the contact phone); otherwise WhatsApp asks whom to
+// send it to.
+function whatsappNumber(...candidates) {
+  for (const value of candidates) {
+    const digits = String(value ?? "").replace(/\D/g, "");
+    if (/^[6-9]\d{9}$/.test(digits)) return `91${digits}`;
+    if (/^91[6-9]\d{9}$/.test(digits)) return digits;
+  }
+  return "";
+}
+
+export function whatsappLoginUrl({ businessName, username, password, phone, reset = false }) {
+  const lines = [
+    reset
+      ? `Hello! The Markkito login password${businessName ? ` for *${businessName}*` : ""} has been reset.`
+      : `Hello! Your business${businessName ? ` *${businessName}*` : ""} is now listed on Markkito.`,
+    "",
+    `Login: ${window.location.origin}/login`,
+    `Username: ${username}`,
+    password ? `Password: ${password}` : "Password: your existing Markkito password",
+    "",
+    reset
+      ? "Please sign in with the new password."
+      : "Sign in to update your phone, address, photos, opening hours and more.",
+  ];
+  const number = whatsappNumber(username, phone);
+  return `https://wa.me/${number}?text=${encodeURIComponent(lines.join("\n"))}`;
+}
+
+export function whatsappShareButton(details) {
+  return `<a href="${esc(whatsappLoginUrl(details))}" target="_blank" rel="noopener" class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#25D366] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#1ebe5b]">
+    ${icon("message-square", { size: 16 })} Share login on WhatsApp
+  </a>`;
 }
