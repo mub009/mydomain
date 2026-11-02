@@ -1,12 +1,14 @@
 import { initAiDescription } from "../lib/ai-describe";
 import { api, errorMessage } from "../lib/api";
 import { icon } from "../lib/icons";
+import { initStateCity } from "../lib/state-city";
 import { $, $$, esc, pageData } from "../lib/ui";
 import { copyField, generatePassword, initCloneButtons, initLiveSearch, reloadWithFlash, resetPasswordModal, showError, showFlash, statusBadgeClass } from "../lib/widgets";
 
 const data = pageData("dashboard-data") ?? {};
 showFlash();
 initCloneButtons();
+initStateCity();
 // The Listings and Business logins search boxes.
 initLiveSearch();
 

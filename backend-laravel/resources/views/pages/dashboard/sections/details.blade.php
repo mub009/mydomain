@@ -64,14 +64,7 @@
     <input name="addressLine2" value="{{ $biz['addressLine2'] ?? '' }}" class="input" />
   </div>
   <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
-    <div>
-      <label class="block text-xs font-semibold text-ink-700 mb-1">City</label>
-      <input required name="city" value="{{ $biz['city'] }}" class="input" />
-    </div>
-    <div>
-      <label class="block text-xs font-semibold text-ink-700 mb-1">State</label>
-      <input required name="state" value="{{ $biz['state'] }}" class="input" />
-    </div>
+    <x-state-city :state="$biz['state'] ?? ''" :city="$biz['city'] ?? ''" labels />
     <div>
       <label class="block text-xs font-semibold text-ink-700 mb-1">Postal code</label>
       <input required name="postalCode" value="{{ $biz['postalCode'] ?? '' }}" class="input" />

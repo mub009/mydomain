@@ -1,6 +1,7 @@
 import { api, errorMessage } from "../lib/api";
 import { boardHeadline, boardUrl, downloadDataUrl, renderQrDataUrl } from "../lib/channels";
 import { icon } from "../lib/icons";
+import { initStateCity, stateCityFields } from "../lib/state-city";
 import { $, $$, alertBox, esc, formatDateTime, openModal, pageData } from "../lib/ui";
 import { initLiveSearch, reloadWithFlash, resetPasswordModal, showError, showFlash } from "../lib/widgets";
 
@@ -341,9 +342,8 @@ $$("[data-edit-business]").forEach((button) =>
           <option value="">Select category</option>
           ${categories.map((c) => `<option value="${esc(c.id)}" ${c.id === b.category?.id ? "selected" : ""}>${esc(c.name)}</option>`).join("")}
         </select>
-        <div class="flex gap-3">
-          <input class="input" name="city" value="${esc(b.city)}" placeholder="City" />
-          <input class="input" name="state" value="${esc(b.state)}" placeholder="State" />
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          ${stateCityFields({ state: b.state, city: b.city })}
         </div>
         <input class="input" name="phone" value="${esc(b.phone)}" placeholder="Phone" />
         <div class="flex gap-3">
@@ -359,6 +359,7 @@ $$("[data-edit-business]").forEach((button) =>
       </form>`,
     );
     const form = $("form", modal.body);
+    initStateCity(form);
     form.addEventListener("submit", (e) => {
       e.preventDefault();
       submitModalForm(form, $("[data-submit]", form), "Saving…", async () => {

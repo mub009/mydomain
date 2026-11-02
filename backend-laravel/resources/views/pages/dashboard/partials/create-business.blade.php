@@ -45,8 +45,7 @@
   {{-- Side by side from tablet width; stacked on phones, where two text
        inputs in a row are wider than the screen. --}}
   <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-    <input required name="city" placeholder="City" class="input min-w-0" />
-    <input required name="state" placeholder="State" class="input min-w-0" />
+    <x-state-city />
   </div>
   <input required inputmode="numeric" autocomplete="postal-code" name="postalCode" placeholder="Postal code" class="input" />
   <div class="grid grid-cols-2 gap-3">

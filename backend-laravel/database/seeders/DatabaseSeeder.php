@@ -91,5 +91,7 @@ class DatabaseSeeder extends Seeder
                 ['url' => "https://picsum.photos/seed/{$seed}/800/600", 'caption' => str_replace('-', ' ', $seed)],
             );
         }
+
+        $this->call(StateCitySeeder::class);
     }
 }

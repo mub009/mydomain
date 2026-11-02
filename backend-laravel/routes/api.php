@@ -46,6 +46,9 @@ Route::prefix('auth')->group(function () {
 // purposes it accepts and what each is gated to.
 Route::post('/uploads/image', [UploadController::class, 'image'])->middleware('auth.jwt');
 
+// States and their cities, for the State / City drop-downs.
+Route::get('/locations', [\App\Http\Controllers\LocationController::class, 'index']);
+
 Route::prefix('categories')->group(function () {
     Route::get('/', [CategoryController::class, 'index']);
     Route::get('/{slug}', [CategoryController::class, 'show']);
