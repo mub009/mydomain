@@ -120,7 +120,7 @@
                 <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-sm font-bold text-brand-700">{{ mb_strtoupper(mb_substr($b['name'], 0, 1)) }}</span>
               @endif
               <div class="min-w-0">
-                <a href="/dashboard/businesses/{{ $b['id'] }}" class="block truncate font-semibold text-ink-900 hover:text-brand-600">{{ $b['name'] }}</a>
+                <a href="/dashboard/businesses/{{ $b['id'] }}" target="_blank" rel="noopener" class="block truncate font-semibold text-ink-900 hover:text-brand-600">{{ $b['name'] }}</a>
                 <p class="truncate text-xs text-ink-500">{{ collect([$b['category']['name'] ?? null, $b['city']])->filter()->implode(' · ') }}</p>
               </div>
             </div>
@@ -132,7 +132,7 @@
             <span class="hidden text-right text-sm tabular-nums text-ink-700 md:block">{{ number_format($b['leadCount'] ?? 0) }}</span>
             <div class="flex flex-wrap items-center gap-2 md:w-[232px] md:flex-nowrap md:justify-end">
               {{-- First on phones; last on wide screens, so it lines up down the list. --}}
-              <a href="/dashboard/businesses/{{ $b['id'] }}" class="btn-primary px-3 py-1.5 text-sm md:order-last"><x-icon name="settings-2" :size="14" /> Manage</a>
+              <a href="/dashboard/businesses/{{ $b['id'] }}" target="_blank" rel="noopener" class="btn-primary px-3 py-1.5 text-sm md:order-last"><x-icon name="settings-2" :size="14" /> Manage</a>
               @if ($b['status'] === 'PUBLISHED')
                 <a href="{{ SiteUrl::for($b['slug']) }}" target="_blank" rel="noreferrer" class="btn-secondary px-2.5 py-1.5 text-sm" title="Open website"><x-icon name="globe" :size="14" /> Website</a>
               @endif
@@ -212,7 +212,7 @@
                   @if (count($a['businesses']) > 0)
                     <div class="mt-1.5 flex flex-wrap gap-1.5">
                       @foreach (array_slice($a['businesses'], 0, 4) as $b)
-                        <a href="/dashboard/businesses/{{ $b['id'] }}" class="inline-flex items-center gap-1 rounded-md bg-gray-50 px-2 py-0.5 text-xs text-ink-700 ring-1 ring-inset ring-gray-200 hover:bg-brand-50 hover:text-brand-700">
+                        <a href="/dashboard/businesses/{{ $b['id'] }}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 rounded-md bg-gray-50 px-2 py-0.5 text-xs text-ink-700 ring-1 ring-inset ring-gray-200 hover:bg-brand-50 hover:text-brand-700">
                           <x-icon name="building-2" :size="11" /> {{ $b['name'] }}
                           <span class="text-ink-400">· {{ $statusLabel($b['status']) }}</span>
                         </a>

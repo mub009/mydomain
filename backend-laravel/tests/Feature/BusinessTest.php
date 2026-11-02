@@ -157,6 +157,25 @@ class BusinessTest extends TestCase
             ->assertStatus(200);
     }
 
+    public function test_business_login_without_contact_names_is_named_after_the_business(): void
+    {
+        [, $token] = $this->actingToken(['role' => 'DEALER', 'privileges' => ['MANAGE_LISTINGS'], 'points' => 5]);
+        $category = $this->category();
+
+        $this->postJson('/api/v1/businesses', [
+            'name' => 'Nameless Login Shop', 'categoryId' => $category->id,
+            'phone' => '9998887777', 'addressLine1' => '1 Main St', 'city' => 'Pune', 'state' => 'MH',
+            'latitude' => 18.5, 'longitude' => 73.8,
+            'owner' => ['username' => 'team@nameless.test', 'password' => 'Secret123!'],
+        ], ['Authorization' => "Bearer {$token}"])
+            ->assertStatus(201)
+            ->assertJsonPath('data.ownerAccount.username', 'team@nameless.test');
+
+        $this->assertDatabaseHas('users', ['email' => 'team@nameless.test', 'firstName' => 'Nameless Login Shop', 'lastName' => '', 'role' => 'BUSINESS_OWNER']);
+        $this->postJson('/api/v1/auth/login', ['email' => 'team@nameless.test', 'password' => 'Secret123!'])
+            ->assertStatus(200);
+    }
+
     public function test_business_login_username_can_still_be_an_email(): void
     {
         [, $token] = $this->actingToken(['role' => 'DEALER', 'privileges' => ['MANAGE_LISTINGS'], 'points' => 5]);

@@ -70,10 +70,6 @@
           The listing is assigned to this account so the business can sign in and manage it. If the email
           already has an account, the listing is linked to it and the password is ignored.
         </p>
-        <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3">
-          <input class="input min-w-0" name="ownerFirstName" placeholder="Contact first name" autocomplete="off" data-owner-required />
-          <input class="input min-w-0" name="ownerLastName" placeholder="Contact last name" autocomplete="off" data-owner-required />
-        </div>
         <div>
           <label class="block text-[11px] font-medium text-ink-600 mb-1">Login username (email or mobile number)</label>
           <input class="input" name="ownerUsername" placeholder="owner@business.com or 9876543210" autocomplete="off" autocapitalize="none" spellcheck="false" data-owner-required />

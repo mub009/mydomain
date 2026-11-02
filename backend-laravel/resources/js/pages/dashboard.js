@@ -78,8 +78,6 @@ form?.addEventListener("submit", async (e) => {
       ...(assignOwner
         ? {
             owner: {
-              firstName: f.ownerFirstName,
-              lastName: f.ownerLastName,
               username: f.ownerUsername,
               phone: f.ownerPhone || undefined,
               password: f.ownerPassword,

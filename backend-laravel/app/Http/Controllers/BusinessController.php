@@ -86,8 +86,9 @@ class BusinessController extends Controller
     {
         return [
             'owner' => [$presence, 'array'],
-            'owner.firstName' => ['required_with:owner', 'string', 'min:1', 'max:80'],
-            'owner.lastName' => ['required_with:owner', 'string', 'min:1', 'max:80'],
+            // Optional: a new login is named after the business when left out.
+            'owner.firstName' => ['sometimes', 'nullable', 'string', 'max:80'],
+            'owner.lastName' => ['sometimes', 'nullable', 'string', 'max:80'],
             'owner.username' => ['required_with:owner', 'string', 'max:255'],
             'owner.phone' => ['nullable', 'string', 'min:7', 'max:20'],
             'owner.password' => ['required_with:owner', 'string', 'min:8', 'max:72'],
@@ -134,7 +135,7 @@ class BusinessController extends Controller
     }
 
     // Inside the caller's transaction: the account the listing goes to.
-    private function ownerAccount(array $login, array $actor): User
+    private function ownerAccount(array $login, array $actor, string $businessName): User
     {
         $account = $login['existing'];
         if ($account) {
@@ -150,8 +151,8 @@ class BusinessController extends Controller
             'email' => $login['email'],
             'phone' => $login['phone'],
             'passwordHash' => Hash::make($login['owner']['password']),
-            'firstName' => $login['owner']['firstName'],
-            'lastName' => $login['owner']['lastName'],
+            'firstName' => trim((string) ($login['owner']['firstName'] ?? '')) ?: mb_substr($businessName, 0, 80),
+            'lastName' => trim((string) ($login['owner']['lastName'] ?? '')),
             'role' => 'BUSINESS_OWNER',
             'status' => 'ACTIVE',
             // Remember who set this account up so the dealer can manage it
@@ -219,7 +220,7 @@ class BusinessController extends Controller
         $login = $this->checkOwnerLogin($owner);
 
         $result = DB::transaction(function () use ($data, $actor, $initialStatus, $isStaff, $login) {
-            $ownerRecord = $this->ownerAccount($login, $actor);
+            $ownerRecord = $this->ownerAccount($login, $actor, $data['name']);
 
             $business = Business::create([
                 ...$data,
@@ -412,7 +413,7 @@ class BusinessController extends Controller
         $login = $this->checkOwnerLogin($owner);
 
         return DB::transaction(function () use ($actor, $source, $login) {
-            $ownerRecord = $this->ownerAccount($login, $actor);
+            $ownerRecord = $this->ownerAccount($login, $actor, $source->name);
             $name = mb_substr($source->name, 0, 143).' (Copy)';
             $copy = Business::create([
                 ...$source->only([

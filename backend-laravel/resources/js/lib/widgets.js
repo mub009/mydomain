@@ -273,10 +273,6 @@ export function initCloneButtons() {
           <div class="rounded-lg border border-gray-200 p-3 space-y-2">
             <p class="text-sm font-semibold text-ink-900 flex items-center gap-1.5">${icon("key-round", { size: 14 })} Login for the copy</p>
             <p class="text-[11px] text-ink-500">The copy is assigned to this account so its business team can sign in. If the username already has an account, the copy is linked to it and the password is ignored.</p>
-            <div class="flex gap-2">
-              <input class="input" name="firstName" placeholder="Contact first name" required />
-              <input class="input" name="lastName" placeholder="Contact last name" required />
-            </div>
             <div>
               <label class="block text-[11px] font-medium text-ink-600 mb-1">Username (email or mobile number)</label>
               <input class="input" name="username" placeholder="owner@business.com or 9876543210" autocomplete="off" required />
@@ -309,8 +305,6 @@ export function initCloneButtons() {
         confirm.disabled = true;
         confirm.textContent = "Cloning…";
         const owner = {
-          firstName: form.firstName.value.trim(),
-          lastName: form.lastName.value.trim(),
           username: form.username.value.trim(),
           password: form.password.value,
           phone: form.phone.value.trim() || undefined,
