@@ -92,6 +92,6 @@ class DatabaseSeeder extends Seeder
             );
         }
 
-        $this->call(StateCitySeeder::class);
+        $this->call([CategorySeeder::class, StateCitySeeder::class]);
     }
 }
