@@ -212,6 +212,7 @@ export function initHotspotEditor(editor, options) {
   }
 
   function renderPalette() {
+    if (!palette) return; // the business card editor has no palette: boxes are added by clicking the image
     palette.innerHTML = GROUPS.map(([kind, title]) => {
       const items = actionList.filter((a) => (a.kind || "action") === kind);
       if (!items.length) return "";
@@ -573,7 +574,7 @@ export function initHotspotEditor(editor, options) {
   }
 
   // --- Drag from the palette onto the card ------------------------------------
-  palette.addEventListener("pointerdown", (e) => {
+  palette?.addEventListener("pointerdown", (e) => {
     const chip = e.target.closest("[data-palette-action]");
     if (!chip || chip.disabled || e.button > 0) return;
     e.preventDefault();
@@ -607,7 +608,7 @@ export function initHotspotEditor(editor, options) {
     );
   });
   // Keyboard (Enter/Space on a chip) adds it in the middle; pointer taps are handled above.
-  palette.addEventListener("click", (e) => {
+  palette?.addEventListener("click", (e) => {
     const chip = e.target.closest("[data-palette-action]");
     if (chip && !chip.disabled && e.detail === 0) addSpot(chip.dataset.paletteAction);
   });

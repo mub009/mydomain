@@ -2,7 +2,7 @@
      the palette to drag them from, the selected action's settings and the
      list of placed ones. Brought to life by resources/js/lib/hotspot-editor.js.
      Used by the business's Visiting Card section and the admin card-template editor. --}}
-@props(['subject' => 'your card', 'replaceable' => true])
+@props(['subject' => 'your card', 'replaceable' => true, 'palette' => true])
 <div {{ $attributes->merge(['class' => 'grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]']) }} data-hotspot-editor>
   {{-- Stage --}}
   <div class="min-w-0">
@@ -34,11 +34,13 @@
 
   {{-- Palette, inspector and the list of placed actions --}}
   <div class="space-y-4">
-    <div>
-      <p class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-ink-500">Drag onto {{ $subject }}</p>
-      <div class="flex flex-wrap gap-1.5" data-palette></div>
-      <p class="mt-1.5 text-[11px] text-ink-400">Or click right on the image to add one at that spot. Details show your listing's name, address, phone… in your own font.</p>
-    </div>
+    @if ($palette)
+      <div>
+        <p class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-ink-500">Drag onto {{ $subject }}</p>
+        <div class="flex flex-wrap gap-1.5" data-palette></div>
+        <p class="mt-1.5 text-[11px] text-ink-400">Or click right on the image to add one at that spot. Details show your listing's name, address, phone… in your own font.</p>
+      </div>
+    @endif
     <div class="rounded-xl border border-gray-200 p-3" data-inspector></div>
     <div>
       <p class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-ink-500">On the card <span class="font-normal normal-case" data-spot-count></span></p>

@@ -118,7 +118,7 @@
       <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 class="flex items-center gap-1.5 font-bold text-ink-900"><x-icon name="image" :size="16" class="text-brand-600" /> Card design & actions</h3>
-          <p class="mt-0.5 text-sm text-ink-500">Upload your card as a JPG — or start from a ready-made design below — then drag actions onto it, over the buttons or icons in the design.</p>
+          <p class="mt-0.5 text-sm text-ink-500">Upload your card as a JPG — or start from a ready-made design below — then click on it to add actions over the buttons or icons in the design.</p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
           <span class="hidden text-xs font-semibold text-amber-700" data-dirty-note>Unsaved changes</span>
@@ -137,7 +137,7 @@
         </p>
       @endif
 
-      <x-hotspot-editor subject="your card" :replaceable="false" />
+      <x-hotspot-editor subject="your card" :replaceable="false" :palette="false" />
     </div>
     @endunless
 

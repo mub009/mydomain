@@ -238,8 +238,9 @@ class BusinessCardTest extends TestCase
         $this->signIn($admin);
         // Admins (and dealers) get the editor.
         $this->get("/dashboard/businesses/{$business->id}?section=".urlencode('Visiting Card'))
-            ->assertOk()->assertSee('Card design & actions', false)->assertSee('Drop the card image here')->assertSee('Drag onto')
-            ->assertDontSee('Replace image'); // a business's card image isn't swapped from here
+            ->assertOk()->assertSee('Card design & actions', false)->assertSee('Drop the card image here')
+            // A business's card image isn't swapped from here, and actions are added by clicking the image.
+            ->assertDontSee('Replace image')->assertDontSee('Drag onto')->assertDontSee('data-palette', false);
         $this->get('/admin?tab='.urlencode('Card Templates'))->assertOk()->assertSee('Visiting card templates')->assertSee('Luxury Dining');
         $this->get('/admin/card-templates/new')->assertOk()->assertSee('New card template');
         $template = CardTemplate::where('name', 'Luxury Dining')->first();
