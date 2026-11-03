@@ -59,6 +59,8 @@ class ImageCard
         'address' => ['label' => 'Address', 'icon' => 'map-pin', 'kind' => 'text', 'value' => 'text', 'link' => 'directions'],
         'hours' => ['label' => 'Opening hours', 'icon' => 'clock', 'kind' => 'text', 'value' => 'text'],
         'about' => ['label' => 'About', 'icon' => 'info', 'kind' => 'text', 'value' => 'text'],
+        // Free text typed on the card itself — a slogan, an offer, a note — in any font and style.
+        'custom_text' => ['label' => 'Custom text', 'icon' => 'pencil', 'kind' => 'text', 'value' => 'text'],
         // A logo's value is an uploaded picture; empty = the listing's logo.
         'logo' => ['label' => 'Logo', 'icon' => 'image', 'kind' => 'image', 'value' => 'image'],
         'qr' => ['label' => 'QR code', 'icon' => 'qr-code', 'kind' => 'image', 'value' => null],
@@ -121,6 +123,7 @@ class ImageCard
             'hotspots.*.font' => ['nullable', 'in:'.implode(',', CardEngine::FONTS)],
             'hotspots.*.fontSize' => ['nullable', 'integer', 'min:8', 'max:48'],
             'hotspots.*.bold' => ['nullable', 'boolean'],
+            'hotspots.*.italic' => ['nullable', 'boolean'],
             'hotspots.*.color' => ['nullable', 'regex:'.self::HEX],
             'hotspots.*.bg' => ['nullable', 'regex:'.self::HEX],
             'hotspots.*.align' => ['nullable', 'in:'.implode(',', self::ALIGNS)],
@@ -157,6 +160,7 @@ class ImageCard
                 'font' => in_array($h['font'] ?? null, CardEngine::FONTS, true) ? $h['font'] : null,
                 'fontSize' => isset($h['fontSize']) ? (int) min(48, max(8, (int) $h['fontSize'])) : null,
                 'bold' => (bool) ($h['bold'] ?? false),
+                'italic' => (bool) ($h['italic'] ?? false),
                 'color' => isset($h['color']) && preg_match(self::HEX, $h['color']) ? strtolower($h['color']) : null,
                 'bg' => isset($h['bg']) && preg_match(self::HEX, $h['bg']) ? strtolower($h['bg']) : null,
                 'align' => in_array($h['align'] ?? null, self::ALIGNS, true) ? $h['align'] : null,
@@ -382,6 +386,9 @@ class ImageCard
         }
         if (! empty($h['bold'])) {
             $css .= ';font-weight:700';
+        }
+        if (! empty($h['italic'])) {
+            $css .= ';font-style:italic';
         }
         if (isset($h['color']) && preg_match(self::HEX, $h['color'])) {
             $css .= ";color:{$h['color']}";

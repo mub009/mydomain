@@ -278,6 +278,30 @@ class ImageCardTest extends TestCase
         $this->assertStringContainsString('font-weight:700;color:#ffee00;background:#123456', $html);
     }
 
+    public function test_custom_text_is_drawn_in_its_own_font_size_and_style(): void
+    {
+        $this->save([
+            $this->spot('custom_text', ['value' => "Free home delivery\nOrder by 9pm", 'font' => 'Playfair Display', 'fontSize' => 22, 'bold' => true, 'italic' => true, 'color' => '#AA0000', 'align' => 'center']),
+            // Typed nothing: left off the card.
+            $this->spot('custom_text', ['id' => 'h-empty']),
+        ])->assertOk()
+            ->assertJsonPath('data.hotspots.0.value', "Free home delivery\nOrder by 9pm")
+            ->assertJsonPath('data.hotspots.0.italic', true)
+            ->assertJsonPath('data.hotspots.1.italic', false);
+
+        $this->postJson("/api/v1/businesses/{$this->business->id}/card/publish", [], $this->auth)->assertOk();
+        $html = $this->get('/card/spice-garden')->assertOk()->getContent();
+        $this->assertStringContainsString("Free home delivery\nOrder by 9pm", $html);
+        $this->assertStringContainsString('family=Playfair+Display', $html);
+        $this->assertStringContainsString('font-size:calc(22 * 100cqw / 480)', $html);
+        $this->assertStringContainsString('font-weight:700;font-style:italic;color:#aa0000', $html);
+        $this->assertSame(1, substr_count($html, 'class="spot detail"'));
+
+        // Custom text isn't a listing detail, so it's never reported as missing.
+        $this->getJson("/api/v1/businesses/{$this->business->id}/card", $this->auth)->assertOk()->assertJsonPath('data.missingDetails', []);
+        $this->get('/card/spice-garden.pdf')->assertOk();
+    }
+
     public function test_business_details_are_drawn_on_the_card_from_the_listing(): void
     {
         $this->business->update(['logoUrl' => 'https://cdn.example.test/logo.jpg', 'description' => "Kerala meals\nand seafood"]);

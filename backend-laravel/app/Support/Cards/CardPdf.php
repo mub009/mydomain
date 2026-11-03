@@ -128,10 +128,11 @@ class CardPdf
                 if ($h['kind'] === 'text') {
                     // dompdf has only its own fonts: the serif or sans one nearest the chosen font.
                     $text = sprintf(
-                        'font-family:%s;font-size:%spt;font-weight:%s;color:%s;text-align:%s;%s',
+                        'font-family:%s;font-size:%spt;font-weight:%s;font-style:%s;color:%s;text-align:%s;%s',
                         in_array($h['font'] ?? null, self::SERIF_FONTS, true) ? "'DejaVu Serif'" : "'DejaVu Sans'",
                         round(((int) ($h['fontSize'] ?? 0) ?: ImageCard::DEFAULT_FONT_SIZE) * $pt, 2),
                         empty($h['bold']) ? 'normal' : 'bold',
+                        empty($h['italic']) ? 'normal' : 'italic',
                         $h['color'] ?? '#ffffff',
                         $h['align'] ?? 'left',
                         isset($h['bg']) ? "background:{$h['bg']};" : '',

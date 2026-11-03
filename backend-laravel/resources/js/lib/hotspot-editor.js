@@ -49,6 +49,7 @@ function textStyle(h) {
   let css = `font-size:calc(${h.fontSize || DEFAULT_FONT_SIZE} * 100cqw / 480);`;
   if (h.font) css += `font-family:'${h.font.replace(/[^A-Za-z ]/g, "")}',system-ui,sans-serif;`;
   if (h.bold) css += "font-weight:700;";
+  if (h.italic) css += "font-style:italic;";
   if (hex.test(h.color || "")) css += `color:${h.color};`;
   if (hex.test(h.bg || "")) css += `background:${h.bg};`;
   return css;
@@ -157,7 +158,7 @@ export function initHotspotEditor(editor, options) {
         class="absolute flex cursor-move touch-none items-center overflow-visible rounded ${kindOf(h) === "text" ? `${align} px-[0.15em] leading-tight text-white` : ""} ring-2 ${ring} focus:outline-none"
         style="left:${h.x}%;top:${h.y}%;width:${h.w}%;height:${h.h}%;${kindOf(h) === "text" ? esc(textStyle(h)) : ""}">
         ${inner}
-        ${!shown ? `<span class="pointer-events-none absolute -top-2.5 left-1 rounded bg-amber-500 px-1 text-[9px] text-white">${h.action === "logo" ? "upload a logo" : "not on your listing"}</span>` : ""}
+        ${!shown ? `<span class="pointer-events-none absolute -top-2.5 left-1 rounded bg-amber-500 px-1 text-[9px] text-white">${h.action === "logo" ? "upload a logo" : h.action === "custom_text" ? "type your text" : "not on your listing"}</span>` : ""}
         ${selected ? handlesHtml() : ""}
       </div>`;
   }
@@ -262,12 +263,13 @@ export function initHotspotEditor(editor, options) {
     ).join("");
     const textStyleHtml = `<div class="space-y-2 rounded-lg bg-gray-50 p-2.5">
         <p class="text-xs font-semibold text-ink-700">Text style</p>
-        <div class="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+        <div class="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-2">
           <select class="input py-1.5 text-xs" data-field="font" aria-label="Font">
             <option value="">Default font</option>
             ${fonts.map((f) => `<option value="${esc(f)}" ${f === h.font ? "selected" : ""}>${esc(f)}</option>`).join("")}
           </select>
           <button type="button" data-field="bold" aria-pressed="${h.bold ? "true" : "false"}" title="Bold" class="rounded-lg border px-3 text-sm font-bold ${h.bold ? "border-brand-500 bg-brand-50 text-brand-800" : "border-gray-300 bg-white text-ink-700"}">B</button>
+          <button type="button" data-field="italic" aria-pressed="${h.italic ? "true" : "false"}" title="Italic" class="rounded-lg border px-3 font-serif text-sm italic ${h.italic ? "border-brand-500 bg-brand-50 text-brand-800" : "border-gray-300 bg-white text-ink-700"}">I</button>
         </div>
         <label class="block">
           <span class="mb-0.5 flex justify-between text-[11px] text-ink-600">Size <span data-size-label>${h.fontSize || DEFAULT_FONT_SIZE}px</span></span>
@@ -330,14 +332,14 @@ export function initHotspotEditor(editor, options) {
               </div>`
             : help
             ? `<label class="block">
-                <span class="mb-1 block text-xs font-semibold text-ink-700">${esc(help.label)}${h.action === "link" ? "" : ` <span class="font-normal text-ink-400">(optional)</span>`}</span>
+                <span class="mb-1 block text-xs font-semibold text-ink-700">${esc(h.action === "custom_text" ? "Your text" : help.label)}${h.action === "link" || h.action === "custom_text" ? "" : ` <span class="font-normal text-ink-400">(optional)</span>`}</span>
                 ${
                   a.value === "text"
-                    ? `<textarea class="input py-2" rows="2" maxlength="300" data-field="value" placeholder="${esc(fallback || "")}">${esc(h.value || "")}</textarea>`
+                    ? `<textarea class="input py-2" rows="2" maxlength="300" data-field="value" placeholder="${esc(fallback || (h.action === "custom_text" ? "e.g. Free home delivery" : ""))}">${esc(h.value || "")}</textarea>`
                     : `<input class="input py-2" type="${help.type}" maxlength="300" data-field="value" value="${esc(h.value || "")}" placeholder="${esc(fallback || help.placeholder)}" />`
                 }
-                <span class="mt-1 block text-[11px] ${!h.value && !fallback && h.action !== "link" ? "text-amber-700" : "text-ink-500"}">${
-                  h.action === "link" ? "Where this button leads." : fallback ? esc(fallbackPrefix + fallback) : esc(missingHint)
+                <span class="mt-1 block text-[11px] ${!h.value && !fallback && h.action !== "link" && h.action !== "custom_text" ? "text-amber-700" : "text-ink-500"}">${
+                  h.action === "link" ? "Where this button leads." : h.action === "custom_text" ? "Type anything — a slogan, an offer, a note. Press Enter for a new line." : fallback ? esc(fallbackPrefix + fallback) : esc(missingHint)
                 }</span>
               </label>`
             : `<p class="rounded-md bg-gray-50 px-2.5 py-2 text-[11px] ${targetOf(h) ? "text-ink-500" : "text-amber-700"}">${esc(
@@ -375,6 +377,10 @@ export function initHotspotEditor(editor, options) {
       h.bold = !h.bold;
       changed({ inspector: true });
     });
+    $('[data-field="italic"]', inspector)?.addEventListener("click", () => {
+      h.italic = !h.italic;
+      changed({ inspector: true });
+    });
     $('[data-field="fontSize"]', inspector)?.addEventListener("input", (e) => {
       h.fontSize = Number(e.target.value);
       $("[data-size-label]", inspector).textContent = `${h.fontSize}px`;
@@ -389,7 +395,7 @@ export function initHotspotEditor(editor, options) {
       changed();
     });
     $('[data-field="resetText"]', inspector)?.addEventListener("click", () => {
-      Object.assign(h, { font: null, fontSize: null, bold: false, color: null, bg: null, align: null });
+      Object.assign(h, { font: null, fontSize: null, bold: false, italic: false, color: null, bg: null, align: null });
       changed({ inspector: true });
     });
     $$("[data-align]", inspector).forEach((b) =>
@@ -446,7 +452,7 @@ export function initHotspotEditor(editor, options) {
                 <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-100 text-ink-700">${icon(a.icon, { size: 12 })}</span>
                 <span class="min-w-0 flex-1">
                   <span class="block truncate font-semibold">${esc(textOf(h))}</span>
-                  <span class="block truncate ${target ? "text-ink-500" : "text-amber-700"}">${esc(target || "Needs a phone/address/link")}</span>
+                  <span class="block truncate ${target ? "text-ink-500" : "text-amber-700"}">${esc(target || (h.action === "custom_text" ? "Type your text" : "Needs a phone/address/link"))}</span>
                 </span>
               </button>
             </li>`;
@@ -838,7 +844,7 @@ export function initHotspotEditor(editor, options) {
         imageUrl: state.imageUrl,
         imageWidth: state.imageWidth,
         imageHeight: state.imageHeight,
-        hotspots: state.hotspots.map(({ id, action, x, y, w, h, value, label, style, font, fontSize, bold, color, bg, align }) => ({
+        hotspots: state.hotspots.map(({ id, action, x, y, w, h, value, label, style, font, fontSize, bold, italic, color, bg, align }) => ({
           id,
           action,
           x,
@@ -851,6 +857,7 @@ export function initHotspotEditor(editor, options) {
           font: font || null,
           fontSize: fontSize || null,
           bold: !!bold,
+          italic: !!italic,
           color: color || null,
           bg: bg || null,
           align: align || null,
