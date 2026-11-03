@@ -324,6 +324,13 @@ class ImageCardTest extends TestCase
         $this->putJson($url, ['imageColour' => ['hue' => 0, 'brightness' => 100, 'saturation' => 100]], $owner)->assertOk()->assertJsonPath('data.imageColour', null);
         $this->assertStringNotContainsString('feColorMatrix', $this->get('/card/spice-garden')->getContent());
 
+        // The owner's Visiting Card page has the one-tap colour swatches.
+        $this->withoutVite();
+        $this->post('/login', ['email' => $this->ownerEmail, 'password' => 'Password123!']);
+        $this->get("/dashboard/businesses/{$this->business->id}?section=".urlencode('Visiting Card'))->assertOk()
+            ->assertSee('data-colour-panel', false)->assertSee('Tap a colour')->assertSee('data-swatch="gold"', false)
+            ->assertSee('Black &amp; white', false)->assertSee('Fine-tune');
+
         // A preview shows unsaved colours.
         $this->postJson("{$url}/preview", ['imageUrl' => 'https://cdn.example.test/cards/images/card.jpg', 'imageColour' => ['saturation' => 0]], $owner)
             ->assertOk()->assertSee('feColorMatrix', false);

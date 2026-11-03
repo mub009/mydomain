@@ -109,27 +109,41 @@ if (root && card) {
   );
 
   // --- Card colour -----------------------------------------------------------
-  // Tint, hue, brightness and saturation of the card image, for the whole
-  // business team. Shown live: on the editor's image, or (for an owner) by
+  // One tap on a swatch recolours the card image and saves it — for the
+  // whole business team. "Fine-tune" adjusts how strong the colour is and the
+  // brightness. Shown live: on the editor's image, or (for an owner) by
   // redrawing the read-only preview.
   let colour = { ...COLOUR_DEFAULTS, ...(card.imageColourDefaults || {}), ...(card.imageColour || {}) };
   const panel = $("[data-colour-panel]", root);
   if (panel) {
-    const field = (name) => $(`[data-colour="${name}"]`, panel);
-    const colourSave = $("[data-colour-save]", panel);
-    const colourDirty = $("[data-colour-dirty]", panel);
     const stageImage = $("[data-stage-image]", root);
-    let lastTint = colour.tint || "#2563eb";
+    const statusEl = $("[data-colour-status]", panel);
+    const swatches = $$("[data-swatch]", panel);
+    const customInput = $("[data-colour-custom]", panel);
+    const customDot = $("[data-custom-dot]", panel);
+    const slider = (name) => $(`[data-colour="${name}"]`, panel);
+
+    // Which swatch the current colour is.
+    const current = () => {
+      if (!colour.tint) return colour.saturation === 0 ? "mono" : "original";
+      const preset = swatches.find((s) => s.dataset.tint && s.dataset.tint.toLowerCase() === colour.tint.toLowerCase());
+      return preset ? preset.dataset.swatch : "custom";
+    };
 
     const fill = () => {
-      field("useTint").checked = !!colour.tint;
-      field("tint").value = lastTint;
-      field("tint").disabled = !colour.tint;
-      field("strength").disabled = !colour.tint;
-      for (const key of ["strength", "hue", "brightness", "saturation"]) {
-        field(key).value = colour[key];
-        const label = $(`[data-colour-label="${key}"]`, panel);
-        label.textContent = `${key === "hue" && colour.hue > 0 ? "+" : ""}${colour[key]}${label.dataset.unit || "%"}`;
+      const on = current();
+      swatches.forEach((s) => s.setAttribute("aria-checked", String(s.dataset.swatch === on)));
+      // The "own colour" dot shows the picked colour once there is one.
+      const own = on === "custom" ? colour.tint : null;
+      customDot.style.background = own || "";
+      customDot.classList.toggle("border-dashed", !own);
+      customDot.classList.toggle("text-ink-500", !own);
+      customDot.classList.toggle("text-transparent", !!own);
+      if (own) customInput.value = own;
+      $("[data-strength-row]", panel).hidden = !colour.tint;
+      for (const key of ["strength", "brightness"]) {
+        slider(key).value = colour[key];
+        $(`[data-colour-label="${key}"]`, panel).textContent = `${colour[key]}%`;
       }
     };
 
@@ -156,52 +170,62 @@ if (root && card) {
         } catch (err) {
           fail(err);
         }
-      }, 250);
+      }, 200);
     };
 
-    const changedColour = () => {
+    // Saved a moment after the last change, so dragging a slider is one save.
+    let saveTimer = null;
+    let saveRequest = 0;
+    const saveColour = () => {
+      clearTimeout(saveTimer);
+      statusEl.textContent = "Saving…";
+      statusEl.className = "text-xs font-semibold text-ink-500";
+      saveTimer = setTimeout(async () => {
+        const request = ++saveRequest;
+        try {
+          await api.put(base, { imageColour: isChanged(colour) ? colour : null });
+          if (request !== saveRequest) return;
+          statusEl.textContent = "✓ Saved";
+          statusEl.className = "text-xs font-semibold text-emerald-700";
+        } catch (err) {
+          statusEl.textContent = "Not saved";
+          statusEl.className = "text-xs font-semibold text-red-700";
+          fail(err);
+        }
+      }, 500);
+    };
+
+    const changed = () => {
       fill();
       show();
-      colourSave.disabled = false;
-      colourDirty.classList.remove("hidden");
+      saveColour();
     };
 
-    field("useTint").addEventListener("change", (e) => {
-      colour.tint = e.target.checked ? lastTint : null;
-      changedColour();
+    swatches.forEach((s) => {
+      if (s.dataset.swatch === "custom") return; // the colour input inside it handles it
+      s.addEventListener("click", () => {
+        const tint = s.dataset.tint || null;
+        // A fresh pick starts from the plain image, keeping any brightness the person chose.
+        colour = {
+          ...COLOUR_DEFAULTS,
+          brightness: colour.brightness,
+          strength: colour.tint ? colour.strength : 60,
+          tint,
+          saturation: Number(s.dataset.saturation),
+        };
+        changed();
+      });
     });
-    field("tint").addEventListener("input", (e) => {
-      lastTint = e.target.value;
-      colour.tint = lastTint;
-      changedColour();
+    customInput.addEventListener("input", (e) => {
+      colour = { ...colour, tint: e.target.value, hue: 0, saturation: 100 };
+      changed();
     });
-    for (const key of ["strength", "hue", "brightness", "saturation"]) {
-      field(key).addEventListener("input", (e) => {
+    for (const key of ["strength", "brightness"]) {
+      slider(key).addEventListener("input", (e) => {
         colour[key] = Number(e.target.value);
-        changedColour();
+        changed();
       });
     }
-    $("[data-colour-reset]", panel).addEventListener("click", () => {
-      colour = { ...COLOUR_DEFAULTS };
-      changedColour();
-    });
-
-    colourSave.addEventListener("click", async () => {
-      fail("");
-      colourSave.disabled = true;
-      const label = $("span", colourSave);
-      label.textContent = "Saving…";
-      try {
-        await api.put(base, { imageColour: isChanged(colour) ? colour : null });
-        colourDirty.classList.add("hidden");
-        label.textContent = "Saved";
-        setTimeout(() => (label.textContent = "Save colour"), 1500);
-      } catch (err) {
-        colourSave.disabled = false;
-        label.textContent = "Save colour";
-        fail(err);
-      }
-    });
 
     fill();
     if (stageImage) applyToImage(stageImage, colour);
