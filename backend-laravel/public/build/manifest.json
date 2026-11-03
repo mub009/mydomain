@@ -29,8 +29,8 @@
       "__commonjsHelpers-CqkleIqs.js"
     ]
   },
-  "_gold-rate-render-CpH5EuEg.js": {
-    "file": "assets/gold-rate-render-CpH5EuEg.js",
+  "_gold-rate-render-BFglOME5.js": {
+    "file": "assets/gold-rate-render-BFglOME5.js",
     "name": "gold-rate-render",
     "imports": [
       "_channels-CvUWVcU_.js"
@@ -82,7 +82,7 @@
     ]
   },
   "resources/css/app.css": {
-    "file": "assets/app-ykj9oD47.css",
+    "file": "assets/app-CyhdPOYT.css",
     "src": "resources/css/app.css",
     "isEntry": true
   },
@@ -102,7 +102,7 @@
     ]
   },
   "resources/js/pages/admin.js": {
-    "file": "assets/admin-t0Eq9_ud.js",
+    "file": "assets/admin-B4SnLoqQ.js",
     "name": "admin",
     "src": "resources/js/pages/admin.js",
     "isEntry": true,
@@ -117,7 +117,7 @@
     ]
   },
   "resources/js/pages/business-create.js": {
-    "file": "assets/business-create-DJp9mupa.js",
+    "file": "assets/business-create-F9elYT22.js",
     "name": "business-create",
     "src": "resources/js/pages/business-create.js",
     "isEntry": true,
@@ -200,14 +200,28 @@
       "__commonjsHelpers-CqkleIqs.js"
     ]
   },
+  "resources/js/pages/gold-posters.js": {
+    "file": "assets/gold-posters-DhARQnpH.js",
+    "name": "gold-posters",
+    "src": "resources/js/pages/gold-posters.js",
+    "isEntry": true,
+    "imports": [
+      "_api-3HrlSN3j.js",
+      "_gold-rate-render-BFglOME5.js",
+      "_ui-DIxCFilW.js",
+      "_widgets-BjlLNHvj.js",
+      "_channels-CvUWVcU_.js",
+      "__commonjsHelpers-CqkleIqs.js"
+    ]
+  },
   "resources/js/pages/gold-rate-editor.js": {
-    "file": "assets/gold-rate-editor-B_OMoonf.js",
+    "file": "assets/gold-rate-editor-Bn9dPV-s.js",
     "name": "gold-rate-editor",
     "src": "resources/js/pages/gold-rate-editor.js",
     "isEntry": true,
     "imports": [
       "_api-3HrlSN3j.js",
-      "_gold-rate-render-CpH5EuEg.js",
+      "_gold-rate-render-BFglOME5.js",
       "_ui-DIxCFilW.js",
       "_widgets-BjlLNHvj.js",
       "_channels-CvUWVcU_.js",
@@ -215,13 +229,13 @@
     ]
   },
   "resources/js/pages/gold-rates.js": {
-    "file": "assets/gold-rates-BI1x-1yX.js",
+    "file": "assets/gold-rates-DzGJuCvQ.js",
     "name": "gold-rates",
     "src": "resources/js/pages/gold-rates.js",
     "isEntry": true,
     "imports": [
       "_api-3HrlSN3j.js",
-      "_gold-rate-render-CpH5EuEg.js",
+      "_gold-rate-render-BFglOME5.js",
       "_ui-DIxCFilW.js",
       "_widgets-BjlLNHvj.js",
       "_channels-CvUWVcU_.js",
@@ -240,7 +254,7 @@
     ]
   },
   "resources/js/pages/manage.js": {
-    "file": "assets/manage-DlhcuNKl.js",
+    "file": "assets/manage-CG6wqvB5.js",
     "name": "manage",
     "src": "resources/js/pages/manage.js",
     "isEntry": true,

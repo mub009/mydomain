@@ -210,13 +210,46 @@ class WebPagesTest extends TestCase
         $this->get('/dashboard/businesses/no-such-id')->assertNotFound();
     }
 
+    public function test_the_manage_page_shows_only_the_features_a_business_has(): void
+    {
+        $dealer = $this->user(['role' => 'DEALER', 'privileges' => ['MANAGE_LISTINGS'], 'points' => 4]);
+        $owner = $this->user(['role' => 'BUSINESS_OWNER']);
+        $business = $this->business($owner, ['createdById' => $dealer->id, 'features' => ['GOLD_RATE']]);
+        $template = \App\Models\GoldRateTemplate::create([
+            'name' => 'Diwali Rates', 'imagePath' => 'gold-rates/x.png', 'imageWidth' => 1080, 'imageHeight' => 1080,
+            'businessId' => $business->id, 'layout' => [],
+        ]);
+
+        // The owner: only the gold-rate section of the three features, and no features panel.
+        $this->signIn($owner);
+        $menu = $this->get("/dashboard/businesses/{$business->id}")->assertOk();
+        $menu->assertSee('?section=Gold+Rate', false)->assertDontSee('?section=Visiting+Card', false)
+            ->assertDontSee('?section=Website', false)->assertDontSee('?section=Our+Gallery', false)
+            ->assertSee('?section=Contact', false)->assertDontSee('data-features-panel', false);
+        $this->get("/dashboard/businesses/{$business->id}?section=Gold+Rate")->assertOk()
+            ->assertSee('Diwali Rates')->assertSee("/dashboard/businesses/{$business->id}/gold-rates/{$template->id}/thumb", false);
+        // A section of a feature it doesn't have falls back to the menu.
+        $this->get("/dashboard/businesses/{$business->id}?section=Website")->assertOk()->assertDontSee('data-site-builder', false);
+        $this->post('/logout');
+
+        // The dealer who set it up gets the features panel, with its points.
+        $this->signIn($dealer);
+        $this->get("/dashboard/businesses/{$business->id}")->assertOk()->assertSee('data-features-panel', false)->assertSee('Features for this business');
+        $this->get('/dashboard/businesses/new')->assertOk()->assertSee('data-features-picker', false)->assertSee('1 point each');
+
+        // Without the feature, the poster images are off limits.
+        $business->update(['features' => []]);
+        $this->get("/dashboard/businesses/{$business->id}/gold-rates/{$template->id}/image")->assertNotFound();
+        $this->get("/dashboard/businesses/{$business->id}?section=Gold+Rate")->assertOk()->assertDontSee('Diwali Rates');
+    }
+
     public function test_dealer_dashboard_follows_privileges(): void
     {
         $dealer = $this->user(['role' => 'DEALER', 'privileges' => ['MANAGE_LEADS'], 'points' => 3]);
         $this->signIn($dealer);
 
         // No MANAGE_LISTINGS: the listings tab and the manager are off limits.
-        $this->get('/dashboard')->assertOk()->assertSee('Dealer dashboard')->assertSee('For new listings')->assertDontSee('Add business');
+        $this->get('/dashboard')->assertOk()->assertSee('Dealer dashboard')->assertSee('1 per feature')->assertDontSee('Add business');
         $this->get('/dashboard?tab=leads')->assertOk();
         $this->get('/dashboard/businesses/anything')->assertRedirect('/dashboard');
     }

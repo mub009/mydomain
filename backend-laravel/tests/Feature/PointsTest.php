@@ -35,7 +35,8 @@ class PointsTest extends TestCase
         $this->getJson('/api/v1/points/mine', ['Authorization' => "Bearer {$token}"])
             ->assertStatus(200)
             ->assertJsonPath('data.points', 7)
-            ->assertJsonPath('data.businessesRemaining', 7)
+            ->assertJsonPath('data.featuresRemaining', 7)
+            ->assertJsonPath('data.pointsPerFeature', 1)
             ->assertJsonPath('data.chargeable', true);
     }
 

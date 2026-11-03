@@ -69,7 +69,7 @@
           <p class="mt-0.5 text-sm text-ink-500">
             Removes the listing, its website, photos, reviews, leads, bookings and orders for good.
             @if ($authUser?->role === 'DEALER')
-              If you were charged a point for it, you get it back.
+              Any points you paid for its features come back to you.
             @endif
           </p>
         </div>

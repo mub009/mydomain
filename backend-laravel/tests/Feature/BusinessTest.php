@@ -91,7 +91,7 @@ class BusinessTest extends TestCase
             ->assertJsonPath('data.businessType', 'B2B');
     }
 
-    public function test_dealer_created_business_is_published_immediately_and_spends_a_point(): void
+    public function test_dealer_created_business_is_published_immediately_and_spends_a_point_per_feature(): void
     {
         [$dealer, $token] = $this->actingToken([
             'role' => 'DEALER', 'privileges' => ['MANAGE_LISTINGS'], 'points' => 5,
@@ -102,24 +102,132 @@ class BusinessTest extends TestCase
             'name' => 'Dealer Shop', 'slug' => 'dealer-shop', 'categoryId' => $category->id,
             'phone' => '9998887777', 'addressLine1' => '1 Main St', 'city' => 'Pune', 'state' => 'MH',
             'postalCode' => '411001', 'latitude' => 18.5, 'longitude' => 73.8,
+            'features' => ['VISITING_CARD', 'WEBSITE'],
         ], ['Authorization' => "Bearer {$token}"]);
 
-        $response->assertStatus(201)->assertJsonPath('data.status', 'PUBLISHED');
-        $this->assertSame(4, $dealer->fresh()->points);
+        $response->assertStatus(201)->assertJsonPath('data.status', 'PUBLISHED')
+            ->assertJsonPath('data.features', ['WEBSITE', 'VISITING_CARD']);
+        $this->assertSame(3, $dealer->fresh()->points);
+        $this->assertDatabaseHas('point_transactions', ['userId' => $dealer->id, 'type' => 'FEATURE_ADDED', 'feature' => 'WEBSITE', 'amount' => -1]);
     }
 
-    public function test_dealer_without_points_is_rejected(): void
+    public function test_a_listing_is_free_but_features_need_points(): void
     {
-        [, $token] = $this->actingToken(['role' => 'DEALER', 'privileges' => ['MANAGE_LISTINGS'], 'points' => 0]);
+        [$dealer, $token] = $this->actingToken(['role' => 'DEALER', 'privileges' => ['MANAGE_LISTINGS'], 'points' => 1]);
         $category = $this->category();
-
-        $response = $this->postJson('/api/v1/businesses', [
-            'name' => 'No Points Shop', 'slug' => 'no-points-shop', 'categoryId' => $category->id,
+        $body = [
+            'name' => 'No Points Shop', 'categoryId' => $category->id,
             'phone' => '9998887777', 'addressLine1' => '1 Main St', 'city' => 'Pune', 'state' => 'MH',
             'postalCode' => '411001', 'latitude' => 18.5, 'longitude' => 73.8,
-        ], ['Authorization' => "Bearer {$token}"]);
+        ];
+        $auth = ['Authorization' => "Bearer {$token}"];
 
-        $response->assertStatus(403)->assertJsonPath('error.code', 'FORBIDDEN');
+        // Two features, one point: refused, and nothing is created.
+        $this->postJson('/api/v1/businesses', [...$body, 'features' => ['WEBSITE', 'GOLD_RATE']], $auth)
+            ->assertStatus(403)->assertJsonPath('error.code', 'FORBIDDEN');
+        $this->assertDatabaseCount('businesses', 0);
+        // No features: free, and the business gets none.
+        $this->postJson('/api/v1/businesses', $body, $auth)->assertStatus(201)->assertJsonPath('data.features', []);
+        $this->assertSame(1, $dealer->fresh()->points);
+        $this->postJson('/api/v1/businesses', [...$body, 'features' => ['BOGUS']], $auth)->assertStatus(400);
+    }
+
+    public function test_owners_and_admins_get_every_feature_for_free(): void
+    {
+        [, $ownerToken] = $this->actingToken(['role' => 'BUSINESS_OWNER']);
+        [$admin, $adminToken] = $this->actingToken(['role' => 'ADMIN', 'points' => 0]);
+        $category = $this->category();
+        $body = [
+            'name' => 'Own Shop', 'categoryId' => $category->id,
+            'phone' => '9998887777', 'addressLine1' => '1 Main St', 'city' => 'Pune', 'state' => 'MH',
+            'latitude' => 18.5, 'longitude' => 73.8,
+        ];
+
+        // An owner can't pick: their listing has everything (null).
+        $this->postJson('/api/v1/businesses', [...$body, 'features' => []], ['Authorization' => "Bearer {$ownerToken}"])
+            ->assertStatus(201)->assertJsonPath('data.features', null);
+        // An admin may pick, free.
+        $this->postJson('/api/v1/businesses', [...$body, 'name' => 'Admin Shop', 'features' => ['GOLD_RATE']], ['Authorization' => "Bearer {$adminToken}"])
+            ->assertStatus(201)->assertJsonPath('data.features', ['GOLD_RATE']);
+        $this->assertSame(0, $admin->fresh()->points);
+    }
+
+    public function test_dealer_changes_features_paying_and_getting_points_back(): void
+    {
+        [$dealer, $token] = $this->actingToken(['role' => 'DEALER', 'privileges' => ['MANAGE_LISTINGS'], 'points' => 3]);
+        [, $otherDealer] = $this->actingToken(['role' => 'DEALER', 'privileges' => ['MANAGE_LISTINGS'], 'points' => 3]);
+        $category = $this->category();
+        $auth = ['Authorization' => "Bearer {$token}"];
+
+        $id = $this->postJson('/api/v1/businesses', [
+            'name' => 'Feature Shop', 'categoryId' => $category->id,
+            'city' => 'Pune', 'state' => 'MH', 'latitude' => 18.5, 'longitude' => 73.8,
+            'owner' => ['username' => 'team@feature.test', 'password' => 'Secret123!'],
+            'features' => ['WEBSITE'],
+        ], $auth)->assertStatus(201)->json('data.id');
+        $this->assertSame(2, $dealer->fresh()->points);
+
+        // Swap the website for the card and gold rate: one point back, two spent.
+        $this->putJson("/api/v1/businesses/{$id}/features", ['features' => ['VISITING_CARD', 'GOLD_RATE']], $auth)
+            ->assertOk()->assertJsonPath('data.spentPoints', 2)->assertJsonPath('data.refundedPoints', 1)
+            ->assertJsonPath('data.features', ['VISITING_CARD', 'GOLD_RATE']);
+        $this->assertSame(1, $dealer->fresh()->points);
+        $this->putJson("/api/v1/businesses/{$id}/features", ['features' => ['WEBSITE', 'VISITING_CARD', 'GOLD_RATE']], $auth)->assertOk();
+        $this->assertSame(0, $dealer->fresh()->points);
+        // No points left for more: refused (nothing left to add here, so take one off and try two).
+        $this->putJson("/api/v1/businesses/{$id}/features", ['features' => []], $auth)->assertOk()->assertJsonPath('data.refundedPoints', 3);
+        $this->assertSame(3, $dealer->fresh()->points);
+        $this->putJson("/api/v1/businesses/{$id}/features", ['features' => ['WEBSITE', 'VISITING_CARD']], $auth)->assertOk();
+
+        // Not another dealer, and not the business itself.
+        $this->putJson("/api/v1/businesses/{$id}/features", ['features' => []], ['Authorization' => "Bearer {$otherDealer}"])->assertStatus(403);
+        $ownerToken = $this->postJson('/api/v1/auth/login', ['email' => 'team@feature.test', 'password' => 'Secret123!'])->json('data.accessToken');
+        $this->putJson("/api/v1/businesses/{$id}/features", ['features' => ['GOLD_RATE']], ['Authorization' => "Bearer {$ownerToken}"])->assertStatus(403);
+
+        // Deleting gives back everything still paid for.
+        $this->deleteJson("/api/v1/businesses/{$id}", [], $auth)->assertOk()->assertJsonPath('data.refundedPoints', 2);
+        $this->assertSame(3, $dealer->fresh()->points);
+        $this->getJson('/api/v1/points/mine', $auth)->assertJsonPath('data.totalSpent', 0);
+    }
+
+    public function test_a_dealer_cannot_add_features_without_points(): void
+    {
+        [$dealer, $token] = $this->actingToken(['role' => 'DEALER', 'privileges' => ['MANAGE_LISTINGS'], 'points' => 1]);
+        $category = $this->category();
+        $auth = ['Authorization' => "Bearer {$token}"];
+        $id = $this->postJson('/api/v1/businesses', [
+            'name' => 'Short Shop', 'categoryId' => $category->id,
+            'city' => 'Pune', 'state' => 'MH', 'latitude' => 18.5, 'longitude' => 73.8,
+        ], $auth)->assertStatus(201)->json('data.id');
+
+        $this->putJson("/api/v1/businesses/{$id}/features", ['features' => ['WEBSITE', 'GOLD_RATE']], $auth)->assertStatus(403);
+        $this->assertSame(1, $dealer->fresh()->points);
+        $this->assertSame([], \App\Models\Business::find($id)->features);
+    }
+
+    public function test_a_business_only_reaches_the_features_it_has(): void
+    {
+        [, $token] = $this->actingToken(['role' => 'DEALER', 'privileges' => ['MANAGE_LISTINGS'], 'points' => 5]);
+        $category = $this->category();
+        $auth = ['Authorization' => "Bearer {$token}"];
+        $id = $this->postJson('/api/v1/businesses', [
+            'name' => 'Bare Shop', 'slug' => 'bare-shop', 'categoryId' => $category->id,
+            'city' => 'Pune', 'state' => 'MH', 'latitude' => 18.5, 'longitude' => 73.8,
+            'features' => ['GOLD_RATE'],
+        ], $auth)->assertStatus(201)->json('data.id');
+
+        // No website: not public, and not editable.
+        $this->get('/site/bare-shop')->assertNotFound();
+        $this->getJson("/api/v1/businesses/{$id}/site", $auth)->assertStatus(403);
+        // No visiting card.
+        $this->getJson("/api/v1/businesses/{$id}/card", $auth)->assertStatus(403);
+        $this->get('/card/bare-shop')->assertNotFound();
+        // The listing page itself is always there.
+        $this->get('/business/bare-shop')->assertOk();
+
+        $this->putJson("/api/v1/businesses/{$id}/features", ['features' => ['GOLD_RATE', 'WEBSITE', 'VISITING_CARD']], $auth)->assertOk();
+        $this->get('/site/bare-shop')->assertOk();
+        $this->getJson("/api/v1/businesses/{$id}/card", $auth)->assertOk();
     }
 
     public function test_slug_is_generated_from_the_name_and_kept_unique(): void
@@ -257,15 +365,16 @@ class BusinessTest extends TestCase
             'phone' => '9998887777', 'addressLine1' => '1 Main St', 'city' => 'Pune', 'state' => 'MH',
             'postalCode' => '411001', 'latitude' => 18.5, 'longitude' => 73.8,
             'owner' => ['firstName' => 'Ravi', 'lastName' => 'K', 'username' => '9876543210', 'password' => 'Secret123!'],
+            'features' => ['WEBSITE', 'VISITING_CARD', 'GOLD_RATE'],
         ], $auth)->assertStatus(201)->json('data.id');
-        $this->assertSame(4, $dealer->fresh()->points);
+        $this->assertSame(2, $dealer->fresh()->points);
 
         $this->deleteJson("/api/v1/businesses/{$id}", [], $auth)
-            ->assertStatus(200)->assertJsonPath('data.refundedPoints', 1);
+            ->assertStatus(200)->assertJsonPath('data.refundedPoints', 3);
 
         $this->assertDatabaseMissing('businesses', ['id' => $id]);
         $this->assertSame(5, $dealer->fresh()->points);
-        $this->assertDatabaseHas('point_transactions', ['userId' => $dealer->id, 'type' => 'BUSINESS_DELETED', 'amount' => 1, 'balanceAfter' => 5]);
+        $this->assertDatabaseHas('point_transactions', ['userId' => $dealer->id, 'type' => 'BUSINESS_DELETED', 'amount' => 3, 'balanceAfter' => 5]);
         $this->getJson('/api/v1/points/mine', $auth)->assertJsonPath('data.totalSpent', 0);
     }
 
@@ -279,6 +388,7 @@ class BusinessTest extends TestCase
             'phone' => '9998887777', 'addressLine1' => '1 Main St', 'city' => 'Pune', 'state' => 'MH',
             'postalCode' => '411001', 'latitude' => 18.5, 'longitude' => 73.8,
             'owner' => ['firstName' => 'Ravi', 'lastName' => 'K', 'username' => 'ravi@example.com', 'password' => 'Secret123!'],
+            'features' => ['WEBSITE'],
         ], ['Authorization' => "Bearer {$token}"])->assertStatus(201)->json('data.id');
 
         $ownerToken = $this->postJson('/api/v1/auth/login', ['email' => 'ravi@example.com', 'password' => 'Secret123!'])->json('data.accessToken');
