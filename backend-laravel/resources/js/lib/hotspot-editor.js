@@ -20,6 +20,7 @@ import { $, $$, esc } from "./ui";
 //   imageUrl, imageWidth, imageHeight, hotspots — the starting state
 //   onChange()      after every edit
 //   onError(msg|err)
+//   canReplaceImage false: once there's an image, a new one can't be dropped on it
 
 const MAX_SPOTS = 40;
 const MIN_SIZE = 3; // percent
@@ -75,6 +76,7 @@ export function initHotspotEditor(editor, options) {
     missingHint = "Nothing to fall back on — enter one.",
     onChange = () => {},
     onError = () => {},
+    canReplaceImage = true, // false where the editor offers no "Replace image" (a business's card)
   } = options;
   const actionList = options.actions;
   const fonts = options.fonts || [];
@@ -755,6 +757,8 @@ export function initHotspotEditor(editor, options) {
 
   async function useFile(file) {
     if (!file) return;
+    // Where the image can't be replaced, a file dropped on it is ignored.
+    if (state.imageUrl && !canReplaceImage) return;
     if (!/^image\/(jpeg|png|webp)$/.test(file.type)) return onError("Choose a JPG, PNG or WebP image.");
     onError("");
     uploading.classList.replace("hidden", "flex");

@@ -2,7 +2,7 @@
      the palette to drag them from, the selected action's settings and the
      list of placed ones. Brought to life by resources/js/lib/hotspot-editor.js.
      Used by the business's Visiting Card section and the admin card-template editor. --}}
-@props(['subject' => 'your card'])
+@props(['subject' => 'your card', 'replaceable' => true])
 <div {{ $attributes->merge(['class' => 'grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]']) }} data-hotspot-editor>
   {{-- Stage --}}
   <div class="min-w-0">
@@ -23,7 +23,9 @@
       <div class="mt-3 hidden flex-wrap items-center justify-between gap-2 text-xs" data-image-tools>
         <span class="text-ink-500"><span class="font-semibold text-ink-700">Click the image to add an action or a business detail.</span> Drag a box to move it, pull its corners to resize.</span>
         <span class="flex gap-3">
-          <label class="cursor-pointer font-semibold text-brand-700 hover:underline">Replace image<input type="file" accept="image/jpeg,image/png,image/webp" class="sr-only" data-image-file /></label>
+          @if ($replaceable)
+            <label class="cursor-pointer font-semibold text-brand-700 hover:underline">Replace image<input type="file" accept="image/jpeg,image/png,image/webp" class="sr-only" data-image-file /></label>
+          @endif
           <button type="button" class="font-semibold text-red-700 hover:underline" data-remove-image>Remove image</button>
         </span>
       </div>

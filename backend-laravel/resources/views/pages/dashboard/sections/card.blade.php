@@ -137,7 +137,7 @@
         </p>
       @endif
 
-      <x-hotspot-editor subject="your card" />
+      <x-hotspot-editor subject="your card" :replaceable="false" />
     </div>
     @endunless
 

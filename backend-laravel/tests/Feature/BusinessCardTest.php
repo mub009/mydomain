@@ -227,14 +227,19 @@ class BusinessCardTest extends TestCase
 
         $this->signIn($owner);
         $this->get("/dashboard/businesses/{$business->id}?section=".urlencode('Visiting Card'))
-            ->assertOk()->assertSee('Card design & actions', false)->assertSee('Drop the card image here')->assertSee('Publish card')
-            ->assertSee("/card/{$business->slug}");
+            // The owner sees the card and its link, but not the design editor.
+            ->assertOk()->assertSee('Your card')->assertSee('Publish card')->assertSee("/card/{$business->slug}")
+            ->assertDontSee('Card design & actions', false)->assertDontSee('Drag onto')->assertDontSee('data-hotspot-editor', false);
         $this->get('/dashboard/businesses/new')->assertOk()->assertSee('data-card-picker', false);
         $this->get('/admin?tab='.urlencode('Card Templates'))->assertRedirect();
 
         $admin = $this->user('ADMIN');
         $this->post('/logout');
         $this->signIn($admin);
+        // Admins (and dealers) get the editor.
+        $this->get("/dashboard/businesses/{$business->id}?section=".urlencode('Visiting Card'))
+            ->assertOk()->assertSee('Card design & actions', false)->assertSee('Drop the card image here')->assertSee('Drag onto')
+            ->assertDontSee('Replace image'); // a business's card image isn't swapped from here
         $this->get('/admin?tab='.urlencode('Card Templates'))->assertOk()->assertSee('Visiting card templates')->assertSee('Luxury Dining');
         $this->get('/admin/card-templates/new')->assertOk()->assertSee('New card template');
         $template = CardTemplate::where('name', 'Luxury Dining')->first();
