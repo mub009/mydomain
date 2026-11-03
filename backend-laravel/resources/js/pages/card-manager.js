@@ -41,6 +41,7 @@ if (root && card) {
         hotspots: card.hotspots,
         canReplaceImage: false,
         canDelete: false,
+        canMove: false,
         onChange: () => {
           saveBtn.disabled = false;
           dirtyNote.classList.remove("hidden");

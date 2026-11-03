@@ -22,6 +22,7 @@ import { $, $$, esc } from "./ui";
 //   onError(msg|err)
 //   canReplaceImage false: once there's an image, a new one can't be dropped on it
 //   canDelete       false: no "Remove" for placed boxes
+//   canMove         false: placed boxes can't be dragged, resized or nudged
 
 const MAX_SPOTS = 40;
 const MIN_SIZE = 3; // percent
@@ -80,6 +81,7 @@ export function initHotspotEditor(editor, options) {
     onError = () => {},
     canReplaceImage = true, // false where the editor offers no "Replace image" (a business's card)
     canDelete = true, // false: placed actions and details can't be removed (a business's card)
+    canMove = true, // false: placed boxes keep their position and size (a business's card)
   } = options;
   const actionList = options.actions;
   const fonts = options.fonts || [];
@@ -128,6 +130,7 @@ export function initHotspotEditor(editor, options) {
   }
 
   const handlesHtml = () =>
+    !canMove ? "" :
     Object.entries({
       nw: "-left-1.5 -top-1.5 cursor-nwse-resize",
       ne: "-right-1.5 -top-1.5 cursor-nesw-resize",
@@ -155,7 +158,7 @@ export function initHotspotEditor(editor, options) {
     }
     const align = { left: "justify-start text-left", center: "justify-center text-center", right: "justify-end text-right" }[h.align || "left"];
     return `<div data-spot="${esc(h.id)}" tabindex="0" role="button" aria-label="${esc(actions[h.action].label)} — drag to move"
-        class="absolute flex cursor-move touch-none items-center overflow-visible rounded ${kindOf(h) === "text" ? `${align} px-[0.15em] leading-tight text-white` : ""} ring-2 ${ring} focus:outline-none"
+        class="absolute flex ${canMove ? "cursor-move" : "cursor-pointer"} touch-none items-center overflow-visible rounded ${kindOf(h) === "text" ? `${align} px-[0.15em] leading-tight text-white` : ""} ring-2 ${ring} focus:outline-none"
         style="left:${h.x}%;top:${h.y}%;width:${h.w}%;height:${h.h}%;${kindOf(h) === "text" ? esc(textStyle(h)) : ""}">
         ${inner}
         ${!shown ? `<span class="pointer-events-none absolute -top-2.5 left-1 rounded bg-amber-500 px-1 text-[9px] text-white">${h.action === "logo" ? "upload a logo" : h.action === "custom_text" ? "type your text" : "not on your listing"}</span>` : ""}
@@ -184,13 +187,13 @@ export function initHotspotEditor(editor, options) {
       sw: "-bottom-1.5 -left-1.5 cursor-nesw-resize",
       se: "-bottom-1.5 -right-1.5 cursor-nwse-resize",
     };
-    const handles = selected
+    const handles = selected && canMove
       ? Object.entries(corners)
           .map(([d, cls]) => `<span data-handle="${d}" class="absolute h-3.5 w-3.5 rounded-full border-2 border-white bg-brand-600 shadow ${cls}"></span>`)
           .join("")
       : "";
     return `<div data-spot="${esc(h.id)}" tabindex="0" role="button" aria-label="${esc(textOf(h))} — drag to move"
-        class="absolute flex cursor-move touch-none items-center justify-center gap-1 overflow-visible rounded-lg ${drawn ? "" : "text-[11px] font-semibold"} ring-2 ${ring} ${fill} ${selected ? "z-10 ring-[3px]" : ""} focus:outline-none"
+        class="absolute flex ${canMove ? "cursor-move" : "cursor-pointer"} touch-none items-center justify-center gap-1 overflow-visible rounded-lg ${drawn ? "" : "text-[11px] font-semibold"} ring-2 ${ring} ${fill} ${selected ? "z-10 ring-[3px]" : ""} focus:outline-none"
         style="left:${h.x}%;top:${h.y}%;width:${h.w}%;height:${h.h}%;${drawn ? esc(textStyle(h)) : ""}">
         <span class="pointer-events-none flex min-w-0 items-center gap-1 rounded px-1 ${drawn ? "" : "bg-white/85 text-brand-800"}">
           ${icon(a.icon, { size: 13, className: drawn ? "h-[1.35em] w-[1.35em] shrink-0" : "shrink-0" })}<span class="truncate ${h.style === "icon" ? "sr-only" : ""}">${esc(textOf(h))}</span>
@@ -631,6 +634,8 @@ export function initHotspotEditor(editor, options) {
     if (state.selected !== h.id) select(h.id);
     const target = $(`[data-spot="${CSS.escape(h.id)}"]`, spotsLayer);
     target.focus({ preventScroll: true });
+    // Where positions are fixed, a press only selects the box.
+    if (!canMove) return;
     const handle = e.target.closest("[data-handle]")?.dataset.handle;
     const start = toStage(e);
     const orig = { x: h.x, y: h.y, w: h.w, h: h.h };
@@ -679,7 +684,7 @@ export function initHotspotEditor(editor, options) {
     }
     const step = e.shiftKey ? 2 : 0.5;
     const d = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[e.key];
-    if (!d) return;
+    if (!d || !canMove) return;
     e.preventDefault();
     if (e.altKey) {
       h.w = round(clamp(h.w + d[0], MIN_SIZE, 100 - h.x));
