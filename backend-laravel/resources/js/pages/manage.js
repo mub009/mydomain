@@ -35,8 +35,14 @@ $("[data-share-business]")?.addEventListener("click", (e) => {
   ].filter(Boolean);
   const main = links[0]?.url;
   const message = [`*${share.name}*`, ...links.map((l) => `${l.label}: ${l.url}`)].join("\n");
+  // Open them right here too — the header has no separate buttons for this.
+  const openLinks = [
+    share.website && `<a href="${esc(share.website)}" target="_blank" rel="noopener" class="btn-secondary flex-1 justify-center py-2.5 text-sm">${icon("globe", { size: 15 })} Open website</a>`,
+    share.listing && `<a href="${esc(share.listing)}" target="_blank" rel="noopener" class="btn-secondary flex-1 justify-center py-2.5 text-sm">${icon("external-link", { size: 15 })} View public page</a>`,
+  ].filter(Boolean);
   const body = links.length
     ? `<div class="space-y-3">
+        <div class="flex flex-col gap-2 sm:flex-row">${openLinks.join("")}</div>
         <div class="space-y-2.5 rounded-xl border border-emerald-200 bg-emerald-50 p-3">${links.map((l) => copyField(l.label, l.url)).join("")}</div>
         <a href="https://wa.me/?text=${encodeURIComponent(message)}" target="_blank" rel="noopener" class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#25D366] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#1ebe5b]">${icon("message-square", { size: 16 })} Share on WhatsApp</a>
         <a href="https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(main)}" target="_blank" rel="noopener" class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#1877F2] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#166fe0]">${icon("facebook", { size: 16 })} Share on Facebook</a>

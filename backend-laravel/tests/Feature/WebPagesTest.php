@@ -164,7 +164,8 @@ class WebPagesTest extends TestCase
             ->assertSee('data-share-business', false)
             ->assertSee(e(json_encode("https://{$business->slug}.markkito.test")), false)
             ->assertSee(e(json_encode(\App\Support\Seo\SeoTracker::listingUrl($business->slug))), false)
-            ->assertSee('Open website');
+            // Opening them is inside the Share pop-up, not separate header buttons.
+            ->assertDontSee('Open website')->assertDontSee('View public page');
     }
 
     public function test_add_business_has_its_own_page(): void
