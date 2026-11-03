@@ -161,10 +161,10 @@ class CardEngine
         return $chosen && $chosen->isActive ? $chosen : self::defaultFor($business->categoryId);
     }
 
-    /** Premium designs need a paid plan; admins may apply any. */
+    /** Every design is open to every business (there are no premium designs). */
     public static function canUse(CardTemplate $template, Business $business, ?array $actor = null): bool
     {
-        return ! $template->isPremium || ($actor['role'] ?? null) === 'ADMIN' || ($business->subscriptionPlan ?? 'FREE') !== 'FREE';
+        return true;
     }
 
     /** What the picker and admin list show for a template. */
@@ -178,6 +178,11 @@ class CardEngine
             'categoryName' => $template->category?->name,
             'layout' => $template->layout,
             'backgroundImageUrl' => $template->backgroundImageUrl,
+            // An image template: its artwork and the actions placed on it.
+            'imageUrl' => $template->imageUrl,
+            'imageWidth' => $template->imageWidth,
+            'imageHeight' => $template->imageHeight,
+            'hotspots' => $template->hotspots ?? [],
             'design' => self::normalizeDesign($template->design),
             'isDefault' => $template->isDefault,
             'isActive' => $template->isActive,
@@ -199,7 +204,7 @@ class CardEngine
         return rtrim((string) config('app.url'), '/')."/card/{$slug}";
     }
 
-    private static function digits(?string $value): ?string
+    public static function digits(?string $value): ?string
     {
         $digits = preg_replace('/\D+/', '', (string) $value);
         if ($digits === '') {
@@ -242,7 +247,7 @@ class CardEngine
         return end($fallbacks) ?: $color;
     }
 
-    private static function safeUrl(?string $url): ?string
+    public static function safeUrl(?string $url): ?string
     {
         // No quotes, brackets or spaces: a background URL is printed inside CSS url('…').
         return $url && preg_match('#^https?://[^\s"\'()<>\\\\]+$#i', $url) ? $url : null;
@@ -335,7 +340,11 @@ class CardEngine
     public static function render(CardTemplate|array|null $template, array $details, bool $preview = false): string
     {
         if ($template instanceof CardTemplate) {
-            $template = ['layout' => $template->layout, 'backgroundImageUrl' => $template->backgroundImageUrl, 'design' => $template->design];
+            // An image template is its artwork with the actions on it.
+            if ($image = ImageCard::fromTemplate($template)) {
+                return ImageCard::renderSource($image, $details, $preview);
+            }
+            $template =['layout' => $template->layout, 'backgroundImageUrl' => $template->backgroundImageUrl, 'design' => $template->design];
         }
         $template ??= ['layout' => 'classic', 'backgroundImageUrl' => null, 'design' => null];
         $layout = array_key_exists($template['layout'] ?? '', self::LAYOUTS) ? $template['layout'] : 'classic';

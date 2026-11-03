@@ -8,14 +8,17 @@ use App\Models\CardTemplate;
 use App\Support\ApiResponse;
 use App\Support\Cards\BackgroundGenerator;
 use App\Support\Cards\CardEngine;
-use App\Support\Cards\StarterTemplates;
+use App\Support\Cards\ImageCard;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 // Admin management of the digital-visiting-card designs: any number per
 // category (or general), each with its layout, background, fonts, colours
-// and button style; one default per category; active/inactive; free/premium.
+// and button style; one default per category; active/inactive.
+// A template can instead be an image template: an uploaded card artwork with
+// actions placed on it (imageUrl + hotspots, see ImageCard), each linked to
+// the details of whichever business wears it.
 class CardTemplateController extends Controller
 {
     private function rules(bool $partial): array
@@ -31,8 +34,33 @@ class CardTemplateController extends Controller
             'isActive' => ['sometimes', 'boolean'],
             'isPremium' => ['sometimes', 'boolean'],
             'sortOrder' => ['sometimes', 'integer', 'min:0', 'max:10000'],
+            ...self::imageRules(),
             ...CardEngine::designRules(),
         ];
+    }
+
+    private static function imageRules(): array
+    {
+        return [
+            'imageUrl' => ['sometimes', 'nullable', 'url', 'max:500', 'regex:#^https?://[^\s"\'()<>\\\\]+$#i'],
+            'imageWidth' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:20000'],
+            'imageHeight' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:20000'],
+            ...ImageCard::rules(),
+        ];
+    }
+
+    // The image fields as stored: actions checked and kept inside the image,
+    // and no size or actions left behind on a template whose image is removed.
+    private static function imageFields(array $data): array
+    {
+        if (array_key_exists('hotspots', $data)) {
+            $data['hotspots'] = ImageCard::normalize($data['hotspots'] ?? []);
+        }
+        if (array_key_exists('imageUrl', $data) && $data['imageUrl'] === null) {
+            $data['imageWidth'] = $data['imageHeight'] = null;
+        }
+
+        return $data;
     }
 
     private function find(string $id): CardTemplate
@@ -79,7 +107,7 @@ class CardTemplateController extends Controller
         $data = $request->validate([
             // A category id, or "general" for the templates without one.
             'categoryId' => ['nullable', 'string', 'max:40'],
-            'status' => ['nullable', 'in:active,inactive,premium,free'],
+            'status' => ['nullable', 'in:active,inactive'],
             'search' => ['nullable', 'string', 'max:80'],
         ]);
         $query = CardTemplate::with('category')
@@ -92,8 +120,6 @@ class CardTemplateController extends Controller
         match ($data['status'] ?? null) {
             'active' => $query->where('isActive', true),
             'inactive' => $query->where('isActive', false),
-            'premium' => $query->where('isPremium', true),
-            'free' => $query->where('isPremium', false),
             default => null,
         };
         if (! empty($data['search'])) {
@@ -113,7 +139,7 @@ class CardTemplateController extends Controller
 
     public function store(Request $request)
     {
-        $data = $request->validate($this->rules(false));
+        $data = self::imageFields($request->validate($this->rules(false)));
         $template = new CardTemplate([
             ...$data,
             'slug' => $this->uniqueSlug($data['name']),
@@ -130,7 +156,7 @@ class CardTemplateController extends Controller
     public function update(Request $request, string $id)
     {
         $template = $this->find($id);
-        $data = $request->validate($this->rules(true));
+        $data = self::imageFields($request->validate($this->rules(true)));
         if (array_key_exists('design', $data)) {
             // Partial design edits keep the rest of the saved design.
             $data['design'] = CardEngine::normalizeDesign(array_replace_recursive($template->design ?? [], $data['design'] ?? []));
@@ -170,12 +196,22 @@ class CardTemplateController extends Controller
             'backgroundImageUrl' => ['nullable', 'string', 'max:500'],
             'name' => ['nullable', 'string', 'max:150'],
             'categoryId' => ['nullable', 'uuid'],
+            ...self::imageRules(),
             ...CardEngine::designRules(),
         ]);
         $category = ! empty($data['categoryId']) ? \App\Models\Category::whereKey($data['categoryId'])->value('name') : null;
+        $sample = CardEngine::sampleDetails($data['name'] ?? null, $category);
+
+        // With an image, the card is that image with its actions; else the layout.
+        if (! empty($data['imageUrl'])) {
+            return ApiResponse::ok(['html' => ImageCard::renderSource([
+                ...$data,
+                'hotspots' => ImageCard::normalize($data['hotspots'] ?? [], true),
+            ], $sample, true)]);
+        }
 
         return ApiResponse::ok([
-            'html' => CardEngine::render($data, CardEngine::sampleDetails($data['name'] ?? null, $category), true),
+            'html' => CardEngine::render($data, $sample, true),
         ]);
     }
 
@@ -204,11 +240,6 @@ class CardTemplateController extends Controller
         return ApiResponse::ok(['url' => $result['url'], 'source' => $result['source'], 'style' => $result['style']]);
     }
 
-    public function installStarters()
-    {
-        return ApiResponse::ok(['added' => StarterTemplates::install()]);
-    }
-
     // The editor's choices.
     public function options()
     {
@@ -219,6 +250,8 @@ class CardTemplateController extends Controller
             'colorKeys' => CardEngine::COLOR_KEYS,
             'defaultDesign' => CardEngine::defaultDesign(),
             'aiStyles' => BackgroundGenerator::STYLES,
+            'actions' => ImageCard::actionList(),
+            'actionDefaults' => ImageCard::TEMPLATE_DEFAULTS,
         ]);
     }
 }

@@ -8,6 +8,7 @@ use App\Models\BusinessCard;
 use App\Support\BusinessAccess;
 use App\Support\Cards\CardEngine;
 use App\Support\Cards\CardPdf;
+use App\Support\Cards\ImageCard;
 use App\Support\WebAuth;
 
 // The public digital visiting card at /card/<slug> (the URL its QR code
@@ -28,7 +29,10 @@ class CardPageController extends Controller
         $business = $this->liveBusiness($slug);
         BusinessCard::whereKey($business->card->id)->increment('viewCount');
 
-        $html = CardEngine::render(CardEngine::templateFor($business), CardEngine::details($business));
+        // The business's own artwork with its actions, when it has uploaded one; else its template.
+        // Its image (its own, or its image template's) with the actions on it; else the template's layout.
+        $html = ImageCard::render($business)
+            ?? CardEngine::render(CardEngine::templateFor($business), CardEngine::details($business));
 
         return response($html)->header('Content-Type', 'text/html; charset=UTF-8');
     }

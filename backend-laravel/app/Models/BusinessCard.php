@@ -19,7 +19,10 @@ class BusinessCard extends Model
 
     // backgroundImageUrl: the business's own background (e.g. AI-made),
     // worn over whichever template it picks.
-    protected $fillable = ['businessId', 'templateId', 'backgroundImageUrl', 'isPublished', 'publishedAt', 'viewCount'];
+    // imageUrl + hotspots: an image card — the business's own artwork with
+    // actions placed on it (App\Support\Cards\ImageCard). Shown instead of
+    // the template whenever an image is set.
+    protected $fillable = ['businessId', 'templateId', 'backgroundImageUrl', 'imageUrl', 'imageWidth', 'imageHeight', 'hotspots', 'isPublished', 'publishedAt', 'viewCount'];
 
     protected function casts(): array
     {
@@ -27,6 +30,9 @@ class BusinessCard extends Model
             'isPublished' => 'boolean',
             'publishedAt' => 'datetime',
             'viewCount' => 'integer',
+            'imageWidth' => 'integer',
+            'imageHeight' => 'integer',
+            'hotspots' => 'array',
         ];
     }
 

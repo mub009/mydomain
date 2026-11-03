@@ -2,11 +2,6 @@
 
 @php
     $isNew = $template === null;
-    $design = $template['design'] ?? $options['defaultDesign'];
-    $colorLabels = [
-        'primary' => 'Primary', 'accent' => 'Accent', 'background' => 'Page background', 'surface' => 'Card surface',
-        'text' => 'Text', 'muted' => 'Secondary text', 'buttonText' => 'Button text',
-    ];
 @endphp
 
 @section('title', ($isNew ? 'New template' : $template['name']).' · Card template')
@@ -29,6 +24,20 @@
     <p class="text-sm text-red-700 bg-red-50 rounded-md px-3 py-2" data-error hidden></p>
 
     <div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_420px]">
+      <div class="min-w-0 space-y-5">
+      {{-- Image template: an uploaded card artwork with actions dragged onto it.
+           When set, it replaces the layout below on every card wearing this template. --}}
+      <div class="card p-5" data-template-image>
+        <div class="mb-4">
+          <h2 class="flex items-center gap-1.5 font-bold text-ink-900"><x-icon name="image" :size="16" class="text-brand-600" /> Card image &amp; actions</h2>
+          <p class="mt-0.5 text-sm text-ink-500">
+            Upload a finished card design (JPG) and drag actions onto it. Each action uses the details of the business wearing the template —
+            its phone, WhatsApp, address… — unless you type a fixed value. Each action's font, size and colours are set on the action itself.
+          </p>
+        </div>
+        <x-hotspot-editor subject="the card" />
+      </div>
+
       <form class="card space-y-5 p-5" data-template-form>
         <div class="grid gap-3 sm:grid-cols-2">
           <label class="block sm:col-span-2">
@@ -53,91 +62,18 @@
         <div class="flex flex-wrap gap-x-6 gap-y-2 rounded-lg border border-gray-200 bg-gray-50/60 p-3 text-sm">
           <label class="flex items-center gap-2"><input type="checkbox" name="isActive" @checked($template['isActive'] ?? true) /> Active <span class="text-xs text-ink-500">(businesses can pick it)</span></label>
           <label class="flex items-center gap-2"><input type="checkbox" name="isDefault" @checked($template['isDefault'] ?? false) /> Default for its category</label>
-          <label class="flex items-center gap-2"><input type="checkbox" name="isPremium" @checked($template['isPremium'] ?? false) /> Premium <span class="text-xs text-ink-500">(paid plans only)</span></label>
         </div>
 
-        <div>
-          <p class="mb-2 text-xs font-bold uppercase tracking-wide text-ink-500">Layout</p>
-          <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            @foreach ($options['layouts'] as $value => $label)
-              <label class="cursor-pointer">
-                <input type="radio" name="layout" value="{{ $value }}" class="peer sr-only" @checked(($template['layout'] ?? 'classic') === $value) />
-                <span class="block rounded-lg border border-gray-300 px-3 py-2 text-sm text-ink-700 transition-colors hover:bg-gray-50 peer-checked:border-brand-500 peer-checked:bg-brand-50 peer-checked:text-brand-800">{{ $label }}</span>
-              </label>
-            @endforeach
-          </div>
-        </div>
-
-        <div>
-          <p class="mb-2 text-xs font-bold uppercase tracking-wide text-ink-500">Background image</p>
-          <x-upload-field name="backgroundImageUrl" purpose="card-backgrounds" :value="$template['backgroundImageUrl'] ?? ''" placeholder="https://…/background.jpg" hint="Optional. Used in the card's header (or behind it, for the luxury layout). Without one, a gradient of the template colours is used — or the business's own cover photo." clearable />
-          <div class="mt-2 flex flex-wrap gap-1.5">
-            @foreach ($options['aiStyles'] as $value => $label)
-              <label class="cursor-pointer">
-                <input type="radio" name="aiStyle" value="{{ $value }}" class="peer sr-only" @checked($value === \App\Support\Cards\BackgroundGenerator::defaultStyle($template['layout'] ?? 'classic')) />
-                <span class="block rounded-full border border-gray-300 px-3 py-1 text-xs font-semibold text-ink-700 transition-colors hover:bg-gray-50 peer-checked:border-violet-500 peer-checked:bg-violet-50 peer-checked:text-violet-800">{{ $label }}</span>
-              </label>
-            @endforeach
-          </div>
-          <div class="mt-2 flex flex-col gap-2 sm:flex-row">
-            <input maxlength="200" class="input min-w-0 flex-1 text-sm" placeholder="AI style ideas (optional), e.g. soft bokeh of gold jewellery" data-ai-hint />
-            <button type="button" class="btn-secondary shrink-0 px-3 py-2 text-sm" data-generate-background><x-icon name="sparkles" :size="14" /> <span>Generate with AI</span></button>
-          </div>
-          <p class="mt-1 text-[11px] text-ink-400">Made from the category, layout and colours above. No text is put in the image.</p>
-          <label class="mt-3 block">
-            <span class="mb-1 flex justify-between text-xs font-semibold text-ink-700">Darken the image <span class="font-normal text-ink-500" data-overlay-label>{{ round($design['overlay'] * 100) }}%</span></span>
-            <input type="range" name="overlay" min="0" max="0.9" step="0.05" value="{{ $design['overlay'] }}" class="w-full" />
-          </label>
-        </div>
-
-        <div>
-          <p class="mb-2 text-xs font-bold uppercase tracking-wide text-ink-500">Fonts</p>
-          <div class="grid gap-3 sm:grid-cols-2">
-            @foreach (['heading' => 'Headings', 'body' => 'Body text'] as $key => $label)
-              <label class="block">
-                <span class="mb-1 block text-xs font-semibold text-ink-700">{{ $label }}</span>
-                <select name="font_{{ $key }}" class="input">
-                  @foreach ($options['fonts'] as $font)
-                    <option value="{{ $font }}" @selected($design['fonts'][$key] === $font)>{{ $font }}</option>
-                  @endforeach
-                </select>
-              </label>
-            @endforeach
-          </div>
-        </div>
-
-        <div>
-          <p class="mb-2 text-xs font-bold uppercase tracking-wide text-ink-500">Colours</p>
-          <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            @foreach ($options['colorKeys'] as $key)
-              <label class="block">
-                <span class="mb-1 block text-xs font-semibold text-ink-700">{{ $colorLabels[$key] ?? $key }}</span>
-                <span class="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-2 py-1.5">
-                  <input type="color" name="color_{{ $key }}" value="{{ $design['colors'][$key] }}" class="h-7 w-9 cursor-pointer rounded border-0 bg-transparent p-0" />
-                  <span class="font-mono text-xs text-ink-500" data-color-value="{{ $key }}">{{ $design['colors'][$key] }}</span>
-                </span>
-              </label>
-            @endforeach
-          </div>
-        </div>
-
-        <div>
-          <p class="mb-2 text-xs font-bold uppercase tracking-wide text-ink-500">Button style</p>
-          <div class="flex flex-wrap gap-2">
-            @foreach ($options['buttonStyles'] as $value => $label)
-              <label class="cursor-pointer">
-                <input type="radio" name="buttonStyle" value="{{ $value }}" class="peer sr-only" @checked($design['buttonStyle'] === $value) />
-                <span class="block rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-ink-700 transition-colors hover:bg-gray-50 peer-checked:border-brand-500 peer-checked:bg-brand-50 peer-checked:text-brand-800">{{ $label }}</span>
-              </label>
-            @endforeach
-          </div>
-        </div>
+        {{-- The layout, colours and button style are kept as saved (defaults for new
+             ones); they only matter to an old template without an image. --}}
+        <input type="hidden" name="layout" value="{{ $template['layout'] ?? 'classic' }}" />
 
         <div class="flex flex-wrap items-center gap-2 border-t border-gray-100 pt-4">
           <button class="btn-primary px-5 py-2.5" data-save><x-icon name="save" :size="15" /> {{ $isNew ? 'Create template' : 'Save changes' }}</button>
-          <span class="text-xs text-ink-500">Changes reach every card using this template as soon as they're saved.</span>
+          <span class="text-xs text-ink-500">Saves the image and actions above too. Changes reach every card using this template as soon as they're saved.</span>
         </div>
       </form>
+      </div>
 
       <div class="lg:sticky lg:top-4 lg:self-start">
         <div class="card p-4">
@@ -146,14 +82,26 @@
             <input data-sample-name placeholder="Sample business name" maxlength="80" class="input max-w-[11rem] py-1.5 text-xs" />
           </div>
           <div class="flex justify-center">
-            <iframe sandbox="" title="Template preview" class="h-[680px] w-full max-w-[390px] rounded-[28px] border-[6px] border-ink-900 bg-white" data-preview></iframe>
+            <iframe sandbox="allow-popups allow-popups-to-escape-sandbox" title="Template preview" class="h-[680px] w-full max-w-[390px] rounded-[28px] border-[6px] border-ink-900 bg-white" data-preview></iframe>
           </div>
         </div>
       </div>
     </div>
   </div>
 
-  <script type="application/json" id="card-template-data">@json(['id' => $template['id'] ?? null])</script>
+  @php
+      $templateData = [
+          'id' => $template['id'] ?? null,
+          'imageUrl' => $template['imageUrl'] ?? null,
+          'imageWidth' => $template['imageWidth'] ?? null,
+          'imageHeight' => $template['imageHeight'] ?? null,
+          'hotspots' => $template['hotspots'] ?? [],
+          'actions' => $options['actions'],
+          'fonts' => $options['fonts'],
+          'actionDefaults' => $options['actionDefaults'],
+      ];
+  @endphp
+  <script type="application/json" id="card-template-data">@json($templateData)</script>
 @endsection
 
 @push('scripts')

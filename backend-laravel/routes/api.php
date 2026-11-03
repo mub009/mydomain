@@ -168,6 +168,8 @@ Route::prefix('businesses')->group(function () {
         Route::get('/{id}/card', [CardController::class, 'show']);
         Route::put('/{id}/card', [CardController::class, 'update']);
         Route::post('/{id}/card/publish', [CardController::class, 'publish']);
+        // The editor's unsaved image and actions, drawn with the business's details.
+        Route::post('/{id}/card/preview', [CardController::class, 'preview']);
         // Image generation is slow and may be billed: kept to a few an hour.
         Route::post('/{id}/card/background', [CardController::class, 'generateBackground'])->middleware('throttle:12,60');
     });
@@ -318,7 +320,6 @@ Route::prefix('admin')->middleware(['auth.jwt', 'role:ADMIN'])->group(function (
         Route::get('/options', [CardTemplateController::class, 'options']);
         Route::post('/', [CardTemplateController::class, 'store']);
         Route::post('/preview', [CardTemplateController::class, 'preview']);
-        Route::post('/starter', [CardTemplateController::class, 'installStarters']);
         Route::post('/background', [CardTemplateController::class, 'generateBackground'])->middleware('throttle:30,60');
         Route::get('/{id}', [CardTemplateController::class, 'show']);
         Route::patch('/{id}', [CardTemplateController::class, 'update']);

@@ -7,7 +7,7 @@ use App\Models\BusinessCard;
 use App\Models\Category;
 use App\Models\CardTemplate;
 use App\Models\User;
-use App\Support\Cards\StarterTemplates;
+use Tests\Support\StarterTemplates;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Support\Facades\Hash;

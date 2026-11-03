@@ -41,25 +41,21 @@ initUploadFields(form ?? document);
 // --- Visiting card design ---------------------------------------------------
 // Once a category is picked, its 3–5 card designs appear as small previews
 // (drawn with the name typed so far). Tapping one selects it and opens it
-// full size. A new listing is on the free plan, so premium designs are shown
-// locked — except to admins.
+// full size.
 const picker = form ? $("[data-card-picker]", form) : null;
 const pickerOptions = picker ? $("[data-card-options]", picker) : null;
 const pickedInput = picker ? $("[data-card-template]", picker) : null;
-const isAdmin = currentUser()?.role === "ADMIN";
 let cardTemplates = [];
 let cardRequest = 0;
 
 function renderCardOptions() {
   pickerOptions.innerHTML = cardTemplates
     .map((t) => {
-      const locked = t.isPremium && !isAdmin;
       const selected = t.id === pickedInput.value;
-      return `<button type="button" data-card-option="${esc(t.id)}" ${locked ? 'data-locked="1"' : ""}
+      return `<button type="button" data-card-option="${esc(t.id)}"
           class="group overflow-hidden rounded-lg border bg-white text-left transition ${selected ? "border-brand-500 ring-2 ring-brand-200" : "border-gray-200 hover:border-gray-300"}">
           <span class="relative block h-40 overflow-hidden bg-gray-100">
             <iframe sandbox="" tabindex="-1" aria-hidden="true" loading="lazy" class="pointer-events-none absolute left-0 top-0 origin-top-left border-0" style="width:300%;height:300%;transform:scale(.3333)" data-srcdoc-index="${cardTemplates.indexOf(t)}"></iframe>
-            ${t.isPremium ? `<span class="badge absolute left-1 top-1 bg-amber-100 text-amber-800 !text-[10px]">Premium</span>` : ""}
             ${selected ? `<span class="badge absolute right-1 top-1 bg-brand-600 text-white !text-[10px]">Selected</span>` : ""}
           </span>
           <span class="block truncate px-2 py-1.5 text-xs font-semibold text-ink-900">${esc(t.name)}</span>
@@ -86,7 +82,7 @@ async function loadCardTemplates() {
     cardTemplates = data;
     // Keep the pick if the new category still offers it; else its default.
     if (!data.some((t) => t.id === pickedInput.value)) {
-      pickedInput.value = data.find((t) => !(t.isPremium && !isAdmin))?.id ?? "";
+      pickedInput.value = data[0]?.id ?? "";
     }
     picker.hidden = data.length === 0;
     renderCardOptions();
@@ -103,15 +99,10 @@ pickerOptions?.addEventListener("click", (e) => {
   const option = e.target.closest("[data-card-option]");
   if (!option) return;
   const template = cardTemplates.find((t) => t.id === option.dataset.cardOption);
-  const locked = Boolean(option.dataset.locked);
-  if (!locked) {
-    pickedInput.value = template.id;
-    renderCardOptions();
-  }
+  pickedInput.value = template.id;
+  renderCardOptions();
   cardPreviewModal(template.name, template.previewHtml, {
-    footer: locked
-      ? `<p class="text-center text-sm text-amber-700">Premium design — available after upgrading your plan.</p>`
-      : `<p class="text-center text-sm text-ink-500">Selected. Your own details and logo are filled in once the business is created.</p>`,
+    footer: `<p class="text-center text-sm text-ink-500">Selected. Your own details and logo are filled in once the business is created.</p>`,
   });
 });
 

@@ -11,6 +11,7 @@ use App\Support\ApiResponse;
 use App\Support\BusinessAccess;
 use App\Support\Cards\BackgroundGenerator;
 use App\Support\Cards\CardEngine;
+use App\Support\Cards\ImageCard;
 use Illuminate\Http\Request;
 
 // A business's digital visiting card, for the people who manage it: the
@@ -60,6 +61,7 @@ class CardController extends Controller
         $card = $business->card;
         $current = CardEngine::templateFor($business, $card);
         $details = CardEngine::details($business);
+        $image = ImageCard::source($business, $card);
 
         $templates = CardEngine::templatesFor($business->categoryId);
         // A design picked earlier that this category no longer offers stays listed, so it can still be seen.
@@ -71,6 +73,27 @@ class CardController extends Controller
             'businessId' => $business->id,
             'templateId' => $current?->id,
             'backgroundImageUrl' => $card?->backgroundImageUrl,
+            // The image card: the business's own artwork with actions placed on
+            // it, or else the image template it wears (imageFromTemplate).
+            'imageUrl' => $image['imageUrl'] ?? null,
+            'imageWidth' => $image['imageWidth'] ?? null,
+            'imageHeight' => $image['imageHeight'] ?? null,
+            'hotspots' => $image['hotspots'] ?? [],
+            'imageFromTemplate' => (bool) ($image['fromTemplate'] ?? false),
+            // Its own copy, of a design that has an image of its own to go back to.
+            'canResetImage' => (bool) $card?->imageUrl && (bool) $current?->imageUrl,
+            'actions' => ImageCard::actionList(),
+            'fonts' => CardEngine::FONTS,
+            'listingDefaults' => ImageCard::listingDefaults($details),
+            'imagePreviewHtml' => $image ? ImageCard::renderSource($image, $details, true) : null,
+            // Ready-made image designs from the admin, for "Start from a design".
+            'imageTemplates' => $templates->filter(fn (CardTemplate $t) => (bool) $t->imageUrl)->map(fn (CardTemplate $t) => [
+                'id' => $t->id,
+                'name' => $t->name,
+                'imageUrl' => $t->imageUrl,
+                'actionCount' => count($t->hotspots ?? []),
+                'inUse' => $t->id === $current?->id && ! $card?->imageUrl,
+            ])->values(),
             'aiProvider' => BackgroundGenerator::provider(),
             'aiStyles' => BackgroundGenerator::STYLES,
             'aiDefaultStyle' => BackgroundGenerator::defaultStyle($current?->layout ?? 'classic'),
@@ -90,8 +113,10 @@ class CardController extends Controller
         ]);
     }
 
-    // Switch the card's design, and/or set (or clear, with null) the card's
-    // own background. Neither touches the business's details.
+    // Switch the card's design, set (or clear, with null) the card's own
+    // background, and/or set the image card: its artwork (imageUrl, with
+    // its pixel size) and the actions placed on it (hotspots — see
+    // ImageCard). None of it touches the business's details.
     public function update(Request $request, string $id)
     {
         $actor = $request->attributes->get('auth');
@@ -99,9 +124,13 @@ class CardController extends Controller
         $data = $request->validate([
             'templateId' => ['sometimes', 'uuid'],
             'backgroundImageUrl' => ['sometimes', 'nullable', 'url', 'max:500'],
+            'imageUrl' => ['sometimes', 'nullable', 'url', 'max:500'],
+            'imageWidth' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:20000'],
+            'imageHeight' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:20000'],
+            ...ImageCard::rules(),
         ]);
         if (! $data) {
-            throw ApiException::badRequest('Send a templateId or a backgroundImageUrl');
+            throw ApiException::badRequest('Send a templateId, backgroundImageUrl, imageUrl or hotspots');
         }
         $changes = [];
 
@@ -115,6 +144,11 @@ class CardController extends Controller
                 throw ApiException::forbidden('This is a premium design. Upgrade your plan to use it.');
             }
             $changes['templateId'] = $template->id;
+            // Picking a design drops the card's own image copy, so the design's
+            // image (if it has one) shows — unless an image is sent with it.
+            if (! array_key_exists('imageUrl', $data)) {
+                $changes += ['imageUrl' => null, 'imageWidth' => null, 'imageHeight' => null, 'hotspots' => null];
+            }
         }
         if (array_key_exists('backgroundImageUrl', $data)) {
             if ($data['backgroundImageUrl'] !== null && ! CardEngine::isSafeUrl($data['backgroundImageUrl'])) {
@@ -122,10 +156,29 @@ class CardController extends Controller
             }
             $changes['backgroundImageUrl'] = $data['backgroundImageUrl'];
         }
+        if (array_key_exists('imageUrl', $data)) {
+            if ($data['imageUrl'] !== null && ! CardEngine::isSafeUrl($data['imageUrl'])) {
+                throw ApiException::badRequest('That image address cannot be used');
+            }
+            $changes['imageUrl'] = $data['imageUrl'];
+            $changes['imageWidth'] = $data['imageUrl'] !== null ? ($data['imageWidth'] ?? null) : null;
+            $changes['imageHeight'] = $data['imageUrl'] !== null ? ($data['imageHeight'] ?? null) : null;
+        }
+        if (array_key_exists('hotspots', $data)) {
+            $changes['hotspots'] = ImageCard::normalize($data['hotspots'] ?? []);
+        }
 
         $card = BusinessCard::updateOrCreate(['businessId' => $business->id], $changes);
 
-        return ApiResponse::ok(['templateId' => $card->templateId, 'backgroundImageUrl' => $card->backgroundImageUrl, 'isPublished' => $card->isPublished]);
+        return ApiResponse::ok([
+            'templateId' => $card->templateId,
+            'backgroundImageUrl' => $card->backgroundImageUrl,
+            'imageUrl' => $card->imageUrl,
+            'imageWidth' => $card->imageWidth,
+            'imageHeight' => $card->imageHeight,
+            'hotspots' => $card->hotspots ?? [],
+            'isPublished' => $card->isPublished,
+        ]);
     }
 
     /**
@@ -161,6 +214,30 @@ class CardController extends Controller
             'style' => $result['style'],
             'previewHtml' => CardEngine::render($template, $details, true),
         ]);
+    }
+
+    /**
+     * The card as the editor has it right now, saved or not: the image and
+     * actions sent, drawn with the business's own details. Actions still
+     * being typed are shown without their unfinished value.
+     */
+    public function preview(Request $request, string $id)
+    {
+        $business = $this->managed($request, $id);
+        $data = $request->validate([
+            'imageUrl' => ['required', 'url', 'max:500'],
+            'imageWidth' => ['nullable', 'integer', 'min:1', 'max:20000'],
+            'imageHeight' => ['nullable', 'integer', 'min:1', 'max:20000'],
+            ...ImageCard::rules(),
+        ]);
+        if (! CardEngine::isSafeUrl($data['imageUrl'])) {
+            throw ApiException::badRequest('That image address cannot be used');
+        }
+
+        return ApiResponse::ok(['html' => ImageCard::renderSource([
+            ...$data,
+            'hotspots' => ImageCard::normalize($data['hotspots'] ?? [], true),
+        ], CardEngine::details($business), true)]);
     }
 
     public function publish(Request $request, string $id)

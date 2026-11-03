@@ -12,17 +12,6 @@ const fail = (err) => showError(errorBox, errorMessage(err));
 if (root) {
   initSearchableSelects(root);
 
-  $("[data-install-starters]", root)?.addEventListener("click", async (e) => {
-    e.currentTarget.disabled = true;
-    try {
-      const { data } = await api.post("/admin/card-templates/starter");
-      reloadWithFlash(data.added ? `Added ${data.added} starter designs.` : "All starter designs are already installed.");
-    } catch (err) {
-      e.currentTarget.disabled = false;
-      fail(err);
-    }
-  });
-
   $$("[data-template-row]", root).forEach((row) => {
     const id = row.dataset.templateRow;
 

@@ -35,6 +35,8 @@ class UploadController extends Controller
         'categories' => ['folder' => 'categories', 'roles' => ['ADMIN']],
         // Background images of the digital-visiting-card templates.
         'card-backgrounds' => ['folder' => 'cards/backgrounds', 'roles' => ['ADMIN']],
+        // A business's own card artwork, with actions placed on it (ImageCard).
+        'card-images' => ['folder' => 'cards/images', 'roles' => ['BUSINESS_OWNER', 'DEALER', 'ADMIN']],
         // Poster Studio itself isn't ported yet (see README), but its
         // artwork uploads need SVG + sanitization once it is, so that
         // path is ready ahead of the rest of the module.

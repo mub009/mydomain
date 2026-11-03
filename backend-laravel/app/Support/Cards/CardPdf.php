@@ -44,6 +44,11 @@ class CardPdf
     /** The PDF's bytes. $live: the card is public, so its own link, QR code and "Save contact" can be included. */
     public static function render(Business $business, bool $live): string
     {
+        // An image card prints as its own artwork; if that can't be read, the template is the fallback.
+        if (($source = ImageCard::source($business)) && ($pdf = self::renderImage($business, $source, $live)) !== null) {
+            return $pdf;
+        }
+
         $template = CardEngine::templateFor($business);
         $design = CardEngine::normalizeDesign($template?->design);
         $layout = $template?->layout ?? 'classic';
@@ -85,6 +90,84 @@ class CardPdf
         $tall = [0, 0, self::PAGE[2], self::PAGE[3] * $pages];
 
         return self::draw(view('cards.pdf', [...$view, 'compact' => true])->render(), $tall, $b['name'])[0];
+    }
+
+    /**
+     * An image card as a PDF: one page the shape of the artwork, with every
+     * action placed on it a clickable link over the same spot. Null when the
+     * image can't be read.
+     */
+    private static function renderImage(Business $business, array $source, bool $live): ?string
+    {
+        $src = self::gd($source['imageUrl']);
+        if (! $src) {
+            return null;
+        }
+        // Re-encoded as a JPEG at most 1600px wide: dompdf can't read every
+        // format the upload accepts (WebP), and it keeps the file small.
+        $sw = imagesx($src);
+        $sh = imagesy($src);
+        $scale = min(1, 1600 / $sw);
+        $dst = imagecreatetruecolor(max(1, (int) round($sw * $scale)), max(1, (int) round($sh * $scale)));
+        imagefill($dst, 0, 0, imagecolorallocate($dst, 255, 255, 255));
+        imagecopyresampled($dst, $src, 0, 0, 0, 0, imagesx($dst), imagesy($dst), $sw, $sh);
+        ob_start();
+        imagejpeg($dst, null, 85);
+        $jpeg = 'data:image/jpeg;base64,'.base64_encode((string) ob_get_clean());
+
+        $width = self::PAGE[2];
+        $height = round($width * $sh / $sw, 2);
+        $details = CardEngine::details($business);
+        $pt = $width / 480; // the editor's sizes are px at a 480px-wide card
+        $spots = collect(ImageCard::resolved($source['hotspots'], $details))
+            // Share needs a browser; "Save contact" and the QR code point at the
+            // online card, which isn't up yet when not live.
+            ->reject(fn ($h) => $h['action'] === 'share' || (in_array($h['action'], ['save_contact', 'qr'], true) && ! $live))
+            ->map(function ($h) use ($width, $height, $pt) {
+                $text = null;
+                if ($h['kind'] === 'text') {
+                    // dompdf has only its own fonts: the serif or sans one nearest the chosen font.
+                    $text = sprintf(
+                        'font-family:%s;font-size:%spt;font-weight:%s;color:%s;text-align:%s;%s',
+                        in_array($h['font'] ?? null, self::SERIF_FONTS, true) ? "'DejaVu Serif'" : "'DejaVu Sans'",
+                        round(((int) ($h['fontSize'] ?? 0) ?: ImageCard::DEFAULT_FONT_SIZE) * $pt, 2),
+                        empty($h['bold']) ? 'normal' : 'bold',
+                        $h['color'] ?? '#ffffff',
+                        $h['align'] ?? 'left',
+                        isset($h['bg']) ? "background:{$h['bg']};" : '',
+                    );
+                }
+
+                return [
+                    'kind' => $h['kind'],
+                    'href' => $h['href'],
+                    'text' => $h['text'],
+                    'display' => $h['display'],
+                    'textStyle' => $text,
+                    'src' => $h['kind'] === 'image' ? ($h['action'] === 'logo' ? self::png($h['src']) : $h['src']) : null,
+                    'box' => sprintf('left:%spt;top:%spt;width:%spt;height:%spt', round($h['x'] * $width / 100, 2), round($h['y'] * $height / 100, 2), round($h['w'] * $width / 100, 2), round($h['h'] * $height / 100, 2)),
+                ];
+            })
+            ->reject(fn ($h) => $h['kind'] === 'image' && ! $h['src'])
+            ->values()->all();
+
+        $html = view('cards.pdf-image', ['image' => $jpeg, 'width' => $width, 'height' => $height, 'spots' => $spots, 'name' => $details['name']])->render();
+
+        return self::draw($html, [0, 0, $width, $height], $details['name'])[0];
+    }
+
+    /** An image from the app's storage as a PNG data URI dompdf can draw (it can't read WebP), or null. */
+    private static function png(string $url): ?string
+    {
+        $img = self::gd($url);
+        if (! $img) {
+            return null;
+        }
+        imagesavealpha($img, true);
+        ob_start();
+        imagepng($img);
+
+        return 'data:image/png;base64,'.base64_encode((string) ob_get_clean());
     }
 
     /** @return array{0: string, 1: int} the PDF and its page count */
@@ -236,7 +319,7 @@ class CardPdf
         return 'data:image/png;base64,'.base64_encode(ob_get_clean());
     }
 
-    private static function qr(string $text): string
+    public static function qr(string $text): string
     {
         $png = (new QRCode(new QROptions([
             'outputInterface' => QRGdImagePNG::class,

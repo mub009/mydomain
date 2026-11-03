@@ -1,12 +1,14 @@
 import { api, errorMessage } from "../lib/api";
 import { cardPreviewModal } from "../lib/card-preview";
 import { downloadDataUrl, renderQrDataUrl } from "../lib/channels";
+import { initHotspotEditor } from "../lib/hotspot-editor";
 import { $, $$, pageData } from "../lib/ui";
 import { reloadWithFlash, showError } from "../lib/widgets";
 
 // The "Visiting Card" section of a business's Manage page
-// (pages/dashboard/sections/card.blade.php): switch designs, preview,
-// publish, and the card link's QR code.
+// (pages/dashboard/sections/card.blade.php): the card image with its
+// actions (lib/hotspot-editor.js), ready-made designs from the admin,
+// publishing, and the card link's QR code.
 
 const biz = pageData("manage-data");
 const card = pageData("card-data");
@@ -16,53 +18,91 @@ const errorBox = $("[data-error]");
 if (root && card) {
   const base = `/businesses/${biz.id}/card`;
   const fail = (err) => {
-    showError(errorBox, errorMessage(err));
-    errorBox.scrollIntoView({ behavior: "smooth", block: "center" });
+    showError(errorBox, !err ? "" : typeof err === "string" ? err : errorMessage(err));
+    if (err) errorBox?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
 
-  async function useTemplate(id, button) {
-    showError(errorBox, "");
-    if (button) {
-      button.disabled = true;
-      button.textContent = "Applying…";
+  // --- The image and its actions --------------------------------------------
+  const saveBtn = $("[data-save-card]", root);
+  const dirtyNote = $("[data-dirty-note]", root);
+  const editor = initHotspotEditor($("[data-hotspot-editor]", root), {
+    actions: card.actions,
+    fonts: card.fonts,
+    defaults: card.listingDefaults,
+    fallbackPrefix: "Leave empty to use your listing's: ",
+    missingHint: "Your listing has none — enter one, or add it in Contact.",
+    imageUrl: card.imageUrl,
+    imageWidth: card.imageWidth,
+    imageHeight: card.imageHeight,
+    hotspots: card.hotspots,
+    onChange: () => {
+      saveBtn.disabled = false;
+      dirtyNote.classList.remove("hidden");
+    },
+    onError: fail,
+  });
+
+  async function save({ reload = true } = {}) {
+    const problem = editor.check();
+    if (problem) {
+      fail(problem);
+      return false;
     }
+    const body = editor.payload();
+    fail("");
+    saveBtn.disabled = true;
+    const label = $("span", saveBtn);
+    label.textContent = "Saving…";
+    try {
+      await api.put(base, body);
+      editor.markClean();
+      if (reload) reloadWithFlash("Your card is saved.");
+      return true;
+    } catch (err) {
+      saveBtn.disabled = false;
+      fail(err);
+      return false;
+    } finally {
+      label.textContent = "Save card";
+    }
+  }
+  saveBtn.addEventListener("click", () => save());
+
+  window.addEventListener("beforeunload", (e) => {
+    if (editor.dirty) {
+      e.preventDefault();
+      e.returnValue = "";
+    }
+  });
+
+  // --- Ready-made designs ----------------------------------------------------
+  // Picking one drops the card's own image copy, so the design's image shows.
+  async function useTemplate(id, message, button) {
+    if (editor.dirty && !window.confirm("Discard your unsaved changes to this card?")) return;
+    fail("");
+    if (button) button.disabled = true;
     try {
       await api.put(base, { templateId: id });
-      const name = card.templates.find((t) => t.id === id)?.name ?? "the new design";
-      reloadWithFlash(`Your card now uses ${name}. Your details are unchanged.`);
+      editor.markClean();
+      reloadWithFlash(message);
     } catch (err) {
-      if (button) {
-        button.disabled = false;
-        button.textContent = "Use this";
-      }
+      if (button) button.disabled = false;
       fail(err);
     }
   }
-
-  $$("[data-use-template]", root).forEach((btn) => btn.addEventListener("click", () => useTemplate(btn.dataset.useTemplate, btn)));
-
-  // Full-size preview, with "Use this design" when it isn't the current one.
-  $$("[data-preview-template]", root).forEach((btn) =>
-    btn.addEventListener("click", () => {
-      const id = btn.dataset.previewTemplate;
-      const template = card.templates.find((t) => t.id === id);
-      const html = $(`[data-template-frame="${id}"]`, root)?.srcdoc;
-      if (!template || !html) return;
-      const canUse = id !== card.templateId && !template.locked;
-      const footer = canUse
-        ? `<div class="flex justify-center"><button type="button" class="btn-primary px-5 py-2.5 text-sm" data-modal-use>Use this design</button></div>`
-        : template.locked
-          ? `<p class="text-center text-sm text-amber-700">This premium design needs a paid plan.</p>`
-          : "";
-      const modal = cardPreviewModal(template.name, html, { footer });
-      $("[data-modal-use]", modal.body)?.addEventListener("click", (e) => useTemplate(id, e.currentTarget));
-    }),
+  $$("[data-use-template]", root).forEach((btn) =>
+    btn.addEventListener("click", () => useTemplate(btn.dataset.useTemplate, `Your card now uses ${btn.dataset.name}.`, btn)),
+  );
+  $("[data-reset-image]", root)?.addEventListener("click", (e) =>
+    useTemplate(card.templateId, "Your card is back to the original design.", e.currentTarget),
   );
 
+  // --- Publish, preview, link, QR -------------------------------------------
   $$("[data-publish-card]", root).forEach((btn) =>
     btn.addEventListener("click", async () => {
       const publish = btn.dataset.publishCard === "1";
-      showError(errorBox, "");
+      if (publish && editor.dirty && !(await save({ reload: false }))) return;
+      fail("");
       btn.disabled = true;
       try {
         const { data } = await api.post(`${base}/publish`, { isPublished: publish });
@@ -80,6 +120,25 @@ if (root && card) {
     }),
   );
 
+  // The card as it is in the editor right now, saved or not, with your real details.
+  $("[data-preview-card]", root)?.addEventListener("click", async (e) => {
+    const body = editor.payload();
+    if (!body.imageUrl) return fail("Upload your card image first.");
+    fail("");
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    try {
+      const { data } = await api.post(`${base}/preview`, body);
+      cardPreviewModal("Your card", data.html, {
+        footer: `<p class="text-center text-xs text-ink-500">Tap an action to try it — it opens in a new tab.${editor.dirty ? " Your changes aren't saved yet." : ""}</p>`,
+      });
+    } catch (err) {
+      fail(err);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
   $("[data-copy-card]", root)?.addEventListener("click", async (e) => {
     const label = $("span", e.currentTarget);
     try {
@@ -92,63 +151,6 @@ if (root && card) {
     setTimeout(() => (label.textContent = "Copy"), 2000);
   });
 
-  // --- AI background ---------------------------------------------------------
-  // Generated for this business (not saved yet): previewed on the card in
-  // use, then kept with "Use this background".
-  const generateBtn = $("[data-generate-background]", root);
-  const hintInput = $("[data-ai-hint]", root);
-  async function generateBackground() {
-    showError(errorBox, "");
-    const label = $("span", generateBtn);
-    const before = label.textContent;
-    generateBtn.disabled = true;
-    label.textContent = "Painting… (up to a minute)";
-    try {
-      const { data } = await api.post(`${base}/background`, {
-        templateId: card.templateId,
-        hint: hintInput.value.trim() || undefined,
-        style: $('[name="aiStyle"]:checked', root)?.value,
-      });
-      const note = data.source === "builtin" ? `<p class="text-center text-xs text-ink-500">Made with the built-in generator.</p>` : "";
-      const modal = cardPreviewModal("Your new background", data.previewHtml, {
-        footer: `${note}<div class="flex flex-wrap justify-center gap-2">
-            <button type="button" class="btn-secondary px-4 py-2 text-sm" data-again>Try another</button>
-            <button type="button" class="btn-primary px-5 py-2 text-sm" data-keep>Use this background</button>
-          </div>`,
-      });
-      $("[data-again]", modal.body).addEventListener("click", () => {
-        modal.close();
-        generateBackground();
-      });
-      $("[data-keep]", modal.body).addEventListener("click", async (e) => {
-        e.currentTarget.disabled = true;
-        try {
-          await api.put(base, { backgroundImageUrl: data.url });
-          reloadWithFlash("New background saved on your card.");
-        } catch (err) {
-          modal.close();
-          fail(err);
-        }
-      });
-    } catch (err) {
-      fail(err);
-    } finally {
-      generateBtn.disabled = false;
-      label.textContent = before;
-    }
-  }
-  generateBtn?.addEventListener("click", generateBackground);
-
-  $("[data-remove-background]", root)?.addEventListener("click", async () => {
-    try {
-      await api.put(base, { backgroundImageUrl: null });
-      reloadWithFlash("Background removed. Your card uses its design's own background again.");
-    } catch (err) {
-      fail(err);
-    }
-  });
-
-  // The QR code holds the card link, so a scan opens the card.
   const qr = $("[data-card-qr]", root);
   renderQrDataUrl(card.publicUrl, 640).then((dataUrl) => {
     qr.src = dataUrl;

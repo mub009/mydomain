@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Support\Cards;
+namespace Tests\Support;
 
 use App\Models\Category;
 use App\Models\CardTemplate;
@@ -95,8 +95,7 @@ class StarterTemplates
                     'design' => $design,
                     'isDefault' => $i === 0 && ! $hasDefault,
                     'isActive' => true,
-                    // The last two of each set are the premium ones.
-                    'isPremium' => $i >= 3,
+                    'isPremium' => false,
                     'sortOrder' => $i,
                 ]);
                 $added++;

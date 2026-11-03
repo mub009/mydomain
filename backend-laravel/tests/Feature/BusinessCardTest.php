@@ -7,7 +7,7 @@ use App\Models\BusinessCard;
 use App\Models\Category;
 use App\Models\CardTemplate;
 use App\Models\User;
-use App\Support\Cards\StarterTemplates;
+use Tests\Support\StarterTemplates;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
@@ -106,21 +106,20 @@ class BusinessCardTest extends TestCase
         $this->assertSame(1, BusinessCard::where('businessId', $business->id)->value('viewCount'));
     }
 
-    public function test_premium_designs_need_a_paid_plan(): void
+    public function test_every_design_is_open_to_every_business(): void
     {
         $category = $this->category('Restaurants', 'restaurants');
         StarterTemplates::install();
         $owner = $this->user('BUSINESS_OWNER');
         $business = $this->business($owner, $category);
         $auth = $this->auth($owner);
+        $this->assertSame(0, CardTemplate::where('isPremium', true)->count());
+
+        // Even one marked premium before premium designs were dropped, on the free plan.
         $luxury = CardTemplate::where('name', 'Luxury Dining')->first();
-        $this->assertTrue($luxury->isPremium);
-
+        $luxury->update(['isPremium' => true]);
         $this->getJson("/api/v1/businesses/{$business->id}/card", $auth)
-            ->assertJsonPath('data.templates.3.name', 'Luxury Dining')->assertJsonPath('data.templates.3.locked', true);
-        $this->putJson("/api/v1/businesses/{$business->id}/card", ['templateId' => $luxury->id], $auth)->assertStatus(403);
-
-        $business->update(['subscriptionPlan' => 'PREMIUM']);
+            ->assertJsonPath('data.templates.3.name', 'Luxury Dining')->assertJsonPath('data.templates.3.locked', false);
         $this->putJson("/api/v1/businesses/{$business->id}/card", ['templateId' => $luxury->id], $auth)->assertOk();
     }
 
@@ -228,7 +227,7 @@ class BusinessCardTest extends TestCase
 
         $this->signIn($owner);
         $this->get("/dashboard/businesses/{$business->id}?section=".urlencode('Visiting Card'))
-            ->assertOk()->assertSee('Choose a design')->assertSee('Premium Restaurant')->assertSee('Publish card')
+            ->assertOk()->assertSee('Card design & actions', false)->assertSee('Drop the card image here')->assertSee('Publish card')
             ->assertSee("/card/{$business->slug}");
         $this->get('/dashboard/businesses/new')->assertOk()->assertSee('data-card-picker', false);
         $this->get('/admin?tab='.urlencode('Card Templates'))->assertRedirect();

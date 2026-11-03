@@ -7,7 +7,9 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 // One digital-visiting-card design. Holds only the look — layout, colours,
-// fonts, background, button style — never any business's details.
+// fonts, background, button style — never any business's details. An image
+// template (imageUrl + hotspots) is instead an artwork with actions placed
+// on it, each linked to the wearing business's details (ImageCard).
 class CardTemplate extends Model
 {
     use HasUuid;
@@ -18,7 +20,7 @@ class CardTemplate extends Model
     protected $table = 'card_templates';
 
     protected $fillable = [
-        'categoryId', 'name', 'slug', 'layout', 'backgroundImageUrl', 'design',
+        'categoryId', 'name', 'slug', 'layout', 'backgroundImageUrl', 'imageUrl', 'imageWidth', 'imageHeight', 'hotspots', 'design',
         'isDefault', 'isActive', 'isPremium', 'sortOrder',
     ];
 
@@ -26,6 +28,9 @@ class CardTemplate extends Model
     {
         return [
             'design' => 'array',
+            'hotspots' => 'array',
+            'imageWidth' => 'integer',
+            'imageHeight' => 'integer',
             'isDefault' => 'boolean',
             'isActive' => 'boolean',
             'isPremium' => 'boolean',

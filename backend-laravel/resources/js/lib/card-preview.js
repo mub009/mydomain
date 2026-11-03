@@ -12,7 +12,7 @@ export function cardPreviewModal(title, html, { footer = "" } = {}) {
         <button type="button" class="rounded-full bg-gray-100 px-3 py-1 text-ink-700" data-size="wide">Wide screen</button>
       </div>
       <div class="flex justify-center">
-        <iframe sandbox="" title="Card preview" class="h-[640px] w-[390px] max-w-full rounded-[28px] border-[6px] border-ink-900 bg-white shadow-lg transition-all" data-preview-frame></iframe>
+        <iframe sandbox="allow-popups allow-popups-to-escape-sandbox" title="Card preview" class="h-[640px] w-[390px] max-w-full rounded-[28px] border-[6px] border-ink-900 bg-white shadow-lg transition-all" data-preview-frame></iframe>
       </div>
       ${footer}
     </div>`,
