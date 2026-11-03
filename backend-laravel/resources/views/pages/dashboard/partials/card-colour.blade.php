@@ -24,11 +24,11 @@
   </div>
   <p class="mt-0.5 text-xs text-ink-500">Tap a colour — it's saved straight away. Your original image is always kept.</p>
 
-  {{-- The card right here, recoloured the instant a colour is tapped — so on
-       a phone the change shows next to the colours, not a scroll away.
-       Hidden on wide screens where the full card is already beside it. --}}
-  @if (! empty($card['imageUrl']))
-    <div @class(['mt-3 flex justify-center rounded-lg bg-gray-100 p-2', 'lg:hidden' => ! ($thumbAlways ?? false)])>
+  {{-- In the editor (dealers and admins), whose card is a scroll away: a small
+       copy of it right here, recoloured the instant a colour is tapped. An
+       owner sees the colour on their card itself. --}}
+  @if (! empty($card['imageUrl']) && ($thumbAlways ?? false))
+    <div class="mt-3 flex justify-center rounded-lg bg-gray-100 p-2">
       <img src="{{ $card['imageUrl'] }}" alt="Your card in this colour" class="max-h-56 w-auto rounded-md shadow-sm transition-[filter] duration-150" data-colour-thumb />
     </div>
   @endif

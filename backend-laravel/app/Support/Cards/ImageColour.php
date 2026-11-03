@@ -103,6 +103,19 @@ class ImageColour
         return collect($m)->map(fn ($row) => implode(' ', array_map($f, $row)).' 0 0')->implode(' ').' 0 0 0 1 0';
     }
 
+    /** One #rrggbb colour recoloured the same way (text and buttons in the PDF). */
+    public static function hex(string $hex, array $c): string
+    {
+        if (! preg_match(self::HEX, $hex)) {
+            return $hex;
+        }
+        $m = self::matrix($c);
+        $rgb = sscanf($hex, '#%02x%02x%02x');
+        $out = array_map(fn ($row) => (int) max(0, min(255, round($row[0] * $rgb[0] + $row[1] * $rgb[1] + $row[2] * $rgb[2]))), $m);
+
+        return vsprintf('#%02x%02x%02x', $out);
+    }
+
     /** Recolours a truecolor GD image in place (for the PDF). */
     public static function applyGd(GdImage $img, array $c): void
     {

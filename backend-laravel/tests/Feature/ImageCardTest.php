@@ -305,11 +305,17 @@ class ImageCardTest extends TestCase
         $this->putJson($url, ['imageColour' => ['hue' => 400]], $owner)->assertStatus(400);
         $this->putJson($url, ['imageColour' => ['tint' => 'red;}']], $owner)->assertStatus(400);
         $this->getJson($url, $owner)->assertOk()->assertJsonPath('data.imageColour.strength', 60);
+        // The owner's preview comes uncoloured: the page lays the colour over it live, so it isn't applied twice.
+        $this->assertStringNotContainsString('feColorMatrix', $this->getJson($url, $owner)->json('data.imagePreviewHtml'));
+        $this->assertStringContainsString('feColorMatrix', $this->getJson($url, $this->auth)->json('data.imagePreviewHtml'));
 
         $this->postJson("{$url}/publish", [], $owner)->assertOk();
         $html = $this->get('/card/spice-garden')->assertOk()->getContent();
         $this->assertStringContainsString('<feColorMatrix type="matrix" values="', $html);
-        $this->assertStringContainsString('filter:url(#card-colour)', $html);
+        $this->assertStringContainsString('.card{filter:url(#card-colour)}', $html); // the whole card: image, buttons and text
+        // The PDF recolours text and button colours with the same maths: grey turns red.
+        $red = \App\Support\Cards\ImageColour::hex('#808080', \App\Support\Cards\ImageColour::normalize(['tint' => '#ff0000', 'strength' => 100]));
+        $this->assertMatchesRegularExpression('/^#[c-f][0-9a-f]0000$/', $red);
         $this->assertStringStartsWith('%PDF', $this->get('/card/spice-garden.pdf')->assertOk()->getContent());
 
         // The same maths on the pixels: a red tint makes a grey pixel red.
@@ -328,7 +334,7 @@ class ImageCardTest extends TestCase
         $this->withoutVite();
         $this->post('/login', ['email' => $this->ownerEmail, 'password' => 'Password123!']);
         $this->get("/dashboard/businesses/{$this->business->id}?section=".urlencode('Visiting Card'))->assertOk()
-            ->assertSee('data-colour-panel', false)->assertSee('data-colour-thumb', false)->assertSee('Tap a colour')->assertSee('data-swatch="gold"', false)
+            ->assertSee('data-colour-panel', false)->assertDontSee('data-colour-thumb', false)->assertSee('Tap a colour')->assertSee('data-swatch="gold"', false)
             ->assertSee('Black &amp; white', false)->assertSee('Fine-tune');
 
         // A preview shows unsaved colours.

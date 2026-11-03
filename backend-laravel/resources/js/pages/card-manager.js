@@ -116,9 +116,17 @@ if (root && card) {
   let colour = { ...COLOUR_DEFAULTS, ...(card.imageColourDefaults || {}), ...(card.imageColour || {}) };
   const panel = $("[data-colour-panel]", root);
   if (panel) {
-    const stageImage = $("[data-stage-image]", root);
-    // The small copy of the card beside the colours, recoloured on the spot.
-    const thumb = $("[data-colour-thumb]", panel);
+    // Everything that shows the card takes the colour the instant it's picked:
+    // the owner's card (its image, buttons and text — the public card is
+    // coloured the same way), or the editor's image with its actions and the
+    // small copy beside the colours.
+    const targets = [
+      readonlyPreview,
+      $("[data-stage-image]", root),
+      $("[data-stage-spots]", root),
+      $("[data-colour-thumb]", panel),
+    ].filter(Boolean);
+    const paint = () => targets.forEach((el) => applyToImage(el, colour));
     const statusEl = $("[data-colour-status]", panel);
     const swatches = $$("[data-swatch]", panel);
     const customInput = $("[data-colour-custom]", panel);
@@ -149,33 +157,6 @@ if (root && card) {
       }
     };
 
-    let previewTimer = null;
-    let previewRequest = 0;
-    const show = () => {
-      if (stageImage) applyToImage(stageImage, colour);
-      if (thumb) applyToImage(thumb, colour);
-      if (!readonlyPreview || !card.imageUrl) return;
-      clearTimeout(previewTimer);
-      previewTimer = setTimeout(async () => {
-        const request = ++previewRequest;
-        try {
-          const { data } = await api.post(`${base}/preview`, {
-            imageUrl: card.imageUrl,
-            imageWidth: card.imageWidth,
-            imageHeight: card.imageHeight,
-            hotspots: card.hotspots,
-            imageColour: colour,
-          });
-          if (request === previewRequest) {
-            readonlyPreview.srcdoc = data.html;
-            card.previewHtml = data.html; // the Preview button shows it too
-          }
-        } catch (err) {
-          fail(err);
-        }
-      }, 200);
-    };
-
     // Saved a moment after the last change, so dragging a slider is one save.
     let saveTimer = null;
     let saveRequest = 0;
@@ -200,7 +181,7 @@ if (root && card) {
 
     const changed = () => {
       fill();
-      show();
+      paint();
       saveColour();
     };
 
@@ -231,8 +212,7 @@ if (root && card) {
     }
 
     fill();
-    if (stageImage) applyToImage(stageImage, colour);
-    if (thumb) applyToImage(thumb, colour);
+    paint();
   }
 
   // --- Publish, preview, link, QR -------------------------------------------
@@ -261,10 +241,26 @@ if (root && card) {
   // The card as it is in the editor right now, saved or not, with your real details.
   $("[data-preview-card]", root)?.addEventListener("click", async (e) => {
     if (!editor) {
-      if (!card.previewHtml) return fail("Your card design isn't set up yet.");
-      return cardPreviewModal("Your card", card.previewHtml, {
-        footer: `<p class="text-center text-xs text-ink-500">Tap an action to try it — it opens in a new tab.</p>`,
-      });
+      if (!card.imageUrl) return fail("Your card design isn't set up yet.");
+      const btn = e.currentTarget;
+      btn.disabled = true;
+      try {
+        const { data } = await api.post(`${base}/preview`, {
+          imageUrl: card.imageUrl,
+          imageWidth: card.imageWidth,
+          imageHeight: card.imageHeight,
+          hotspots: card.hotspots,
+          imageColour: colour,
+        });
+        cardPreviewModal("Your card", data.html, {
+          footer: `<p class="text-center text-xs text-ink-500">Tap an action to try it — it opens in a new tab.</p>`,
+        });
+      } catch (err) {
+        fail(err);
+      } finally {
+        btn.disabled = false;
+      }
+      return;
     }
     const body = { ...editor.payload(), imageColour: colour };
     if (!body.imageUrl) return fail("Upload your card image first.");

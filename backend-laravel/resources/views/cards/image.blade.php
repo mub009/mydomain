@@ -30,7 +30,9 @@
     .backdrop{position:fixed;inset:-40px;background:url('{{ $image }}') center/cover;filter:{{ $colourMatrix ? 'url(#card-colour) ' : '' }}blur(36px) brightness(.55);transform:scale(1.1)}
     .page{position:relative;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px 12px}
     .card{position:relative;width:100%;max-width:480px;container-type:inline-size;border-radius:18px;overflow:hidden;box-shadow:0 24px 60px -20px rgba(0,0,0,.6);background:#1f2937}
-    .card > img{display:block;width:100%;height:auto;user-select:none;-webkit-user-drag:none;{{ $colourMatrix ? 'filter:url(#card-colour)' : '' }}}
+    .card > img{display:block;width:100%;height:auto;user-select:none;-webkit-user-drag:none}
+    {{-- The business's colour covers the whole card: its image, buttons and text. --}}
+    {!! $colourMatrix ? '.card{filter:url(#card-colour)}' : '' !!}
     .spot{position:absolute;display:flex;align-items:center;justify-content:center;gap:6px;border-radius:10px;color:#fff;text-decoration:none;font-weight:600;font-size:13px;-webkit-tap-highlight-color:transparent;cursor:pointer;border:0;padding:0;font-family:inherit;background:transparent}
     .spot:focus-visible{outline:3px solid #facc15;outline-offset:2px}
     .spot.invisible:active{background:rgba(255,255,255,.25)}

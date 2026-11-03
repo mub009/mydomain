@@ -128,7 +128,7 @@ class CardPdf
             // Share needs a browser; "Save contact" and the QR code point at the
             // online card, which isn't up yet when not live.
             ->reject(fn ($h) => $h['action'] === 'share' || (in_array($h['action'], ['save_contact', 'qr'], true) && ! $live))
-            ->map(function ($h) use ($width, $height, $pt) {
+            ->map(function ($h) use ($width, $height, $pt, $colour) {
                 $text = null;
                 if ($h['kind'] === 'text') {
                     // dompdf has only its own fonts: the serif or sans one nearest the chosen font.
@@ -138,9 +138,9 @@ class CardPdf
                         round(((int) ($h['fontSize'] ?? 0) ?: ImageCard::DEFAULT_FONT_SIZE) * $pt, 2),
                         empty($h['bold']) ? 'normal' : 'bold',
                         empty($h['italic']) ? 'normal' : 'italic',
-                        $h['color'] ?? '#ffffff',
+                        $colour ? ImageColour::hex($h['color'] ?? '#ffffff', $colour) : ($h['color'] ?? '#ffffff'),
                         $h['align'] ?? 'left',
-                        isset($h['bg']) ? "background:{$h['bg']};" : '',
+                        isset($h['bg']) ? 'background:'.($colour ? ImageColour::hex($h['bg'], $colour) : $h['bg']).';' : '',
                     );
                 }
 
