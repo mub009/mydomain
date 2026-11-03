@@ -77,18 +77,24 @@
       <div class="card p-5">
         <div class="mb-4">
           <h3 class="flex items-center gap-1.5 font-bold text-ink-900"><x-icon name="image" :size="16" class="text-brand-600" /> Your card</h3>
-          <p class="mt-0.5 text-sm text-ink-500">Your card shows your listing's details. Change its colour below. For a different design, ask your dealer.</p>
+          <p class="mt-0.5 text-sm text-ink-500">Your card shows your listing's details. To change the design itself, pick a ready-made design below or ask your dealer.</p>
         </div>
+        {{-- On a phone: the card, then its colours (kept in view at the bottom
+             of the screen while the card is scrolled), then what's missing.
+             On a wide screen: the card on the left, the rest beside it. --}}
         <div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <div class="min-w-0">
+          <div class="min-w-0 lg:row-span-2">
             @if ($card['imagePreviewHtml'])
               <div class="mx-auto w-full max-w-[360px] overflow-hidden rounded-xl border border-gray-200 bg-gray-50">
                 <iframe sandbox="" title="Your card" class="block h-[600px] w-full border-0" data-card-readonly-preview></iframe>
               </div>
             @else
-              <p class="rounded-md bg-gray-50 px-3 py-6 text-center text-sm text-ink-500">Your card design isn't set up yet — ask your dealer.</p>
+              <p class="rounded-md bg-gray-50 px-3 py-6 text-center text-sm text-ink-500">Your card design isn't set up yet. Pick a ready-made design below, or ask your dealer.</p>
             @endif
           </div>
+          @if ($hasImage)
+            <div class="sticky bottom-2 z-10 rounded-xl bg-white shadow-xl ring-1 ring-black/5 lg:static lg:shadow-none lg:ring-0">@include('pages.dashboard.partials.card-colour')</div>
+          @endif
           <div>
             @if (count($card['missingDetails']))
               <div class="rounded-xl border border-amber-200 bg-amber-50 p-4">
@@ -118,7 +124,7 @@
       <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 class="flex items-center gap-1.5 font-bold text-ink-900"><x-icon name="image" :size="16" class="text-brand-600" /> Card design & actions</h3>
-          <p class="mt-0.5 text-sm text-ink-500">Click on the card to add actions over the buttons or icons in the design.</p>
+          <p class="mt-0.5 text-sm text-ink-500">Upload your card as a JPG — or start from a ready-made design below — then click on it to add actions over the buttons or icons in the design.</p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
           <span class="hidden text-xs font-semibold text-amber-700" data-dirty-note>Unsaved changes</span>
@@ -128,7 +134,7 @@
 
       @if ($card['imageFromTemplate'])
         <p class="mb-4 rounded-md bg-sky-50 px-3 py-2 text-xs text-sky-800">
-          Your card uses the design <span class="font-semibold">{{ $currentImageTemplate['name'] ?? '' }}</span>, linked to your listing's details. Changes you save here make it your own copy.
+          Your card uses the ready-made design <span class="font-semibold">{{ $currentImageTemplate['name'] ?? '' }}</span>, linked to your listing's details. Changes you save here make it your own copy.
         </p>
       @elseif ($card['canResetImage'])
         <p class="mb-4 flex flex-wrap items-center gap-2 rounded-md bg-gray-50 px-3 py-2 text-xs text-ink-600">
@@ -139,15 +145,43 @@
 
       <x-hotspot-editor subject="your card" :replaceable="false" :palette="false" :movable="false" />
 
+      @if ($hasImage)
+        <div class="mt-5 max-w-md">@include('pages.dashboard.partials.card-colour', ['thumbAlways' => true])</div>
+      @endif
+
     </div>
     @endunless
 
-    {{-- Card colour, in its own section under the card. On a phone it stays
-         at the bottom of the screen while the card is scrolled, so each tap
-         shows on the card straight away. --}}
-    @if ($hasImage)
-      <div class="sticky bottom-2 z-10 rounded-xl bg-white shadow-xl ring-1 ring-black/5 lg:static lg:shadow-sm lg:ring-0">
-        @include('pages.dashboard.partials.card-colour', ['thumbAlways' => $card['canEdit']])
+    {{-- Ready-made image designs made by the admin for this category --}}
+    @if (count($card['imageTemplates']))
+      <div class="card p-5">
+        <div class="mb-4">
+          <h3 class="font-bold text-ink-900">Ready-made designs</h3>
+          <p class="mt-0.5 text-sm text-ink-500">Designed for {{ $biz['category']['name'] ?? 'your category' }}, with the actions already placed — they use your phone, WhatsApp and address automatically.</p>
+        </div>
+        <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+          @foreach ($card['imageTemplates'] as $t)
+            <div @class(['overflow-hidden rounded-xl border bg-white', 'border-brand-500 ring-2 ring-brand-200' => $t['inUse'], 'border-gray-200' => ! $t['inUse']])>
+              <div class="relative aspect-[3/5] bg-gray-100">
+                <img src="{{ $t['imageUrl'] }}" alt="{{ $t['name'] }}" loading="lazy" class="h-full w-full object-cover object-top" />
+                <span class="absolute left-2 top-2 flex gap-1">
+                  @if ($t['inUse'])<span class="badge bg-brand-600 text-white"><x-icon name="check" :size="11" /> In use</span>@endif
+                </span>
+              </div>
+              <div class="space-y-2 border-t border-gray-100 p-3">
+                <div>
+                  <p class="truncate text-sm font-semibold text-ink-900">{{ $t['name'] }}</p>
+                  <p class="text-[11px] text-ink-500">{{ $t['actionCount'] }} {{ $t['actionCount'] === 1 ? 'action' : 'actions' }}</p>
+                </div>
+                @if ($t['inUse'])
+                  <span class="block text-xs font-semibold text-brand-700">Selected</span>
+                @else
+                  <button type="button" class="btn-primary w-full px-3 py-1.5 text-xs" data-use-template="{{ $t['id'] }}" data-name="{{ $t['name'] }}">Use this design</button>
+                @endif
+              </div>
+            </div>
+          @endforeach
+        </div>
       </div>
     @endif
   </div>
