@@ -235,7 +235,11 @@ export function initHotspotEditor(editor, options) {
     const h = spotById(state.selected);
     if (!h) {
       inspector.innerHTML = `<p class="py-3 text-center text-xs text-ink-500">${
-        state.imageUrl ? "Click anywhere on the image to add an action or business detail there, or select one to edit it." : "Upload the card image to start placing actions."
+        state.imageUrl
+          ? state.hotspots.length
+            ? "Click a box on the card, or pick one under “On the card”, to edit it. Click an empty spot on the image to add a new one."
+            : "Click anywhere on the image to add an action or business detail there."
+          : "Upload the card image to start placing actions."
       }</p>`;
       return;
     }
@@ -797,6 +801,11 @@ export function initHotspotEditor(editor, options) {
     renderAll();
   });
 
+  // Open with a box already selected, so its settings show right away:
+  // the first one that still needs details, else the first one.
+  if (state.imageUrl && state.hotspots.length) {
+    state.selected = (state.hotspots.find((h) => !targetOf(h)) || state.hotspots[0]).id;
+  }
   renderAll();
 
   return {
