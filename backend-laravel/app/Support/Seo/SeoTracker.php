@@ -4,6 +4,7 @@ namespace App\Support\Seo;
 
 use App\Models\Business;
 use App\Models\SeoPage;
+use App\Support\BusinessFeatures;
 use App\Support\SiteUrl;
 use Illuminate\Support\Facades\Cache;
 use Throwable;
@@ -38,7 +39,7 @@ class SeoTracker
         }
         $site = $business->site;
         $websiteLive = $site?->siteType === 'ECOMMERCE' ? $site->isPublished : $business->status === 'PUBLISHED';
-        if ($websiteLive) {
+        if ($websiteLive && BusinessFeatures::has($business, BusinessFeatures::WEBSITE)) {
             $urls['WEBSITE'] = self::websiteUrl($business->slug);
         }
 

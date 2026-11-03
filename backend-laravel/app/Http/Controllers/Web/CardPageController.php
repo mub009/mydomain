@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Business;
 use App\Models\BusinessCard;
 use App\Support\BusinessAccess;
+use App\Support\BusinessFeatures;
 use App\Support\Cards\CardEngine;
 use App\Support\Cards\CardPdf;
 use App\Support\Cards\ImageCard;
@@ -19,7 +20,8 @@ class CardPageController extends Controller
     private function liveBusiness(string $slug): Business
     {
         $business = Business::with(['category', 'hours' => fn ($q) => $q->orderBy('dayOfWeek'), 'card'])->where('slug', $slug)->first();
-        abort_unless($business && $business->status === 'PUBLISHED' && $business->card?->isPublished, 404);
+        abort_unless($business && $business->status === 'PUBLISHED' && $business->card?->isPublished
+            && BusinessFeatures::has($business, BusinessFeatures::VISITING_CARD), 404);
 
         return $business;
     }
@@ -51,6 +53,7 @@ class CardPageController extends Controller
         abort_unless($business, 404);
         $user = WebAuth::user();
         abort_unless(BusinessAccess::canManage(['role' => $user->role, 'sub' => $user->id], $business), 403);
+        abort_unless(BusinessFeatures::has($business, BusinessFeatures::VISITING_CARD), 404);
 
         return self::pdfResponse($business, $business->status === 'PUBLISHED' && (bool) $business->card?->isPublished);
     }

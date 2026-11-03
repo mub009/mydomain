@@ -8,6 +8,7 @@ use App\Models\BusinessSite;
 use App\Models\Product;
 use App\Support\ApiResponse;
 use App\Support\BusinessAccess;
+use App\Support\BusinessFeatures;
 use App\Support\SiteBuilder\LiveSite;
 use App\Support\SiteBuilder\Sanitizer;
 use App\Support\SiteBuilder\TemplateRegistry;
@@ -46,6 +47,8 @@ class SiteController extends Controller
     private function assertOwnerOrAdmin(array $actor, Business $business): void
     {
         BusinessAccess::assertCanManage($actor, $business);
+        // The website is a feature the dealer gives the business.
+        BusinessFeatures::assert($business, BusinessFeatures::WEBSITE);
     }
 
     private function ownedBusiness(array $actor, string $businessId): Business
@@ -282,10 +285,13 @@ class SiteController extends Controller
             'id', 'name', 'slug', 'status', 'city', 'description', 'phone', 'email', 'logoUrl',
             'addressLine1', 'addressLine2', 'state', 'postalCode', 'latitude', 'longitude',
             'instagramUsername', 'avgRating', 'reviewCount',
-            'categoryId', 'country', 'coverImageUrl', 'seoTitle', 'seoDescription', 'seoKeywords',
+            'categoryId', 'country', 'coverImageUrl', 'seoTitle', 'seoDescription', 'seoKeywords', 'features',
         ]);
         if (! $business) {
             throw ApiException::notFound('Business not found');
+        }
+        if (! BusinessFeatures::has($business, BusinessFeatures::WEBSITE)) {
+            throw ApiException::notFound('This business has no website');
         }
 
         $site = BusinessSite::where('businessId', $business->id)->first();

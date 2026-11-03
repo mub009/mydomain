@@ -21,14 +21,13 @@ class PointsController extends Controller
             throw ApiException::notFound('User not found');
         }
 
-        // Net of refunds for listings the dealer deleted.
-        $spent = (int) -PointTransaction::where('userId', $user->id)->whereIn('type', ['BUSINESS_CREATED', 'BUSINESS_DELETED'])->sum('amount');
-
         return ApiResponse::ok([
             'points' => $user->points,
-            'pointsPerBusiness' => Points::PER_BUSINESS,
-            'businessesRemaining' => intdiv($user->points, Points::PER_BUSINESS),
-            'totalSpent' => $spent,
+            // Each feature given to a business costs this; the listing itself is free.
+            'pointsPerFeature' => Points::PER_FEATURE,
+            'featuresRemaining' => intdiv($user->points, Points::PER_FEATURE),
+            // Net of refunds for features taken away and listings deleted.
+            'totalSpent' => Points::totalSpent($user->id),
             // Non-dealers are not charged, so their balance is informational only.
             'chargeable' => $user->role === 'DEALER',
         ]);

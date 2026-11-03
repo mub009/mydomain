@@ -9,6 +9,7 @@ use App\Models\Category;
 use App\Models\CardTemplate;
 use App\Support\ApiResponse;
 use App\Support\BusinessAccess;
+use App\Support\BusinessFeatures;
 use App\Support\Cards\BackgroundGenerator;
 use App\Support\Cards\CardEngine;
 use App\Support\Cards\ImageCard;
@@ -26,6 +27,8 @@ class CardController extends Controller
         $business = Business::with(['category', 'hours' => fn ($q) => $q->orderBy('dayOfWeek'), 'card'])->find($id)
             ?? throw ApiException::notFound('Business not found');
         BusinessAccess::assertCanManage($request->attributes->get('auth'), $business);
+        // The visiting card is a feature the dealer gives the business.
+        BusinessFeatures::assert($business, BusinessFeatures::VISITING_CARD);
 
         return $business;
     }

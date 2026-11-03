@@ -14,6 +14,7 @@ use App\Models\Service;
 use App\Models\User;
 use App\Support\ApiResponse;
 use App\Support\BusinessAccess;
+use App\Support\BusinessFeatures;
 use App\Support\Pagination;
 use App\Support\Points;
 use Illuminate\Http\Request;
@@ -182,9 +183,19 @@ class BusinessController extends Controller
             $rules['phone'] = ['nullable', 'string', 'min:7', 'max:20'];
             $rules['addressLine1'] = ['nullable', 'string', 'max:200'];
         }
-        $data = $request->validate($rules);
+        $data = $request->validate([...$rules, ...BusinessFeatures::rules()]);
         $owner = $data['owner'] ?? null;
         unset($data['owner']);
+        // What the business gets: a dealer picks (and pays a point for) each
+        // feature; an admin may pick too, free; otherwise it gets them all.
+        $features = array_key_exists('features', $data) || $actor['role'] === 'DEALER'
+            ? BusinessFeatures::clean($data['features'] ?? [])
+            : null;
+        unset($data['features']);
+        if ($actor['role'] === 'BUSINESS_OWNER') {
+            $features = null;
+        }
+        $data['features'] = $features;
         $data['country'] = $data['country'] ?? 'IN';
         // Explicit rather than relying on the DB column default — Eloquent
         // doesn't reload a row after create(), so the response would show
@@ -199,16 +210,16 @@ class BusinessController extends Controller
         $isStaff = in_array($actor['role'], ['DEALER', 'ADMIN'], true);
         $initialStatus = $isStaff ? 'PUBLISHED' : 'PENDING_APPROVAL';
 
-        // Dealers spend a point per listing — check up front so we never
+        // Dealers spend a point per feature — check up front so we never
         // create an owner account and then reject the request.
-        Points::assertHasPointsForBusiness($actor);
+        Points::assertCanAfford($actor, count($features ?? []));
 
         // Plain owners always own their listings. Dealers and admins may
         // instead supply a login for the business's own team; the listing is
         // then assigned to that account so the business can sign in and
         // manage it themselves.
         if (! $owner || ! $isStaff) {
-            $business = DB::transaction(function () use ($data, $actor, $initialStatus, $isStaff) {
+            $business = DB::transaction(function () use ($data, $actor, $initialStatus, $isStaff, $features) {
                 $business = Business::create([
                     ...$data,
                     'ownerId' => $actor['sub'],
@@ -217,7 +228,9 @@ class BusinessController extends Controller
                     'isVerified' => $isStaff,
                 ]);
                 BusinessHours::createDefaultsFor($business->id);
-                Points::spendForBusiness($actor, $business->id);
+                foreach ($features ?? [] as $feature) {
+                    Points::spendForFeature($actor, $business->id, $feature);
+                }
 
                 return $business;
             });
@@ -228,7 +241,7 @@ class BusinessController extends Controller
 
         $login = $this->checkOwnerLogin($owner);
 
-        $result = DB::transaction(function () use ($data, $actor, $initialStatus, $isStaff, $login) {
+        $result = DB::transaction(function () use ($data, $actor, $initialStatus, $isStaff, $login, $features) {
             $ownerRecord = $this->ownerAccount($login, $actor, $data['name']);
 
             $business = Business::create([
@@ -240,7 +253,9 @@ class BusinessController extends Controller
             ]);
             BusinessHours::createDefaultsFor($business->id);
 
-            Points::spendForBusiness($actor, $business->id);
+            foreach ($features ?? [] as $feature) {
+                Points::spendForFeature($actor, $business->id, $feature);
+            }
 
             return [$business, $this->ownerAccountPayload($ownerRecord, $login)];
         });
@@ -401,10 +416,53 @@ class BusinessController extends Controller
         return ApiResponse::ok(['refundedPoints' => $refunded]);
     }
 
+    /**
+     * Which features a business has. The dealer who set it up pays a point
+     * for each one added and gets it back for each one taken away; an admin
+     * changes them for free. The business itself can't change them.
+     */
+    public function updateFeatures(Request $request, string $id)
+    {
+        $actor = $request->attributes->get('auth');
+        $business = $this->findOrFail($id);
+        $canChange = $actor['role'] === 'ADMIN' || ($actor['role'] === 'DEALER' && $business->createdById === $actor['sub']);
+        if (! $canChange) {
+            throw ApiException::forbidden('Only the dealer who set up this business, or an admin, can change its features');
+        }
+        $data = $request->validate(['features' => ['present', 'array'], 'features.*' => BusinessFeatures::rules()['features.*']]);
+
+        $before = BusinessFeatures::of($business);
+        $after = BusinessFeatures::clean($data['features']);
+        $added = array_values(array_diff($after, $before));
+        $removed = array_values(array_diff($before, $after));
+        Points::assertCanAfford($actor, count($added));
+
+        $refunded = DB::transaction(function () use ($actor, $business, $after, $added, $removed) {
+            $refunded = 0;
+            foreach ($removed as $feature) {
+                $refunded += Points::refundFeature($actor, $business, $feature);
+            }
+            foreach ($added as $feature) {
+                Points::spendForFeature($actor, $business->id, $feature);
+            }
+            $business->update(['features' => $after]);
+
+            return $refunded;
+        });
+
+        return ApiResponse::ok([
+            'features' => $after,
+            'added' => $added,
+            'removed' => $removed,
+            'spentPoints' => $actor['role'] === 'DEALER' ? count($added) * Points::PER_FEATURE : 0,
+            'refundedPoints' => $refunded,
+        ]);
+    }
+
     // Dealers only: a draft copy of a listing they manage, as a head start on
     // a similar one (another branch, another shop of the same kind). It
     // copies what the listing shows — details, hours, services, photos,
-    // products and website — and costs a point like any new listing. The
+    // products and website — and the same features, a point each. The
     // copy is a different business, so it gets its own login (`owner`, as
     // in store) and is assigned to that account.
     // Reviews, leads, bookings, orders, QR boards and the Google review link
@@ -418,10 +476,11 @@ class BusinessController extends Controller
         }
         $this->assertOwnerOrAdmin($actor, $source);
         $owner = $request->validate(self::ownerRules('required'))['owner'];
-        Points::assertHasPointsForBusiness($actor);
+        $features = BusinessFeatures::of($source);
+        Points::assertCanAfford($actor, count($features));
         $login = $this->checkOwnerLogin($owner);
 
-        return DB::transaction(function () use ($actor, $source, $login) {
+        return DB::transaction(function () use ($actor, $source, $login, $features) {
             $ownerRecord = $this->ownerAccount($login, $actor, $source->name);
             $name = mb_substr($source->name, 0, 143).' (Copy)';
             $copy = Business::create([
@@ -438,6 +497,7 @@ class BusinessController extends Controller
                 // publicly until the dealer has made it its own.
                 'status' => 'DRAFT',
                 'isVerified' => false,
+                'features' => $features,
             ]);
 
             foreach ($source->photos as $photo) {
@@ -464,7 +524,9 @@ class BusinessController extends Controller
                 ]), 'businessId' => $copy->id, 'isPublished' => false]);
             }
 
-            Points::spendForBusiness($actor, $copy->id);
+            foreach ($features as $feature) {
+                Points::spendForFeature($actor, $copy->id, $feature);
+            }
 
             return ApiResponse::created([...$copy->toArray(), 'ownerAccount' => $this->ownerAccountPayload($ownerRecord, $login)]);
         });

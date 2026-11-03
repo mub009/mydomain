@@ -6,12 +6,6 @@
         ? 'Add the basics now. The phone, address, description, hours, services and photos are added afterwards from the business’s Manage page.'
         : 'Create the listing, then add hours, services, and photos.' }}
   </p>
-  @if ($isDealer && $points)
-    <p class="text-xs text-amber-700 bg-amber-50 rounded-md px-3 py-2">
-      <x-icon name="coins" :size="12" class="inline -mt-0.5 mr-1" />
-      This will use {{ $points['pointsPerBusiness'] }} of your {{ $points['points'] }} points.
-    </p>
-  @endif
   <div>
     <input required name="name" placeholder="Business name" class="input" data-slug-source />
     <p class="mt-1 text-[11px] text-ink-500" data-slug-preview hidden>Page link: <span class="font-mono text-ink-700">/business/<span data-slug-value></span></span></p>
@@ -22,6 +16,34 @@
       <option value="{{ $c['id'] }}">{{ $c['name'] }}</option>
     @endforeach
   </select>
+
+  @if ($canAssignOwner)
+    {{-- What the business gets (App\Support\BusinessFeatures). A dealer pays a
+         point for each; an admin's are free. The listing itself is free. --}}
+    <div class="rounded-lg border border-gray-200 p-3" data-features-picker data-points="{{ $isDealer ? (int) ($points['points'] ?? 0) : '' }}">
+      <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <p class="text-xs font-semibold text-ink-700"><x-icon name="sliders-horizontal" :size="13" class="-mt-0.5 mr-1 inline" />Features for this business</p>
+        <span class="text-[11px] text-ink-500">{{ $isDealer ? '1 point each · the listing itself is free' : 'Free for admins' }}</span>
+      </div>
+      <div class="grid gap-2 sm:grid-cols-3">
+        @foreach (\App\Support\BusinessFeatures::ALL as $key)
+          <label class="flex cursor-pointer gap-2 rounded-lg border border-gray-200 bg-white p-2.5 transition has-[:checked]:border-brand-500 has-[:checked]:bg-brand-50/50">
+            <input type="checkbox" name="features" value="{{ $key }}" class="mt-0.5 h-4 w-4 shrink-0 rounded border-gray-300" data-feature-option @checked(! $isDealer) />
+            <span>
+              <span class="block text-xs font-semibold text-ink-900">{{ \App\Support\BusinessFeatures::LABELS[$key] }}</span>
+              <span class="mt-0.5 block text-[11px] leading-snug text-ink-500">{{ \App\Support\BusinessFeatures::BLURBS[$key] }}</span>
+            </span>
+          </label>
+        @endforeach
+      </div>
+      @if ($isDealer)
+        <p class="mt-2 text-xs text-amber-700" data-features-cost>
+          <x-icon name="coins" :size="12" class="inline -mt-0.5 mr-1" />
+          <span>No features picked — the listing is free.</span> You have {{ (int) ($points['points'] ?? 0) }} points.
+        </p>
+      @endif
+    </div>
+  @endif
 
   {{-- Step 2–3: the digital visiting card designs for the chosen category,
        filled in by business-create.js. The pick is saved on the new

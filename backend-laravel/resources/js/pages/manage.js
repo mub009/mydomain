@@ -672,3 +672,52 @@ exportButton?.addEventListener("click", async () => {
     $("span", exportButton).textContent = "Export CSV";
   }
 });
+
+// --- Features ----------------------------------------------------------------
+// The dealer who set the business up (a point each, returned when turned
+// off) or an admin (free) picks what the business gets: its website, the
+// digital visiting card, gold-rate posters (partials/features.blade.php).
+const featuresPanel = $("[data-features-panel]");
+if (featuresPanel) {
+  const boxes = $$("[data-feature]", featuresPanel);
+  const saveFeatures = $("[data-save-features]", featuresPanel);
+  const summary = $("[data-features-summary]", featuresPanel);
+  const balanceEl = $("[data-points-balance]", featuresPanel);
+  const charged = !!balanceEl;
+  const balance = charged ? Number(balanceEl.textContent) : 0;
+  const before = new Set(boxes.filter((b) => b.checked).map((b) => b.value));
+  const chosen = () => boxes.filter((b) => b.checked).map((b) => b.value);
+
+  const refresh = () => {
+    const now = new Set(chosen());
+    const added = [...now].filter((f) => !before.has(f)).length;
+    const removed = [...before].filter((f) => !now.has(f)).length;
+    const changed = added + removed > 0;
+    const short = charged && added > balance;
+    saveFeatures.disabled = !changed || short;
+    summary.classList.toggle("text-red-700", short);
+    summary.textContent = !changed
+      ? ""
+      : short
+        ? `You need ${added} points but have ${balance}. Ask the admin to add more.`
+        : charged
+          ? `${[added && `Uses ${added} point${added === 1 ? "" : "s"}`, removed && `returns up to ${removed}`].filter(Boolean).join(", ")}.`
+          : "Unsaved changes.";
+  };
+  boxes.forEach((b) => b.addEventListener("change", refresh));
+
+  saveFeatures.addEventListener("click", async () => {
+    showError(errorBox, "");
+    saveFeatures.disabled = true;
+    try {
+      const { data } = await api.put(`${base}/features`, { features: chosen() });
+      const parts = [];
+      if (data.spentPoints) parts.push(`${data.spentPoints} point${data.spentPoints === 1 ? "" : "s"} used`);
+      if (data.refundedPoints) parts.push(`${data.refundedPoints} returned`);
+      reloadWithFlash(`Features saved${parts.length ? ` — ${parts.join(", ")}` : ""}.`);
+    } catch (err) {
+      fail(err);
+      refresh();
+    }
+  });
+}

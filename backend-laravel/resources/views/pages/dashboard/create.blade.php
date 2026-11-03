@@ -12,15 +12,8 @@
       <h1 class="text-xl font-bold tracking-tight text-ink-900">Add a business</h1>
     </div>
 
-    @if ($outOfPoints)
-      <div class="card p-6 text-center">
-        <p class="font-semibold text-red-700">No points left</p>
-        <p class="mt-1 text-sm text-ink-500">Adding a business uses {{ $points['pointsPerBusiness'] ?? 1 }} point. Contact the admin to add more.</p>
-        <a href="/dashboard" class="btn-secondary mt-4 inline-flex px-4 py-2 text-sm">Back to dashboard</a>
-      </div>
-    @else
-      @include('pages.dashboard.partials.create-business')
-    @endif
+    {{-- The listing is free; points go on its features, picked in the form. --}}
+    @include('pages.dashboard.partials.create-business')
   </div>
 
   <script type="application/json" id="dashboard-data">@json(['isDealer' => $isDealer, 'canAssignOwner' => $canAssignOwner])</script>

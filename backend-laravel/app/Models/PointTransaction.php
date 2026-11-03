@@ -15,7 +15,7 @@ class PointTransaction extends Model
 
     protected $table = 'point_transactions';
 
-    protected $fillable = ['userId', 'type', 'amount', 'balanceAfter', 'note', 'businessId', 'grantedById'];
+    protected $fillable = ['userId', 'type', 'amount', 'balanceAfter', 'note', 'businessId', 'grantedById', 'feature'];
 
     protected function casts(): array
     {

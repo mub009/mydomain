@@ -25,7 +25,7 @@ class Business extends Model
         'latitude', 'longitude', 'googlePlaceId', 'googleReviewUrl',
         'instagramUsername', 'facebookPageUrl', 'youtubeUrl', 'preferredReviewChannel',
         'logoUrl', 'coverImageUrl', 'isVerified', 'avgRating', 'reviewCount',
-        'leadCount', 'viewCount',
+        'leadCount', 'viewCount', 'features',
     ];
 
     protected function casts(): array
@@ -38,6 +38,8 @@ class Business extends Model
             'reviewCount' => 'integer',
             'leadCount' => 'integer',
             'viewCount' => 'integer',
+            // App\Support\BusinessFeatures; null = every feature.
+            'features' => 'array',
         ];
     }
 
@@ -126,7 +128,7 @@ class Business extends Model
     protected static function booted(): void
     {
         static::saved(function (Business $business) {
-            if ($business->wasRecentlyCreated || $business->wasChanged(['status', 'slug', 'name', 'description', 'seoTitle', 'seoDescription', 'seoKeywords'])) {
+            if ($business->wasRecentlyCreated || $business->wasChanged(['status', 'slug', 'name', 'description', 'seoTitle', 'seoDescription', 'seoKeywords', 'features'])) {
                 SeoTracker::sync($business);
             }
         });

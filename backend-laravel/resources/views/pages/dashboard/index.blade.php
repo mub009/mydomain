@@ -21,7 +21,7 @@
     };
     $stats = [
         ['building-2', 'Listings', $stats['listings'], "{$stats['live']} live"],
-        ...($isDealer ? [['coins', 'Points', $points['points'] ?? '—', $outOfPoints ? 'None left' : 'For new listings']] : []),
+        ...($isDealer ? [['coins', 'Points', $points['points'] ?? '—', $outOfPoints ? 'None left' : '1 per feature']] : []),
         ['eye', 'Profile views', number_format($stats['totalViews']), 'All listings'],
         ['message-square', 'Leads', number_format($stats['totalLeads']), 'All listings'],
         ['star', 'Rating', $stats['avgRating'] > 0 ? number_format($stats['avgRating'], 1) : '—', "{$stats['ratedReviews']} reviews"],
@@ -42,11 +42,8 @@
             <x-icon name="coins" :size="15" /> {{ $points['points'] }} {{ $points['points'] === 1 ? 'point' : 'points' }}
           </span>
         @endif
-        @if ($outOfPoints)
-          <span title="No points left — contact the admin to add more" class="btn-primary cursor-not-allowed px-4 py-2 text-sm opacity-50"><x-icon name="plus" :size="15" /> Add business</span>
-        @else
-          <a href="/dashboard/businesses/new" class="btn-primary px-4 py-2 text-sm"><x-icon name="plus" :size="15" /> Add business</a>
-        @endif
+        {{-- A listing is free; its features cost the points. --}}
+        <a href="/dashboard/businesses/new" class="btn-primary px-4 py-2 text-sm"><x-icon name="plus" :size="15" /> Add business</a>
       </div>
     @endif
   </div>
@@ -66,7 +63,7 @@
   @if ($outOfPoints)
     <div class="mb-6 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
       <x-icon name="alert-triangle" :size="18" class="mt-0.5 shrink-0 text-red-600" />
-      <p class="text-sm text-red-800"><span class="font-semibold">You're out of points.</span> Adding or cloning a business costs {{ $points['pointsPerBusiness'] ?? 1 }} point — ask the admin to add more. You can still manage your existing listings.</p>
+      <p class="text-sm text-red-800"><span class="font-semibold">You're out of points.</span> Each feature you give a business (website, visiting card, gold rate) costs 1 point — ask the admin to add more. You can still add listings and manage your existing ones.</p>
     </div>
   @endif
 
@@ -132,11 +129,11 @@
             <div class="flex flex-wrap items-center gap-2 md:w-[232px] md:flex-nowrap md:justify-end">
               {{-- First on phones; last on wide screens, so it lines up down the list. --}}
               <a href="/dashboard/businesses/{{ $b['id'] }}" target="_blank" rel="noopener" class="btn-primary px-3 py-1.5 text-sm md:order-last"><x-icon name="settings-2" :size="14" /> Manage</a>
-              @if ($b['status'] === 'PUBLISHED')
+              @if ($b['status'] === 'PUBLISHED' && \App\Support\BusinessFeatures::has($b, \App\Support\BusinessFeatures::WEBSITE))
                 <a href="{{ SiteUrl::for($b['slug']) }}" target="_blank" rel="noreferrer" class="btn-secondary px-2.5 py-1.5 text-sm" title="Open website"><x-icon name="globe" :size="14" /> Website</a>
               @endif
               @if ($isDealer)
-                <button type="button" data-clone-business="{{ json_encode(['id' => $b['id'], 'name' => $b['name']]) }}" @disabled($outOfPoints) title="{{ $outOfPoints ? 'No points left — contact the admin to add more' : 'Make a copy of this business' }}" class="btn-secondary px-2.5 py-1.5 text-sm disabled:cursor-not-allowed disabled:opacity-50"><x-icon name="copy" :size="14" /> Clone</button>
+                <button type="button" data-clone-business="{{ json_encode(['id' => $b['id'], 'name' => $b['name']]) }}" title="Make a copy of this business — its features cost 1 point each" class="btn-secondary px-2.5 py-1.5 text-sm disabled:cursor-not-allowed disabled:opacity-50"><x-icon name="copy" :size="14" /> Clone</button>
               @endif
             </div>
           </div>

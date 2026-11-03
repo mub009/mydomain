@@ -18,6 +18,9 @@ use App\Http\Controllers\SeoController;
 use App\Http\Controllers\SiteController;
 use App\Http\Controllers\UserController;
 use App\Models\Business;
+use App\Models\GoldRate;
+use App\Models\GoldRateTemplate;
+use App\Support\BusinessFeatures;
 use App\Support\InternalApi;
 use App\Support\Privileges;
 use App\Support\WebAuth;
@@ -43,7 +46,7 @@ class DashboardController extends Controller
 
     // WhatsApp broadcasts and Poster Studio are not part of the Laravel
     // backend yet (see README), so the manager doesn't offer them.
-    public const SECTIONS = ['Contact', 'Hours', 'Services', 'Photos', 'Slider', 'Our Gallery', 'Reviews & QR', 'Visiting Card', 'Website', 'SEO', 'Products', 'Orders', 'Customers'];
+    public const SECTIONS = ['Contact', 'Hours', 'Services', 'Photos', 'Slider', 'Our Gallery', 'Reviews & QR', 'Visiting Card', 'Gold Rate', 'Website', 'SEO', 'Products', 'Orders', 'Customers'];
 
     // How each section appears on the business's menu page: its icon, the
     // icon's colours, and one line on what it is for.
@@ -56,6 +59,7 @@ class DashboardController extends Controller
         'Our Gallery' => ['icon' => 'layout-grid', 'tint' => 'bg-teal-50 text-teal-600', 'blurb' => 'The gallery section of your website'],
         'Reviews & QR' => ['icon' => 'qr-code', 'tint' => 'bg-yellow-50 text-yellow-600', 'blurb' => 'Review links and QR boards'],
         'Visiting Card' => ['icon' => 'layout-template', 'tint' => 'bg-fuchsia-50 text-fuchsia-600', 'blurb' => 'Your digital visiting card, its design, link and QR code'],
+        'Gold Rate' => ['icon' => 'coins', 'tint' => 'bg-amber-50 text-amber-700', 'blurb' => "Today's gold-rate posters with your logo, to download and share"],
         'Website' => ['icon' => 'globe', 'tint' => 'bg-sky-50 text-sky-600', 'blurb' => 'Design and publish your website'],
         'SEO' => ['icon' => 'search-check', 'tint' => 'bg-lime-50 text-lime-700', 'blurb' => 'How you appear on Google, and whether you are listed'],
         'Products' => ['icon' => 'package', 'tint' => 'bg-emerald-50 text-emerald-600', 'blurb' => 'Items for your online shop'],
@@ -182,8 +186,10 @@ class DashboardController extends Controller
             abort($e->statusCode === 403 ? 403 : 404);
         }
 
+        // Only the sections of the features this business has (BusinessFeatures).
+        $sections = array_values(array_filter(self::SECTIONS, fn ($s) => BusinessFeatures::allowsSection($biz, $s)));
         // With no section picked, the page is the menu of all of them.
-        $section = in_array($request->query('section'), self::SECTIONS, true) ? $request->query('section') : null;
+        $section = in_array($request->query('section'), $sections, true) ? $request->query('section') : null;
         $page = max(1, (int) $request->query('page', 1));
         $data = [];
 
@@ -203,6 +209,9 @@ class DashboardController extends Controller
                 break;
             case 'Visiting Card':
                 $data['card'] = InternalApi::tryCall([CardController::class, 'show'], [], ['id' => $id], true)['data'] ?? null;
+                break;
+            case 'Gold Rate':
+                $data['goldRate'] = self::goldPosters($id);
                 break;
             case 'Website':
                 $data['site'] = InternalApi::tryCall([SiteController::class, 'show'], [], ['id' => $id], true)['data'] ?? null;
@@ -236,14 +245,23 @@ class DashboardController extends Controller
         $websiteLive = $site?->siteType === 'ECOMMERCE' ? (bool) $site->isPublished : $biz['status'] === 'PUBLISHED';
         $share = array_filter([
             'name' => $biz['name'],
-            'website' => $websiteLive ? \App\Support\SiteUrl::for($biz['slug']) : null,
+            'website' => $websiteLive && BusinessFeatures::has($biz, BusinessFeatures::WEBSITE) ? \App\Support\SiteUrl::for($biz['slug']) : null,
             'listing' => $biz['status'] === 'PUBLISHED' ? \App\Support\Seo\SeoTracker::listingUrl($biz['slug']) : null,
         ]);
+
+        // The features panel on the menu: the dealer who set the business up
+        // (a point each) or an admin (free) can change them.
+        $user = WebAuth::user();
+        $canChangeFeatures = $user->role === 'ADMIN' || ($user->role === 'DEALER' && ($biz['createdById'] ?? null) === $user->id);
 
         return view('pages.dashboard.manage', [
             'biz' => $biz,
             'share' => $share,
             'section' => $section,
+            'sections' => $sections,
+            'features' => BusinessFeatures::of($biz),
+            'canChangeFeatures' => $canChangeFeatures,
+            'dealerPoints' => $canChangeFeatures && $user->role === 'DEALER' ? (int) $user->points : null,
             ...$data,
         ]);
     }
@@ -256,5 +274,30 @@ class DashboardController extends Controller
         $qs = http_build_query($query);
 
         return $path.($qs ? "?{$qs}" : '');
+    }
+
+    /**
+     * The gold-rate posters the admin made for this business, with today's
+     * rates — drawn in the browser (resources/js/lib/gold-rate-render.js).
+     * Their images come through the business's own dashboard routes, never
+     * the admin-only ones.
+     */
+    private static function goldPosters(string $id): array
+    {
+        $base = "/dashboard/businesses/{$id}/gold-rates";
+        $templates = GoldRateTemplate::with('business.hours')->where('businessId', $id)->orderBy('name')->get()
+            ->map(function (GoldRateTemplate $t) use ($base) {
+                $item = $t->toArray();
+                $v = fn (?string $path) => substr(md5((string) $path), 0, 10);
+                $item['imageUrl'] = "{$base}/{$t->id}/image?v=".$v($t->imagePath);
+                $item['thumbUrl'] = "{$base}/{$t->id}/thumb?v=".$v($t->thumbPath ?? $t->imagePath);
+                if (! empty($item['businessCard']['logoUrl'])) {
+                    $item['businessCard']['logoUrl'] = "{$base}/logo?v=".$v($t->business?->logoUrl);
+                }
+
+                return $item;
+            })->values()->all();
+
+        return ['templates' => $templates, ...GoldRate::current()];
     }
 }

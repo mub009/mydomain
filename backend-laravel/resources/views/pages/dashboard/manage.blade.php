@@ -50,7 +50,7 @@
     @if (! $section)
       {{-- The menu: every section as an icon tile. --}}
       <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-        @foreach (D::SECTIONS as $s)
+        @foreach ($sections as $s)
           @php $tile = D::SECTION_TILES[$s]; @endphp
           <a href="{{ $base }}?section={{ urlencode($s) }}" class="card group flex flex-col items-center gap-2.5 p-5 text-center transition hover:-translate-y-0.5 hover:shadow-md hover:ring-1 hover:ring-brand-200">
             <span class="flex h-14 w-14 items-center justify-center rounded-2xl {{ $tile['tint'] }} transition-transform group-hover:scale-105"><x-icon :name="$tile['icon']" :size="26" /></span>
@@ -59,6 +59,8 @@
           </a>
         @endforeach
       </div>
+
+      @include('pages.dashboard.partials.features')
 
       {{-- For undoing a listing made by mistake. --}}
       <div class="card flex flex-col gap-3 border border-red-100 p-5 sm:flex-row sm:items-center sm:justify-between">
@@ -76,7 +78,7 @@
     @else
       {{-- Section tabs, for hopping between sections. --}}
       <div class="flex gap-1 overflow-x-auto border-b border-gray-200">
-        @foreach (D::SECTIONS as $s)
+        @foreach ($sections as $s)
           <a href="{{ $base }}?section={{ urlencode($s) }}" @class([
               'flex items-center gap-1.5 whitespace-nowrap px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors',
               'border-brand-600 text-brand-600' => $section === $s,
@@ -105,6 +107,7 @@
       ]) @break
       @case('Reviews & QR') @include('pages.dashboard.sections.reviews-qr') @break
       @case('Visiting Card') @include('pages.dashboard.sections.card') @break
+      @case('Gold Rate') @include('pages.dashboard.sections.gold-rate') @break
       @case('Website') @include('pages.dashboard.sections.website') @break
       @case('SEO') @include('pages.dashboard.sections.seo') @break
       @case('Products') @include('pages.dashboard.sections.products') @break
@@ -114,7 +117,7 @@
   </div>
 
   @php
-      $manageData = ['id' => $biz['id'], 'slug' => $biz['slug'], 'name' => $biz['name'], 'section' => $section];
+      $manageData = ['id' => $biz['id'], 'slug' => $biz['slug'], 'name' => $biz['name'], 'section' => $section, 'features' => $features];
   @endphp
   <script type="application/json" id="manage-data">@json($manageData)</script>
 
@@ -128,5 +131,8 @@
   @endif
   @if ($section === 'Visiting Card')
     @vite('resources/js/pages/card-manager.js')
+  @endif
+  @if ($section === 'Gold Rate')
+    @vite('resources/js/pages/gold-posters.js')
   @endif
 @endpush

@@ -10,7 +10,10 @@ use App\Models\GoldRatePreset;
 use App\Models\GoldRateTemplate;
 use App\Support\GoldRates\BusinessCard;
 use App\Support\GoldRates\GoldRateFiles;
+use App\Support\BusinessAccess;
+use App\Support\BusinessFeatures;
 use App\Support\GoldRates\TemplateLayout;
+use App\Support\WebAuth;
 
 // The gold-rate template editor page, and the template and business logo
 // images it draws with. The images live on the private disk; serving them from here
@@ -66,5 +69,45 @@ class GoldRatePageController extends Controller
             'Content-Security-Policy' => "default-src 'none'",
             'Cache-Control' => 'private, max-age=3600',
         ]);
+    }
+
+    // --- For the business itself (Manage → Gold Rate) ----------------------
+    // The same images, for the people who manage a business with the Gold
+    // rate feature, and only of the posters made for that business.
+
+    private static function managedWithGoldRate(string $id): Business
+    {
+        $business = Business::findOrFail($id);
+        $user = WebAuth::user();
+        abort_unless(BusinessAccess::canManage(['role' => $user->role, 'sub' => $user->id], $business), 403);
+        abort_unless(BusinessFeatures::has($business, BusinessFeatures::GOLD_RATE), 404);
+
+        return $business;
+    }
+
+    private static function postersTemplate(string $id, string $templateId): GoldRateTemplate
+    {
+        self::managedWithGoldRate($id);
+
+        return GoldRateTemplate::where('businessId', $id)->findOrFail($templateId);
+    }
+
+    public function ownerTemplateImage(string $id, string $templateId)
+    {
+        return GoldRateFiles::response(self::postersTemplate($id, $templateId)->imagePath, 'image/png');
+    }
+
+    public function ownerTemplateThumb(string $id, string $templateId)
+    {
+        $template = self::postersTemplate($id, $templateId);
+
+        return GoldRateFiles::response($template->thumbPath ?? $template->imagePath, 'image/png');
+    }
+
+    public function ownerLogo(string $id)
+    {
+        self::managedWithGoldRate($id);
+
+        return $this->businessLogo($id);
     }
 }

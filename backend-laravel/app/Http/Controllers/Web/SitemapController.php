@@ -38,7 +38,7 @@ class SitemapController extends Controller
             ->orderBy('createdAt')
             ->skip(($n - 1) * self::PER_FILE)->take(self::PER_FILE)
             ->with('site:id,businessId,siteType,isPublished,updatedAt')
-            ->get(['id', 'slug', 'status', 'updatedAt']);
+            ->get(['id', 'slug', 'status', 'updatedAt', 'features']);
         if ($n > 1 && $businesses->isEmpty()) {
             abort(404);
         }

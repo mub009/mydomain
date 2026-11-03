@@ -68,6 +68,10 @@ Route::middleware('web.role:BUSINESS_OWNER,DEALER,ADMIN')->group(function () {
     Route::get('/dashboard/businesses/new', [DashboardController::class, 'create']);
     Route::get('/dashboard/businesses/{id}', [DashboardController::class, 'manage']);
     Route::get('/dashboard/businesses/{id}/card.pdf', [CardPageController::class, 'ownerPdf']);
+    // Manage → Gold Rate: the posters made for the business, drawn in the browser.
+    Route::get('/dashboard/businesses/{id}/gold-rates/logo', [GoldRatePageController::class, 'ownerLogo']);
+    Route::get('/dashboard/businesses/{id}/gold-rates/{templateId}/image', [GoldRatePageController::class, 'ownerTemplateImage']);
+    Route::get('/dashboard/businesses/{id}/gold-rates/{templateId}/thumb', [GoldRatePageController::class, 'ownerTemplateThumb']);
 });
 
 Route::middleware('web.role:ADMIN')->group(function () {

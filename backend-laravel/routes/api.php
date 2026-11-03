@@ -132,6 +132,8 @@ Route::prefix('businesses')->group(function () {
         Route::delete('/{id}', [BusinessController::class, 'destroy']);
         Route::post('/{id}/submit', [BusinessController::class, 'submit']);
         Route::post('/{id}/clone', [BusinessController::class, 'duplicate'])->middleware('role:DEALER');
+        // Which features (website, visiting card, gold rate) the business has; a point each for dealers.
+        Route::put('/{id}/features', [BusinessController::class, 'updateFeatures'])->middleware('role:DEALER,ADMIN');
 
         Route::post('/{id}/photos', [BusinessController::class, 'addPhoto']);
         Route::delete('/{id}/photos/{photoId}', [BusinessController::class, 'removePhoto']);

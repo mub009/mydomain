@@ -38,6 +38,34 @@ slugSource?.addEventListener("input", () => {
 initAiDescription(form);
 initUploadFields(form ?? document);
 
+// --- Features ----------------------------------------------------------------
+// What the business gets (website, visiting card, gold rate). A dealer pays
+// a point for each; the listing itself is free.
+const featuresPicker = form ? $("[data-features-picker]", form) : null;
+const featureBoxes = featuresPicker ? $$("[data-feature-option]", featuresPicker) : [];
+const pickedFeatures = () => featureBoxes.filter((b) => b.checked).map((b) => b.value);
+// Without the picker (an owner adding their own listing) the business gets everything.
+const hasFeature = (key) => !featuresPicker || pickedFeatures().includes(key);
+
+function syncFeatures() {
+  const cost = featuresPicker ? $("[data-features-cost]", featuresPicker) : null;
+  if (cost) {
+    const n = pickedFeatures().length;
+    const points = Number(featuresPicker.dataset.points || 0);
+    const short = n > points;
+    cost.classList.toggle("text-red-700", short);
+    cost.classList.toggle("text-amber-700", !short);
+    $("span", cost).textContent = !n
+      ? "No features picked — the listing is free."
+      : short
+        ? `These ${n} features need ${n} points.`
+        : `This uses ${n} point${n === 1 ? "" : "s"}.`;
+  }
+  // The card designs only matter when the business gets the visiting card.
+  if (picker) picker.hidden = !hasFeature("VISITING_CARD") || cardTemplates.length === 0;
+}
+featureBoxes.forEach((b) => b.addEventListener("change", syncFeatures));
+
 // --- Visiting card design ---------------------------------------------------
 // Once a category is picked, its 3–5 card designs appear as small previews
 // (drawn with the name typed so far). Tapping one selects it and opens it
@@ -84,7 +112,7 @@ async function loadCardTemplates() {
     if (!data.some((t) => t.id === pickedInput.value)) {
       pickedInput.value = data[0]?.id ?? "";
     }
-    picker.hidden = data.length === 0;
+    picker.hidden = data.length === 0 || !hasFeature("VISITING_CARD");
     renderCardOptions();
   } catch {
     picker.hidden = true;
@@ -130,6 +158,7 @@ form?.addEventListener("submit", async (e) => {
       latitude: Number(f.latitude),
       longitude: Number(f.longitude),
       country: "IN",
+      ...(featuresPicker ? { features: pickedFeatures() } : {}),
       ...(assignOwner
         ? {
             owner: {
@@ -143,7 +172,7 @@ form?.addEventListener("submit", async (e) => {
 
     // The card design picked above. Not fatal: the card falls back to the
     // category's default design, and can be changed from Manage.
-    if (f.cardTemplateId) {
+    if (f.cardTemplateId && hasFeature("VISITING_CARD")) {
       await api.put(`/businesses/${created.id}/card`, { templateId: f.cardTemplateId }).catch(() => {});
     }
 
@@ -165,12 +194,14 @@ form?.addEventListener("submit", async (e) => {
       }
       // Back to the dashboard, which shows the login (see dashboard.js).
       reloadWithFlash("Business created, published, and assigned to the business team's account. Their login has also been emailed to them.", "/dashboard");
-    } else {
+    } else if (hasFeature("VISITING_CARD")) {
       // On to the card's preview, where it's published and its link and QR code appear.
       reloadWithFlash(
         "Business created. Here is your digital visiting card — check the preview, then publish it.",
         `/dashboard/businesses/${created.id}?section=${encodeURIComponent("Visiting Card")}`,
       );
+    } else {
+      reloadWithFlash("Business created.", `/dashboard/businesses/${created.id}`);
     }
   } catch (err) {
     showError(errorBox, errorMessage(err));
