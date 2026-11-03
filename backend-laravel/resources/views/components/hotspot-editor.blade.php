@@ -23,10 +23,11 @@
       <div class="mt-3 hidden flex-wrap items-center justify-between gap-2 text-xs" data-image-tools>
         <span class="text-ink-500"><span class="font-semibold text-ink-700">Click the image to add an action or a business detail.</span> Drag a box to move it, pull its corners to resize.</span>
         <span class="flex gap-3">
+          {{-- Not on a business's own card: its image stays as set up. --}}
           @if ($replaceable)
             <label class="cursor-pointer font-semibold text-brand-700 hover:underline">Replace image<input type="file" accept="image/jpeg,image/png,image/webp" class="sr-only" data-image-file /></label>
+            <button type="button" class="font-semibold text-red-700 hover:underline" data-remove-image>Remove image</button>
           @endif
-          <button type="button" class="font-semibold text-red-700 hover:underline" data-remove-image>Remove image</button>
         </span>
       </div>
     </div>

@@ -802,7 +802,7 @@ export function initHotspotEditor(editor, options) {
     else useFile(file);
   });
 
-  $("[data-remove-image]", editor).addEventListener("click", () => {
+  $("[data-remove-image]", editor)?.addEventListener("click", () => {
     closeMenu();
     Object.assign(state, { imageUrl: null, imageWidth: null, imageHeight: null, selected: null });
     markDirty();
