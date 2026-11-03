@@ -21,6 +21,7 @@ import { $, $$, esc } from "./ui";
 //   onChange()      after every edit
 //   onError(msg|err)
 //   canReplaceImage false: once there's an image, a new one can't be dropped on it
+//   canDelete       false: no "Remove" for placed boxes
 
 const MAX_SPOTS = 40;
 const MIN_SIZE = 3; // percent
@@ -77,6 +78,7 @@ export function initHotspotEditor(editor, options) {
     onChange = () => {},
     onError = () => {},
     canReplaceImage = true, // false where the editor offers no "Replace image" (a business's card)
+    canDelete = true, // false: placed actions and details can't be removed (a business's card)
   } = options;
   const actionList = options.actions;
   const fonts = options.fonts || [];
@@ -303,7 +305,7 @@ export function initHotspotEditor(editor, options) {
       <div class="space-y-3">
         <div class="flex items-center justify-between">
           <p class="text-sm font-bold text-ink-900">${isDetail ? "Edit detail" : "Edit action"}</p>
-          <button type="button" class="flex items-center gap-1 text-xs font-semibold text-red-700 hover:underline" data-delete-spot>${icon("trash-2", { size: 13 })} Remove</button>
+          ${canDelete ? `<button type="button" class="flex items-center gap-1 text-xs font-semibold text-red-700 hover:underline" data-delete-spot>${icon("trash-2", { size: 13 })} Remove</button>` : ""}
         </div>
         <label class="block">
           <span class="mb-1 block text-xs font-semibold text-ink-700">${isDetail ? "Shows" : "Action"}</span>
@@ -427,7 +429,7 @@ export function initHotspotEditor(editor, options) {
         changed({ inspector: true });
       }),
     );
-    $("[data-delete-spot]", inspector).addEventListener("click", () => removeSpot(h.id));
+    $("[data-delete-spot]", inspector)?.addEventListener("click", () => removeSpot(h.id));
   }
 
   function renderList() {
@@ -476,6 +478,7 @@ export function initHotspotEditor(editor, options) {
   }
 
   function removeSpot(id) {
+    if (!canDelete) return;
     state.hotspots = state.hotspots.filter((h) => h.id !== id);
     if (state.selected === id) state.selected = null;
     markDirty();
