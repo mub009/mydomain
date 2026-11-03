@@ -79,11 +79,8 @@
           <h3 class="flex items-center gap-1.5 font-bold text-ink-900"><x-icon name="image" :size="16" class="text-brand-600" /> Your card</h3>
           <p class="mt-0.5 text-sm text-ink-500">Your card shows your listing's details. To change the design itself, pick a ready-made design below or ask your dealer.</p>
         </div>
-        {{-- On a phone: the card, then its colours (kept in view at the bottom
-             of the screen while the card is scrolled), then what's missing.
-             On a wide screen: the card on the left, the rest beside it. --}}
         <div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <div class="min-w-0 lg:row-span-2">
+          <div class="min-w-0">
             @if ($card['imagePreviewHtml'])
               <div class="mx-auto w-full max-w-[360px] overflow-hidden rounded-xl border border-gray-200 bg-gray-50">
                 <iframe sandbox="" title="Your card" class="block h-[600px] w-full border-0" data-card-readonly-preview></iframe>
@@ -92,9 +89,6 @@
               <p class="rounded-md bg-gray-50 px-3 py-6 text-center text-sm text-ink-500">Your card design isn't set up yet. Pick a ready-made design below, or ask your dealer.</p>
             @endif
           </div>
-          @if ($hasImage)
-            <div class="sticky bottom-2 z-10 rounded-xl bg-white shadow-xl ring-1 ring-black/5 lg:static lg:shadow-none lg:ring-0">@include('pages.dashboard.partials.card-colour')</div>
-          @endif
           <div>
             @if (count($card['missingDetails']))
               <div class="rounded-xl border border-amber-200 bg-amber-50 p-4">
@@ -145,12 +139,17 @@
 
       <x-hotspot-editor subject="your card" :replaceable="false" :palette="false" :movable="false" />
 
-      @if ($hasImage)
-        <div class="mt-5 max-w-md">@include('pages.dashboard.partials.card-colour', ['thumbAlways' => true])</div>
-      @endif
-
     </div>
     @endunless
+
+    {{-- Card colour, in its own section under the card. On a phone it stays
+         at the bottom of the screen while the card is scrolled, so each tap
+         shows on the card straight away. --}}
+    @if ($hasImage)
+      <div class="sticky bottom-2 z-10 rounded-xl bg-white shadow-xl ring-1 ring-black/5 lg:static lg:shadow-sm lg:ring-0">
+        @include('pages.dashboard.partials.card-colour', ['thumbAlways' => $card['canEdit']])
+      </div>
+    @endif
 
     {{-- Ready-made image designs made by the admin for this category --}}
     @if (count($card['imageTemplates']))
