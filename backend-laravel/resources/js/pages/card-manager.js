@@ -117,6 +117,8 @@ if (root && card) {
   const panel = $("[data-colour-panel]", root);
   if (panel) {
     const stageImage = $("[data-stage-image]", root);
+    // The small copy of the card beside the colours, recoloured on the spot.
+    const thumb = $("[data-colour-thumb]", panel);
     const statusEl = $("[data-colour-status]", panel);
     const swatches = $$("[data-swatch]", panel);
     const customInput = $("[data-colour-custom]", panel);
@@ -151,6 +153,7 @@ if (root && card) {
     let previewRequest = 0;
     const show = () => {
       if (stageImage) applyToImage(stageImage, colour);
+      if (thumb) applyToImage(thumb, colour);
       if (!readonlyPreview || !card.imageUrl) return;
       clearTimeout(previewTimer);
       previewTimer = setTimeout(async () => {
@@ -229,6 +232,7 @@ if (root && card) {
 
     fill();
     if (stageImage) applyToImage(stageImage, colour);
+    if (thumb) applyToImage(thumb, colour);
   }
 
   // --- Publish, preview, link, QR -------------------------------------------

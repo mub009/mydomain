@@ -328,7 +328,7 @@ class ImageCardTest extends TestCase
         $this->withoutVite();
         $this->post('/login', ['email' => $this->ownerEmail, 'password' => 'Password123!']);
         $this->get("/dashboard/businesses/{$this->business->id}?section=".urlencode('Visiting Card'))->assertOk()
-            ->assertSee('data-colour-panel', false)->assertSee('Tap a colour')->assertSee('data-swatch="gold"', false)
+            ->assertSee('data-colour-panel', false)->assertSee('data-colour-thumb', false)->assertSee('Tap a colour')->assertSee('data-swatch="gold"', false)
             ->assertSee('Black &amp; white', false)->assertSee('Fine-tune');
 
         // A preview shows unsaved colours.

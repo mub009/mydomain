@@ -143,7 +143,7 @@
       <x-hotspot-editor subject="your card" :replaceable="false" :palette="false" :movable="false" />
 
       @if ($hasImage)
-        <div class="mt-5 max-w-md">@include('pages.dashboard.partials.card-colour')</div>
+        <div class="mt-5 max-w-md">@include('pages.dashboard.partials.card-colour', ['thumbAlways' => true])</div>
       @endif
     </div>
     @endunless
