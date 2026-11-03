@@ -29,6 +29,13 @@ class CardController extends Controller
         return $business;
     }
 
+    // Uploading the card image and placing its actions is for dealers and
+    // admins; a business owner picks a ready-made design and publishes it.
+    private static function canEditDesign(array $actor): bool
+    {
+        return $actor['role'] !== 'BUSINESS_OWNER';
+    }
+
     private static function isLive(Business $business, ?BusinessCard $card): bool
     {
         return (bool) $card?->isPublished && $business->status === 'PUBLISHED';
@@ -85,6 +92,9 @@ class CardController extends Controller
             'actions' => ImageCard::actionList(),
             'fonts' => CardEngine::FONTS,
             'listingDefaults' => ImageCard::listingDefaults($details),
+            // Business owners wear the design they're given; dealers and admins edit it.
+            'canEdit' => self::canEditDesign($actor),
+            'missingDetails' => ImageCard::missingDetails($image['hotspots'] ?? [], ImageCard::listingDefaults($details)),
             'imagePreviewHtml' => $image ? ImageCard::renderSource($image, $details, true) : null,
             // Ready-made image designs from the admin, for "Start from a design".
             'imageTemplates' => $templates->filter(fn (CardTemplate $t) => (bool) $t->imageUrl)->map(fn (CardTemplate $t) => [
@@ -131,6 +141,9 @@ class CardController extends Controller
         ]);
         if (! $data) {
             throw ApiException::badRequest('Send a templateId, backgroundImageUrl, imageUrl or hotspots');
+        }
+        if (! self::canEditDesign($actor) && array_intersect_key($data, array_flip(['imageUrl', 'imageWidth', 'imageHeight', 'hotspots']))) {
+            throw ApiException::forbidden('The card design can only be changed by your dealer or an admin. You can pick a ready-made design.');
         }
         $changes = [];
 

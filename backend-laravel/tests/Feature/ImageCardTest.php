@@ -21,6 +21,8 @@ class ImageCardTest extends TestCase
 
     private array $auth;
 
+    private string $ownerEmail;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -30,12 +32,18 @@ class ImageCardTest extends TestCase
             'email' => 'owner-'.uniqid().'@example.com', 'passwordHash' => Hash::make('Password123!'),
             'firstName' => 'O', 'lastName' => 'W', 'status' => 'ACTIVE', 'role' => 'BUSINESS_OWNER',
         ]);
+        // The card design is edited by the dealer who set the business up, not its owner.
+        $dealer = User::create([
+            'email' => 'dealer-'.uniqid().'@example.com', 'passwordHash' => Hash::make('Password123!'),
+            'firstName' => 'D', 'lastName' => 'L', 'status' => 'ACTIVE', 'role' => 'DEALER', 'privileges' => ['MANAGE_LISTINGS'],
+        ]);
         $this->business = Business::create([
-            'ownerId' => $owner->id, 'name' => 'Spice Garden', 'slug' => 'spice-garden', 'categoryId' => $category->id,
+            'ownerId' => $owner->id, 'createdById' => $dealer->id, 'name' => 'Spice Garden', 'slug' => 'spice-garden', 'categoryId' => $category->id,
             'status' => 'PUBLISHED', 'phone' => '98765 43210', 'email' => 'hi@spice.test',
             'addressLine1' => '1 Main St', 'city' => 'Kochi', 'state' => 'KL', 'latitude' => 9.9, 'longitude' => 76.2,
         ]);
-        $token = $this->postJson('/api/v1/auth/login', ['email' => $owner->email, 'password' => 'Password123!'])->json('data.accessToken');
+        $this->ownerEmail = $owner->email;
+        $token = $this->postJson('/api/v1/auth/login', ['email' => $dealer->email, 'password' => 'Password123!'])->json('data.accessToken');
         $this->auth = ['Authorization' => "Bearer {$token}"];
 
         $img = imagecreatetruecolor(600, 1000);
@@ -48,6 +56,27 @@ class ImageCardTest extends TestCase
     private function spot(string $action, array $extra = []): array
     {
         return ['id' => 'h-'.$action, 'action' => $action, 'x' => 10, 'y' => 70, 'w' => 30, 'h' => 8, ...$extra];
+    }
+
+    public function test_business_owners_see_their_card_but_cannot_edit_its_design(): void
+    {
+        $this->save([$this->spot('call'), $this->spot('instagram'), $this->spot('logo')])->assertOk();
+
+        $token = $this->postJson('/api/v1/auth/login', ['email' => $this->ownerEmail, 'password' => 'Password123!'])->json('data.accessToken');
+        $owner = ['Authorization' => "Bearer {$token}"];
+
+        $this->putJson("/api/v1/businesses/{$this->business->id}/card", ['hotspots' => [$this->spot('email')]], $owner)->assertStatus(403);
+        $this->putJson("/api/v1/businesses/{$this->business->id}/card", ['imageUrl' => null], $owner)->assertStatus(403);
+        $this->assertCount(3, BusinessCard::where('businessId', $this->business->id)->value('hotspots'));
+
+        // They still see the card, with what their listing lacks for it.
+        $this->getJson("/api/v1/businesses/{$this->business->id}/card", $owner)->assertOk()
+            ->assertJsonPath('data.canEdit', false)
+            ->assertJsonPath('data.missingDetails', [
+                ['key' => 'instagram', 'label' => 'Instagram', 'section' => 'Reviews & QR'],
+                ['key' => 'logo', 'label' => 'Logo', 'section' => 'Contact'],
+            ]);
+        $this->getJson("/api/v1/businesses/{$this->business->id}/card", $this->auth)->assertOk()->assertJsonPath('data.canEdit', true);
     }
 
     private function save(array $hotspots)

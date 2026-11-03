@@ -23,26 +23,33 @@ if (root && card) {
   };
 
   // --- The image and its actions --------------------------------------------
+  // Only dealers and admins edit the design; a business owner sees it read-only.
   const saveBtn = $("[data-save-card]", root);
   const dirtyNote = $("[data-dirty-note]", root);
-  const editor = initHotspotEditor($("[data-hotspot-editor]", root), {
-    actions: card.actions,
-    fonts: card.fonts,
-    defaults: card.listingDefaults,
-    fallbackPrefix: "Leave empty to use your listing's: ",
-    missingHint: "Your listing has none — enter one, or add it in Contact.",
-    imageUrl: card.imageUrl,
-    imageWidth: card.imageWidth,
-    imageHeight: card.imageHeight,
-    hotspots: card.hotspots,
-    onChange: () => {
-      saveBtn.disabled = false;
-      dirtyNote.classList.remove("hidden");
-    },
-    onError: fail,
-  });
+  const editorEl = card.canEdit ? $("[data-hotspot-editor]", root) : null;
+  const editor = editorEl
+    ? initHotspotEditor(editorEl, {
+        actions: card.actions,
+        fonts: card.fonts,
+        defaults: card.listingDefaults,
+        fallbackPrefix: "Leave empty to use your listing's: ",
+        missingHint: "Your listing has none — enter one, or add it in Contact.",
+        imageUrl: card.imageUrl,
+        imageWidth: card.imageWidth,
+        imageHeight: card.imageHeight,
+        hotspots: card.hotspots,
+        onChange: () => {
+          saveBtn.disabled = false;
+          dirtyNote.classList.remove("hidden");
+        },
+        onError: fail,
+      })
+    : null;
+  const readonlyPreview = $("[data-card-readonly-preview]", root);
+  if (readonlyPreview && card.previewHtml) readonlyPreview.srcdoc = card.previewHtml; // a property, never innerHTML
 
   async function save({ reload = true } = {}) {
+    if (!editor) return true;
     const problem = editor.check();
     if (problem) {
       fail(problem);
@@ -66,10 +73,10 @@ if (root && card) {
       label.textContent = "Save card";
     }
   }
-  saveBtn.addEventListener("click", () => save());
+  saveBtn?.addEventListener("click", () => save());
 
   window.addEventListener("beforeunload", (e) => {
-    if (editor.dirty) {
+    if (editor?.dirty) {
       e.preventDefault();
       e.returnValue = "";
     }
@@ -78,12 +85,12 @@ if (root && card) {
   // --- Ready-made designs ----------------------------------------------------
   // Picking one drops the card's own image copy, so the design's image shows.
   async function useTemplate(id, message, button) {
-    if (editor.dirty && !window.confirm("Discard your unsaved changes to this card?")) return;
+    if (editor?.dirty && !window.confirm("Discard your unsaved changes to this card?")) return;
     fail("");
     if (button) button.disabled = true;
     try {
       await api.put(base, { templateId: id });
-      editor.markClean();
+      editor?.markClean();
       reloadWithFlash(message);
     } catch (err) {
       if (button) button.disabled = false;
@@ -101,7 +108,7 @@ if (root && card) {
   $$("[data-publish-card]", root).forEach((btn) =>
     btn.addEventListener("click", async () => {
       const publish = btn.dataset.publishCard === "1";
-      if (publish && editor.dirty && !(await save({ reload: false }))) return;
+      if (publish && editor?.dirty && !(await save({ reload: false }))) return;
       fail("");
       btn.disabled = true;
       try {
@@ -122,6 +129,12 @@ if (root && card) {
 
   // The card as it is in the editor right now, saved or not, with your real details.
   $("[data-preview-card]", root)?.addEventListener("click", async (e) => {
+    if (!editor) {
+      if (!card.previewHtml) return fail("Your card design isn't set up yet.");
+      return cardPreviewModal("Your card", card.previewHtml, {
+        footer: `<p class="text-center text-xs text-ink-500">Tap an action to try it — it opens in a new tab.</p>`,
+      });
+    }
     const body = editor.payload();
     if (!body.imageUrl) return fail("Upload your card image first.");
     fail("");

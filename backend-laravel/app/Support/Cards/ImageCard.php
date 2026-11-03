@@ -292,6 +292,50 @@ class ImageCard
         ];
     }
 
+    // Where each listing detail a card box can show is filled in on the
+    // business's Manage page: [what it is, the section].
+    private const DETAIL_SOURCES = [
+        'call' => ['Phone number', 'Contact'],
+        'phone_text' => ['Phone number', 'Contact'],
+        'whatsapp' => ['WhatsApp number', 'Contact'],
+        'email' => ['Email address', 'Contact'],
+        'email_text' => ['Email address', 'Contact'],
+        'website' => ['Website', 'Contact'],
+        'website_text' => ['Website', 'Contact'],
+        'directions' => ['Address', 'Contact'],
+        'address' => ['Address', 'Contact'],
+        'name' => ['Business name', 'Contact'],
+        'tagline' => ['Category & city', 'Contact'],
+        'about' => ['Description', 'Contact'],
+        'logo' => ['Logo', 'Contact'],
+        'hours' => ['Opening hours', 'Hours'],
+        'instagram' => ['Instagram', 'Reviews & QR'],
+        'facebook' => ['Facebook page', 'Reviews & QR'],
+        'youtube' => ['YouTube channel', 'Reviews & QR'],
+    ];
+
+    /**
+     * The listing details the card's boxes need but the listing lacks — each
+     * once, with the Manage section where it's added. A box with its own
+     * value (set on the card or its design) needs nothing.
+     *
+     * @return list<array{key: string, label: string, section: string}>
+     */
+    public static function missingDetails(array $hotspots, array $defaults): array
+    {
+        $missing = [];
+        foreach ($hotspots as $h) {
+            $action = $h['action'] ?? null;
+            if (! isset(self::DETAIL_SOURCES[$action]) || ! empty($h['value']) || ! empty($defaults[$action])) {
+                continue;
+            }
+            [$label, $section] = self::DETAIL_SOURCES[$action];
+            $missing[$label] ??= ['key' => $action, 'label' => $label, 'section' => $section];
+        }
+
+        return array_values($missing);
+    }
+
     /** For a template, built before any business wears it: what each empty value will use. */
     public const TEMPLATE_DEFAULTS = [
         'call' => "the business's phone",
