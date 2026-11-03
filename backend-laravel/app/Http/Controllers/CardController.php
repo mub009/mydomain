@@ -12,6 +12,7 @@ use App\Support\BusinessAccess;
 use App\Support\Cards\BackgroundGenerator;
 use App\Support\Cards\CardEngine;
 use App\Support\Cards\ImageCard;
+use App\Support\Cards\ImageColour;
 use Illuminate\Http\Request;
 
 // A business's digital visiting card, for the people who manage it: the
@@ -94,8 +95,12 @@ class CardController extends Controller
             'listingDefaults' => ImageCard::listingDefaults($details),
             // Business owners wear the design they're given; dealers and admins edit it.
             'canEdit' => self::canEditDesign($actor),
+            // The image's recolouring — the whole business team, owners too, can change it.
+            'imageColour' => ImageColour::normalize($card?->imageColour),
+            'imageColourDefaults' => ImageColour::DEFAULTS,
             'missingDetails' => ImageCard::missingDetails($image['hotspots'] ?? [], ImageCard::listingDefaults($details)),
-            'imagePreviewHtml' => $image ? ImageCard::renderSource($image, $details, true) : null,
+            // An owner's preview looks like the public card: no outlines over the tap areas.
+            'imagePreviewHtml' => $image ? ImageCard::renderSource($image, $details, true, self::canEditDesign($actor)) : null,
             // Ready-made image designs from the admin, for "Start from a design".
             'imageTemplates' => $templates->filter(fn (CardTemplate $t) => (bool) $t->imageUrl)->map(fn (CardTemplate $t) => [
                 'id' => $t->id,
@@ -138,9 +143,10 @@ class CardController extends Controller
             'imageWidth' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:20000'],
             'imageHeight' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:20000'],
             ...ImageCard::rules(),
+            ...ImageColour::rules(),
         ]);
         if (! $data) {
-            throw ApiException::badRequest('Send a templateId, backgroundImageUrl, imageUrl or hotspots');
+            throw ApiException::badRequest('Send a templateId, backgroundImageUrl, imageUrl, hotspots or imageColour');
         }
         if (! self::canEditDesign($actor) && array_intersect_key($data, array_flip(['imageUrl', 'imageWidth', 'imageHeight', 'hotspots']))) {
             throw ApiException::forbidden('The card design can only be changed by your dealer or an admin. You can pick a ready-made design.');
@@ -180,6 +186,9 @@ class CardController extends Controller
         if (array_key_exists('hotspots', $data)) {
             $changes['hotspots'] = ImageCard::normalize($data['hotspots'] ?? []);
         }
+        if (array_key_exists('imageColour', $data)) {
+            $changes['imageColour'] = ImageColour::normalize($data['imageColour']);
+        }
 
         $card = BusinessCard::updateOrCreate(['businessId' => $business->id], $changes);
 
@@ -190,6 +199,7 @@ class CardController extends Controller
             'imageWidth' => $card->imageWidth,
             'imageHeight' => $card->imageHeight,
             'hotspots' => $card->hotspots ?? [],
+            'imageColour' => ImageColour::normalize($card->imageColour),
             'isPublished' => $card->isPublished,
         ]);
     }
@@ -242,6 +252,7 @@ class CardController extends Controller
             'imageWidth' => ['nullable', 'integer', 'min:1', 'max:20000'],
             'imageHeight' => ['nullable', 'integer', 'min:1', 'max:20000'],
             ...ImageCard::rules(),
+            ...ImageColour::rules(),
         ]);
         if (! CardEngine::isSafeUrl($data['imageUrl'])) {
             throw ApiException::badRequest('That image address cannot be used');
@@ -250,7 +261,8 @@ class CardController extends Controller
         return ApiResponse::ok(['html' => ImageCard::renderSource([
             ...$data,
             'hotspots' => ImageCard::normalize($data['hotspots'] ?? [], true),
-        ], CardEngine::details($business), true)]);
+            'colour' => ImageColour::normalize($data['imageColour'] ?? null),
+        ], CardEngine::details($business), true, self::canEditDesign($request->attributes->get('auth')))]);
     }
 
     public function publish(Request $request, string $id)

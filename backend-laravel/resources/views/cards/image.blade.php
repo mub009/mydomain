@@ -27,10 +27,10 @@
     *{box-sizing:border-box}
     html,body{margin:0;padding:0}
     body{min-height:100vh;background:#111827;color:#fff;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased;overflow-x:hidden}
-    .backdrop{position:fixed;inset:-40px;background:url('{{ $image }}') center/cover;filter:blur(36px) brightness(.55);transform:scale(1.1)}
+    .backdrop{position:fixed;inset:-40px;background:url('{{ $image }}') center/cover;filter:{{ $colourMatrix ? 'url(#card-colour) ' : '' }}blur(36px) brightness(.55);transform:scale(1.1)}
     .page{position:relative;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px 12px}
     .card{position:relative;width:100%;max-width:480px;container-type:inline-size;border-radius:18px;overflow:hidden;box-shadow:0 24px 60px -20px rgba(0,0,0,.6);background:#1f2937}
-    .card > img{display:block;width:100%;height:auto;user-select:none;-webkit-user-drag:none}
+    .card > img{display:block;width:100%;height:auto;user-select:none;-webkit-user-drag:none;{{ $colourMatrix ? 'filter:url(#card-colour)' : '' }}}
     .spot{position:absolute;display:flex;align-items:center;justify-content:center;gap:6px;border-radius:10px;color:#fff;text-decoration:none;font-weight:600;font-size:13px;-webkit-tap-highlight-color:transparent;cursor:pointer;border:0;padding:0;font-family:inherit;background:transparent}
     .spot:focus-visible{outline:3px solid #facc15;outline-offset:2px}
     .spot.invisible:active{background:rgba(255,255,255,.25)}
@@ -54,11 +54,19 @@
     .powered a{color:inherit}
     @if ($preview)
       .spot.inert,.powered a{pointer-events:none}
-      .card.hint .spot.invisible{animation:none;box-shadow:inset 0 0 0 2px rgba(250,204,21,.85);background:rgba(250,204,21,.12)}
+      .card.hint .spot.invisible{animation:none}
+    @endif
+    @if ($marks)
+      {{-- The editor's preview outlines where the invisible tap areas are. --}}
+      .card.hint .spot.invisible{box-shadow:inset 0 0 0 2px rgba(250,204,21,.85);background:rgba(250,204,21,.12)}
     @endif
   </style>
 </head>
 <body>
+  @if ($colourMatrix)
+    {{-- The business's recolouring of the image (App\Support\Cards\ImageColour): numbers only. --}}
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true"><filter id="card-colour" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="{{ $colourMatrix }}" /></filter></svg>
+  @endif
   <div class="backdrop" aria-hidden="true"></div>
   <div class="page">
     <main class="card hint">

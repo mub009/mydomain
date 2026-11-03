@@ -88,11 +88,14 @@ class ImageCard
     {
         $card ??= $business->card;
         if ($card?->imageUrl) {
-            return self::pack($card->imageUrl, $card->imageWidth, $card->imageHeight, $card->hotspots, false);
+            $source = self::pack($card->imageUrl, $card->imageWidth, $card->imageHeight, $card->hotspots, false);
+        } else {
+            $template = CardEngine::templateFor($business, $card);
+            $source = $template ? self::fromTemplate($template) : null;
         }
-        $template = CardEngine::templateFor($business, $card);
 
-        return $template ? self::fromTemplate($template) : null;
+        // The business's recolouring applies to whichever image it wears.
+        return $source ? [...$source, 'colour' => ImageColour::normalize($card?->imageColour)] : null;
     }
 
     public static function fromTemplate(CardTemplate $template): ?array
@@ -442,8 +445,14 @@ class ImageCard
     }
 
     /** @param  array{imageUrl: ?string, imageWidth: ?int, imageHeight: ?int, hotspots: ?array}  $source */
-    public static function renderSource(array $source, array $details, bool $preview = false): string
+    /**
+     * $marks (previews only): outline the invisible tap areas, and keep
+     * actions that have nowhere to go yet — what the editor needs. Without
+     * it a preview looks just like the public card (what an owner sees).
+     */
+    public static function renderSource(array $source, array $details, bool $preview = false, bool $marks = true): string
     {
+        $marks = $preview && $marks;
         $w = $source['imageWidth'] ?? null;
         $h = $source['imageHeight'] ?? null;
 
@@ -451,9 +460,11 @@ class ImageCard
             'b' => $details,
             'image' => CardEngine::safeUrl($source['imageUrl'] ?? null) ?? '',
             'ratio' => $w && $h ? $h / $w : null,
-            'spots' => self::resolved($source['hotspots'] ?? [], $details, $preview),
+            'spots' => self::resolved($source['hotspots'] ?? [], $details, $marks),
             'fontsUrl' => self::fontsUrl($source['hotspots'] ?? []),
+            'colourMatrix' => ($colour = ImageColour::normalize($source['colour'] ?? null)) ? ImageColour::svgValues($colour) : null,
             'preview' => $preview,
+            'marks' => $marks,
         ])->render();
     }
 }

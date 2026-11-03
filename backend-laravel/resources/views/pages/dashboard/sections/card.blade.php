@@ -105,9 +105,12 @@
               </div>
             @elseif ($card['imagePreviewHtml'])
               <div class="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
-                <p class="flex items-center gap-1.5 text-sm font-bold text-emerald-900"><x-icon name="check-circle" :size="15" /> Your card has everything it needs</p>
+                <p class="flex items-center gap-1.5 text-sm font-bold text-emerald-900"><x-icon name="check-circle-2" :size="15" /> Your card has everything it needs</p>
                 <p class="mt-1 text-xs text-emerald-800">Every button and detail on it is filled from your listing.</p>
               </div>
+            @endif
+            @if ($hasImage)
+              <div class="mt-4">@include('pages.dashboard.partials.card-colour')</div>
             @endif
           </div>
         </div>
@@ -138,6 +141,10 @@
       @endif
 
       <x-hotspot-editor subject="your card" :replaceable="false" :palette="false" />
+
+      @if ($hasImage)
+        <div class="mt-5 max-w-md">@include('pages.dashboard.partials.card-colour')</div>
+      @endif
     </div>
     @endunless
 
@@ -189,6 +196,8 @@
           'previewHtml' => $card['imagePreviewHtml'],
           'templateId' => $card['templateId'],
           'canEdit' => $card['canEdit'],
+          'imageColour' => $card['imageColour'],
+          'imageColourDefaults' => $card['imageColourDefaults'],
       ];
   @endphp
   <script type="application/json" id="card-data">@json($cardData)</script>

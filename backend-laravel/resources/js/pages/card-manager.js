@@ -1,5 +1,6 @@
 import { api, errorMessage } from "../lib/api";
 import { cardPreviewModal } from "../lib/card-preview";
+import { applyToImage, COLOUR_DEFAULTS, isChanged } from "../lib/card-colour";
 import { downloadDataUrl, renderQrDataUrl } from "../lib/channels";
 import { initHotspotEditor } from "../lib/hotspot-editor";
 import { $, $$, pageData } from "../lib/ui";
@@ -106,6 +107,105 @@ if (root && card) {
     useTemplate(card.templateId, "Your card is back to the original design.", e.currentTarget),
   );
 
+  // --- Card colour -----------------------------------------------------------
+  // Tint, hue, brightness and saturation of the card image, for the whole
+  // business team. Shown live: on the editor's image, or (for an owner) by
+  // redrawing the read-only preview.
+  let colour = { ...COLOUR_DEFAULTS, ...(card.imageColourDefaults || {}), ...(card.imageColour || {}) };
+  const panel = $("[data-colour-panel]", root);
+  if (panel) {
+    const field = (name) => $(`[data-colour="${name}"]`, panel);
+    const colourSave = $("[data-colour-save]", panel);
+    const colourDirty = $("[data-colour-dirty]", panel);
+    const stageImage = $("[data-stage-image]", root);
+    let lastTint = colour.tint || "#2563eb";
+
+    const fill = () => {
+      field("useTint").checked = !!colour.tint;
+      field("tint").value = lastTint;
+      field("tint").disabled = !colour.tint;
+      field("strength").disabled = !colour.tint;
+      for (const key of ["strength", "hue", "brightness", "saturation"]) {
+        field(key).value = colour[key];
+        const label = $(`[data-colour-label="${key}"]`, panel);
+        label.textContent = `${key === "hue" && colour.hue > 0 ? "+" : ""}${colour[key]}${label.dataset.unit || "%"}`;
+      }
+    };
+
+    let previewTimer = null;
+    let previewRequest = 0;
+    const show = () => {
+      if (stageImage) applyToImage(stageImage, colour);
+      if (!readonlyPreview || !card.imageUrl) return;
+      clearTimeout(previewTimer);
+      previewTimer = setTimeout(async () => {
+        const request = ++previewRequest;
+        try {
+          const { data } = await api.post(`${base}/preview`, {
+            imageUrl: card.imageUrl,
+            imageWidth: card.imageWidth,
+            imageHeight: card.imageHeight,
+            hotspots: card.hotspots,
+            imageColour: colour,
+          });
+          if (request === previewRequest) {
+            readonlyPreview.srcdoc = data.html;
+            card.previewHtml = data.html; // the Preview button shows it too
+          }
+        } catch (err) {
+          fail(err);
+        }
+      }, 250);
+    };
+
+    const changedColour = () => {
+      fill();
+      show();
+      colourSave.disabled = false;
+      colourDirty.classList.remove("hidden");
+    };
+
+    field("useTint").addEventListener("change", (e) => {
+      colour.tint = e.target.checked ? lastTint : null;
+      changedColour();
+    });
+    field("tint").addEventListener("input", (e) => {
+      lastTint = e.target.value;
+      colour.tint = lastTint;
+      changedColour();
+    });
+    for (const key of ["strength", "hue", "brightness", "saturation"]) {
+      field(key).addEventListener("input", (e) => {
+        colour[key] = Number(e.target.value);
+        changedColour();
+      });
+    }
+    $("[data-colour-reset]", panel).addEventListener("click", () => {
+      colour = { ...COLOUR_DEFAULTS };
+      changedColour();
+    });
+
+    colourSave.addEventListener("click", async () => {
+      fail("");
+      colourSave.disabled = true;
+      const label = $("span", colourSave);
+      label.textContent = "Saving…";
+      try {
+        await api.put(base, { imageColour: isChanged(colour) ? colour : null });
+        colourDirty.classList.add("hidden");
+        label.textContent = "Saved";
+        setTimeout(() => (label.textContent = "Save colour"), 1500);
+      } catch (err) {
+        colourSave.disabled = false;
+        label.textContent = "Save colour";
+        fail(err);
+      }
+    });
+
+    fill();
+    if (stageImage) applyToImage(stageImage, colour);
+  }
+
   // --- Publish, preview, link, QR -------------------------------------------
   $$("[data-publish-card]", root).forEach((btn) =>
     btn.addEventListener("click", async () => {
@@ -137,7 +237,7 @@ if (root && card) {
         footer: `<p class="text-center text-xs text-ink-500">Tap an action to try it — it opens in a new tab.</p>`,
       });
     }
-    const body = editor.payload();
+    const body = { ...editor.payload(), imageColour: colour };
     if (!body.imageUrl) return fail("Upload your card image first.");
     fail("");
     const btn = e.currentTarget;

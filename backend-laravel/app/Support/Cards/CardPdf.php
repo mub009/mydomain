@@ -107,10 +107,15 @@ class CardPdf
         // format the upload accepts (WebP), and it keeps the file small.
         $sw = imagesx($src);
         $sh = imagesy($src);
-        $scale = min(1, 1600 / $sw);
+        // Recolouring goes pixel by pixel, so a recoloured image is kept smaller.
+        $colour = ImageColour::normalize($source['colour'] ?? null);
+        $scale = min(1, ($colour ? 1000 : 1600) / $sw);
         $dst = imagecreatetruecolor(max(1, (int) round($sw * $scale)), max(1, (int) round($sh * $scale)));
         imagefill($dst, 0, 0, imagecolorallocate($dst, 255, 255, 255));
         imagecopyresampled($dst, $src, 0, 0, 0, 0, imagesx($dst), imagesy($dst), $sw, $sh);
+        if ($colour) {
+            ImageColour::applyGd($dst, $colour);
+        }
         ob_start();
         imagejpeg($dst, null, 85);
         $jpeg = 'data:image/jpeg;base64,'.base64_encode((string) ob_get_clean());

@@ -22,7 +22,8 @@ class BusinessCard extends Model
     // imageUrl + hotspots: an image card — the business's own artwork with
     // actions placed on it (App\Support\Cards\ImageCard). Shown instead of
     // the template whenever an image is set.
-    protected $fillable = ['businessId', 'templateId', 'backgroundImageUrl', 'imageUrl', 'imageWidth', 'imageHeight', 'hotspots', 'isPublished', 'publishedAt', 'viewCount'];
+    // imageColour: the business's recolouring of that image (ImageColour).
+    protected $fillable = ['businessId', 'templateId', 'backgroundImageUrl', 'imageUrl', 'imageWidth', 'imageHeight', 'hotspots', 'imageColour', 'isPublished', 'publishedAt', 'viewCount'];
 
     protected function casts(): array
     {
@@ -33,6 +34,7 @@ class BusinessCard extends Model
             'imageWidth' => 'integer',
             'imageHeight' => 'integer',
             'hotspots' => 'array',
+            'imageColour' => 'array',
         ];
     }
 

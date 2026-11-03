@@ -77,6 +77,20 @@ class ImageCardTest extends TestCase
                 ['key' => 'logo', 'label' => 'Logo', 'section' => 'Contact'],
             ]);
         $this->getJson("/api/v1/businesses/{$this->business->id}/card", $this->auth)->assertOk()->assertJsonPath('data.canEdit', true);
+
+        // The owner's preview looks like the public card: no outlines over the
+        // tap areas, and no stand-ins for actions with nowhere to go (Instagram).
+        $outline = 'box-shadow:inset 0 0 0 2px rgba(250,204,21,.85)';
+        $ownerHtml = $this->getJson("/api/v1/businesses/{$this->business->id}/card", $owner)->json('data.imagePreviewHtml');
+        $this->assertStringNotContainsString($outline, $ownerHtml);
+        $this->assertStringNotContainsString('aria-label="Instagram"', $ownerHtml);
+        $this->assertStringContainsString('aria-label="Call"', $ownerHtml);
+        $body = ['imageUrl' => 'https://cdn.example.test/cards/images/card.jpg', 'hotspots' => [$this->spot('call')]];
+        $this->assertStringNotContainsString($outline, $this->postJson("/api/v1/businesses/{$this->business->id}/card/preview", $body, $owner)->json('data.html'));
+        // The dealer's editor preview keeps them.
+        $dealerHtml = $this->getJson("/api/v1/businesses/{$this->business->id}/card", $this->auth)->json('data.imagePreviewHtml');
+        $this->assertStringContainsString($outline, $dealerHtml);
+        $this->assertStringContainsString('aria-label="Instagram"', $dealerHtml);
     }
 
     private function save(array $hotspots)
@@ -276,6 +290,43 @@ class ImageCardTest extends TestCase
         $this->assertStringContainsString('family=Poppins', $html);
         $this->assertStringContainsString('font-size:calc(20 * 100cqw / 480)', $html);
         $this->assertStringContainsString('font-weight:700;color:#ffee00;background:#123456', $html);
+    }
+
+    public function test_the_business_team_recolours_the_card_image(): void
+    {
+        $this->save([$this->spot('call')])->assertOk();
+        $token = $this->postJson('/api/v1/auth/login', ['email' => $this->ownerEmail, 'password' => 'Password123!'])->json('data.accessToken');
+        $owner = ['Authorization' => "Bearer {$token}"];
+        $url = "/api/v1/businesses/{$this->business->id}/card";
+
+        // Owners may recolour, though not edit the design.
+        $this->putJson($url, ['imageColour' => ['tint' => '#FF0000', 'strength' => 60, 'hue' => 30, 'brightness' => 110, 'saturation' => 80]], $owner)
+            ->assertOk()->assertJsonPath('data.imageColour.tint', '#ff0000')->assertJsonPath('data.imageColour.hue', 30);
+        $this->putJson($url, ['imageColour' => ['hue' => 400]], $owner)->assertStatus(400);
+        $this->putJson($url, ['imageColour' => ['tint' => 'red;}']], $owner)->assertStatus(400);
+        $this->getJson($url, $owner)->assertOk()->assertJsonPath('data.imageColour.strength', 60);
+
+        $this->postJson("{$url}/publish", [], $owner)->assertOk();
+        $html = $this->get('/card/spice-garden')->assertOk()->getContent();
+        $this->assertStringContainsString('<feColorMatrix type="matrix" values="', $html);
+        $this->assertStringContainsString('filter:url(#card-colour)', $html);
+        $this->assertStringStartsWith('%PDF', $this->get('/card/spice-garden.pdf')->assertOk()->getContent());
+
+        // The same maths on the pixels: a red tint makes a grey pixel red.
+        $img = imagecreatetruecolor(1, 1);
+        imagefill($img, 0, 0, imagecolorallocate($img, 128, 128, 128));
+        \App\Support\Cards\ImageColour::applyGd($img, \App\Support\Cards\ImageColour::normalize(['tint' => '#ff0000', 'strength' => 100]));
+        $rgb = imagecolorat($img, 0, 0);
+        $this->assertGreaterThan(200, ($rgb >> 16) & 0xFF);
+        $this->assertSame(0, ($rgb >> 8) & 0xFF);
+
+        // Settings that change nothing are stored as nothing; then no filter is drawn.
+        $this->putJson($url, ['imageColour' => ['hue' => 0, 'brightness' => 100, 'saturation' => 100]], $owner)->assertOk()->assertJsonPath('data.imageColour', null);
+        $this->assertStringNotContainsString('feColorMatrix', $this->get('/card/spice-garden')->getContent());
+
+        // A preview shows unsaved colours.
+        $this->postJson("{$url}/preview", ['imageUrl' => 'https://cdn.example.test/cards/images/card.jpg', 'imageColour' => ['saturation' => 0]], $owner)
+            ->assertOk()->assertSee('feColorMatrix', false);
     }
 
     public function test_custom_text_is_drawn_in_its_own_font_size_and_style(): void
