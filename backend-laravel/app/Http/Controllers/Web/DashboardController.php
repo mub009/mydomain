@@ -157,8 +157,8 @@ class DashboardController extends Controller
         $renewals = [];
         if ($isDealer || $user->role === 'BUSINESS_OWNER') {
             $soon = now()->addDays(30);
-            $mine = $isDealer ? Business::where('createdById', $user->id) : Business::where('ownerId', $user->id);
-            foreach ($mine->whereNotNull('featureExpiry')->get(['id', 'name', 'features', 'featureExpiry']) as $b) {
+            $renewScope = $isDealer ? Business::where('createdById', $user->id) : Business::where('ownerId', $user->id);
+            foreach ($renewScope->whereNotNull('featureExpiry')->get(['id', 'name', 'features', 'featureExpiry']) as $b) {
                 foreach (BusinessFeatures::of($b) as $f) {
                     $e = BusinessFeatures::expiry($b, $f);
                     if ($e && $e->lte($soon)) {
