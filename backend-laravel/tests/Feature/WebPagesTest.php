@@ -236,7 +236,7 @@ class WebPagesTest extends TestCase
         // The dealer who set it up gets the features panel, with its points.
         $this->signIn($dealer);
         $this->get("/dashboard/businesses/{$business->id}")->assertOk()->assertSee('data-features-panel', false)->assertSee('Features for this business');
-        $this->get('/dashboard/businesses/new')->assertOk()->assertSee('data-features-picker', false)->assertSee('1 point each');
+        $this->get('/dashboard/businesses/new')->assertOk()->assertSee('data-features-picker', false)->assertSee('Priced per feature');
 
         // Without the feature, the poster images are off limits.
         $business->update(['features' => []]);

@@ -49,23 +49,28 @@ class FeaturePlansTest extends TestCase
         ]);
     }
 
-    /** Admin: WEBSITE 3 points for 12 months, GOLD_RATE 2 points unlimited. */
+    /** Admin: WEBSITE 3 points for 12 months, renewing for 4, at Rs 1,500; GOLD_RATE 2 points unlimited. */
     private function setPrices(): void
     {
         $admin = $this->user(['role' => 'ADMIN']);
-        $plans = collect(BusinessFeatures::ALL)->map(fn ($f) => ['feature' => $f, 'points' => 1, 'months' => null])->keyBy('feature');
-        $plans['WEBSITE'] = ['feature' => 'WEBSITE', 'points' => 3, 'months' => 12];
-        $plans['GOLD_RATE'] = ['feature' => 'GOLD_RATE', 'points' => 2, 'months' => null];
+        $plans = collect(BusinessFeatures::ALL)->map(fn ($f) => ['feature' => $f, 'points' => 1, 'renewalPoints' => 1, 'price' => null, 'months' => null])->keyBy('feature');
+        $plans['WEBSITE'] = ['feature' => 'WEBSITE', 'points' => 3, 'renewalPoints' => 4, 'price' => 1500, 'commission' => 300,
+            'renewalPrice' => 1000, 'renewalCommission' => 200, 'months' => 12];
+        $plans['GOLD_RATE'] = ['feature' => 'GOLD_RATE', 'points' => 2, 'renewalPoints' => 2, 'price' => 800, 'commission' => 100, 'months' => null];
         $this->putJson('/api/v1/admin/feature-plans', ['plans' => $plans->values()->all()], $this->auth($admin))->assertOk()
-            ->assertJsonPath('data.plans.0.feature', 'WEBSITE')->assertJsonPath('data.plans.0.points', 3)->assertJsonPath('data.plans.0.duration', '1 year');
+            ->assertJsonPath('data.plans.0.feature', 'WEBSITE')->assertJsonPath('data.plans.0.points', 3)
+            ->assertJsonPath('data.plans.0.renewalPoints', 4)->assertJsonPath('data.plans.0.price', 1500)
+            ->assertJsonPath('data.plans.0.priceLabel', '₹1,500')->assertJsonPath('data.plans.0.commission', 300)
+            ->assertJsonPath('data.plans.0.renewalPrice', 1000)->assertJsonPath('data.plans.0.renewalCommission', 200)
+            ->assertJsonPath('data.plans.0.duration', '1 year');
     }
 
     public function test_only_admins_set_prices_and_only_allowed_durations(): void
     {
         $admin = $this->user(['role' => 'ADMIN']);
         $this->getJson('/api/v1/admin/feature-plans', $this->auth($this->dealer()))->assertForbidden();
-        $this->putJson('/api/v1/admin/feature-plans', ['plans' => [['feature' => 'WEBSITE', 'points' => 2, 'months' => 2]]], $this->auth($admin))->assertStatus(400);
-        $this->putJson('/api/v1/admin/feature-plans', ['plans' => [['feature' => 'WEBSITE', 'points' => -1, 'months' => null]]], $this->auth($admin))->assertStatus(400);
+        $this->putJson('/api/v1/admin/feature-plans', ['plans' => [['feature' => 'WEBSITE', 'points' => 2, 'renewalPoints' => 2, 'price' => null, 'months' => 2]]], $this->auth($admin))->assertStatus(400);
+        $this->putJson('/api/v1/admin/feature-plans', ['plans' => [['feature' => 'WEBSITE', 'points' => -1, 'renewalPoints' => 1, 'price' => null, 'months' => null]]], $this->auth($admin))->assertStatus(400);
         $this->getJson('/api/v1/admin/feature-plans', $this->auth($admin))->assertOk()->assertJsonCount(5, 'data.plans')->assertJsonCount(5, 'data.durations');
     }
 
@@ -95,7 +100,7 @@ class FeaturePlansTest extends TestCase
     public function test_an_expired_feature_switches_off_until_renewed(): void
     {
         $this->setPrices();
-        $dealer = $this->dealer(10);
+        $dealer = $this->dealer(12);
         $business = $this->business($dealer);
         $this->putJson("/api/v1/businesses/{$business->id}/features", ['features' => ['WEBSITE']], $this->auth($dealer))->assertOk();
         $this->assertTrue(BusinessFeatures::has($business->fresh(), 'WEBSITE'));
@@ -106,9 +111,10 @@ class FeaturePlansTest extends TestCase
         $this->assertTrue(BusinessFeatures::expired($business, 'WEBSITE'));
         $this->assertFalse(BusinessFeatures::allowsSection($business, 'Website'));
 
+        // Renewal costs the renewal points, not the first-time points.
         $this->postJson("/api/v1/businesses/{$business->id}/features/WEBSITE/renew", [], $this->auth($dealer))
-            ->assertOk()->assertJsonPath('data.spentPoints', 3);
-        $this->assertSame(4, $dealer->fresh()->points);
+            ->assertOk()->assertJsonPath('data.spentPoints', 4);
+        $this->assertSame(5, $dealer->fresh()->points);
         $business->refresh();
         $this->assertTrue(BusinessFeatures::has($business, 'WEBSITE'));
         // A lapsed feature's new year starts today.
@@ -168,5 +174,38 @@ class FeaturePlansTest extends TestCase
 
         $this->getJson('/api/v1/points/mine', $this->auth($dealer))->assertOk()
             ->assertJsonPath('data.featurePlans.0.points', 3)->assertJsonPath('data.featurePlans.0.duration', '1 year');
+    }
+
+    public function test_the_dealer_owes_the_admin_commission_on_sales_and_renewals(): void
+    {
+        $this->setPrices();
+        $admin = $this->user(['role' => 'ADMIN']);
+        // A commission over the price is refused.
+        $this->putJson('/api/v1/admin/feature-plans', ['plans' => [['feature' => 'WEBSITE', 'points' => 1, 'renewalPoints' => 1, 'price' => 100, 'commission' => 150, 'months' => null]]], $this->auth($admin))
+            ->assertStatus(400);
+
+        $dealer = $this->dealer(20);
+        $business = $this->business($dealer);
+        $this->putJson("/api/v1/businesses/{$business->id}/features", ['features' => ['WEBSITE', 'GOLD_RATE']], $this->auth($dealer))->assertOk();
+        $this->assertSame(400, \App\Support\Points::commissionOwed($dealer->id));
+        $this->assertSame(1500, PointTransaction::where('feature', 'WEBSITE')->value('priceInr'));
+
+        $this->travel(13)->months();
+        $this->postJson("/api/v1/businesses/{$business->id}/features/WEBSITE/renew", [], $this->auth($dealer))->assertOk();
+        $this->assertSame(600, \App\Support\Points::commissionOwed($dealer->id));
+
+        // Turning off the unlimited feature takes its commission back off.
+        $this->putJson("/api/v1/businesses/{$business->id}/features", ['features' => ['WEBSITE']], $this->auth($dealer))->assertOk();
+        $this->assertSame(500, \App\Support\Points::commissionOwed($dealer->id));
+
+        // Later price changes don't change what was owed.
+        $this->putJson('/api/v1/admin/feature-plans', ['plans' => [['feature' => 'WEBSITE', 'points' => 1, 'renewalPoints' => 1, 'price' => 5000, 'commission' => 4000, 'renewalPrice' => null, 'renewalCommission' => null, 'months' => 12]]], $this->auth($admin))->assertOk();
+        $this->assertSame(500, \App\Support\Points::commissionOwed($dealer->id));
+        $this->getJson('/api/v1/points/mine', $this->auth($dealer))->assertOk()->assertJsonPath('data.commissionOwed', 500);
+
+        // The dealer's dashboard shows the total.
+        $this->withoutVite();
+        $this->post('/login', ['email' => $dealer->email, 'password' => 'Password123!']);
+        $this->get('/dashboard')->assertOk()->assertSee('Commission to admin')->assertSee('₹500');
     }
 }

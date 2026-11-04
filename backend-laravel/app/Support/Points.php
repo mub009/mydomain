@@ -21,9 +21,9 @@ class Points
     private const SPENDING_TYPES = ['BUSINESS_CREATED', 'FEATURE_ADDED', 'FEATURE_REMOVED', 'FEATURE_RENEWED'];
 
     /** Up front, before anything is created: whether the dealer can pay for these features (FeaturePlans). */
-    public static function assertCanAfford(array $actor, array $features): void
+    public static function assertCanAfford(array $actor, array $features, bool $renewal = false): void
     {
-        $cost = FeaturePlans::cost($features);
+        $cost = FeaturePlans::cost($features, $renewal);
         if ($actor['role'] !== 'DEALER' || $cost <= 0) {
             return;
         }
@@ -38,7 +38,7 @@ class Points
     }
 
     // Gives a business a feature, or renews one: a dealer pays the feature's
-    // points (FeaturePlans) and a timed feature runs for its months, from
+    // points, or its renewal points (FeaturePlans), and a timed feature runs for its months, from
     // its current end date when renewed early, else from today. An admin
     // pays nothing; a feature an admin adds is unlimited. Must run inside
     // the caller's transaction so the change and the debit commit together.
@@ -46,10 +46,14 @@ class Points
     public static function buyFeature(array $actor, Business $business, string $feature, bool $renewal = false): int
     {
         $isDealer = $actor['role'] === 'DEALER';
-        $cost = $isDealer ? FeaturePlans::points($feature) : 0;
-        $months = FeaturePlans::months($feature);
+        $plan = FeaturePlans::plan($feature);
+        $cost = $isDealer ? ($renewal ? $plan['renewalPoints'] : $plan['points']) : 0;
+        $months = $plan['months'];
+        // The rupee price and the admin's commission, as they are today.
+        $price = $renewal ? $plan['renewalPrice'] : $plan['price'];
+        $commission = $renewal ? $plan['renewalCommission'] : $plan['commission'];
 
-        if ($isDealer && $cost > 0) {
+        if ($isDealer && ($cost > 0 || $commission)) {
             $dealer = User::where('id', $actor['sub'])->lockForUpdate()->first();
             if (! $dealer) {
                 throw ApiException::notFound('User not found');
@@ -68,6 +72,8 @@ class Points
                 'businessId' => $business->id,
                 'feature' => $feature,
                 'durationMonths' => $months,
+                'priceInr' => $price,
+                'commissionInr' => $commission,
                 'note' => $label.($renewal ? ' renewed' : '').($months ? ' · '.FeaturePlans::durationLabel($months) : '')." for “{$business->name}”",
             ]);
         }
@@ -94,13 +100,15 @@ class Points
             return 0;
         }
 
-        $paid = (int) -PointTransaction::where('userId', $actor['sub'])
+        $purchases = PointTransaction::where('userId', $actor['sub'])
             ->where('businessId', $business->id)
             ->where('feature', $feature)
             ->whereIn('type', ['FEATURE_ADDED', 'FEATURE_REMOVED'])
             // A timed purchase (FeaturePlans) is never refunded.
-            ->whereNull('durationMonths')
-            ->sum('amount');
+            ->whereNull('durationMonths');
+        $paid = (int) -(clone $purchases)->sum('amount');
+        // The sale is undone, so its commission is no longer owed.
+        $commission = (int) (clone $purchases)->sum('commissionInr');
         $dealer = User::where('id', $actor['sub'])->lockForUpdate()->first();
         if ($paid <= 0 || ! $dealer) {
             return 0;
@@ -115,6 +123,7 @@ class Points
             'balanceAfter' => $dealer->points,
             'businessId' => $business->id,
             'feature' => $feature,
+            'commissionInr' => $commission ? -$commission : null,
             'note' => (BusinessFeatures::LABELS[$feature] ?? $feature)." removed from “{$business->name}” — point returned",
         ]);
 
@@ -132,12 +141,13 @@ class Points
             return 0;
         }
 
-        $paid = (int) -PointTransaction::where('userId', $actor['sub'])
+        $purchases = PointTransaction::where('userId', $actor['sub'])
             ->where('businessId', $business->id)
             ->whereIn('type', self::SPENDING_TYPES)
             // Timed purchases and renewals (FeaturePlans) are never refunded.
-            ->whereNull('durationMonths')
-            ->sum('amount');
+            ->whereNull('durationMonths');
+        $paid = (int) -(clone $purchases)->sum('amount');
+        $commission = (int) (clone $purchases)->sum('commissionInr');
         $dealer = User::where('id', $actor['sub'])->lockForUpdate()->first();
         if ($paid <= 0 || ! $dealer) {
             return 0;
@@ -151,10 +161,17 @@ class Points
             'amount' => $paid,
             'balanceAfter' => $dealer->points,
             'businessId' => $business->id,
+            'commissionInr' => $commission ? -$commission : null,
             'note' => "Deleted “{$business->name}” — ".($paid === 1 ? 'point' : "{$paid} points").' returned',
         ]);
 
         return $paid;
+    }
+
+    /** The admin's commission a dealer owes, net of refunds (FeaturePlans). */
+    public static function commissionOwed(string $userId): int
+    {
+        return (int) PointTransaction::where('userId', $userId)->sum('commissionInr');
     }
 
     /** What a dealer has spent on businesses, net of refunds. */

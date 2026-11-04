@@ -34,7 +34,10 @@
               <span class="block text-xs font-semibold text-ink-900">{{ \App\Support\BusinessFeatures::LABELS[$key] }}</span>
               <span class="mt-0.5 block text-[11px] leading-snug text-ink-500">{{ \App\Support\BusinessFeatures::BLURBS[$key] }}</span>
               @if ($isDealer)
-                <span class="mt-1 inline-block rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">{{ $featurePlans[$key]['points'] }} {{ $featurePlans[$key]['points'] === 1 ? 'point' : 'points' }} · {{ \App\Support\FeaturePlans::durationLabel($featurePlans[$key]['months']) }}</span>
+                <span class="mt-1 inline-block rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">{{ $featurePlans[$key]['points'] }} {{ $featurePlans[$key]['points'] === 1 ? 'point' : 'points' }} · {{ \App\Support\FeaturePlans::durationLabel($featurePlans[$key]['months']) }}{{ $featurePlans[$key]['price'] !== null ? ' · '.\App\Support\FeaturePlans::priceLabel($featurePlans[$key]['price']) : '' }}</span>
+                @if ($featurePlans[$key]['commission'] !== null)
+                  <span class="mt-0.5 block text-[10px] text-ink-500">Admin commission {{ \App\Support\FeaturePlans::priceLabel($featurePlans[$key]['commission']) }}</span>
+                @endif
               @endif
             </span>
           </label>

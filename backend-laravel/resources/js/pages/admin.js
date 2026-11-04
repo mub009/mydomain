@@ -191,6 +191,7 @@ const POINT_TYPES = {
   BUSINESS_DELETED: ["Business deleted (refund)", "bg-gray-100 text-gray-600"],
   FEATURE_ADDED: ["Feature added", "bg-brand-50 text-brand-700"],
   FEATURE_REMOVED: ["Feature removed (refund)", "bg-gray-100 text-gray-600"],
+  FEATURE_RENEWED: ["Feature renewed", "bg-amber-50 text-amber-700"],
 };
 
 $$("[data-points]").forEach((button) =>
@@ -596,6 +597,15 @@ $$("[data-seo-submit]").forEach((button) =>
 );
 
 // --- Feature pricing ------------------------------------------------------------
+// The renewal columns only apply to a feature with an end date.
+$$("[data-plan]").forEach((row) => {
+  const months = $('[name="months"]', row);
+  months.addEventListener("change", () => $$('[data-renewal-field="1"]', row).forEach((input) => (input.disabled = months.value === "")));
+});
+const rupees = (row, name) => {
+  const value = $(`[name="${name}"]`, row).value;
+  return value === "" ? null : Number(value);
+};
 $("[data-feature-plans]")?.addEventListener("submit", async (e) => {
   e.preventDefault();
   const form = e.currentTarget;
@@ -604,6 +614,11 @@ $("[data-feature-plans]")?.addEventListener("submit", async (e) => {
   const plans = $$("[data-plan]", form).map((row) => ({
     feature: row.dataset.plan,
     points: Number($('[name="points"]', row).value),
+    renewalPoints: Number($('[name="renewalPoints"]', row).value),
+    price: rupees(row, "price"),
+    commission: rupees(row, "commission"),
+    renewalPrice: rupees(row, "renewalPrice"),
+    renewalCommission: rupees(row, "renewalCommission"),
     months: $('[name="months"]', row).value === "" ? null : Number($('[name="months"]', row).value),
   }));
   showError(errorBox, "");

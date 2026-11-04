@@ -56,6 +56,17 @@
                 <span class="mt-1.5 inline-flex items-center gap-1 rounded-md bg-amber-50 px-1.5 py-0.5 text-[11px] font-semibold text-amber-700">
                   <x-icon name="coins" :size="11" /> {{ $plan['points'] }} {{ $plan['points'] === 1 ? 'point' : 'points' }} · {{ FeaturePlans::durationLabel($plan['months']) }}
                 </span>
+                @if ($plan['price'] !== null || $plan['commission'] !== null)
+                  <span class="mt-1 block text-[11px] text-ink-700">
+                    @if ($plan['price'] !== null)<b>{{ FeaturePlans::priceLabel($plan['price']) }}</b>@endif
+                    @if ($plan['commission'] !== null)<span class="text-ink-500">{{ $plan['price'] !== null ? ' · ' : '' }}admin commission {{ FeaturePlans::priceLabel($plan['commission']) }}</span>@endif
+                  </span>
+                @endif
+                @if ($plan['months'])
+                  <span class="mt-0.5 block text-[11px] text-ink-500">
+                    Renews for {{ $plan['renewalPoints'] }} {{ $plan['renewalPoints'] === 1 ? 'point' : 'points' }}{{ $plan['renewalPrice'] !== null ? ' · '.FeaturePlans::priceLabel($plan['renewalPrice']) : '' }}{{ $plan['renewalCommission'] !== null ? ' · admin commission '.FeaturePlans::priceLabel($plan['renewalCommission']) : '' }}
+                  </span>
+                @endif
               @endif
             </span>
           </label>
@@ -68,8 +79,8 @@
                   Paid until {{ $expiry->format('j M Y') }}
                 @endif
               </span>
-              <button type="button" class="btn-secondary px-2.5 py-1 text-xs" data-renew-feature="{{ $key }}" data-renew-cost="{{ $isDealerHere ? $plan['points'] : 0 }}" data-renew-label="{{ F::LABELS[$key] }}">
-                <x-icon name="refresh-cw" :size="12" /> Renew{{ $isDealerHere ? ' · '.$plan['points'].' pt'.($plan['points'] === 1 ? '' : 's') : '' }}
+              <button type="button" class="btn-secondary px-2.5 py-1 text-xs" data-renew-feature="{{ $key }}" data-renew-cost="{{ $isDealerHere ? $plan['renewalPoints'] : 0 }}" data-renew-label="{{ F::LABELS[$key] }}">
+                <x-icon name="refresh-cw" :size="12" /> Renew{{ $isDealerHere ? ' · '.$plan['renewalPoints'].' pt'.($plan['renewalPoints'] === 1 ? '' : 's') : '' }}
               </button>
             </div>
           @endif

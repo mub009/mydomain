@@ -8,8 +8,8 @@ use App\Support\BusinessFeatures;
 use App\Support\FeaturePlans;
 use Illuminate\Http\Request;
 
-// Admin: feature pricing (App\Support\FeaturePlans) — each feature's cost in
-// points and how long it lasts before the dealer has to renew it.
+// Admin: feature pricing (App\Support\FeaturePlans) — each feature's points
+// to add it, points to renew it, price in rupees, and how long it lasts.
 class FeaturePlanController extends Controller
 {
     public function index()
@@ -23,6 +23,11 @@ class FeaturePlanController extends Controller
             'plans' => ['required', 'array', 'min:1'],
             'plans.*.feature' => ['required', 'string', 'distinct', 'in:'.implode(',', BusinessFeatures::ALL)],
             'plans.*.points' => ['required', 'integer', 'min:0', 'max:'.FeaturePlans::MAX_POINTS],
+            'plans.*.renewalPoints' => ['required', 'integer', 'min:0', 'max:'.FeaturePlans::MAX_POINTS],
+            'plans.*.price' => ['present', 'nullable', 'integer', 'min:0', 'max:'.FeaturePlans::MAX_PRICE],
+            'plans.*.renewalPrice' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:'.FeaturePlans::MAX_PRICE],
+            'plans.*.commission' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:'.FeaturePlans::MAX_PRICE],
+            'plans.*.renewalCommission' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:'.FeaturePlans::MAX_PRICE],
             'plans.*.months' => ['present', 'nullable', 'integer'],
         ]);
         $plans = [];
@@ -31,7 +36,20 @@ class FeaturePlanController extends Controller
             if (! in_array($months, FeaturePlans::DURATIONS, true)) {
                 throw ApiException::badRequest('Pick 1, 3, 6 or 12 months, or unlimited');
             }
-            $plans[$plan['feature']] = ['points' => $plan['points'], 'months' => $months];
+            foreach (['price', 'renewalPrice', 'commission', 'renewalCommission'] as $money) {
+                $amount = $plan[$money] ?? null;
+                if ($amount !== null && in_array($money, ['commission', 'renewalCommission'], true)) {
+                    $of = $money === 'commission' ? ($plan['price'] ?? null) : ($plan['renewalPrice'] ?? null);
+                    if ($of !== null && $amount > $of) {
+                        throw ApiException::badRequest(BusinessFeatures::LABELS[$plan['feature']].': the commission can\'t be more than the price');
+                    }
+                }
+            }
+            $plans[$plan['feature']] = [
+                'points' => $plan['points'], 'renewalPoints' => $plan['renewalPoints'], 'months' => $months,
+                'price' => $plan['price'], 'renewalPrice' => $plan['renewalPrice'] ?? null,
+                'commission' => $plan['commission'] ?? null, 'renewalCommission' => $plan['renewalCommission'] ?? null,
+            ];
         }
         FeaturePlans::save($plans);
 

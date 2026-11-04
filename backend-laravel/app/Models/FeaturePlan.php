@@ -17,12 +17,17 @@ class FeaturePlan extends Model
 
     protected $keyType = 'string';
 
-    protected $fillable = ['feature', 'points', 'durationMonths'];
+    protected $fillable = ['feature', 'points', 'renewalPoints', 'priceInr', 'renewalPriceInr', 'commissionInr', 'renewalCommissionInr', 'durationMonths'];
 
     protected function casts(): array
     {
         return [
             'points' => 'integer',
+            'renewalPoints' => 'integer',
+            'priceInr' => 'integer',
+            'renewalPriceInr' => 'integer',
+            'commissionInr' => 'integer',
+            'renewalCommissionInr' => 'integer',
             'durationMonths' => 'integer',
         ];
     }

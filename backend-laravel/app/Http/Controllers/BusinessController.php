@@ -474,7 +474,7 @@ class BusinessController extends Controller
         ]);
     }
 
-    // Renews a timed feature (FeaturePlans): the dealer pays its points again
+    // Renews a timed feature (FeaturePlans): the dealer pays its renewal points
     // and it runs for another term, from its end date if that's still ahead.
     // An expired feature comes back on. Admins renew for free.
     public function renewFeature(Request $request, string $id, string $feature)
@@ -491,7 +491,7 @@ class BusinessController extends Controller
         if (! BusinessFeatures::expiry($business, $feature)) {
             throw ApiException::badRequest(BusinessFeatures::LABELS[$feature].' has no end date, so there is nothing to renew');
         }
-        Points::assertCanAfford($actor, [$feature]);
+        Points::assertCanAfford($actor, [$feature], true);
 
         $spent = DB::transaction(fn () => Points::buyFeature($actor, $business, $feature, true));
         $expiry = BusinessFeatures::expiry($business->fresh(), $feature);

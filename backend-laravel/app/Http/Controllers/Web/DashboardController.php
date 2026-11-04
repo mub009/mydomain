@@ -154,9 +154,23 @@ class DashboardController extends Controller
             usort($renewals, fn ($a, $b) => $a['date'] <=> $b['date']);
         }
 
+        // The admin's commission on the dealer's sales and renewals
+        // (FeaturePlans), net of refunds, and the latest entries.
+        $commission = null;
+        if ($isDealer) {
+            $rows = \App\Models\PointTransaction::where('point_transactions.userId', $user->id)
+                ->whereNotNull('point_transactions.commissionInr')
+                ->leftJoin('businesses', 'businesses.id', '=', 'point_transactions.businessId')
+                ->orderByDesc('point_transactions.createdAt')
+                ->limit(10)
+                ->get(['point_transactions.*', 'businesses.name as businessName']);
+            $commission = ['owed' => \App\Support\Points::commissionOwed($user->id), 'recent' => $rows];
+        }
+
         return view('pages.dashboard.index', [
             'user' => $user,
             'renewals' => $renewals,
+            'commission' => $commission,
             'isDealer' => $isDealer,
             'canAssignOwner' => $isDealer || $user->role === 'ADMIN',
             'visibleTabs' => $visibleTabs,

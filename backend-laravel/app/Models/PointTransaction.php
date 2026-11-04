@@ -15,13 +15,15 @@ class PointTransaction extends Model
 
     protected $table = 'point_transactions';
 
-    protected $fillable = ['userId', 'type', 'amount', 'balanceAfter', 'note', 'businessId', 'grantedById', 'feature', 'durationMonths'];
+    protected $fillable = ['userId', 'type', 'amount', 'balanceAfter', 'note', 'businessId', 'grantedById', 'feature', 'durationMonths', 'priceInr', 'commissionInr'];
 
     protected function casts(): array
     {
         return [
             'amount' => 'integer',
             'balanceAfter' => 'integer',
+            'priceInr' => 'integer',
+            'commissionInr' => 'integer',
         ];
     }
 

@@ -29,6 +29,8 @@ class PointsController extends Controller
             'featuresRemaining' => intdiv($user->points, Points::PER_FEATURE),
             // What each feature costs and how long it lasts (FeaturePlans).
             'featurePlans' => FeaturePlans::present(),
+            // The admin's commission on the dealer's sales and renewals, net of refunds.
+            'commissionOwed' => Points::commissionOwed($user->id),
             // Net of refunds for features taken away and listings deleted.
             'totalSpent' => Points::totalSpent($user->id),
             // Non-dealers are not charged, so their balance is informational only.
