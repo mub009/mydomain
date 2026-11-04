@@ -133,4 +133,74 @@ class AiReviewTest extends TestCase
             ->assertSee('Your AI review page')->assertSee('/review/spice-garden')->assertSee('data-ai-settings', false)
             ->assertDontSee('Add your <b>Google review link</b>', false);
     }
+
+    public function test_the_business_controls_tone_length_keywords_staff_and_words_to_avoid(): void
+    {
+        $url = "/api/v1/businesses/{$this->business->id}/ai-review";
+        $this->putJson($url, [
+            'tone' => 'professional', 'length' => 'short', 'keywords' => 'kerala food in kochi',
+            'staff' => 'Priya', 'avoid' => 'cheap, waiting', 'emoji' => true,
+        ], $this->auth)->assertOk()
+            ->assertJsonPath('data.tone', 'professional')->assertJsonPath('data.length', 'short')
+            ->assertJsonPath('data.keywords', 'kerala food in kochi')->assertJsonPath('data.staff', 'Priya')
+            ->assertJsonPath('data.avoid', 'cheap, waiting')->assertJsonPath('data.emoji', true)
+            ->assertJsonCount(5, 'data.toneOptions')->assertJsonCount(3, 'data.lengthOptions');
+        $this->putJson($url, ['tone' => 'angry'], $this->auth)->assertStatus(400);
+        $this->putJson($url, ['length' => 'huge'], $this->auth)->assertStatus(400);
+
+        // The AI is told all of it, plus how recent reviews began.
+        config(['services.ai.provider' => 'gemini', 'services.gemini.key' => 'test-key']);
+        \App\Models\AiReviewDraft::create(['businessId' => $this->business->id, 'text' => 'Lovely lunch with the family here, the staff were kind.', 'fingerprint' => 'x']);
+        Http::fake(['generativelanguage.googleapis.com/*' => Http::response(['candidates' => [['content' => ['parts' => [['text' => json_encode(['review' => 'Professional service and a warm welcome from Priya. Good kerala food in kochi.'])]]]]]])]);
+        $this->postJson('/api/v1/ai-review/spice-garden/generate', ['rating' => 5, 'language' => 'en'])->assertOk()->assertJsonPath('data.unique', true);
+        Http::assertSent(function ($request) {
+            $brief = json_encode($request->data());
+
+            return str_contains($brief, 'Search phrase to work in once: kerala food in kochi')
+                && str_contains($brief, 'Words and phrases never to use: cheap, waiting')
+                && str_contains($brief, 'Length: 15 to 35 words')
+                && str_contains($brief, 'Emoji: allowed')
+                && str_contains($brief, 'Recent reviews started like this; start differently: Lovely lunch with the family')
+                && str_contains($brief, 'and professional');
+        });
+    }
+
+    public function test_a_draft_that_repeats_a_recent_review_or_uses_an_avoided_word_is_written_again(): void
+    {
+        config(['services.ai.provider' => 'gemini', 'services.gemini.key' => 'test-key']);
+        $this->business->update(['aiReview' => ['avoid' => 'cheap']]);
+        $old = 'Great food and very friendly staff, I will definitely come back again soon.';
+        \App\Models\AiReviewDraft::create(['businessId' => $this->business->id, 'text' => $old, 'fingerprint' => 'x']);
+        $reply = fn ($text) => ['candidates' => [['content' => ['parts' => [['text' => json_encode(['review' => $text])]]]]]];
+        Http::fake(['generativelanguage.googleapis.com/*' => Http::sequence()
+            ->push($reply($old))                                            // a repeat
+            ->push($reply('Tasty meals and cheap prices, loved it.'))      // uses an avoided word
+            ->push($reply('The Kerala meals were fresh and the welcome was warm. A relaxed lunch we enjoyed.'))]);
+
+        $this->postJson('/api/v1/ai-review/spice-garden/generate', ['rating' => 5, 'language' => 'en'])->assertOk()
+            ->assertJsonPath('data.review', 'The Kerala meals were fresh and the welcome was warm. A relaxed lunch we enjoyed.')
+            ->assertJsonPath('data.unique', true);
+        Http::assertSentCount(3);
+        // The one given out is remembered; a try-out from the dashboard isn't.
+        $this->assertSame(2, \App\Models\AiReviewDraft::where('businessId', $this->business->id)->count());
+        config(['services.ai.provider' => 'builtin']);
+        $this->postJson("/api/v1/businesses/{$this->business->id}/ai-review/sample", ['rating' => 5, 'language' => 'en'], $this->auth)->assertOk();
+        $this->assertSame(2, \App\Models\AiReviewDraft::where('businessId', $this->business->id)->count());
+    }
+
+    public function test_the_built_in_writer_gives_varied_reviews_that_follow_the_settings(): void
+    {
+        $this->business->update(['aiReview' => ['keywords' => 'kerala meals in kochi', 'staff' => 'Priya', 'avoid' => 'recommended']]);
+        $reviews = [];
+        for ($i = 0; $i < 30; $i++) {
+            $reviews[] = $this->postJson('/api/v1/ai-review/spice-garden/generate', ['rating' => 5, 'language' => 'en'])->assertOk()->json('data.review');
+        }
+        // No exact repeats, and every one written avoids the banned word where it could.
+        $this->assertCount(30, array_unique($reviews));
+        $this->assertLessThanOrEqual(3, count(array_filter($reviews, fn ($r) => stripos($r, 'recommended') !== false)));
+        $this->assertGreaterThan(0, count(array_filter($reviews, fn ($r) => str_contains($r, 'kerala meals in kochi'))));
+        $this->assertGreaterThan(0, count(array_filter($reviews, fn ($r) => str_contains($r, 'Priya'))));
+        $this->assertGreaterThan(0.0, \App\Support\AiReview::similarity('a b c d', 'a b c e'));
+        $this->assertSame(1.0, \App\Support\AiReview::similarity('Same text here.', 'same TEXT here!'));
+    }
 }

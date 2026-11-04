@@ -59,7 +59,7 @@
     {{-- What the reviews mention --}}
     <form class="card space-y-4 p-5" data-ai-settings>
       <div>
-        <h3 class="font-bold text-ink-900">What the AI writes about</h3>
+        <h3 class="font-bold text-ink-900">What the AI writes, and how</h3>
         <p class="mt-0.5 text-sm text-ink-500">The AI uses your business name, category, city and services. Add anything else reviews may mention — each review picks one or two, so no two read the same.</p>
       </div>
       <label class="block">
@@ -77,6 +77,46 @@
           @endforeach
         </div>
       </fieldset>
+      <div class="grid gap-4 sm:grid-cols-2">
+        <label class="block">
+          <span class="mb-1 block text-xs font-semibold text-ink-700">Tone</span>
+          <select name="tone" class="input">
+            @foreach ($r['toneOptions'] as $o)
+              <option value="{{ $o['key'] }}" @selected($r['tone'] === $o['key'])>{{ $o['label'] }}</option>
+            @endforeach
+          </select>
+        </label>
+        <label class="block">
+          <span class="mb-1 block text-xs font-semibold text-ink-700">Length</span>
+          <select name="length" class="input">
+            @foreach ($r['lengthOptions'] as $o)
+              <option value="{{ $o['key'] }}" @selected($r['length'] === $o['key'])>{{ $o['label'] }}</option>
+            @endforeach
+          </select>
+        </label>
+        <label class="block">
+          <span class="mb-1 block text-xs font-semibold text-ink-700">Search keywords <span class="font-normal text-ink-400">(optional)</span></span>
+          <input name="keywords" maxlength="300" class="input" value="{{ $r['keywords'] }}" placeholder="e.g. dentist in Dammam, teeth whitening" />
+          <span class="mt-1 block text-[11px] text-ink-500">Separate with commas. Each review works in one of them, naturally.</span>
+        </label>
+        <label class="block">
+          <span class="mb-1 block text-xs font-semibold text-ink-700">Staff names <span class="font-normal text-ink-400">(optional)</span></span>
+          <input name="staff" maxlength="200" class="input" value="{{ $r['staff'] }}" placeholder="e.g. Dr. Anil, Priya" />
+          <span class="mt-1 block text-[11px] text-ink-500">Some reviews thank one of them by name.</span>
+        </label>
+        <label class="block sm:col-span-2">
+          <span class="mb-1 block text-xs font-semibold text-ink-700">Words to avoid <span class="font-normal text-ink-400">(optional)</span></span>
+          <input name="avoid" maxlength="300" class="input" value="{{ $r['avoid'] }}" placeholder="e.g. cheap, waiting, best in town" />
+          <span class="mt-1 block text-[11px] text-ink-500">Separate with commas. A review that uses one is written again.</span>
+        </label>
+      </div>
+      <label class="flex items-center gap-2 text-sm text-ink-700">
+        <input type="checkbox" name="emoji" value="1" class="rounded text-brand-600" @checked($r['emoji']) /> Allow an emoji or two in reviews
+      </label>
+      <p class="flex items-start gap-1.5 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+        <x-icon name="check-circle-2" :size="14" class="mt-0.5 shrink-0" />
+        <span>Every review is unique: each one is checked against the last {{ number_format(min($r['remembered'], 150)) }} reviews written for you, and written again if it reads too much like one of them.</span>
+      </p>
       <div class="flex items-center gap-3">
         <button type="submit" class="btn-primary px-4 py-2 text-sm"><x-icon name="save" :size="15" /> Save</button>
         <span class="text-xs font-semibold text-brand-700" data-saved aria-live="polite"></span>

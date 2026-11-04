@@ -39,6 +39,10 @@ class AiReviewController extends Controller
             'views' => (int) $business->aiReviewViews,
             'copies' => (int) $business->aiReviewCopies,
             'languageOptions' => collect(AiReview::LANGUAGES)->map(fn ($l, $code) => ['code' => $code, 'name' => $l[0], 'native' => $l[1]])->values(),
+            'toneOptions' => collect(AiReview::TONES)->map(fn ($label, $key) => ['key' => $key, 'label' => $label])->values(),
+            'lengthOptions' => collect(AiReview::LENGTHS)->map(fn ($l, $key) => ['key' => $key, 'label' => $l[0]])->values(),
+            // Reviews remembered so new ones read differently.
+            'remembered' => AiReview::draftCount($business),
         ]);
     }
 
@@ -62,7 +66,8 @@ class AiReviewController extends Controller
         $business = $this->managed($request, $id);
         $data = $request->validate(['rating' => ['required', 'integer', 'min:1', 'max:5'], 'language' => ['required', 'string']]);
 
-        return ApiResponse::ok(AiReview::write($business, (int) $data['rating'], $data['language']));
+        // A try-out isn't a customer's review, so it isn't remembered.
+        return ApiResponse::ok(AiReview::write($business, (int) $data['rating'], $data['language'], false));
     }
 
     private function live(string $slug): Business

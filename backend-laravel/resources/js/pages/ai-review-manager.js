@@ -45,7 +45,16 @@ if (root && data) {
     const button = $('button[type="submit"]', form);
     button.disabled = true;
     try {
-      const res = await api.put(base, { highlights: form.highlights.value.trim(), languages });
+      const res = await api.put(base, {
+        highlights: form.highlights.value.trim(),
+        languages,
+        tone: form.tone.value,
+        length: form.length.value,
+        keywords: form.keywords.value.trim(),
+        staff: form.staff.value.trim(),
+        avoid: form.avoid.value.trim(),
+        emoji: form.emoji.checked,
+      });
       // The sample's language list follows what is offered.
       const select = $("[data-sample-language]", root);
       const options = res.data.languageOptions.filter((l) => res.data.languages.includes(l.code));
