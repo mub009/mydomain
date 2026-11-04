@@ -142,11 +142,11 @@
     </div>
     @endunless
 
-    {{-- Card colour, in its own section under the card. On a phone it stays
-         at the bottom of the screen while the card is scrolled, so each tap
-         shows on the card straight away. --}}
+    {{-- Card colour, in its own section under the card. It scrolls with the
+         page — not pinned over the screen, where it covered the action
+         editor's fields on a phone. --}}
     @if ($hasImage)
-      <div class="sticky bottom-2 z-10 rounded-xl bg-white shadow-xl ring-1 ring-black/5 lg:static lg:shadow-sm lg:ring-0">
+      <div class="rounded-xl bg-white shadow-sm">
         @include('pages.dashboard.partials.card-colour', ['thumbAlways' => $card['canEdit']])
       </div>
     @endif
