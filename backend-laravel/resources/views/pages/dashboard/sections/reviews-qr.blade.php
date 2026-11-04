@@ -43,14 +43,17 @@
 
         <div>
           <label class="mb-1 block text-xs font-semibold text-ink-700">Google Place ID</label>
-          <input class="input" name="googlePlaceId" placeholder="ChIJN1t_tDeuEmsRUsoyG83frY4" value="{{ $links['googlePlaceId'] ?? '' }}" />
+          <input class="input" name="googlePlaceId" placeholder="ChIJN1t_tDeuEmsRUsoyG83frY4 — or paste a Google Maps link" value="{{ $links['googlePlaceId'] ?? '' }}" />
           <p class="mt-1 text-[11px] text-ink-400">
             Find it at <a href="https://developers.google.com/maps/documentation/places/web-service/place-id" target="_blank" rel="noreferrer" class="text-brand-600 hover:underline">Google's Place ID finder</a>. We build the “write a review” link from it.
           </p>
         </div>
         <div>
-          <label class="mb-1 block text-xs font-semibold text-ink-700">Google review link (optional override)</label>
-          <input class="input" name="googleReviewUrl" placeholder="https://g.page/r/…/review" value="{{ $links['googleReviewUrl'] ?? '' }}" />
+          <label class="mb-1 block text-xs font-semibold text-ink-700">Google Maps share link or review link</label>
+          <input class="input" name="googleReviewUrl" placeholder="https://maps.app.goo.gl/…" value="{{ $links['googleReviewUrl'] ?? '' }}" />
+          <p class="mt-1 text-[11px] text-ink-400">
+            Easiest: open your business in Google Maps, tap <b>Share</b>, copy the link and paste it here. We find your place and fill in the Place ID for you.
+          </p>
         </div>
         <div>
           <label class="mb-1 block text-xs font-semibold text-ink-700">Instagram username</label>

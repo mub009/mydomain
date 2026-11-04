@@ -7,6 +7,7 @@ use App\Models\Business;
 use App\Models\ReviewScan;
 use App\Support\ApiResponse;
 use App\Support\BusinessAccess;
+use App\Support\GooglePlaceLink;
 use App\Support\ReviewChannels;
 use Illuminate\Http\Request;
 
@@ -76,6 +77,21 @@ class ReviewLinkController extends Controller
             'youtubeUrl' => ['sometimes', 'nullable', 'string', 'max:500'],
             'preferredReviewChannel' => ['sometimes', 'nullable', 'in:'.implode(',', ReviewChannels::ALL)],
         ]);
+
+        // A link pasted into the Place ID box: find the place in it.
+        if (! empty($data['googlePlaceId']) && str_contains($data['googlePlaceId'], '/')) {
+            $data['googlePlaceId'] = GooglePlaceLink::placeId($data['googlePlaceId'])
+                ?? throw ApiException::badRequest('We couldn’t find your place in that link. Paste the Share link from Google Maps (maps.app.goo.gl/…), or the Place ID itself (it starts with ChIJ).');
+        }
+        // A Google Maps share link (the easy one to copy) in the review link box: find the
+        // place, so customers land straight on Google's review box. A link we can't
+        // read is kept as it is: it still opens the business on Google.
+        $reviewUrl = $data['googleReviewUrl'] ?? null;
+        if ($reviewUrl && ! GooglePlaceLink::isDirectReviewLink($reviewUrl) && GooglePlaceLink::looksLikeGoogleLink($reviewUrl)
+            && ($placeId = GooglePlaceLink::placeId($reviewUrl))) {
+            $data['googlePlaceId'] = $placeId;
+            $data['googleReviewUrl'] = null;
+        }
 
         // A preferred channel is only meaningful if that channel is configured.
         $merged = array_merge($business->only([
