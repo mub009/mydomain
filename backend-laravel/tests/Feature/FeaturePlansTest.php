@@ -380,4 +380,35 @@ class FeaturePlansTest extends TestCase
         $this->post('/login', ['email' => $admin->email, 'password' => 'Password123!']);
         $this->get('/admin?tab=Commission')->assertOk()->assertSee('data-commission-charts', false)->assertSee('Commission over time');
     }
+
+    public function test_the_business_owner_sees_their_plan_and_when_features_expire(): void
+    {
+        $this->setPrices(); // Website: 12 months; Gold rate: unlimited.
+        $dealer = $this->dealer(20);
+        $dealer->update(['firstName' => 'Ravi', 'lastName' => 'Dealer']);
+        $owner = $this->user(['role' => 'BUSINESS_OWNER']);
+        $business = $this->business($dealer);
+        $business->update(['ownerId' => $owner->id]);
+        $this->putJson("/api/v1/businesses/{$business->id}/features", ['features' => ['WEBSITE', 'GOLD_RATE']], $this->auth($dealer))->assertOk();
+
+        $this->withoutVite();
+        $this->post('/login', ['email' => $owner->email, 'password' => 'Password123!']);
+        $this->get("/dashboard/businesses/{$business->id}")->assertOk()
+            ->assertSee('Your plan')->assertSee('2 of 5 features active')
+            ->assertSee('Valid until')->assertSee(now()->addMonths(12)->format('j M Y'))
+            ->assertSee('Unlimited')->assertSee('Not included')
+            ->assertDontSee('To renew or add features');
+
+        // A month before the end: expiring soon, with the dealer to contact, and a reminder on the dashboard.
+        $this->travel(11)->months();
+        $this->travel(15)->days();
+        $this->get("/dashboard/businesses/{$business->id}")->assertOk()
+            ->assertSee('Expiring soon')->assertSee('To renew or add features, contact your dealer')->assertSee('Ravi Dealer');
+        $this->get('/dashboard')->assertOk()->assertSee('Features to renew')->assertSee('View plan');
+
+        // Past the end: expired and switched off.
+        $this->travel(1)->months();
+        $this->get("/dashboard/businesses/{$business->id}")->assertOk()
+            ->assertSee('Expired on')->assertSee('Switched off until renewed')->assertSee('1 of 5 features active');
+    }
 }

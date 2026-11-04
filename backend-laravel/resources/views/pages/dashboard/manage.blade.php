@@ -60,6 +60,8 @@
     @include('pages.dashboard.partials.features')
 
     @if (! $section)
+      @include('pages.dashboard.partials.plan')
+
       {{-- The menu: every section as an icon tile. --}}
       <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         @foreach ($sections as $s)

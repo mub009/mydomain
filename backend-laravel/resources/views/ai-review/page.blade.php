@@ -105,7 +105,7 @@
       <span class="label">Your review</span>
       <div class="box loading" data-box>
         <textarea data-review aria-label="Your review — you can change it" placeholder="Your review"></textarea>
-        <div class="busy" aria-live="polite"><span class="spin"></span> WRITING YOUR REVIEW…</div>
+        <div class="busy" aria-live="polite"><span class="spin"></span> <span data-busy-text>WRITING YOUR REVIEW…</span></div>
       </div>
       <div class="row">
         <span>You can edit it before posting.</span>
@@ -157,6 +157,10 @@
       async function write() {
         const mine = ++seq;
         box.classList.add("loading"); again.disabled = true; err.style.display = "none";
+        // While the AI writes: a few steps, so the wait feels like progress.
+        const steps = ["WRITING YOUR REVIEW…", "READING ABOUT THE BUSINESS…", "CHOOSING THE RIGHT WORDS…", "MAKING IT SOUND LIKE YOU…", "ALMOST THERE…"];
+        let step = 0; const busyText = $("[data-busy-text]"); busyText.textContent = steps[0];
+        const ticker = setInterval(() => { step = Math.min(step + 1, steps.length - 1); busyText.textContent = steps[step]; }, 2200);
         try {
           const res = await fetch(`/api/v1/ai-review/${encodeURIComponent(cfg.slug)}/generate`, {
             method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -171,6 +175,7 @@
           err.textContent = `${e.message} You can type your own review, or tap “Write another”.`;
           err.style.display = "block";
         } finally {
+          clearInterval(ticker);
           if (mine === seq) { box.classList.remove("loading"); again.disabled = false; ready(); }
         }
       }

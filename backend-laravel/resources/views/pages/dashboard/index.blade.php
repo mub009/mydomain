@@ -114,7 +114,7 @@
             <span class="min-w-0 text-amber-900"><b>{{ $r['name'] }}</b> · {{ $r['feature'] }}
               <span @class(['text-xs font-semibold', 'text-red-700' => $r['expired'], 'text-amber-700' => ! $r['expired']])>{{ $r['expired'] ? 'expired '.$r['date']->format('j M Y').', switched off' : 'ends '.$r['date']->format('j M Y') }}</span>
             </span>
-            <a href="/dashboard/businesses/{{ $r['id'] }}" class="shrink-0 text-xs font-semibold text-amber-800 underline hover:text-amber-950">Renew</a>
+            <a href="/dashboard/businesses/{{ $r['id'] }}" class="shrink-0 text-xs font-semibold text-amber-800 underline hover:text-amber-950">{{ $isDealer ? 'Renew' : 'View plan' }}</a>
           </li>
         @endforeach
       </ul>

@@ -88,6 +88,10 @@ class AiReview
 
     private const ATTEMPTS = 3;
 
+    // A customer waits for the review: the AI gets this long in all (seconds),
+    // then the built-in writer finishes the job at once.
+    private const TIME_BUDGET = 15;
+
     public static function rules(): array
     {
         return [
@@ -173,6 +177,7 @@ class AiReview
         [, $minWords, $maxWords] = self::LENGTHS[$settings['length']];
 
         $best = null;
+        $started = microtime(true);
         for ($attempt = 0; $attempt < self::ATTEMPTS; $attempt++) {
             $facts = [
                 'name' => $business->name,
@@ -190,7 +195,8 @@ class AiReview
                 // How recent reviews began, so this one starts differently.
                 'avoidOpenings' => array_slice(array_map(fn ($t) => self::opening($t), $recent), 0, 8),
             ];
-            $draft = AiWriter::googleReview($facts, $rating, self::LANGUAGES[$language][0], self::style($settings['tone']));
+            $left = (int) floor(self::TIME_BUDGET - (microtime(true) - $started));
+            $draft = AiWriter::googleReview($facts, $rating, self::LANGUAGES[$language][0], self::style($settings['tone']), min(12, $left));
             $draft['review'] = self::tidy($draft['review'], $settings['emoji']);
 
             $similarity = self::maxSimilarity($draft['review'], $recentShingles);

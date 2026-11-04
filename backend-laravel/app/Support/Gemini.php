@@ -24,7 +24,7 @@ class Gemini
      * @param  array<string, mixed>  $schema  OpenAPI-style schema (types in capitals: OBJECT, STRING, …)
      * @return array<string, mixed>
      */
-    public static function json(string $system, array $turns, array $schema, int $maxTokens = 2048): array
+    public static function json(string $system, array $turns, array $schema, int $maxTokens = 2048, int $timeout = 30): array
     {
         if (! self::configured()) {
             throw new RuntimeException('No Gemini API key is set');
@@ -33,7 +33,7 @@ class Gemini
         $model = config('services.gemini.model');
         $base = rtrim((string) config('services.gemini.base_url'), '/');
         $bundle = config('services.gemini.ca_bundle');
-        $response = Http::timeout(30)
+        $response = Http::timeout($timeout)->connectTimeout(min(5, $timeout))
             ->withOptions($bundle ? ['verify' => $bundle] : [])
             ->withHeaders(['x-goog-api-key' => config('services.gemini.key')])
             ->post("{$base}/v1beta/models/{$model}:generateContent", [

@@ -83,6 +83,17 @@ class DashboardController extends Controller
         return Privileges::has($user->role, $user->privileges, $privilege);
     }
 
+    /** The dealer who set a business up, for its owner to contact; null when that's the viewer or not a dealer. */
+    private static function planContact(?string $creatorId, string $viewerId): ?array
+    {
+        if (! $creatorId || $creatorId === $viewerId) {
+            return null;
+        }
+        $dealer = \App\Models\User::where('id', $creatorId)->where('role', 'DEALER')->first(['firstName', 'lastName', 'phone']);
+
+        return $dealer ? ['name' => trim("{$dealer->firstName} {$dealer->lastName}"), 'phone' => $dealer->phone] : null;
+    }
+
     public function index(Request $request)
     {
         $user = WebAuth::user();
@@ -142,10 +153,12 @@ class DashboardController extends Controller
 
         // Timed features (FeaturePlans) on the dealer's businesses that have
         // run out or end within 30 days, soonest first: what to renew.
+        // A business owner sees the same for their own businesses.
         $renewals = [];
-        if ($isDealer) {
+        if ($isDealer || $user->role === 'BUSINESS_OWNER') {
             $soon = now()->addDays(30);
-            foreach (Business::where('createdById', $user->id)->whereNotNull('featureExpiry')->get(['id', 'name', 'features', 'featureExpiry']) as $b) {
+            $mine = $isDealer ? Business::where('createdById', $user->id) : Business::where('ownerId', $user->id);
+            foreach ($mine->whereNotNull('featureExpiry')->get(['id', 'name', 'features', 'featureExpiry']) as $b) {
                 foreach (BusinessFeatures::of($b) as $f) {
                     $e = BusinessFeatures::expiry($b, $f);
                     if ($e && $e->lte($soon)) {
@@ -299,6 +312,8 @@ class DashboardController extends Controller
             'features' => BusinessFeatures::of($biz),
             'canChangeFeatures' => $canChangeFeatures,
             'dealerPoints' => $canChangeFeatures && $user->role === 'DEALER' ? (int) $user->points : null,
+            // "Your plan": who the business asks to renew or add features.
+            'planContact' => self::planContact($biz['createdById'] ?? null, $user->id),
             ...$data,
         ]);
     }
