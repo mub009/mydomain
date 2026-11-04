@@ -6,6 +6,7 @@ use App\Exceptions\ApiException;
 use App\Models\PointTransaction;
 use App\Models\User;
 use App\Support\ApiResponse;
+use App\Support\FeaturePlans;
 use App\Support\Pagination;
 use App\Support\Points;
 use Illuminate\Http\Request;
@@ -26,6 +27,8 @@ class PointsController extends Controller
             // Each feature given to a business costs this; the listing itself is free.
             'pointsPerFeature' => Points::PER_FEATURE,
             'featuresRemaining' => intdiv($user->points, Points::PER_FEATURE),
+            // What each feature costs and how long it lasts (FeaturePlans).
+            'featurePlans' => FeaturePlans::present(),
             // Net of refunds for features taken away and listings deleted.
             'totalSpent' => Points::totalSpent($user->id),
             // Non-dealers are not charged, so their balance is informational only.

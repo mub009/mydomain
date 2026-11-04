@@ -135,6 +135,8 @@ Route::prefix('businesses')->group(function () {
         Route::post('/{id}/clone', [BusinessController::class, 'duplicate'])->middleware('role:DEALER');
         // Which features (website, visiting card, gold rate) the business has; a point each for dealers.
         Route::put('/{id}/features', [BusinessController::class, 'updateFeatures'])->middleware('role:DEALER,ADMIN');
+        // A timed feature (FeaturePlans): another term for its points.
+        Route::post('/{id}/features/{feature}/renew', [BusinessController::class, 'renewFeature'])->middleware('role:DEALER,ADMIN');
 
         Route::post('/{id}/photos', [BusinessController::class, 'addPhoto']);
         Route::delete('/{id}/photos/{photoId}', [BusinessController::class, 'removePhoto']);
@@ -322,6 +324,9 @@ Route::prefix('admin')->middleware(['auth.jwt', 'role:ADMIN'])->group(function (
 
     Route::get('/classifieds/stats', [ClassifiedStatsController::class, 'overview']);
     // Which business pages are in Google, against the two-day target.
+    // Feature pricing: points and duration per feature (FeaturePlans).
+    Route::get('/feature-plans', [\App\Http\Controllers\FeaturePlanController::class, 'index']);
+    Route::put('/feature-plans', [\App\Http\Controllers\FeaturePlanController::class, 'update']);
     Route::get('/seo', [SeoController::class, 'adminIndex']);
     Route::post('/seo/run', [SeoController::class, 'adminRun'])->middleware('throttle:10,1');
     Route::post('/seo/pages/{id}/submit', [SeoController::class, 'adminSubmit']);

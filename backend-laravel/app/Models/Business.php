@@ -26,7 +26,7 @@ class Business extends Model
         'instagramUsername', 'facebookPageUrl', 'youtubeUrl', 'preferredReviewChannel',
         'logoUrl', 'coverImageUrl', 'isVerified', 'avgRating', 'reviewCount',
         'leadCount', 'viewCount', 'features', 'aiReview', 'aiReviewViews', 'aiReviewCopies',
-        'oneReviewViews', 'oneReviewTaps', 'oneReviewStyle', 'socialLinks',
+        'oneReviewViews', 'oneReviewTaps', 'oneReviewStyle', 'socialLinks', 'featureExpiry',
     ];
 
     protected function casts(): array
@@ -47,6 +47,8 @@ class Business extends Model
             'oneReviewViews' => 'integer',
             'oneReviewTaps' => 'array',
             'socialLinks' => 'array',
+            // App\Support\FeaturePlans: { FEATURE: end date } for timed features.
+            'featureExpiry' => 'array',
         ];
     }
 

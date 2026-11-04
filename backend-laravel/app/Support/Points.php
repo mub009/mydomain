@@ -18,12 +18,13 @@ class Points
 
     // Every type a dealer's spending on a business is recorded under; their
     // sum (negated) is what the dealer has paid for it, net of refunds.
-    private const SPENDING_TYPES = ['BUSINESS_CREATED', 'FEATURE_ADDED', 'FEATURE_REMOVED'];
+    private const SPENDING_TYPES = ['BUSINESS_CREATED', 'FEATURE_ADDED', 'FEATURE_REMOVED', 'FEATURE_RENEWED'];
 
-    /** Up front, before anything is created: whether the dealer can pay for $count features. */
-    public static function assertCanAfford(array $actor, int $count): void
+    /** Up front, before anything is created: whether the dealer can pay for these features (FeaturePlans). */
+    public static function assertCanAfford(array $actor, array $features): void
     {
-        if ($actor['role'] !== 'DEALER' || $count <= 0) {
+        $cost = FeaturePlans::cost($features);
+        if ($actor['role'] !== 'DEALER' || $cost <= 0) {
             return;
         }
 
@@ -31,38 +32,57 @@ class Points
         if (! $dealer) {
             throw ApiException::notFound('User not found');
         }
-        if ($dealer->points < $count * self::PER_FEATURE) {
+        if ($dealer->points < $cost) {
             throw ApiException::forbidden(self::OUT_OF_POINTS_MESSAGE);
         }
     }
 
-    // A point for giving a business a feature. Must run inside the caller's
-    // transaction so the change and the debit commit together.
-    public static function spendForFeature(array $actor, string $businessId, string $feature): void
+    // Gives a business a feature, or renews one: a dealer pays the feature's
+    // points (FeaturePlans) and a timed feature runs for its months, from
+    // its current end date when renewed early, else from today. An admin
+    // pays nothing; a feature an admin adds is unlimited. Must run inside
+    // the caller's transaction so the change and the debit commit together.
+    // Returns the points charged.
+    public static function buyFeature(array $actor, Business $business, string $feature, bool $renewal = false): int
     {
-        if ($actor['role'] !== 'DEALER') {
-            return;
+        $isDealer = $actor['role'] === 'DEALER';
+        $cost = $isDealer ? FeaturePlans::points($feature) : 0;
+        $months = FeaturePlans::months($feature);
+
+        if ($isDealer && $cost > 0) {
+            $dealer = User::where('id', $actor['sub'])->lockForUpdate()->first();
+            if (! $dealer) {
+                throw ApiException::notFound('User not found');
+            }
+            if ($dealer->points < $cost) {
+                throw ApiException::forbidden(self::OUT_OF_POINTS_MESSAGE);
+            }
+            $dealer->decrement('points', $cost);
+
+            $label = BusinessFeatures::LABELS[$feature] ?? $feature;
+            PointTransaction::create([
+                'userId' => $actor['sub'],
+                'type' => $renewal ? 'FEATURE_RENEWED' : 'FEATURE_ADDED',
+                'amount' => -$cost,
+                'balanceAfter' => $dealer->points,
+                'businessId' => $business->id,
+                'feature' => $feature,
+                'durationMonths' => $months,
+                'note' => $label.($renewal ? ' renewed' : '').($months ? ' · '.FeaturePlans::durationLabel($months) : '')." for “{$business->name}”",
+            ]);
         }
 
-        $dealer = User::where('id', $actor['sub'])->lockForUpdate()->first();
-        if (! $dealer) {
-            throw ApiException::notFound('User not found');
+        $expiry = is_array($business->featureExpiry) ? $business->featureExpiry : [];
+        if ($months && ($isDealer || $renewal)) {
+            $current = BusinessFeatures::expiry($business, $feature);
+            $from = $renewal && $current && $current->isFuture() ? $current : now();
+            $expiry[$feature] = $from->copy()->addMonthsNoOverflow($months)->toIso8601String();
+        } else {
+            unset($expiry[$feature]);
         }
-        if ($dealer->points < self::PER_FEATURE) {
-            throw ApiException::forbidden(self::OUT_OF_POINTS_MESSAGE);
-        }
+        $business->forceFill(['featureExpiry' => $expiry ?: null])->save();
 
-        $dealer->decrement('points', self::PER_FEATURE);
-
-        PointTransaction::create([
-            'userId' => $actor['sub'],
-            'type' => 'FEATURE_ADDED',
-            'amount' => -self::PER_FEATURE,
-            'balanceAfter' => $dealer->points,
-            'businessId' => $businessId,
-            'feature' => $feature,
-            'note' => BusinessFeatures::LABELS[$feature] ?? $feature,
-        ]);
+        return $cost;
     }
 
     // Taking a feature away returns what the dealer paid for it, if anything
@@ -78,6 +98,8 @@ class Points
             ->where('businessId', $business->id)
             ->where('feature', $feature)
             ->whereIn('type', ['FEATURE_ADDED', 'FEATURE_REMOVED'])
+            // A timed purchase (FeaturePlans) is never refunded.
+            ->whereNull('durationMonths')
             ->sum('amount');
         $dealer = User::where('id', $actor['sub'])->lockForUpdate()->first();
         if ($paid <= 0 || ! $dealer) {
@@ -113,6 +135,8 @@ class Points
         $paid = (int) -PointTransaction::where('userId', $actor['sub'])
             ->where('businessId', $business->id)
             ->whereIn('type', self::SPENDING_TYPES)
+            // Timed purchases and renewals (FeaturePlans) are never refunded.
+            ->whereNull('durationMonths')
             ->sum('amount');
         $dealer = User::where('id', $actor['sub'])->lockForUpdate()->first();
         if ($paid <= 0 || ! $dealer) {

@@ -4,9 +4,10 @@ namespace App\Support;
 
 use App\Exceptions\ApiException;
 use App\Models\Business;
+use Illuminate\Support\Carbon;
 
 // What a business gets beyond its listing — chosen by the dealer who sets it
-// up, a point each (Points::spendForFeature): its own website on a
+// up, for the admin's price in points (FeaturePlans, Points::buyFeature): its own website on a
 // subdomain, the digital visiting card, gold-rate posters, and AI-written
 // Google reviews for its customers. A business
 // sees and uses only the features it has.
@@ -69,9 +70,30 @@ class BusinessFeatures
         return $raw === null ? self::ALL : self::clean($raw);
     }
 
+    /** Whether the business has the feature and it hasn't run out (FeaturePlans). */
     public static function has(Business|array $business, string $feature): bool
     {
-        return in_array($feature, self::of($business), true);
+        if (! in_array($feature, self::of($business), true)) {
+            return false;
+        }
+        $expiry = self::expiry($business, $feature);
+
+        return $expiry === null || $expiry->isFuture();
+    }
+
+    /** A timed feature's end date; null for an unlimited one. */
+    public static function expiry(Business|array $business, string $feature): ?Carbon
+    {
+        $raw = $business instanceof Business ? $business->featureExpiry : ($business['featureExpiry'] ?? null);
+        $date = is_array($raw) ? ($raw[$feature] ?? null) : null;
+
+        return $date ? Carbon::parse($date) : null;
+    }
+
+    /** Listed but past its end date: switched off until the dealer renews it. */
+    public static function expired(Business|array $business, string $feature): bool
+    {
+        return in_array($feature, self::of($business), true) && ! self::has($business, $feature);
     }
 
     public static function assert(Business $business, string $feature): void

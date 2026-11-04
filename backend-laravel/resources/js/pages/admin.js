@@ -594,3 +594,27 @@ $$("[data-seo-submit]").forEach((button) =>
     seoAction(button, "Sending…", () => api.post(`/admin/seo/pages/${button.dataset.seoSubmit}/submit`), () => "Sent to Google — it usually crawls within a day or two."),
   ),
 );
+
+// --- Feature pricing ------------------------------------------------------------
+$("[data-feature-plans]")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const form = e.currentTarget;
+  const saved = $("[data-plans-saved]", form);
+  const button = $('button[type="submit"]', form);
+  const plans = $$("[data-plan]", form).map((row) => ({
+    feature: row.dataset.plan,
+    points: Number($('[name="points"]', row).value),
+    months: $('[name="months"]', row).value === "" ? null : Number($('[name="months"]', row).value),
+  }));
+  showError(errorBox, "");
+  saved.textContent = "";
+  button.disabled = true;
+  try {
+    await api.put("/admin/feature-plans", { plans });
+    saved.textContent = "Pricing saved.";
+  } catch (err) {
+    fail(err);
+  } finally {
+    button.disabled = false;
+  }
+});

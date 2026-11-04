@@ -212,7 +212,7 @@ class BusinessController extends Controller
 
         // Dealers spend a point per feature — check up front so we never
         // create an owner account and then reject the request.
-        Points::assertCanAfford($actor, count($features ?? []));
+        Points::assertCanAfford($actor, $features ?? []);
 
         // Plain owners always own their listings. Dealers and admins may
         // instead supply a login for the business's own team; the listing is
@@ -229,7 +229,7 @@ class BusinessController extends Controller
                 ]);
                 BusinessHours::createDefaultsFor($business->id);
                 foreach ($features ?? [] as $feature) {
-                    Points::spendForFeature($actor, $business->id, $feature);
+                    Points::buyFeature($actor, $business, $feature);
                 }
 
                 return $business;
@@ -254,7 +254,7 @@ class BusinessController extends Controller
             BusinessHours::createDefaultsFor($business->id);
 
             foreach ($features ?? [] as $feature) {
-                Points::spendForFeature($actor, $business->id, $feature);
+                Points::buyFeature($actor, $business, $feature);
             }
 
             return [$business, $this->ownerAccountPayload($ownerRecord, $login)];
@@ -435,27 +435,71 @@ class BusinessController extends Controller
         $after = BusinessFeatures::clean($data['features']);
         $added = array_values(array_diff($after, $before));
         $removed = array_values(array_diff($before, $after));
-        Points::assertCanAfford($actor, count($added));
 
-        $refunded = DB::transaction(function () use ($actor, $business, $after, $added, $removed) {
+        // A timed feature that's paid for runs to its end date: a dealer
+        // can't switch it off early, as it isn't refunded (FeaturePlans).
+        if ($actor['role'] === 'DEALER') {
+            foreach ($removed as $feature) {
+                $expiry = BusinessFeatures::expiry($business, $feature);
+                if ($expiry && $expiry->isFuture()) {
+                    throw ApiException::badRequest(BusinessFeatures::LABELS[$feature].' is paid until '.$expiry->format('j M Y').'. It switches off by itself then unless you renew it.');
+                }
+            }
+        }
+        Points::assertCanAfford($actor, $added);
+
+        [$spent, $refunded] = DB::transaction(function () use ($actor, $business, $after, $added, $removed) {
             $refunded = 0;
             foreach ($removed as $feature) {
                 $refunded += Points::refundFeature($actor, $business, $feature);
             }
+            $expiry = array_diff_key(is_array($business->featureExpiry) ? $business->featureExpiry : [], array_flip($removed));
+            $business->forceFill(['featureExpiry' => $expiry ?: null]);
+            $spent = 0;
             foreach ($added as $feature) {
-                Points::spendForFeature($actor, $business->id, $feature);
+                $spent += Points::buyFeature($actor, $business, $feature);
             }
             $business->update(['features' => $after]);
 
-            return $refunded;
+            return [$spent, $refunded];
         });
 
         return ApiResponse::ok([
             'features' => $after,
             'added' => $added,
             'removed' => $removed,
-            'spentPoints' => $actor['role'] === 'DEALER' ? count($added) * Points::PER_FEATURE : 0,
+            'spentPoints' => $spent,
             'refundedPoints' => $refunded,
+            'featureExpiry' => $business->fresh()->featureExpiry,
+        ]);
+    }
+
+    // Renews a timed feature (FeaturePlans): the dealer pays its points again
+    // and it runs for another term, from its end date if that's still ahead.
+    // An expired feature comes back on. Admins renew for free.
+    public function renewFeature(Request $request, string $id, string $feature)
+    {
+        $actor = $request->attributes->get('auth');
+        $business = $this->findOrFail($id);
+        $canChange = $actor['role'] === 'ADMIN' || ($actor['role'] === 'DEALER' && $business->createdById === $actor['sub']);
+        if (! $canChange) {
+            throw ApiException::forbidden('Only the dealer who set up this business, or an admin, can renew its features');
+        }
+        if (! in_array($feature, BusinessFeatures::of($business), true)) {
+            throw ApiException::badRequest('This business does not have that feature');
+        }
+        if (! BusinessFeatures::expiry($business, $feature)) {
+            throw ApiException::badRequest(BusinessFeatures::LABELS[$feature].' has no end date, so there is nothing to renew');
+        }
+        Points::assertCanAfford($actor, [$feature]);
+
+        $spent = DB::transaction(fn () => Points::buyFeature($actor, $business, $feature, true));
+        $expiry = BusinessFeatures::expiry($business->fresh(), $feature);
+
+        return ApiResponse::ok([
+            'feature' => $feature,
+            'expiresAt' => $expiry?->toIso8601String(),
+            'spentPoints' => $spent,
         ]);
     }
 
@@ -481,7 +525,7 @@ class BusinessController extends Controller
         // The dealer names the copy; without a name it is marked as a copy.
         $name = mb_strlen($name) >= 2 ? $name : mb_substr($source->name, 0, 143).' (Copy)';
         $features = BusinessFeatures::of($source);
-        Points::assertCanAfford($actor, count($features));
+        Points::assertCanAfford($actor, $features);
         $login = $this->checkOwnerLogin($owner);
 
         return DB::transaction(function () use ($actor, $source, $login, $features, $name) {
@@ -528,7 +572,7 @@ class BusinessController extends Controller
             }
 
             foreach ($features as $feature) {
-                Points::spendForFeature($actor, $copy->id, $feature);
+                Points::buyFeature($actor, $copy, $feature);
             }
 
             return ApiResponse::created([...$copy->toArray(), 'ownerAccount' => $this->ownerAccountPayload($ownerRecord, $login)]);
