@@ -26,7 +26,14 @@
       <div class="flex flex-wrap items-center gap-2">
         @if ($canChangeFeatures)
           {{-- Opens the "Features for this business" panel below the header. --}}
+          @php
+              // Timed features past, or within 30 days of, their end date (FeaturePlans).
+              $renewDue = collect($features)->filter(fn ($f) => ($e = \App\Support\BusinessFeatures::expiry($biz, $f)) && $e->lte(now()->addDays(30)))->count();
+          @endphp
           <button type="button" data-features-toggle aria-expanded="false" class="btn-secondary px-3 py-2 text-sm"><x-icon name="sliders-horizontal" :size="15" /> Features
+            @if ($renewDue)
+              <span class="rounded-md bg-red-50 px-1.5 text-xs font-semibold text-red-700">{{ $renewDue }} to renew</span>
+            @endif
             @if ($dealerPoints !== null)
               <span class="rounded-md bg-amber-50 px-1.5 text-xs font-semibold text-amber-700">{{ $dealerPoints }} pts</span>
             @endif

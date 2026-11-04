@@ -86,6 +86,26 @@
     <div class="card p-8 text-center text-sm text-ink-500">Your account doesn’t have any features enabled yet. Please contact your administrator to grant access.</div>
   @endif
 
+  @if (! empty($renewals))
+    {{-- Timed features to renew (App\Support\FeaturePlans). --}}
+    <div class="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+      <p class="flex items-center gap-1.5 text-sm font-bold text-amber-900"><x-icon name="refresh-cw" :size="15" /> Features to renew</p>
+      <ul class="mt-2 space-y-1.5">
+        @foreach (array_slice($renewals, 0, 8) as $r)
+          <li class="flex flex-wrap items-center justify-between gap-2 text-sm">
+            <span class="min-w-0 text-amber-900"><b>{{ $r['name'] }}</b> · {{ $r['feature'] }}
+              <span @class(['text-xs font-semibold', 'text-red-700' => $r['expired'], 'text-amber-700' => ! $r['expired']])>{{ $r['expired'] ? 'expired '.$r['date']->format('j M Y').', switched off' : 'ends '.$r['date']->format('j M Y') }}</span>
+            </span>
+            <a href="/dashboard/businesses/{{ $r['id'] }}" class="shrink-0 text-xs font-semibold text-amber-800 underline hover:text-amber-950">Renew</a>
+          </li>
+        @endforeach
+      </ul>
+      @if (count($renewals) > 8)
+        <p class="mt-1.5 text-xs text-amber-700">And {{ count($renewals) - 8 }} more.</p>
+      @endif
+    </div>
+  @endif
+
   @if ($tab === 'businesses')
     <p class="mb-4 rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-700" data-flash hidden></p>
     <div data-owner-creds></div>

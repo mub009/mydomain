@@ -50,15 +50,16 @@ const hasFeature = (key) => !featuresPicker || pickedFeatures().includes(key);
 function syncFeatures() {
   const cost = featuresPicker ? $("[data-features-cost]", featuresPicker) : null;
   if (cost) {
-    const n = pickedFeatures().length;
+    // Each feature's price comes from the admin's pricing (FeaturePlans).
+    const n = featureBoxes.filter((b) => b.checked).reduce((sum, b) => sum + Number(b.dataset.cost || 0), 0);
     const points = Number(featuresPicker.dataset.points || 0);
     const short = n > points;
     cost.classList.toggle("text-red-700", short);
     cost.classList.toggle("text-amber-700", !short);
-    $("span", cost).textContent = !n
+    $("span", cost).textContent = !pickedFeatures().length
       ? "No features picked — the listing is free."
       : short
-        ? `These ${n} features need ${n} points.`
+        ? `These features need ${n} points.`
         : `This uses ${n} point${n === 1 ? "" : "s"}.`;
   }
   // The card designs only matter when the business gets the visiting card.

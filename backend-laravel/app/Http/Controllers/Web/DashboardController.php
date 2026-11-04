@@ -138,8 +138,25 @@ class DashboardController extends Controller
             $list = InternalApi::tryCall($action, ['page' => $bizPage], ['businessId' => $selectedId], true);
         }
 
+        // Timed features (FeaturePlans) on the dealer's businesses that have
+        // run out or end within 30 days, soonest first: what to renew.
+        $renewals = [];
+        if ($isDealer) {
+            $soon = now()->addDays(30);
+            foreach (Business::where('createdById', $user->id)->whereNotNull('featureExpiry')->get(['id', 'name', 'features', 'featureExpiry']) as $b) {
+                foreach (BusinessFeatures::of($b) as $f) {
+                    $e = BusinessFeatures::expiry($b, $f);
+                    if ($e && $e->lte($soon)) {
+                        $renewals[] = ['id' => $b->id, 'name' => $b->name, 'feature' => BusinessFeatures::LABELS[$f], 'date' => $e, 'expired' => ! $e->isFuture()];
+                    }
+                }
+            }
+            usort($renewals, fn ($a, $b) => $a['date'] <=> $b['date']);
+        }
+
         return view('pages.dashboard.index', [
             'user' => $user,
+            'renewals' => $renewals,
             'isDealer' => $isDealer,
             'canAssignOwner' => $isDealer || $user->role === 'ADMIN',
             'visibleTabs' => $visibleTabs,

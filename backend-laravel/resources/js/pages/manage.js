@@ -754,23 +754,53 @@ if (featuresPanel) {
   const before = new Set(boxes.filter((b) => b.checked).map((b) => b.value));
   const chosen = () => boxes.filter((b) => b.checked).map((b) => b.value);
 
+  // Each feature's price comes from the admin's pricing (FeaturePlans).
+  const costOf = (key) => Number(boxes.find((b) => b.value === key)?.dataset.cost || 0);
+  const pts = (n) => `${n} point${n === 1 ? "" : "s"}`;
+
   const refresh = () => {
     const now = new Set(chosen());
-    const added = [...now].filter((f) => !before.has(f)).length;
-    const removed = [...before].filter((f) => !now.has(f)).length;
-    const changed = added + removed > 0;
-    const short = charged && added > balance;
+    const added = [...now].filter((f) => !before.has(f));
+    const removed = [...before].filter((f) => !now.has(f));
+    const cost = added.reduce((sum, f) => sum + costOf(f), 0);
+    const changed = added.length + removed.length > 0;
+    const short = charged && cost > balance;
+    const timedAdded = added.some((f) => boxes.find((b) => b.value === f)?.dataset.timed === "1");
     saveFeatures.disabled = !changed || short;
     summary.classList.toggle("text-red-700", short);
     summary.textContent = !changed
       ? ""
       : short
-        ? `You need ${added} points but have ${balance}. Ask the admin to add more.`
+        ? `You need ${pts(cost)} but have ${balance}. Ask the admin to add more.`
         : charged
-          ? `${[added && `Uses ${added} point${added === 1 ? "" : "s"}`, removed && `returns up to ${removed}`].filter(Boolean).join(", ")}.`
+          ? `${[cost && `Uses ${pts(cost)}`, removed.length && "unlimited features give their points back"].filter(Boolean).join("; ")}${
+              timedAdded ? ". Features with an end date need renewing and aren't refunded" : ""
+            }.`
           : "Unsaved changes.";
   };
   boxes.forEach((b) => b.addEventListener("change", refresh));
+
+  // Renew a timed feature: another term for its points.
+  $$("[data-renew-feature]", featuresPanel).forEach((button) =>
+    button.addEventListener("click", async () => {
+      const cost = Number(button.dataset.renewCost || 0);
+      if (charged && cost > balance) {
+        return showError(errorBox, `Renewing ${button.dataset.renewLabel} needs ${pts(cost)} but you have ${balance}. Ask the admin to add more.`);
+      }
+      showError(errorBox, "");
+      button.disabled = true;
+      try {
+        const { data } = await api.post(`${base}/features/${button.dataset.renewFeature}/renew`);
+        const until = data.expiresAt ? new Date(data.expiresAt).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : null;
+        reloadWithFlash(
+          `${button.dataset.renewLabel} renewed${until ? ` until ${until}` : ""}${data.spentPoints ? ` — ${pts(data.spentPoints)} used` : ""}.`,
+        );
+      } catch (err) {
+        fail(err);
+        button.disabled = false;
+      }
+    }),
+  );
 
   saveFeatures.addEventListener("click", async () => {
     showError(errorBox, "");
