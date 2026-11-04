@@ -26,6 +26,7 @@ class CommissionController extends Controller
             'sales' => $sales,
             'salesMeta' => ['page' => $pagination['page'], 'pageSize' => $pagination['pageSize'], 'total' => $total, 'totalPages' => (int) max(1, ceil($total / max(1, $pagination['pageSize'])))],
             'payments' => Commission::payments($dealerId),
+            'timeline' => Commission::timeline($dealerId),
         ]);
     }
 
@@ -110,6 +111,7 @@ class CommissionController extends Controller
             'dealers' => $dealers,
             'meta' => ['page' => $pagination['page'], 'pageSize' => $pagination['pageSize'], 'total' => $total, 'totalPages' => (int) max(1, ceil($total / max(1, $pagination['pageSize'])))],
             'recentPayments' => $recent,
+            'timeline' => Commission::timeline(),
         ]);
     }
 

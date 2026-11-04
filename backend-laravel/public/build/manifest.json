@@ -29,6 +29,13 @@
       "__commonjsHelpers-CqkleIqs.js"
     ]
   },
+  "_commission-charts-B4yi6lxM.js": {
+    "file": "assets/commission-charts-B4yi6lxM.js",
+    "name": "commission-charts",
+    "imports": [
+      "_ui-DIxCFilW.js"
+    ]
+  },
   "_gold-rate-render-BFglOME5.js": {
     "file": "assets/gold-rate-render-BFglOME5.js",
     "name": "gold-rate-render",
@@ -82,7 +89,7 @@
     ]
   },
   "resources/css/app.css": {
-    "file": "assets/app-DOpkVDbI.css",
+    "file": "assets/app-BmLBedAj.css",
     "src": "resources/css/app.css",
     "isEntry": true
   },
@@ -102,12 +109,13 @@
     ]
   },
   "resources/js/pages/admin.js": {
-    "file": "assets/admin-CmKWBrTa.js",
+    "file": "assets/admin-B5z8gmab.js",
     "name": "admin",
     "src": "resources/js/pages/admin.js",
     "isEntry": true,
     "imports": [
       "_api-3HrlSN3j.js",
+      "_commission-charts-B4yi6lxM.js",
       "_channels-CvUWVcU_.js",
       "_ui-DIxCFilW.js",
       "_searchable-select-Ci9s0_RU.js",
@@ -201,12 +209,13 @@
     ]
   },
   "resources/js/pages/dashboard.js": {
-    "file": "assets/dashboard-r6Vaxv1Z.js",
+    "file": "assets/dashboard-C4nzFvdX.js",
     "name": "dashboard",
     "src": "resources/js/pages/dashboard.js",
     "isEntry": true,
     "imports": [
       "_api-3HrlSN3j.js",
+      "_commission-charts-B4yi6lxM.js",
       "_ui-DIxCFilW.js",
       "_widgets-DR4AA6UJ.js",
       "_channels-CvUWVcU_.js",

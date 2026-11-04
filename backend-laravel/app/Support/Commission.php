@@ -39,6 +39,63 @@ class Commission
         ];
     }
 
+    /**
+     * For the charts: collected, commission and commission received per day
+     * (last 30 days), per week (last 12, Monday to Sunday) and per month
+     * (last 12). For one dealer, or every dealer when null. Net of refunds,
+     * so a period can dip below zero.
+     *
+     * @return array<string, array<int, array{key: string, label: string, title: string, collected: int, commission: int, received: int}>>
+     */
+    public static function timeline(?string $dealerId = null): array
+    {
+        $now = now();
+        $since = $now->copy()->subMonthsNoOverflow(11)->startOfMonth();
+        $dealers = User::where('role', 'DEALER')->select('id');
+
+        $sales = PointTransaction::whereIn('type', self::SALE_TYPES)->where('createdAt', '>=', $since)
+            ->when($dealerId, fn ($q) => $q->where('userId', $dealerId), fn ($q) => $q->whereIn('userId', $dealers))
+            ->get(['createdAt', 'priceInr', 'commissionInr']);
+        $payments = CommissionPayment::where('paidOn', '>=', $since->toDateString())
+            ->when($dealerId, fn ($q) => $q->where('dealerId', $dealerId), fn ($q) => $q->whereIn('dealerId', $dealers))
+            ->get(['paidOn', 'amountInr']);
+
+        $periods = [
+            // [how many, Carbon unit, start of a bucket, key format, short label, full label]
+            'daily' => [30, 'Days', fn ($d) => $d->copy()->startOfDay(), 'Y-m-d', 'j M', 'D, j M Y'],
+            'weekly' => [12, 'Weeks', fn ($d) => $d->copy()->startOfWeek(), 'o-W', 'j M', '\W\e\e\k \o\f j M Y'],
+            'monthly' => [12, 'MonthsNoOverflow', fn ($d) => $d->copy()->startOfMonth(), 'Y-m', 'M', 'F Y'],
+        ];
+        $out = [];
+        foreach ($periods as $name => [$count, $step, $start, $format, $short, $full]) {
+            $buckets = [];
+            $cursor = $start($now)->{'sub'.$step}($count - 1);
+            for ($i = 0; $i < $count; $i++) {
+                $buckets[$cursor->format($format)] = [
+                    'key' => $cursor->format($format), 'label' => $cursor->format($short), 'title' => $cursor->format($full),
+                    'collected' => 0, 'commission' => 0, 'received' => 0,
+                ];
+                $cursor = $cursor->copy()->{'add'.$step}(1);
+            }
+            foreach ($sales as $t) {
+                $key = $start(\Illuminate\Support\Carbon::parse($t->createdAt))->format($format);
+                if (isset($buckets[$key])) {
+                    $buckets[$key]['collected'] += (int) $t->priceInr;
+                    $buckets[$key]['commission'] += (int) $t->commissionInr;
+                }
+            }
+            foreach ($payments as $p) {
+                $key = $start(\Illuminate\Support\Carbon::parse($p->paidOn))->format($format);
+                if (isset($buckets[$key])) {
+                    $buckets[$key]['received'] += (int) $p->amountInr;
+                }
+            }
+            $out[$name] = array_values($buckets);
+        }
+
+        return $out;
+    }
+
     /** Sales, renewals and refunds that carry a price or commission, newest first. */
     public static function sales(string $dealerId, array $pagination): array
     {

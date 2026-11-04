@@ -34,6 +34,8 @@
       </div>
     </div>
 
+    @include('pages.partials.commission-charts', ['timeline' => $r['timeline'], 'collectedTitle' => 'Collected by you'])
+
     <div class="grid gap-4 lg:grid-cols-[1fr_20rem]">
       <div class="card overflow-hidden">
         <div class="border-b border-gray-100 px-5 py-3">

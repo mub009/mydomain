@@ -1,4 +1,5 @@
 import { api, errorMessage } from "../lib/api";
+import { initCommissionCharts } from "../lib/commission-charts";
 import { boardHeadline, boardUrl, downloadDataUrl, renderQrDataUrl } from "../lib/channels";
 import { icon } from "../lib/icons";
 import { initSearchableSelects } from "../lib/searchable-select";
@@ -851,3 +852,6 @@ $$("[data-commission]").forEach((button) =>
     load();
   }),
 );
+
+// Commission charts (Commission tab).
+initCommissionCharts();

@@ -36,6 +36,8 @@
       </div>
     </div>
 
+    @include('pages.partials.commission-charts', ['timeline' => $c['timeline'], 'chartTitle' => 'Commission over time — all dealers', 'collectedTitle' => 'Collected by dealers'])
+
     <form method="GET" class="flex flex-col gap-3 sm:flex-row" data-filter-form>
       <input type="hidden" name="tab" value="Commission" />
       <div class="flex flex-1 items-center gap-2 rounded-lg border border-gray-300 bg-white px-3">

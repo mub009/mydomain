@@ -341,4 +341,43 @@ class FeaturePlansTest extends TestCase
         $this->post('/login', ['email' => $admin->email, 'password' => 'Password123!']);
         $this->get('/admin?tab=Commission')->assertOk()->assertSee('Due from dealers')->assertSee('Anil')->assertSee('Record payment')->assertSee('Latest payments received');
     }
+
+    public function test_the_commission_charts_bucket_by_day_week_and_month(): void
+    {
+        $this->travelTo(\Illuminate\Support\Carbon::parse('2026-11-04 10:00'));
+        $this->setPrices();
+        $admin = $this->user(['role' => 'ADMIN']);
+        $dealer = $this->dealer(20);
+        // Website (Rs 1,500 / Rs 300) two months ago; Gold rate (Rs 800 / Rs 100) today, and Rs 250 paid today.
+        $this->travelTo(\Illuminate\Support\Carbon::parse('2026-09-10 10:00'));
+        $this->putJson('/api/v1/businesses/'.$this->business($dealer)->id.'/features', ['features' => ['WEBSITE']], $this->auth($dealer))->assertOk();
+        $this->travelTo(\Illuminate\Support\Carbon::parse('2026-11-04 10:00'));
+        $this->putJson('/api/v1/businesses/'.$this->business($dealer)->id.'/features', ['features' => ['GOLD_RATE']], $this->auth($dealer))->assertOk();
+        $this->postJson("/api/v1/admin/users/{$dealer->id}/commission-payments", ['amount' => 250], $this->auth($admin))->assertCreated();
+
+        $t = \App\Support\Commission::timeline($dealer->id);
+        $this->assertCount(30, $t['daily']);
+        $this->assertCount(12, $t['weekly']);
+        $this->assertCount(12, $t['monthly']);
+
+        $today = end($t['daily']);
+        $this->assertSame(['2026-11-04', 800, 100, 250], [$today['key'], $today['collected'], $today['commission'], $today['received']]);
+        // September is outside the 30 days.
+        $this->assertSame(800, array_sum(array_column($t['daily'], 'collected')));
+
+        $months = collect($t['monthly'])->keyBy('key');
+        $this->assertSame('2025-12', $t['monthly'][0]['key']);
+        $this->assertSame(1500, $months['2026-09']['collected']);
+        $this->assertSame(300, $months['2026-09']['commission']);
+        $this->assertSame(250, $months['2026-11']['received']);
+        $this->assertSame('November 2026', $months['2026-11']['title']);
+
+        // All dealers together on the admin report; the dealer's own on theirs.
+        $this->getJson('/api/v1/admin/commission', $this->auth($admin))->assertOk()->assertJsonCount(12, 'data.timeline.monthly');
+        $this->getJson('/api/v1/points/commission', $this->auth($dealer))->assertOk()->assertJsonPath('data.timeline.monthly.11.commission', 100);
+
+        $this->withoutVite();
+        $this->post('/login', ['email' => $admin->email, 'password' => 'Password123!']);
+        $this->get('/admin?tab=Commission')->assertOk()->assertSee('data-commission-charts', false)->assertSee('Commission over time');
+    }
 }

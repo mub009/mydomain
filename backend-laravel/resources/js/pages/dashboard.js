@@ -1,4 +1,5 @@
 import { api, errorMessage } from "../lib/api";
+import { initCommissionCharts } from "../lib/commission-charts";
 import { icon } from "../lib/icons";
 import { $, $$, esc } from "../lib/ui";
 import { copyField, initCloneButtons, initLiveSearch, resetPasswordModal, showFlash, statusBadgeClass, whatsappShareButton } from "../lib/widgets";
@@ -62,3 +63,6 @@ $$("[data-status-update]").forEach((select) => {
     }
   });
 });
+
+// Commission charts (Commission tab).
+initCommissionCharts();
