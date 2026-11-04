@@ -275,7 +275,11 @@ export function initCloneButtons() {
         `<form class="space-y-3" data-clone-form>
           <div>
             <p class="text-sm text-ink-700">Make a copy of <strong>${esc(business.name)}</strong>.</p>
-            <p class="mt-1 text-xs text-ink-500">The copy gets its details, hours, services, photos, slider, gallery, products and website, starts as a draft named “${esc(business.name)} (Copy)” and uses 1 point. Reviews, leads, bookings, orders and QR boards stay with the original.</p>
+            <p class="mt-1 text-xs text-ink-500">The copy gets its details, hours, services, photos, slider, gallery, products and website, starts as a draft under the name you give it and uses 1 point. Reviews, leads, bookings, orders and QR boards stay with the original.</p>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-ink-700 mb-1">Business name</label>
+            <input class="input" name="businessName" minlength="2" maxlength="150" placeholder="Name of the new business" autocomplete="off" required />
           </div>
           <div class="rounded-lg border border-gray-200 p-3 space-y-2">
             <p class="text-sm font-semibold text-ink-900 flex items-center gap-1.5">${icon("key-round", { size: 14 })} Login for the copy</p>
@@ -304,6 +308,7 @@ export function initCloneButtons() {
       );
       const form = $("[data-clone-form]", modal.body);
       form.password.value = generatePassword();
+      form.businessName.focus();
       $("[data-clone-generate]", form).addEventListener("click", () => (form.password.value = generatePassword()));
 
       form.addEventListener("submit", async (e) => {
@@ -317,7 +322,7 @@ export function initCloneButtons() {
           phone: form.phone.value.trim() || undefined,
         };
         try {
-          ({ data: copy } = await api.post(`/businesses/${business.id}/clone`, { owner }));
+          ({ data: copy } = await api.post(`/businesses/${business.id}/clone`, { name: form.businessName.value.trim(), owner }));
         } catch (err) {
           showError($("[data-clone-error]", form), errorMessage(err));
           confirm.disabled = false;

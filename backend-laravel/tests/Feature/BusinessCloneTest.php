@@ -115,6 +115,20 @@ class BusinessCloneTest extends TestCase
         $this->assertSame('PUBLISHED', $clone->fresh()->status);
     }
 
+    public function test_the_copy_takes_the_name_the_dealer_enters(): void
+    {
+        $dealer = $this->dealer();
+        $source = $this->business($dealer);
+
+        $copy = $this->postJson("/api/v1/businesses/{$source->id}/clone", [...self::LOGIN, 'name' => '  Spice Route Kochi  '], $this->auth($dealer))
+            ->assertCreated()
+            ->assertJsonPath('data.name', 'Spice Route Kochi')
+            ->json('data');
+        $this->assertStringStartsWith('spice-route-kochi', $copy['slug']);
+
+        $this->postJson("/api/v1/businesses/{$source->id}/clone", [...self::LOGIN, 'name' => str_repeat('x', 151)], $this->auth($dealer))->assertStatus(400);
+    }
+
     public function test_only_dealers_can_clone(): void
     {
         $owner = $this->user(['role' => 'BUSINESS_OWNER']);

@@ -475,14 +475,17 @@ class BusinessController extends Controller
             throw ApiException::notFound('Business not found');
         }
         $this->assertOwnerOrAdmin($actor, $source);
-        $owner = $request->validate(self::ownerRules('required'))['owner'];
+        $data = $request->validate([...self::ownerRules('required'), 'name' => ['nullable', 'string', 'min:2', 'max:150']]);
+        $owner = $data['owner'];
+        $name = trim((string) ($data['name'] ?? ''));
+        // The dealer names the copy; without a name it is marked as a copy.
+        $name = mb_strlen($name) >= 2 ? $name : mb_substr($source->name, 0, 143).' (Copy)';
         $features = BusinessFeatures::of($source);
         Points::assertCanAfford($actor, count($features));
         $login = $this->checkOwnerLogin($owner);
 
-        return DB::transaction(function () use ($actor, $source, $login, $features) {
-            $ownerRecord = $this->ownerAccount($login, $actor, $source->name);
-            $name = mb_substr($source->name, 0, 143).' (Copy)';
+        return DB::transaction(function () use ($actor, $source, $login, $features, $name) {
+            $ownerRecord = $this->ownerAccount($login, $actor, $name);
             $copy = Business::create([
                 ...$source->only([
                     'description', 'categoryId', 'subscriptionPlan', 'businessType', 'email', 'phone', 'website',
