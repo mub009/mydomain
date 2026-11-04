@@ -31,6 +31,15 @@ return [
         'provider' => env('AI_PROVIDER'),
     ],
 
+    // Google Places API (New): "Find my business on Google" in Reviews & QR
+    // looks up a listing's Place ID (App\Support\GooglePlaces). A Google
+    // Cloud key with Places API (New) enabled and billing on; left empty,
+    // the button is hidden and owners paste a Maps share link instead.
+    'google_places' => [
+        'key' => env('GOOGLE_PLACES_API_KEY'),
+        'base_url' => env('GOOGLE_PLACES_BASE_URL', 'https://places.googleapis.com'),
+    ],
+
     // Google Gemini — free key at https://aistudio.google.com/apikey.
     'gemini' => [
         'key' => env('GEMINI_API_KEY'),

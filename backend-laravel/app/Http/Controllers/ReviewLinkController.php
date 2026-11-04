@@ -8,6 +8,7 @@ use App\Models\ReviewScan;
 use App\Support\ApiResponse;
 use App\Support\BusinessAccess;
 use App\Support\GooglePlaceLink;
+use App\Support\GooglePlaces;
 use App\Support\ReviewChannels;
 use Illuminate\Http\Request;
 
@@ -34,6 +35,8 @@ class ReviewLinkController extends Controller
             'youtubeUrl' => $business->youtubeUrl,
             'website' => $business->website,
             'preferredReviewChannel' => $business->preferredReviewChannel,
+            // Whether "Find my business on Google" can be offered (GooglePlaces).
+            'placesSearch' => GooglePlaces::configured(),
             'resolved' => [
                 'GOOGLE' => ReviewChannels::google($business),
                 'INSTAGRAM' => ReviewChannels::instagram($business),
@@ -58,6 +61,25 @@ class ReviewLinkController extends Controller
         }
 
         return $this->present($actor, $business);
+    }
+
+    // "Find my business on Google": matches for the listing's name and city
+    // (or what the owner typed), nearest the shop first, to pick one from.
+    public function searchPlaces(Request $request, string $id)
+    {
+        $actor = $request->attributes->get('auth');
+        $business = Business::find($id);
+        if (! $business) {
+            throw ApiException::notFound('Business not found');
+        }
+        $this->assertOwnerOrAdmin($actor, $business);
+        $data = $request->validate(['q' => ['sometimes', 'nullable', 'string', 'max:200']]);
+        $query = trim((string) ($data['q'] ?? '')) ?: trim("{$business->name} {$business->city}");
+
+        return ApiResponse::ok([
+            'query' => $query,
+            'places' => GooglePlaces::search($query, $business->latitude, $business->longitude),
+        ]);
     }
 
     public function update(Request $request, string $id)

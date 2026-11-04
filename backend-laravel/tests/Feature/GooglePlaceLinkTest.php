@@ -71,4 +71,45 @@ class GooglePlaceLinkTest extends TestCase
         $this->patchJson($url, ['googlePlaceId' => 'https://evil.example/x'], $auth)->assertStatus(400);
         Http::assertNotSent(fn ($request) => str_contains($request->url(), 'evil.example'));
     }
+
+    public function test_find_my_business_on_google_searches_places(): void
+    {
+        $owner = User::create([
+            'email' => 'o-'.uniqid().'@example.com', 'passwordHash' => Hash::make('Password123!'),
+            'firstName' => 'O', 'lastName' => 'W', 'status' => 'ACTIVE', 'role' => 'BUSINESS_OWNER',
+        ]);
+        $business = Business::create([
+            'ownerId' => $owner->id, 'name' => 'Alruhaimi Clinic', 'slug' => 'clinic', 'categoryId' => Category::create(['name' => 'Clinics', 'slug' => 'clinics'])->id,
+            'status' => 'PUBLISHED', 'addressLine1' => '1 Main St', 'city' => 'Dammam', 'state' => 'EP', 'postalCode' => '32241', 'latitude' => 26.37, 'longitude' => 49.97,
+        ]);
+        $token = $this->postJson('/api/v1/auth/login', ['email' => $owner->email, 'password' => 'Password123!'])->json('data.accessToken');
+        $auth = ['Authorization' => "Bearer {$token}"];
+        $url = "/api/v1/businesses/{$business->id}/review-links";
+
+        // No key: the button isn't offered, and the search says to paste a link instead.
+        config(['services.google_places.key' => null]);
+        $this->getJson($url, $auth)->assertOk()->assertJsonPath('data.placesSearch', false);
+        $this->getJson("{$url}/google-places", $auth)->assertStatus(400);
+
+        config(['services.google_places.key' => 'places-key']);
+        Http::fake(['places.googleapis.com/*' => Http::sequence()
+            ->push(['places' => [
+                ['id' => self::PLACE_ID, 'displayName' => ['text' => 'Dr. Khalid Alruhaimi Medical Complex'], 'formattedAddress' => 'Dammam, Saudi Arabia'],
+            ]])
+            // Then Google refusing (bad key, billing off).
+            ->push(['error' => ['message' => 'API key not valid']], 403)]);
+        $this->getJson($url, $auth)->assertJsonPath('data.placesSearch', true);
+        // With no query typed, it searches the listing's name and city, near the shop.
+        $this->getJson("{$url}/google-places", $auth)->assertOk()
+            ->assertJsonPath('data.query', 'Alruhaimi Clinic Dammam')
+            ->assertJsonPath('data.places.0.id', self::PLACE_ID)
+            ->assertJsonPath('data.places.0.name', 'Dr. Khalid Alruhaimi Medical Complex');
+        Http::assertSent(fn ($request) => $request->hasHeader('X-Goog-Api-Key', 'places-key')
+            && $request->hasHeader('X-Goog-FieldMask', 'places.id,places.displayName,places.formattedAddress')
+            && $request['textQuery'] === 'Alruhaimi Clinic Dammam'
+            && $request['locationBias']['circle']['center']['latitude'] === 26.37);
+
+        // Google refusing (bad key, billing off) is a plain message, not an error page.
+        $this->getJson("{$url}/google-places?q=x", $auth)->assertStatus(400)->assertJsonFragment(['message' => 'Google search is not working right now. Paste your Google Maps share link instead.']);
+    }
 }

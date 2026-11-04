@@ -357,6 +357,56 @@ $("[data-review-links-form]")?.addEventListener("submit", async (e) => {
   }
 });
 
+// "Find your business on Google" (Google Places): pick a match, its Place ID is saved.
+const places = $("[data-places-search]");
+if (places) {
+  const go = $("[data-places-go]", places);
+  const query = $("[data-places-query]", places);
+  const list = $("[data-places-results]", places);
+  const note = (text) => (list.innerHTML = `<li class="text-xs text-ink-500">${esc(text)}</li>`);
+  const search = async () => {
+    showError(errorBox, "");
+    go.disabled = true;
+    note("Searching Google…");
+    try {
+      const res = await api.get(`${base}/review-links/google-places`, { q: query.value.trim() });
+      const found = res.data.places;
+      if (!found.length) return note("No match on Google. Try another name, or paste your Google Maps share link below.");
+      list.innerHTML = found
+        .map(
+          (p, i) => `<li><button type="button" data-place="${i}" class="flex w-full items-start gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-left hover:border-brand-500 hover:bg-brand-50">
+            <span class="mt-0.5 text-brand-600">${icon("map-pin", 15)}</span>
+            <span class="min-w-0"><span class="block text-sm font-semibold text-ink-900">${esc(p.name)}</span><span class="block text-[11px] text-ink-500">${esc(p.address)}</span></span>
+          </button></li>`,
+        )
+        .join("");
+      $$("[data-place]", list).forEach((button) =>
+        button.addEventListener("click", async () => {
+          const place = found[Number(button.dataset.place)];
+          try {
+            await busy(button, "Saving…", () => api.patch(`${base}/review-links`, { googlePlaceId: place.id, googleReviewUrl: null }));
+            reloadWithFlash(`Connected to ${place.name} on Google. Customers now go straight to its review box.`);
+          } catch (err) {
+            fail(err);
+          }
+        }),
+      );
+    } catch (err) {
+      list.innerHTML = "";
+      fail(err);
+    } finally {
+      go.disabled = false;
+    }
+  };
+  go.addEventListener("click", search);
+  query.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      search();
+    }
+  });
+}
+
 // Scannable thumbnails of the shop's boards.
 $$("[data-board-thumb]").forEach((slot) =>
   renderQrDataUrl(boardUrl(slot.dataset.boardThumb), 160)

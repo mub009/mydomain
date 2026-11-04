@@ -215,6 +215,8 @@ Route::prefix('businesses')->group(function () {
     Route::middleware('auth.jwt')->group(function () {
         Route::get('/{id}/review-links', [ReviewLinkController::class, 'show']);
         Route::patch('/{id}/review-links', [ReviewLinkController::class, 'update'])->middleware('privilege:MANAGE_LISTINGS');
+        // Google Places search is billed per call: a few an hour.
+        Route::get('/{id}/review-links/google-places', [ReviewLinkController::class, 'searchPlaces'])->middleware(['privilege:MANAGE_LISTINGS', 'throttle:20,60']);
         Route::get('/{id}/qr-codes', [QrCodeController::class, 'businessQrCodes']);
         // SEO: what Google is shown, a checklist, and whether the pages are
         // in Google yet. The SEO text itself saves through PATCH /{id}.

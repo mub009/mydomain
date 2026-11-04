@@ -41,6 +41,19 @@
           </p>
         </div>
 
+        {{-- Google Places search (GooglePlaces): pick the business, its Place ID is saved. --}}
+        @if (! empty($links['placesSearch']))
+          <div class="rounded-lg border border-amber-200 bg-amber-50/60 p-3" data-places-search>
+            <p class="flex items-center gap-1.5 text-xs font-bold text-ink-900"><x-icon name="search" :size="13" class="text-amber-600" /> Find your business on Google</p>
+            <p class="mt-0.5 text-[11px] text-ink-500">Search, tap your business, done. We save its Place ID for you.</p>
+            <div class="mt-2 flex gap-2">
+              <input class="input py-2" data-places-query value="{{ trim($biz['name'].' '.($biz['city'] ?? '')) }}" aria-label="Business name and city" />
+              <button type="button" class="btn-primary shrink-0 px-3 py-2 text-sm" data-places-go><x-icon name="search" :size="14" /> <span>Search</span></button>
+            </div>
+            <ul class="mt-2 space-y-1.5" data-places-results></ul>
+          </div>
+        @endif
+
         <div>
           <label class="mb-1 block text-xs font-semibold text-ink-700">Google Place ID</label>
           <input class="input" name="googlePlaceId" placeholder="ChIJN1t_tDeuEmsRUsoyG83frY4 — or paste a Google Maps link" value="{{ $links['googlePlaceId'] ?? '' }}" />
