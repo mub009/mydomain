@@ -23,7 +23,7 @@ class Points
     /** Up front, before anything is created: whether the dealer can pay for these features (FeaturePlans). */
     public static function assertCanAfford(array $actor, array $features, bool $renewal = false): void
     {
-        $cost = FeaturePlans::cost($features, $renewal);
+        $cost = FeaturePlans::cost($features, $renewal, FeaturePlans::groupIdFor($actor['sub']));
         if ($actor['role'] !== 'DEALER' || $cost <= 0) {
             return;
         }
@@ -46,7 +46,8 @@ class Points
     public static function buyFeature(array $actor, Business $business, string $feature, bool $renewal = false): int
     {
         $isDealer = $actor['role'] === 'DEALER';
-        $plan = FeaturePlans::plan($feature);
+        // The paying dealer's pricing group; for an admin, the business's dealer's.
+        $plan = FeaturePlans::plan($feature, FeaturePlans::groupIdFor($isDealer ? $actor['sub'] : $business->createdById));
         $cost = $isDealer ? ($renewal ? $plan['renewalPoints'] : $plan['points']) : 0;
         $months = $plan['months'];
         // The rupee price and the admin's commission, as they are today.

@@ -45,6 +45,25 @@ function privilegeSelector(selected) {
   </div>`;
 }
 
+// A dealer's pricing group (FeaturePlans): which feature prices they pay.
+function pricingGroupSelector(selected) {
+  const groups = pageData("admin-pricing-groups") ?? [];
+  if (!groups.length) return "";
+  return `<div data-when-dealer>
+    <label class="block text-xs font-semibold text-ink-700 mb-1">Pricing group</label>
+    <select class="input" name="pricingGroupId">
+      ${groups
+        .map((g) => {
+          const value = g.isDefault ? "" : g.id;
+          const isSelected = selected ? selected === g.id : g.isDefault;
+          return `<option value="${esc(value)}" ${isSelected ? "selected" : ""}>${esc(g.name)}${g.isDefault ? " (default)" : ""}</option>`;
+        })
+        .join("")}
+    </select>
+    <p class="text-xs text-ink-500 mt-1">The feature prices this dealer pays. Set them in Feature Pricing.</p>
+  </div>`;
+}
+
 // Shows the privilege picker only while the role is DEALER.
 // Dealers sign in with their mobile number, so for them the number is
 // required and the email optional; every other role needs an email.
@@ -153,6 +172,7 @@ $$("[data-edit-user]").forEach((button) =>
           </div>
         </div>
         ${privilegeSelector(user.privileges ?? [])}
+        ${pricingGroupSelector(user.pricingGroupId ?? null)}
         <button class="btn-primary w-full py-2.5" data-submit>Save changes</button>
       </form>`,
     );
@@ -170,7 +190,7 @@ $$("[data-edit-user]").forEach((button) =>
           phone: f.phone.trim() || null,
           role: f.role,
           status: f.status,
-          ...(f.role === "DEALER" ? { privileges } : {}),
+          ...(f.role === "DEALER" ? { privileges, pricingGroupId: f.pricingGroupId || null } : {}),
         });
         reloadWithFlash("User updated.");
       });
@@ -625,11 +645,83 @@ $("[data-feature-plans]")?.addEventListener("submit", async (e) => {
   saved.textContent = "";
   button.disabled = true;
   try {
-    await api.put("/admin/feature-plans", { plans });
+    await api.put("/admin/feature-plans", { groupId: form.dataset.groupId, plans });
     saved.textContent = "Pricing saved.";
   } catch (err) {
     fail(err);
   } finally {
     button.disabled = false;
   }
+});
+
+// --- Pricing groups ---------------------------------------------------------------
+const groupData = pageData("pricing-group-data");
+const groupUrl = (id) => `/admin?tab=${encodeURIComponent("Feature Pricing")}${id ? `&group=${id}` : ""}`;
+
+function groupNameModal(title, value, submitLabel, work) {
+  const modal = openModal(
+    title,
+    `<form class="space-y-3">
+      <div data-form-error></div>
+      <input required maxlength="80" class="input" name="name" value="${esc(value)}" placeholder="e.g. Gold dealers" />
+      <button class="btn-primary w-full py-2.5" data-submit>${esc(submitLabel)}</button>
+    </form>`,
+  );
+  const form = $("form", modal.body);
+  form.name.focus();
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    submitModalForm(form, $("[data-submit]", form), "Saving…", () => work(form.name.value.trim()));
+  });
+}
+
+$("[data-group-new]")?.addEventListener("click", () =>
+  groupNameModal("New pricing group", "", "Create group", async (name) => {
+    // It starts as a copy of the group being viewed.
+    const { data } = await api.post("/admin/pricing-groups", { name, copyFrom: groupData?.group?.id });
+    reloadWithFlash(`Created “${name}” with ${groupData?.group?.name ?? "the default"} prices. Change them below, then put dealers in it from Users.`, groupUrl(data.id));
+  }),
+);
+$("[data-group-rename]")?.addEventListener("click", () =>
+  groupNameModal("Rename pricing group", groupData.group.name, "Save name", async (name) => {
+    await api.patch(`/admin/pricing-groups/${groupData.group.id}`, { name });
+    reloadWithFlash("Group renamed.", groupUrl(groupData.group.id));
+  }),
+);
+$("[data-group-default]")?.addEventListener("click", async (e) => {
+  const button = e.currentTarget;
+  button.disabled = true;
+  try {
+    await api.patch(`/admin/pricing-groups/${groupData.group.id}`, { isDefault: true });
+    reloadWithFlash(`“${groupData.group.name}” is now the default: dealers in no group pay its prices.`, groupUrl(groupData.group.id));
+  } catch (err) {
+    fail(err);
+    button.disabled = false;
+  }
+});
+$("[data-group-delete]")?.addEventListener("click", () => {
+  const count = groupData.groups.find((g) => g.id === groupData.group.id)?.dealers ?? 0;
+  const modal = openModal(
+    `Delete “${groupData.group.name}”?`,
+    `<div class="space-y-3">
+      <div data-form-error></div>
+      <p class="text-sm text-ink-600">${
+        count ? `Its ${count} ${count === 1 ? "dealer moves" : "dealers move"} to the default group and pay its prices from now on.` : "No dealers are in this group."
+      } Features already bought keep their end dates.</p>
+      <div class="flex justify-end gap-2">
+        <button type="button" class="btn-secondary px-4 py-2 text-sm" data-close>Keep it</button>
+        <button type="button" class="btn-primary !bg-red-600 hover:!bg-red-700 px-4 py-2 text-sm" data-confirm>Delete group</button>
+      </div>
+    </div>`,
+  );
+  $("[data-confirm]", modal.body).addEventListener("click", async (e) => {
+    e.currentTarget.disabled = true;
+    try {
+      await api.delete(`/admin/pricing-groups/${groupData.group.id}`);
+      reloadWithFlash("Group deleted.", groupUrl(null));
+    } catch (err) {
+      $("[data-form-error]", modal.body).innerHTML = alertBox(errorMessage(err));
+      e.currentTarget.disabled = false;
+    }
+  });
 });

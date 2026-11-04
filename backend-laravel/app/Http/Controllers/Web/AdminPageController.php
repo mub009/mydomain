@@ -43,6 +43,8 @@ class AdminPageController extends Controller
 
         switch ($tab) {
             case 'Users':
+                // For the dealer's pricing group picker and badge.
+                $data['pricingGroups'] = \App\Models\PricingGroup::orderByDesc('isDefault')->orderBy('name')->get(['id', 'name', 'isDefault'])->toArray();
                 $data['users'] = InternalApi::tryCall([AdminController::class, 'listUsers'], array_filter([
                     'search' => $q('search'), 'role' => $q('role'), 'page' => $page,
                 ]), [], true);
@@ -88,7 +90,7 @@ class AdminPageController extends Controller
                 $data['categories'] = InternalApi::tryCall([CategoryController::class, 'index'])['data'] ?? [];
                 break;
             case 'Feature Pricing':
-                $data['featurePlans'] = InternalApi::tryCall([\App\Http\Controllers\FeaturePlanController::class, 'index'], [], [], true)['data'] ?? null;
+                $data['featurePlans'] = InternalApi::tryCall([\App\Http\Controllers\FeaturePlanController::class, 'index'], array_filter(['groupId' => $q('group')]), [], true)['data'] ?? null;
                 break;
             case 'Reports':
                 $data['report'] = InternalApi::tryCall([AdminController::class, 'businessCreatorsReport'], [], [], true)['data'] ?? null;

@@ -9,7 +9,8 @@
 @php
     use App\Support\BusinessFeatures as F;
     use App\Support\FeaturePlans;
-    $plans = FeaturePlans::all();
+    // The prices of the dealer who set the business up (their pricing group).
+    $plans = FeaturePlans::forUser($biz['createdById'] ?? null);
     $isDealerHere = $dealerPoints !== null;
 @endphp
 @if ($canChangeFeatures)

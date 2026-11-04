@@ -3,9 +3,13 @@
 namespace App\Support;
 
 use App\Models\FeaturePlan;
+use App\Models\PricingGroup;
+use App\Models\User;
 
 /**
- * Feature pricing, set by the admin, for each feature (BusinessFeatures):
+ * Feature pricing, set by the admin per pricing group (PricingGroup). Each
+ * dealer is in one group (users.pricingGroupId); a dealer in none pays the
+ * default group's prices. For each feature (BusinessFeatures):
  * - points / renewalPoints: what a dealer's balance is charged to add the
  *   feature, and for each renewal of a timed one;
  * - price / renewalPrice: prices in rupees, shown to dealers;
@@ -28,13 +32,55 @@ class FeaturePlans
     /** Rupee amounts in a plan, as stored => as presented. */
     public const MONEY = ['priceInr' => 'price', 'renewalPriceInr' => 'renewalPrice', 'commissionInr' => 'commission', 'renewalCommissionInr' => 'renewalCommission'];
 
-    /** @return array<string, array{points: int, renewalPoints: int, price: ?int, renewalPrice: ?int, commission: ?int, renewalCommission: ?int, months: ?int}> */
-    public static function all(): array
-    {
-        $rows = FeaturePlan::all()->keyBy('feature');
+    // --- Groups ----------------------------------------------------------------
 
-        return collect(BusinessFeatures::ALL)->mapWithKeys(function ($f) use ($rows) {
-            $row = $rows[$f] ?? null;
+    /** The default group, made if somehow missing. */
+    public static function defaultGroup(): PricingGroup
+    {
+        $group = PricingGroup::where('isDefault', true)->first();
+        if ($group) {
+            return $group;
+        }
+        $group = PricingGroup::query()->orderBy('createdAt')->first();
+        if ($group) {
+            $group->update(['isDefault' => true]);
+
+            return $group;
+        }
+
+        return PricingGroup::create(['name' => 'Default', 'isDefault' => true]);
+    }
+
+    /** The group whose prices this dealer pays: theirs, or the default. */
+    public static function groupIdFor(?string $userId): string
+    {
+        $groupId = $userId ? User::whereKey($userId)->value('pricingGroupId') : null;
+        if ($groupId && PricingGroup::whereKey($groupId)->exists()) {
+            return $groupId;
+        }
+
+        return self::defaultGroup()->id;
+    }
+
+    // --- Plans -----------------------------------------------------------------
+
+    /**
+     * Every feature's plan in a group (the default when null), in the
+     * standard order. A feature the group has no row for falls back to the
+     * default group's, then to a point and unlimited.
+     *
+     * @return array<string, array{points: int, renewalPoints: int, price: ?int, renewalPrice: ?int, commission: ?int, renewalCommission: ?int, months: ?int}>
+     */
+    public static function all(?string $groupId = null): array
+    {
+        $defaultId = self::defaultGroup()->id;
+        $groupId ??= $defaultId;
+        $rows = FeaturePlan::whereIn('groupId', array_unique([$groupId, $defaultId]))->get();
+        $own = $rows->where('groupId', $groupId)->keyBy('feature');
+        $fallback = $rows->where('groupId', $defaultId)->keyBy('feature');
+
+        return collect(BusinessFeatures::ALL)->mapWithKeys(function ($f) use ($own, $fallback) {
+            $row = $own[$f] ?? $fallback[$f] ?? null;
             $plan = [
                 'points' => (int) ($row->points ?? Points::PER_FEATURE),
                 'renewalPoints' => (int) ($row->renewalPoints ?? $row->points ?? Points::PER_FEATURE),
@@ -48,30 +94,23 @@ class FeaturePlans
         })->all();
     }
 
-    public static function plan(string $feature): array
+    /** The plans a dealer pays. */
+    public static function forUser(?string $userId): array
     {
-        return self::all()[$feature];
+        return self::all(self::groupIdFor($userId));
     }
 
-    public static function points(string $feature): int
+    public static function plan(string $feature, ?string $groupId = null): array
     {
-        return self::plan($feature)['points'];
+        return self::all($groupId)[$feature];
     }
 
-    public static function renewalPoints(string $feature): int
+    /** What these features cost together in a group, to add or (with $renewal) to renew. */
+    public static function cost(array $features, bool $renewal = false, ?string $groupId = null): int
     {
-        return self::plan($feature)['renewalPoints'];
-    }
+        $plans = self::all($groupId);
 
-    public static function months(string $feature): ?int
-    {
-        return self::plan($feature)['months'];
-    }
-
-    /** What these features cost together, to add or (with $renewal) to renew. */
-    public static function cost(array $features, bool $renewal = false): int
-    {
-        return array_sum(array_map(fn ($f) => $renewal ? self::renewalPoints($f) : self::points($f), $features));
+        return array_sum(array_map(fn ($f) => $renewal ? $plans[$f]['renewalPoints'] : $plans[$f]['points'], $features));
     }
 
     public static function durationLabel(?int $months): string
@@ -89,8 +128,8 @@ class FeaturePlans
         return $price === null ? null : '₹'.number_format($price);
     }
 
-    /** Admin: save every feature's plan at once. */
-    public static function save(array $plans): void
+    /** Admin: save every feature's plan in a group at once. */
+    public static function save(string $groupId, array $plans): void
     {
         foreach ($plans as $feature => $plan) {
             $values = [
@@ -101,14 +140,24 @@ class FeaturePlans
             foreach (self::MONEY as $column => $key) {
                 $values[$column] = $plan[$key] ?? null;
             }
-            FeaturePlan::updateOrCreate(['feature' => $feature], $values);
+            FeaturePlan::updateOrCreate(['groupId' => $groupId, 'feature' => $feature], $values);
         }
     }
 
-    /** For the admin tab and the dealer's pickers. */
-    public static function present(): array
+    /** Copies one group's plans into another (a new group starts as a copy). */
+    public static function copy(string $fromGroupId, string $toGroupId): void
     {
-        return collect(self::all())->map(function ($p, $f) {
+        $plans = [];
+        foreach (self::all($fromGroupId) as $feature => $plan) {
+            $plans[$feature] = $plan;
+        }
+        self::save($toGroupId, $plans);
+    }
+
+    /** For the admin tab and the dealer's pickers. */
+    public static function present(?string $groupId = null): array
+    {
+        return collect(self::all($groupId))->map(function ($p, $f) {
             $out = ['feature' => $f, 'label' => BusinessFeatures::LABELS[$f], ...$p, 'duration' => self::durationLabel($p['months'])];
             foreach (self::MONEY as $key) {
                 $out[$key.'Label'] = self::priceLabel($p[$key]);

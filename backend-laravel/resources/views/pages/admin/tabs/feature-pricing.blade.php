@@ -17,7 +17,40 @@
 @if (! $fp)
   <p class="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">Could not load the feature pricing.</p>
 @else
-  <form class="card p-5" data-feature-plans>
+  {{-- Pricing groups: each has its own prices; dealers are put in one from Users → Edit. --}}
+  <div class="card mb-4 p-4" data-pricing-groups>
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <p class="flex items-center gap-1.5 text-sm font-bold text-ink-900"><x-icon name="users" :size="15" class="text-brand-600" /> Pricing groups</p>
+        <p class="text-xs text-ink-500">Each group has its own prices. Put a dealer in a group from <b>Users → Edit</b>; dealers in no group pay the <b>default</b> group's prices.</p>
+      </div>
+      <button type="button" class="btn-primary px-3 py-2 text-sm" data-group-new><x-icon name="plus" :size="15" /> New group</button>
+    </div>
+    <div class="mt-3 flex flex-wrap gap-2">
+      @foreach ($fp['groups'] as $g)
+        <a href="/admin?tab={{ urlencode('Feature Pricing') }}&group={{ $g['id'] }}" @class([
+            'inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-semibold transition',
+            'border-brand-500 bg-brand-50 text-brand-700' => $g['id'] === $fp['group']['id'],
+            'border-gray-200 text-ink-700 hover:border-brand-300' => $g['id'] !== $fp['group']['id'],
+        ])>
+          {{ $g['name'] }}
+          @if ($g['isDefault'])<span class="rounded bg-amber-100 px-1.5 text-[10px] font-bold uppercase text-amber-800">Default</span>@endif
+          <span class="text-xs font-normal text-ink-500">{{ $g['dealers'] }} {{ $g['dealers'] === 1 ? 'dealer' : 'dealers' }}</span>
+        </a>
+      @endforeach
+    </div>
+    <div class="mt-3 flex flex-wrap items-center gap-2 border-t border-gray-100 pt-3 text-sm">
+      <span class="text-ink-500">Editing <b class="text-ink-900">{{ $fp['group']['name'] }}</b></span>
+      <button type="button" class="btn-secondary px-2.5 py-1 text-xs" data-group-rename><x-icon name="pencil" :size="12" /> Rename</button>
+      @unless ($fp['group']['isDefault'])
+        <button type="button" class="btn-secondary px-2.5 py-1 text-xs" data-group-default><x-icon name="star" :size="12" /> Make default</button>
+        <button type="button" class="btn-secondary px-2.5 py-1 text-xs !text-red-700 hover:!bg-red-50" data-group-delete><x-icon name="trash-2" :size="12" /> Delete group</button>
+      @endunless
+    </div>
+  </div>
+  <script type="application/json" id="pricing-group-data">@json(['group' => $fp['group'], 'groups' => $fp['groups']])</script>
+
+  <form class="card p-5" data-feature-plans data-group-id="{{ $fp['group']['id'] }}">
     <div class="flex flex-wrap items-start justify-between gap-3">
       <div>
         <h3 class="flex items-center gap-1.5 font-bold text-ink-900"><x-icon name="coins" :size="16" class="text-brand-600" /> Feature pricing</h3>

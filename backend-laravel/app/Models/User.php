@@ -19,7 +19,7 @@ class User extends Model
     protected $fillable = [
         'email', 'phone', 'passwordHash', 'firstName', 'lastName',
         'role', 'status', 'privileges', 'points', 'avatarUrl',
-        'emailVerifiedAt', 'createdById',
+        'emailVerifiedAt', 'createdById', 'pricingGroupId',
     ];
 
     protected $hidden = ['passwordHash'];

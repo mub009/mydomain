@@ -21,7 +21,7 @@ class AdminController extends Controller
 {
     private const USER_PUBLIC_COLUMNS = [
         'id', 'email', 'phone', 'firstName', 'lastName', 'role', 'status',
-        'privileges', 'points', 'avatarUrl', 'createdAt',
+        'privileges', 'points', 'avatarUrl', 'createdAt', 'pricingGroupId',
     ];
 
     // ---------------------------------------------------------------
@@ -181,6 +181,8 @@ class AdminController extends Controller
             'status' => ['sometimes', 'in:ACTIVE,SUSPENDED,PENDING_VERIFICATION'],
             'privileges' => ['sometimes', 'array'],
             'privileges.*' => ['in:'.implode(',', Privileges::ALL)],
+            // A dealer's pricing group (FeaturePlans); null is the default group.
+            'pricingGroupId' => ['sometimes', 'nullable', 'string', 'exists:pricing_groups,id'],
         ]);
 
         $user = User::find($id);
@@ -232,6 +234,7 @@ class AdminController extends Controller
             }
         } else {
             $data['privileges'] = null;
+            $data['pricingGroupId'] = null;
         }
 
         $user->update($data);

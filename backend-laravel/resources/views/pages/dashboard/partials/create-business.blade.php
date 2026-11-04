@@ -26,7 +26,7 @@
         <span class="text-[11px] text-ink-500">{{ $isDealer ? 'Priced per feature · the listing itself is free' : 'Free for admins' }}</span>
       </div>
       <div class="grid gap-2 sm:grid-cols-3">
-        @php $featurePlans = \App\Support\FeaturePlans::all(); @endphp
+        @php $featurePlans = \App\Support\FeaturePlans::forUser(\App\Support\WebAuth::user()?->id); @endphp
         @foreach (\App\Support\BusinessFeatures::ALL as $key)
           <label class="flex cursor-pointer gap-2 rounded-lg border border-gray-200 bg-white p-2.5 transition has-[:checked]:border-brand-500 has-[:checked]:bg-brand-50/50">
             <input type="checkbox" name="features" value="{{ $key }}" class="mt-0.5 h-4 w-4 shrink-0 rounded border-gray-300" data-feature-option data-cost="{{ $isDealer ? $featurePlans[$key]['points'] : 0 }}" @checked(! $isDealer) />

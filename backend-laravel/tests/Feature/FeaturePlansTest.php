@@ -35,7 +35,7 @@ class FeaturePlansTest extends TestCase
 
     private function dealer(int $points = 20): User
     {
-        return $this->user(['role' => 'DEALER', 'privileges' => ['MANAGE_LISTINGS'], 'points' => $points]);
+        return $this->user(['role' => 'DEALER', 'privileges' => ['MANAGE_LISTINGS'], 'points' => $points, 'phone' => '9'.random_int(100000000, 999999999)]);
     }
 
     private function business(User $dealer, array $features = []): Business
@@ -207,5 +207,61 @@ class FeaturePlansTest extends TestCase
         $this->withoutVite();
         $this->post('/login', ['email' => $dealer->email, 'password' => 'Password123!']);
         $this->get('/dashboard')->assertOk()->assertSee('Commission to admin')->assertSee('₹500');
+    }
+
+    public function test_dealers_pay_their_pricing_groups_prices(): void
+    {
+        $this->setPrices();
+        $admin = $this->user(['role' => 'ADMIN']);
+        $auth = $this->auth($admin);
+
+        // The default group holds today's prices; a new group starts as a copy.
+        $index = $this->getJson('/api/v1/admin/feature-plans', $auth)->assertOk()->assertJsonCount(1, 'data.groups')
+            ->assertJsonPath('data.group.name', 'Default')->assertJsonPath('data.group.isDefault', true);
+        $defaultId = $index->json('data.group.id');
+        $goldId = $this->postJson('/api/v1/admin/pricing-groups', ['name' => 'Gold dealers'], $auth)->assertCreated()->json('data.id');
+        $this->postJson('/api/v1/admin/pricing-groups', ['name' => 'gold DEALERS'], $auth)->assertStatus(409);
+        $this->getJson("/api/v1/admin/feature-plans?groupId={$goldId}", $auth)->assertOk()
+            ->assertJsonPath('data.plans.0.points', 3)->assertJsonPath('data.plans.0.months', 12);
+
+        // Cheaper Website for Gold dealers.
+        $this->putJson('/api/v1/admin/feature-plans', ['groupId' => $goldId, 'plans' => [
+            ['feature' => 'WEBSITE', 'points' => 1, 'renewalPoints' => 1, 'price' => 500, 'commission' => 50, 'months' => 12],
+        ]], $auth)->assertOk()->assertJsonPath('data.group.id', $goldId)->assertJsonPath('data.plans.0.points', 1);
+        $this->getJson('/api/v1/admin/feature-plans', $auth)->assertJsonPath('data.plans.0.points', 3);
+
+        $gold = $this->dealer(10);
+        $plain = $this->dealer(10);
+        $this->patchJson("/api/v1/admin/users/{$gold->id}", ['pricingGroupId' => $goldId], $auth)->assertOk()->assertJsonPath('data.pricingGroupId', $goldId);
+        $this->patchJson("/api/v1/admin/users/{$gold->id}", ['pricingGroupId' => 'nope'], $auth)->assertStatus(400);
+
+        $this->putJson('/api/v1/businesses/'.$this->business($gold)->id.'/features', ['features' => ['WEBSITE']], $this->auth($gold))->assertOk()->assertJsonPath('data.spentPoints', 1);
+        $this->putJson('/api/v1/businesses/'.$this->business($plain)->id.'/features', ['features' => ['WEBSITE']], $this->auth($plain))->assertOk()->assertJsonPath('data.spentPoints', 3);
+        $this->assertSame(50, \App\Support\Points::commissionOwed($gold->id));
+        $this->assertSame(300, \App\Support\Points::commissionOwed($plain->id));
+        $this->getJson('/api/v1/points/mine', $this->auth($gold))->assertJsonPath('data.featurePlans.0.points', 1);
+
+        // Dealer counts: the plain dealer (no group) counts towards the default.
+        $groups = collect($this->getJson('/api/v1/admin/feature-plans', $auth)->json('data.groups'))->keyBy('name');
+        $this->assertSame(1, $groups['Gold dealers']['dealers']);
+        $this->assertSame(1, $groups['Default']['dealers']);
+
+        // The default can't be deleted; another group can be made the default.
+        $this->deleteJson("/api/v1/admin/pricing-groups/{$defaultId}", [], $auth)->assertStatus(400);
+        $this->patchJson("/api/v1/admin/pricing-groups/{$goldId}", ['isDefault' => true], $auth)->assertOk()->assertJsonPath('data.isDefault', true);
+        $this->assertSame(1, \App\Support\FeaturePlans::all()['WEBSITE']['points']);
+        $this->assertSame(1, \App\Support\FeaturePlans::forUser($plain->id)['WEBSITE']['points']);
+
+        // Deleting a group moves its dealers to the default.
+        $this->patchJson("/api/v1/admin/pricing-groups/{$defaultId}", ['isDefault' => true], $auth)->assertOk();
+        $this->deleteJson("/api/v1/admin/pricing-groups/{$goldId}", [], $auth)->assertOk()->assertJsonPath('data.dealersMoved', 1);
+        $this->assertNull($gold->fresh()->pricingGroupId);
+        $this->assertSame(3, \App\Support\FeaturePlans::forUser($gold->id)['WEBSITE']['points']);
+
+        // The admin pages render.
+        $this->withoutVite();
+        $this->post('/login', ['email' => $admin->email, 'password' => 'Password123!']);
+        $this->get('/admin?tab='.urlencode('Feature Pricing'))->assertOk()->assertSee('Pricing groups')->assertSee('Default');
+        $this->get('/admin?tab=Users')->assertOk()->assertSee('admin-pricing-groups', false);
     }
 }

@@ -327,6 +327,10 @@ Route::prefix('admin')->middleware(['auth.jwt', 'role:ADMIN'])->group(function (
     // Feature pricing: points and duration per feature (FeaturePlans).
     Route::get('/feature-plans', [\App\Http\Controllers\FeaturePlanController::class, 'index']);
     Route::put('/feature-plans', [\App\Http\Controllers\FeaturePlanController::class, 'update']);
+    // Pricing groups: each has its own feature pricing; dealers are put in one.
+    Route::post('/pricing-groups', [\App\Http\Controllers\FeaturePlanController::class, 'createGroup']);
+    Route::patch('/pricing-groups/{id}', [\App\Http\Controllers\FeaturePlanController::class, 'updateGroup']);
+    Route::delete('/pricing-groups/{id}', [\App\Http\Controllers\FeaturePlanController::class, 'deleteGroup']);
     Route::get('/seo', [SeoController::class, 'adminIndex']);
     Route::post('/seo/run', [SeoController::class, 'adminRun'])->middleware('throttle:10,1');
     Route::post('/seo/pages/{id}/submit', [SeoController::class, 'adminSubmit']);

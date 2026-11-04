@@ -39,6 +39,13 @@
               <p class="text-[11px] mt-0.5 font-semibold {{ ($u['points'] ?? 0) > 0 ? 'text-amber-600' : 'text-red-600' }}">
                 <x-icon name="coins" :size="10" class="inline -mt-0.5 mr-0.5" />{{ $u['points'] ?? 0 }} points{{ ($u['points'] ?? 0) === 0 ? ' — needs a top-up' : '' }}
               </p>
+              @php
+                  $groupsById = collect($pricingGroups ?? [])->keyBy('id');
+                  $dealerGroup = $groupsById[$u['pricingGroupId'] ?? ''] ?? collect($pricingGroups ?? [])->firstWhere('isDefault', true);
+              @endphp
+              @if ($dealerGroup)
+                <p class="text-[11px] mt-0.5 text-ink-500 truncate"><x-icon name="users" :size="10" class="inline -mt-0.5 mr-0.5" />Pricing: {{ $dealerGroup['name'] }}</p>
+              @endif
             @endif
           </div>
         </div>
@@ -61,3 +68,4 @@
   </div>
   <x-pager :page="$meta['page']" :total-pages="$meta['totalPages']" />
 </div>
+<script type="application/json" id="admin-pricing-groups">@json($pricingGroups ?? [])</script>
