@@ -380,8 +380,10 @@ class ImageCard
     }
 
     /** An action's inline text style (font, size scaled to the card, colours); every value is checked first. */
-    public static function textStyle(array $h): string
+    public static function textStyle(array $h, ?array $colour = null): string
     {
+        // The business's recolouring, worked out here rather than by a browser filter over the text.
+        $paint = fn (string $hex) => $colour ? ImageColour::hex($hex, $colour) : $hex;
         $size = (int) ($h['fontSize'] ?? 0) ?: self::DEFAULT_FONT_SIZE;
         $css = sprintf('font-size:calc(%d * 100cqw / 480)', min(48, max(8, $size)));
         if (in_array($h['font'] ?? null, CardEngine::FONTS, true)) {
@@ -394,10 +396,10 @@ class ImageCard
             $css .= ';font-style:italic';
         }
         if (isset($h['color']) && preg_match(self::HEX, $h['color'])) {
-            $css .= ";color:{$h['color']}";
+            $css .= ';color:'.$paint($h['color']);
         }
         if (isset($h['bg']) && preg_match(self::HEX, $h['bg'])) {
-            $css .= ";background:{$h['bg']}";
+            $css .= ';background:'.$paint($h['bg']);
         }
         if (in_array($h['align'] ?? null, self::ALIGNS, true)) {
             $css .= ';text-align:'.$h['align'].';justify-content:'.['left' => 'flex-start', 'center' => 'center', 'right' => 'flex-end'][$h['align']];
@@ -455,6 +457,7 @@ class ImageCard
         $marks = $preview && $marks;
         $w = $source['imageWidth'] ?? null;
         $h = $source['imageHeight'] ?? null;
+        $colour = ImageColour::normalize($source['colour'] ?? null);
 
         return view('cards.image', [
             'b' => $details,
@@ -462,7 +465,11 @@ class ImageCard
             'ratio' => $w && $h ? $h / $w : null,
             'spots' => self::resolved($source['hotspots'] ?? [], $details, $marks),
             'fontsUrl' => self::fontsUrl($source['hotspots'] ?? []),
-            'colourMatrix' => ($colour = ImageColour::normalize($source['colour'] ?? null)) ? ImageColour::svgValues($colour) : null,
+            'colour' => $colour,
+            'colourMatrix' => $colour ? ImageColour::svgValues($colour) : null,
+            // The drawn actions' default text and chip colours, recoloured the same way.
+            'spotInk' => $colour ? ImageColour::hex('#ffffff', $colour) : '#ffffff',
+            'spotChip' => implode(',', sscanf($colour ? ImageColour::hex('#111827', $colour) : '#111827', '#%02x%02x%02x')),
             'preview' => $preview,
             'marks' => $marks,
         ])->render();

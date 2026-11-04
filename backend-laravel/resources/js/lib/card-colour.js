@@ -65,7 +65,7 @@ export function applyToImage(img, c) {
     svg.setAttribute("height", "0");
     svg.setAttribute("aria-hidden", "true");
     svg.style.position = "absolute";
-    svg.innerHTML = `<filter id="card-colour-live" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 1 0" /></filter>`;
+    svg.innerHTML = `<filter id="card-colour-live" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" color-interpolation-filters="sRGB" values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 1 0" /></filter>`;
     document.body.appendChild(svg);
   }
   svg.querySelector("feColorMatrix").setAttribute("values", svgValues(c));

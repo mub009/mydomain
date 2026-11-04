@@ -10,6 +10,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="format-detection" content="telephone=no, date=no, address=no, email=no" />
+  {{-- Keeps phones' automatic dark mode (Chrome on Android, Samsung Internet) from changing the card's colours. --}}
+  <meta name="color-scheme" content="only light" />
   <title>{{ $b['name'] }}{{ $b['category'] ? ' — '.$b['category'] : '' }}</title>
   @unless ($preview)
     <meta name="description" content="{{ \Illuminate\Support\Str::limit($b['description'] ?: $b['name'].' — '.$b['tagline'], 160) }}" />
@@ -25,19 +27,24 @@
   @endif
   <style>
     *{box-sizing:border-box}
+    :root{color-scheme:only light}
     html,body{margin:0;padding:0}
     body{min-height:100vh;background:#111827;color:#fff;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased;overflow-x:hidden}
-    .backdrop{position:fixed;inset:-40px;background:url('{{ $image }}') center/cover;filter:{{ $colourMatrix ? 'url(#card-colour) ' : '' }}blur(36px) brightness(.55);transform:scale(1.1)}
+    {{-- The colour and the blur on separate elements: Safari can drop a filter list that mixes url() with blur(). --}}
+    .backdrop-tint{position:fixed;inset:0;{{ $colourMatrix ? 'filter:url(#card-colour)' : '' }}}
+    .backdrop{position:fixed;inset:-40px;background:url('{{ $image }}') center/cover;filter:blur(36px) brightness(.55);transform:scale(1.1)}
     .page{position:relative;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px 12px}
     .card{position:relative;width:100%;max-width:480px;container-type:inline-size;border-radius:18px;overflow:hidden;box-shadow:0 24px 60px -20px rgba(0,0,0,.6);background:#1f2937}
     .card > img{display:block;width:100%;height:auto;user-select:none;-webkit-user-drag:none}
-    {{-- The business's colour covers the whole card: its image, buttons and text. --}}
-    {!! $colourMatrix ? '.card{filter:url(#card-colour)}' : '' !!}
-    .spot{position:absolute;display:flex;align-items:center;justify-content:center;gap:6px;border-radius:10px;color:#fff;text-decoration:none;font-weight:600;font-size:13px;-webkit-tap-highlight-color:transparent;cursor:pointer;border:0;padding:0;font-family:inherit;background:transparent}
+    {{-- The business's colour covers the whole card. The browser recolours only the image
+         (a filter over the text and buttons draws wrong on phones, iPhones especially); their
+         colours are recoloured with the same maths in ImageCard. --}}
+    {!! $colourMatrix ? '.card > img{filter:url(#card-colour)}' : '' !!}
+    .spot{position:absolute;display:flex;align-items:center;justify-content:center;gap:6px;border-radius:10px;color:{{ $spotInk }};text-decoration:none;font-weight:600;font-size:13px;-webkit-tap-highlight-color:transparent;cursor:pointer;border:0;padding:0;font-family:inherit;background:transparent}
     .spot:focus-visible{outline:3px solid #facc15;outline-offset:2px}
     .spot.invisible:active{background:rgba(255,255,255,.25)}
     .spot.icon span{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
-    .spot.icon,.spot.button{background:rgba(17,24,39,.72);box-shadow:0 4px 14px -4px rgba(0,0,0,.5);backdrop-filter:blur(4px)}
+    .spot.icon,.spot.button{background:rgba({{ $spotChip }},.72);box-shadow:0 4px 14px -4px rgba(0,0,0,.5);backdrop-filter:blur(4px)}
     .spot.icon{border-radius:999px}
     .spot.icon:active,.spot.button:active{transform:scale(.97)}
     .spot svg{flex-shrink:0;width:1.35em;height:1.35em;max-height:70%}
@@ -67,9 +74,9 @@
 <body>
   @if ($colourMatrix)
     {{-- The business's recolouring of the image (App\Support\Cards\ImageColour): numbers only. --}}
-    <svg width="0" height="0" style="position:absolute" aria-hidden="true"><filter id="card-colour" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="{{ $colourMatrix }}" /></filter></svg>
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true"><filter id="card-colour" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" color-interpolation-filters="sRGB" values="{{ $colourMatrix }}" /></filter></svg>
   @endif
-  <div class="backdrop" aria-hidden="true"></div>
+  <div class="backdrop-tint" aria-hidden="true"><div class="backdrop"></div></div>
   <div class="page">
     <main class="card hint">
       <img src="{{ $image }}" alt="{{ $b['name'] }} visiting card" @if ($ratio) style="aspect-ratio:1/{{ round($ratio, 5) }}" @endif />
@@ -85,14 +92,14 @@
           <div class="spot pic" style="{{ $box }}"><img src="{{ $s['src'] }}" alt="{{ $s['action'] === 'qr' ? 'QR code for this card' : $b['name'].' logo' }}" /></div>
         @elseif ($s['kind'] === 'text')
           @if ($live && ! ($preview && $inert))
-            <a class="spot detail" style="{{ $box }};{{ \App\Support\Cards\ImageCard::textStyle($s) }}" href="{{ $s['href'] }}" @if ($external || $preview) target="_blank" rel="noopener" @endif><span>{{ $s['display'] }}</span></a>
+            <a class="spot detail" style="{{ $box }};{{ \App\Support\Cards\ImageCard::textStyle($s, $colour) }}" href="{{ $s['href'] }}" @if ($external || $preview) target="_blank" rel="noopener" @endif><span>{{ $s['display'] }}</span></a>
           @else
-            <div class="spot detail" style="{{ $box }};{{ \App\Support\Cards\ImageCard::textStyle($s) }}"><span>{{ $s['display'] }}</span></div>
+            <div class="spot detail" style="{{ $box }};{{ \App\Support\Cards\ImageCard::textStyle($s, $colour) }}"><span>{{ $s['display'] }}</span></div>
           @endif
         @elseif ($s['action'] === 'share')
-          <button type="button" class="spot {{ $s['style'] }} {{ $inert ? 'inert' : '' }}" style="{{ $box }};{{ \App\Support\Cards\ImageCard::textStyle($s) }}" aria-label="{{ $s['text'] }}" data-share><x-icon :name="$s['icon']" :size="18" /> <span>{{ $s['text'] }}</span></button>
+          <button type="button" class="spot {{ $s['style'] }} {{ $inert ? 'inert' : '' }}" style="{{ $box }};{{ \App\Support\Cards\ImageCard::textStyle($s, $colour) }}" aria-label="{{ $s['text'] }}" data-share><x-icon :name="$s['icon']" :size="18" /> <span>{{ $s['text'] }}</span></button>
         @else
-          <a class="spot {{ $s['style'] }} {{ $inert ? 'inert' : '' }}" style="{{ $box }};{{ \App\Support\Cards\ImageCard::textStyle($s) }}" href="{{ $s['href'] ?? '#' }}" aria-label="{{ $s['text'] }}" @if ($external || ($preview && $live)) target="_blank" rel="noopener" @endif><x-icon :name="$s['icon']" :size="18" /> <span>{{ $s['text'] }}</span></a>
+          <a class="spot {{ $s['style'] }} {{ $inert ? 'inert' : '' }}" style="{{ $box }};{{ \App\Support\Cards\ImageCard::textStyle($s, $colour) }}" href="{{ $s['href'] ?? '#' }}" aria-label="{{ $s['text'] }}" @if ($external || ($preview && $live)) target="_blank" rel="noopener" @endif><x-icon :name="$s['icon']" :size="18" /> <span>{{ $s['text'] }}</span></a>
         @endif
       @endforeach
     </main>

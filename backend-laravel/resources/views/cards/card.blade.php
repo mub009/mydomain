@@ -16,6 +16,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="format-detection" content="telephone=no, date=no, address=no, email=no" />
+  {{-- Keeps phones' automatic dark mode (Chrome on Android, Samsung Internet) from changing the card's colours. --}}
+  <meta name="color-scheme" content="only light" />
   <title>{{ $b['name'] }}{{ $b['category'] ? ' — '.$b['category'] : '' }}</title>
   @unless ($preview)
     <meta name="description" content="{{ \Illuminate\Support\Str::limit($b['description'] ?: $b['name'].' — '.$b['tagline'], 160) }}" />
@@ -35,6 +37,7 @@
       --font-heading:"{{ $design['fonts']['heading'] }}",Georgia,serif;--font-body:"{{ $design['fonts']['body'] }}",system-ui,sans-serif;
     }
     *{box-sizing:border-box}
+    :root{color-scheme:only light}
     html,body{margin:0;padding:0}
     body{background:var(--bg);color:var(--text);font-family:var(--font-body);line-height:1.5;-webkit-font-smoothing:antialiased;min-height:100vh}
     a{color:inherit;text-decoration:none}

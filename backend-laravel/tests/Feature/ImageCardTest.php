@@ -311,8 +311,11 @@ class ImageCardTest extends TestCase
 
         $this->postJson("{$url}/publish", [], $owner)->assertOk();
         $html = $this->get('/card/spice-garden')->assertOk()->getContent();
-        $this->assertStringContainsString('<feColorMatrix type="matrix" values="', $html);
-        $this->assertStringContainsString('.card{filter:url(#card-colour)}', $html); // the whole card: image, buttons and text
+        $this->assertStringContainsString('<feColorMatrix type="matrix" color-interpolation-filters="sRGB" values="', $html);
+        // The browser recolours only the image; the buttons' and text's colours are recoloured on the server (phones draw a filter over them wrong).
+        $this->assertStringContainsString('.card > img{filter:url(#card-colour)}', $html);
+        $this->assertStringNotContainsString('.card{filter:', $html);
+        $this->assertStringContainsString('content="only light"', $html);
         // The PDF recolours text and button colours with the same maths: grey turns red.
         $red = \App\Support\Cards\ImageColour::hex('#808080', \App\Support\Cards\ImageColour::normalize(['tint' => '#ff0000', 'strength' => 100]));
         $this->assertMatchesRegularExpression('/^#[c-f][0-9a-f]0000$/', $red);
