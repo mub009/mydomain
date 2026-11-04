@@ -734,6 +734,16 @@ exportButton?.addEventListener("click", async () => {
 // off) or an admin (free) picks what the business gets: its website, the
 // digital visiting card, gold-rate posters (partials/features.blade.php).
 const featuresPanel = $("[data-features-panel]");
+// The "Features" button by Clone opens and closes the panel.
+const featuresToggle = $("[data-features-toggle]");
+if (featuresPanel && featuresToggle) {
+  featuresToggle.addEventListener("click", () => {
+    const open = featuresPanel.hidden;
+    featuresPanel.hidden = !open;
+    featuresToggle.setAttribute("aria-expanded", String(open));
+    if (open) featuresPanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  });
+}
 if (featuresPanel) {
   const boxes = $$("[data-feature]", featuresPanel);
   const saveFeatures = $("[data-save-features]", featuresPanel);

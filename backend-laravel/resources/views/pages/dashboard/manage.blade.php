@@ -24,6 +24,14 @@
         </div>
       </div>
       <div class="flex items-center gap-2">
+        @if ($canChangeFeatures)
+          {{-- Opens the "Features for this business" panel below the header. --}}
+          <button type="button" data-features-toggle aria-expanded="false" class="btn-secondary px-3 py-2 text-sm"><x-icon name="sliders-horizontal" :size="15" /> Features
+            @if ($dealerPoints !== null)
+              <span class="rounded-md bg-amber-50 px-1.5 text-xs font-semibold text-amber-700">{{ $dealerPoints }} pts</span>
+            @endif
+          </button>
+        @endif
         @if ($authUser?->role === 'DEALER')
           <button type="button" data-clone-business="{{ json_encode(['id' => $biz['id'], 'name' => $biz['name']]) }}" class="btn-secondary px-3 py-2 text-sm"><x-icon name="copy" :size="15" /> Clone</button>
         @endif
@@ -42,6 +50,8 @@
     <p class="text-sm text-brand-700 bg-brand-50 rounded-md px-3 py-2" data-flash hidden></p>
     <p class="text-sm text-red-700 bg-red-50 rounded-md px-3 py-2" data-error hidden></p>
 
+    @include('pages.dashboard.partials.features')
+
     @if (! $section)
       {{-- The menu: every section as an icon tile. --}}
       <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
@@ -54,8 +64,6 @@
           </a>
         @endforeach
       </div>
-
-      @include('pages.dashboard.partials.features')
 
       {{-- For undoing a listing made by mistake. --}}
       <div class="card flex flex-col gap-3 border border-red-100 p-5 sm:flex-row sm:items-center sm:justify-between">
