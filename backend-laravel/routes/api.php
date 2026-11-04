@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\AiReviewController;
 use App\Http\Controllers\AiController;
 use App\Http\Controllers\AssistantController;
 use App\Http\Controllers\AnalyticsController;
@@ -202,6 +203,13 @@ Route::prefix('businesses')->group(function () {
         });
     });
 
+    // AI Google Review: what the AI's reviews mention, in which languages, and a sample.
+    Route::middleware('auth.jwt')->group(function () {
+        Route::get('/{id}/ai-review', [AiReviewController::class, 'show']);
+        Route::put('/{id}/ai-review', [AiReviewController::class, 'update'])->middleware('privilege:MANAGE_LISTINGS');
+        Route::post('/{id}/ai-review/sample', [AiReviewController::class, 'sample'])->middleware('throttle:30,60');
+    });
+
     // Review links (Google/Instagram/Facebook/YouTube/website) + the QR
     // boards attached to this business.
     Route::middleware('auth.jwt')->group(function () {
@@ -347,4 +355,11 @@ Route::prefix('admin')->middleware(['auth.jwt', 'role:ADMIN'])->group(function (
         Route::post('/templates/{id}/duplicate', [GoldRateController::class, 'duplicateTemplate']);
         Route::delete('/templates/{id}', [GoldRateController::class, 'destroyTemplate']);
     });
+});
+
+// The public AI Google Review page (/review/<slug>): no sign-in. Writing a
+// review calls the AI, so a visitor gets a handful a minute.
+Route::prefix('ai-review')->group(function () {
+    Route::post('/{slug}/generate', [AiReviewController::class, 'generate'])->middleware('throttle:12,1');
+    Route::post('/{slug}/copied', [AiReviewController::class, 'copied'])->middleware('throttle:20,1');
 });

@@ -101,6 +101,7 @@
           'hint' => 'Square or landscape photos look best.',
       ]) @break
       @case('Reviews & QR') @include('pages.dashboard.sections.reviews-qr') @break
+      @case('AI Google Review') @include('pages.dashboard.sections.ai-review') @break
       @case('Visiting Card') @include('pages.dashboard.sections.card') @break
       @case('Gold Rate') @include('pages.dashboard.sections.gold-rate') @break
       @case('Website') @include('pages.dashboard.sections.website') @break
@@ -129,5 +130,8 @@
   @endif
   @if ($section === 'Gold Rate')
     @vite('resources/js/pages/gold-posters.js')
+  @endif
+  @if ($section === 'AI Google Review')
+    @vite('resources/js/pages/ai-review-manager.js')
   @endif
 @endpush

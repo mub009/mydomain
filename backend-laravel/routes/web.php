@@ -42,6 +42,10 @@ Route::get('/card/{slug}.vcf', [CardPageController::class, 'vcard'])->where('slu
 Route::get('/card/{slug}.pdf', [CardPageController::class, 'pdf'])->where('slug', '[A-Za-z0-9_-]+')->middleware('throttle:30,1');
 Route::get('/card/{slug}', [CardPageController::class, 'show'])->where('slug', '[A-Za-z0-9_-]+');
 
+// A business's AI Google Review page: the AI writes the customer a review
+// to copy and post on the business's Google page.
+Route::get('/review/{slug}', \App\Http\Controllers\Web\AiReviewPageController::class)->where('slug', '[A-Za-z0-9_-]+');
+
 // Short public path encoded on a printed QR board: /r/q/<code>
 Route::get('/r/q/{code}', [QrCodeController::class, 'scan']);
 

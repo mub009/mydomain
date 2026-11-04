@@ -103,9 +103,9 @@ class BusinessCloneTest extends TestCase
         $this->assertFalse($site->isPublished);
         $this->assertSame(['https://cdn.example.com/g.jpg'], $site->galleryImages);
 
-        // The copy gets the original's features (here all three), a point each.
-        $this->assertSame(['WEBSITE', 'VISITING_CARD', 'GOLD_RATE'], $clone->features);
-        $this->assertSame(2, $dealer->fresh()->points);
+        // The copy gets the original's features (here all four), a point each.
+        $this->assertSame(['WEBSITE', 'VISITING_CARD', 'GOLD_RATE', 'AI_REVIEW'], $clone->features);
+        $this->assertSame(1, $dealer->fresh()->points);
         // The original is untouched.
         $this->assertSame('PUBLISHED', $source->fresh()->status);
         $this->assertSame(1, BusinessPhoto::where('businessId', $source->id)->count());

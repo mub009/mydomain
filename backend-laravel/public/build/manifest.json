@@ -82,7 +82,7 @@
     ]
   },
   "resources/css/app.css": {
-    "file": "assets/app-DLW7Erws.css",
+    "file": "assets/app-Bhwq62gB.css",
     "src": "resources/css/app.css",
     "isEntry": true
   },
@@ -112,6 +112,19 @@
       "_ui-DIxCFilW.js",
       "_searchable-select-Ci9s0_RU.js",
       "_state-city-D2K26BbD.js",
+      "_widgets-BjlLNHvj.js",
+      "__commonjsHelpers-CqkleIqs.js"
+    ]
+  },
+  "resources/js/pages/ai-review-manager.js": {
+    "file": "assets/ai-review-manager-JCpnLuLx.js",
+    "name": "ai-review-manager",
+    "src": "resources/js/pages/ai-review-manager.js",
+    "isEntry": true,
+    "imports": [
+      "_api-3HrlSN3j.js",
+      "_channels-CvUWVcU_.js",
+      "_ui-DIxCFilW.js",
       "_widgets-BjlLNHvj.js",
       "__commonjsHelpers-CqkleIqs.js"
     ]

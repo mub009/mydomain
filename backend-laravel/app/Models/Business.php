@@ -25,7 +25,7 @@ class Business extends Model
         'latitude', 'longitude', 'googlePlaceId', 'googleReviewUrl',
         'instagramUsername', 'facebookPageUrl', 'youtubeUrl', 'preferredReviewChannel',
         'logoUrl', 'coverImageUrl', 'isVerified', 'avgRating', 'reviewCount',
-        'leadCount', 'viewCount', 'features',
+        'leadCount', 'viewCount', 'features', 'aiReview', 'aiReviewViews', 'aiReviewCopies',
     ];
 
     protected function casts(): array
@@ -40,6 +40,9 @@ class Business extends Model
             'viewCount' => 'integer',
             // App\Support\BusinessFeatures; null = every feature.
             'features' => 'array',
+            'aiReview' => 'array',
+            'aiReviewViews' => 'integer',
+            'aiReviewCopies' => 'integer',
         ];
     }
 

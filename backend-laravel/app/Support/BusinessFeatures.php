@@ -7,7 +7,8 @@ use App\Models\Business;
 
 // What a business gets beyond its listing — chosen by the dealer who sets it
 // up, a point each (Points::spendForFeature): its own website on a
-// subdomain, the digital visiting card, and gold-rate posters. A business
+// subdomain, the digital visiting card, gold-rate posters, and AI-written
+// Google reviews for its customers. A business
 // sees and uses only the features it has.
 //
 // businesses.features null means every feature: listings from before
@@ -21,18 +22,22 @@ class BusinessFeatures
 
     public const GOLD_RATE = 'GOLD_RATE';
 
-    public const ALL = [self::WEBSITE, self::VISITING_CARD, self::GOLD_RATE];
+    public const AI_REVIEW = 'AI_REVIEW';
+
+    public const ALL = [self::WEBSITE, self::VISITING_CARD, self::GOLD_RATE, self::AI_REVIEW];
 
     public const LABELS = [
         self::WEBSITE => 'Website (subdomain)',
         self::VISITING_CARD => 'Digital visiting card',
         self::GOLD_RATE => 'Gold rate',
+        self::AI_REVIEW => 'AI Google Review',
     ];
 
     public const BLURBS = [
         self::WEBSITE => 'Its own website on a subdomain, with slider, gallery and online shop.',
         self::VISITING_CARD => 'A digital visiting card with its link, QR code and PDF.',
         self::GOLD_RATE => "Today's gold-rate posters with its logo, ready to share.",
+        self::AI_REVIEW => 'A review page where AI writes the review for customers to post on Google.',
     ];
 
     // The Manage-page sections each feature brings.
@@ -40,6 +45,7 @@ class BusinessFeatures
         self::WEBSITE => ['Website', 'Slider', 'Our Gallery', 'Products', 'Orders', 'Customers'],
         self::VISITING_CARD => ['Visiting Card'],
         self::GOLD_RATE => ['Gold Rate'],
+        self::AI_REVIEW => ['AI Google Review'],
     ];
 
     public static function rules(): array
