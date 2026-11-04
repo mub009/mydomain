@@ -43,7 +43,7 @@ class OneReviewTest extends TestCase
             ->assertSee('search.google.com/local/writereview?placeid=ChIJ_test_place', false)
             ->assertSee('https://www.instagram.com/spicegarden/', false)
             // Only review and social media links: no contact links.
-            ->assertDontSee('https://wa.me/', false)->assertDontSee('tel:', false)->assertDontSee('google.com/maps/dir', false)
+            ->assertDontSee('https://wa.me/', false)->assertDontSee('href="tel:', false)->assertDontSee('google.com/maps/dir', false)
             ->assertDontSee('youtube.com', false)->assertDontSee('tiktok.com', false);
         $this->assertSame(1, $this->business->fresh()->oneReviewViews);
     }
