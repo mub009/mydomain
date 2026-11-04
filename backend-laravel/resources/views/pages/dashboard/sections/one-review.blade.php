@@ -11,7 +11,8 @@
       $active = collect($o['links'])->whereNotNull('href');
       $missing = collect($o['links'])->whereNull('href');
       // Where each link is set up.
-      $editIn = ['GOOGLE' => 'Reviews & QR', 'FACEBOOK' => 'Reviews & QR', 'INSTAGRAM' => 'Reviews & QR', 'YOUTUBE' => 'Reviews & QR',
+      $editIn = ['GOOGLE' => 'Reviews & QR', 'FACEBOOK' => 'Reviews & QR', 'FACEBOOK_PAGE' => 'Reviews & QR', 'INSTAGRAM' => 'Reviews & QR', 'YOUTUBE' => 'Reviews & QR',
+          'TIKTOK' => 'Reviews & QR', 'X' => 'Reviews & QR', 'LINKEDIN' => 'Reviews & QR', 'SNAPCHAT' => 'Reviews & QR', 'THREADS' => 'Reviews & QR', 'PINTEREST' => 'Reviews & QR', 'TELEGRAM' => 'Reviews & QR',
           'AI_REVIEW' => 'AI Google Review', 'WHATSAPP' => 'Contact', 'CALL' => 'Contact', 'WEBSITE' => 'Contact', 'DIRECTIONS' => 'Contact'];
   @endphp
   <div class="space-y-5" data-one-review>

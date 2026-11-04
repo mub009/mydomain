@@ -6,11 +6,14 @@
 @php
     $review = array_values(array_filter($links, fn ($l) => $l['group'] === 'review'));
     $follow = array_values(array_filter($links, fn ($l) => $l['group'] === 'follow'));
+    $contact = array_values(array_filter($links, fn ($l) => $l['group'] === 'contact'));
     // Brand colours for each link's icon tile.
     $tint = [
         'GOOGLE' => '#ffffff', 'AI_REVIEW' => '#0f9e68', 'FACEBOOK' => '#1877f2', 'MARKKITO_REVIEW' => '#0f172a',
-        'INSTAGRAM' => 'linear-gradient(45deg,#f9ce34,#ee2a7b 50%,#6228d7)', 'YOUTUBE' => '#ff0000', 'WHATSAPP' => '#25d366',
-        'CALL' => '#0ea5e9', 'WEBSITE' => '#6366f1', 'DIRECTIONS' => '#ea4335',
+        'INSTAGRAM' => 'linear-gradient(45deg,#f9ce34,#ee2a7b 50%,#6228d7)', 'FACEBOOK_PAGE' => '#1877f2', 'YOUTUBE' => '#ff0000',
+        'TIKTOK' => '#010101', 'X' => '#000000', 'LINKEDIN' => '#0a66c2', 'SNAPCHAT' => '#fffc00', 'THREADS' => '#000000',
+        'PINTEREST' => '#e60023', 'TELEGRAM' => '#229ed9',
+        'WHATSAPP' => '#25d366', 'CALL' => '#0ea5e9', 'WEBSITE' => '#6366f1', 'DIRECTIONS' => '#ea4335',
     ];
     $star = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3l-5.9 3.3 1.3-6.6L2.5 9.4l6.6-.8z"/></svg>';
     $icons = [
@@ -20,11 +23,19 @@
         'MARKKITO_REVIEW' => '<svg viewBox="0 0 24 24" fill="#f5b301" aria-hidden="true"><path d="M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3l-5.9 3.3 1.3-6.6L2.5 9.4l6.6-.8z"/></svg>',
         'INSTAGRAM' => '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.3" cy="6.7" r="1" fill="#fff" stroke="none"/></svg>',
         'YOUTUBE' => '<svg viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M10 8.5v7l6-3.5z"/></svg>',
+        'TIKTOK' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#25f4ee" transform="translate(-.8 -.6)" d="M16.5 3c.3 2.1 1.6 3.6 3.5 3.9v3a7.3 7.3 0 0 1-3.5-1.1v6.4A5.8 5.8 0 1 1 10.7 9.4v3.1a2.8 2.8 0 1 0 2.8 2.8V3z"/><path fill="#fe2c55" transform="translate(.8 .6)" d="M16.5 3c.3 2.1 1.6 3.6 3.5 3.9v3a7.3 7.3 0 0 1-3.5-1.1v6.4A5.8 5.8 0 1 1 10.7 9.4v3.1a2.8 2.8 0 1 0 2.8 2.8V3z"/><path fill="#fff" d="M16.5 3c.3 2.1 1.6 3.6 3.5 3.9v3a7.3 7.3 0 0 1-3.5-1.1v6.4A5.8 5.8 0 1 1 10.7 9.4v3.1a2.8 2.8 0 1 0 2.8 2.8V3z"/></svg>',
+        'X' => '<svg viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M17.8 3h3.1l-6.8 7.8 8 10.2h-6.3l-4.9-6.4L5.3 21H2.2l7.3-8.3L1.8 3h6.4l4.4 5.9zm-1.1 16.2h1.7L7.4 4.7H5.6z"/></svg>',
+        'LINKEDIN' => '<svg viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M6.9 8.8H3.6V20h3.3zM5.2 3.5a1.9 1.9 0 1 0 0 3.8 1.9 1.9 0 0 0 0-3.8zM20.4 13.4c0-3-1.6-4.9-4.3-4.9-1.6 0-2.6.9-3 1.6V8.8H9.9V20h3.3v-5.9c0-1.5.6-2.6 2-2.6s1.9 1.1 1.9 2.6V20h3.3z"/></svg>',
+        'SNAPCHAT' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#fff" stroke="#111" stroke-width="1.3" stroke-linejoin="round" d="M12 3c3 0 5 2.2 5 5v2.2l1.6-.5c.6-.1 1 .6.5 1l-1.8 1.1c.6 1.9 1.9 3.2 3.7 3.7-.3.8-1.4 1.1-2.6 1.2l-.4 1.3-1.9-.2c-.9 0-1.6.9-4.1 1.7-2.5-.8-3.2-1.7-4.1-1.7l-1.9.2-.4-1.3c-1.2-.1-2.3-.4-2.6-1.2 1.8-.5 3.1-1.8 3.7-3.7l-1.8-1.1c-.5-.4-.1-1.1.5-1l1.6.5V8c0-2.8 2-5 5-5z"/></svg>',
+        'THREADS' => '<svg viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M16.6 11.2l-.3-.1c-.2-2.9-1.8-4.6-4.5-4.6-1.6 0-3 .7-3.8 2l1.5 1c.6-.9 1.5-1.1 2.3-1.1 1 0 1.7.3 2.1.9.3.4.5 1 .6 1.7-.8-.1-1.6-.2-2.5-.1-2.5.1-4.1 1.6-4 3.7.1 1 .6 2 1.5 2.5.8.5 1.7.7 2.7.7 1.3-.1 2.3-.6 3-1.5.5-.7.9-1.6 1-2.7.6.4 1.1.9 1.3 1.5.4 1 .4 2.6-.9 3.9-1.1 1.1-2.5 1.6-4.6 1.7-2.3 0-4.1-.8-5.2-2.2-1.1-1.3-1.6-3.2-1.6-5.5s.5-4.2 1.6-5.5c1.1-1.4 2.9-2.1 5.2-2.2 2.3 0 4.1.8 5.3 2.2.6.7 1 1.6 1.3 2.6l1.7-.5c-.4-1.3-.9-2.4-1.7-3.3-1.6-1.8-3.8-2.7-6.7-2.8-2.9 0-5.1 1-6.6 2.8C4.1 7 3.4 9.3 3.4 12s.7 5 2 6.7c1.5 1.8 3.7 2.8 6.6 2.8 2.6 0 4.4-.7 5.9-2.2 2-2 1.9-4.4 1.3-5.9-.5-1-1.3-1.8-2.6-2.2zm-4.5 4.4c-1.1.1-2.2-.4-2.3-1.4 0-.8.6-1.6 2.4-1.7h.7c.6 0 1.2.1 1.7.2-.2 2.4-1.4 2.8-2.5 2.9z"/></svg>',
+        'PINTEREST' => '<svg viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M12 2.5a9.5 9.5 0 0 0-3.5 18.3c-.1-.8-.2-2 0-2.8l1.2-5s-.3-.6-.3-1.5c0-1.4.8-2.5 1.8-2.5.9 0 1.3.6 1.3 1.4 0 .9-.5 2.1-.8 3.3-.2 1 .5 1.8 1.5 1.8 1.8 0 3.2-1.9 3.2-4.7 0-2.4-1.8-4.1-4.3-4.1-2.9 0-4.6 2.2-4.6 4.4 0 .9.3 1.8.8 2.3l.1.3-.3 1.2c0 .2-.2.2-.4.1-1.3-.6-2.1-2.5-2.1-4 0-3.3 2.4-6.3 6.9-6.3 3.6 0 6.4 2.6 6.4 6 0 3.6-2.3 6.5-5.4 6.5-1.1 0-2.1-.6-2.4-1.2l-.7 2.5c-.2.9-.9 2.1-1.3 2.8A9.5 9.5 0 1 0 12 2.5z"/></svg>',
+        'TELEGRAM' => '<svg viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M20.7 4.3 2.9 11.2c-1.2.5-1.2 1.2-.2 1.5l4.6 1.4 1.7 5.4c.2.6.1.8.7.8.5 0 .7-.2 1-.5l2.4-2.3 4.8 3.6c.9.5 1.5.2 1.7-.8l3.2-15c.3-1.3-.5-1.9-1.4-1.5zM8.4 13.8l9.4-5.9c.5-.3.9-.1.5.2l-8 7.3-.3 3.3z"/></svg>',
         'WHATSAPP' => '<svg viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M12 2.5a9.4 9.4 0 0 0-8.1 14.2L2.5 21.5l4.9-1.3A9.4 9.4 0 1 0 12 2.5zm0 17.2c-1.5 0-2.9-.4-4.1-1.1l-.3-.2-2.9.8.8-2.8-.2-.3A7.8 7.8 0 1 1 12 19.7zm4.3-5.8c-.2-.1-1.4-.7-1.6-.8s-.4-.1-.5.1-.6.8-.8 1-.3.2-.5.1a6.4 6.4 0 0 1-3.2-2.8c-.2-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.7-1.7c-.2-.4-.4-.4-.5-.4h-.5a.9.9 0 0 0-.7.3 2.8 2.8 0 0 0-.9 2.1 4.9 4.9 0 0 0 1 2.6 11.2 11.2 0 0 0 4.3 3.8c1.6.7 2.2.7 3 .6.5-.1 1.4-.6 1.6-1.1s.2-1.1.1-1.1-.2-.2-.4-.3z"/></svg>',
         'CALL' => '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/></svg>',
         'WEBSITE' => '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>',
         'DIRECTIONS' => '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.1-7-11.5a7 7 0 0 1 14 0C19 14.9 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>',
     ];
+    $icons['FACEBOOK_PAGE'] = $icons['FACEBOOK'];
     $chevron = '<svg class="go" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>';
     $external = fn ($l) => ! in_array($l['key'], ['CALL'], true);
 @endphp
@@ -129,20 +140,22 @@
       </section>
     @endif
 
-    @if ($follow)
-      <section>
-        <h2>Follow &amp; connect</h2>
-        <div class="grid">
-          @foreach ($follow as $l)
-            <a class="link" href="{{ $l['href'] }}" data-link="{{ $l['key'] }}" rel="noopener">
-              <span class="ico" style="background:{{ $tint[$l['key']] }}">{!! $icons[$l['key']] !!}</span>
-              <span class="txt"><b>{{ $l['label'] }}</b></span>
-              {!! $chevron !!}
-            </a>
-          @endforeach
-        </div>
-      </section>
-    @endif
+    @foreach ([['Follow us', $follow], ['Contact us', $contact]] as [$heading, $group])
+      @if ($group)
+        <section>
+          <h2>{{ $heading }}</h2>
+          <div class="grid">
+            @foreach ($group as $l)
+              <a class="link" href="{{ $l['href'] }}" data-link="{{ $l['key'] }}" rel="noopener">
+                <span class="ico" style="background:{{ $tint[$l['key']] }}">{!! $icons[$l['key']] !!}</span>
+                <span class="txt"><b>{{ $l['label'] }}</b>@if ($l['sub'])<small>{{ $l['sub'] }}</small>@endif</span>
+                {!! $chevron !!}
+              </a>
+            @endforeach
+          </div>
+        </section>
+      @endif
+    @endforeach
 
     <footer>Powered by <a href="{{ config('frontend.origin') }}" rel="noopener">Markkito</a></footer>
   </div>

@@ -41,10 +41,36 @@ class OneReviewTest extends TestCase
             ->assertSee('Spice Garden')
             ->assertSee('Review us on Google')
             ->assertSee('search.google.com/local/writereview?placeid=ChIJ_test_place', false)
-            ->assertSee('Follow on Instagram')->assertSee('https://www.instagram.com/spicegarden/', false)
-            ->assertSee('Chat on WhatsApp')->assertSee('Call us')->assertSee('Get directions')
-            ->assertDontSee('Subscribe on YouTube')->assertDontSee('Recommend us on Facebook')->assertDontSee('Visit our website');
+            ->assertSee('https://www.instagram.com/spicegarden/', false)
+            ->assertSee('https://wa.me/', false)->assertSee('tel:', false)->assertSee('google.com/maps/dir', false)
+            ->assertDontSee('youtube.com', false)->assertDontSee('Recommend us on Facebook')->assertDontSee('tiktok.com', false);
         $this->assertSame(1, $this->business->fresh()->oneReviewViews);
+    }
+
+    public function test_every_social_network_entered_in_reviews_and_qr_shows_on_the_page(): void
+    {
+        $token = $this->postJson('/api/v1/auth/login', ['email' => $this->ownerEmail, 'password' => 'Password123!'])->json('data.accessToken');
+        $this->patchJson("/api/v1/businesses/{$this->business->id}/review-links", [
+            'facebookPageUrl' => 'spicegardenkochi', 'youtubeUrl' => '@spicegarden',
+            'socialTiktok' => '@spice.garden', 'socialX' => 'spicegarden', 'socialLinkedin' => 'https://www.linkedin.com/company/spice-garden',
+            'socialSnapchat' => 'spicesnap', 'socialThreads' => '@spicegarden', 'socialPinterest' => 'spicegarden', 'socialTelegram' => 'spicegarden',
+        ], ['Authorization' => "Bearer {$token}"])->assertOk()->assertJsonPath('data.socialTiktok', '@spice.garden');
+
+        $this->get('/one/spice-garden')->assertOk()
+            ->assertSee('https://www.facebook.com/spicegardenkochi"', false)
+            ->assertSee('https://www.facebook.com/spicegardenkochi/reviews', false)
+            ->assertSee('https://www.youtube.com/@spicegarden', false)
+            ->assertSee('https://www.tiktok.com/@spice.garden', false)
+            ->assertSee('https://x.com/spicegarden', false)
+            ->assertSee('https://www.linkedin.com/company/spice-garden', false)
+            ->assertSee('https://www.snapchat.com/add/spicesnap', false)
+            ->assertSee('https://www.threads.net/@spicegarden', false)
+            ->assertSee('https://www.pinterest.com/spicegarden', false)
+            ->assertSee('https://t.me/spicegarden', false);
+
+        // Clearing a field removes it.
+        $this->patchJson("/api/v1/businesses/{$this->business->id}/review-links", ['socialTiktok' => ''], ['Authorization' => "Bearer {$token}"])->assertOk();
+        $this->get('/one/spice-garden')->assertDontSee('tiktok.com', false)->assertSee('https://x.com/spicegarden', false);
     }
 
     public function test_taps_are_counted_per_link(): void
@@ -74,7 +100,7 @@ class OneReviewTest extends TestCase
         $this->get("/dashboard/businesses/{$this->business->id}")->assertOk()->assertSee('One Review');
         $this->get("/dashboard/businesses/{$this->business->id}?section=".urlencode('One Review'))->assertOk()
             ->assertSee('Your One Review page')->assertSee('/one/spice-garden')
-            ->assertSee('Not set up yet')->assertSee('Subscribe on YouTube');
+            ->assertSee('Not set up yet')->assertSee('TikTok');
 
         // Without the feature the section isn't offered.
         $this->business->update(['features' => ['WEBSITE']]);

@@ -10,6 +10,7 @@ use App\Support\BusinessAccess;
 use App\Support\GooglePlaceLink;
 use App\Support\GooglePlaces;
 use App\Support\ReviewChannels;
+use App\Support\SocialLinks;
 use Illuminate\Http\Request;
 
 class ReviewLinkController extends Controller
@@ -33,6 +34,8 @@ class ReviewLinkController extends Controller
             'instagramUsername' => $business->instagramUsername,
             'facebookPageUrl' => $business->facebookPageUrl,
             'youtubeUrl' => $business->youtubeUrl,
+            // TikTok, X, LinkedIn, ... as the owner typed them (SocialLinks).
+            ...SocialLinks::fields($business),
             'website' => $business->website,
             'preferredReviewChannel' => $business->preferredReviewChannel,
             // Whether "Find my business on Google" can be offered (GooglePlaces).
@@ -98,7 +101,11 @@ class ReviewLinkController extends Controller
             'facebookPageUrl' => ['sometimes', 'nullable', 'string', 'max:500'],
             'youtubeUrl' => ['sometimes', 'nullable', 'string', 'max:500'],
             'preferredReviewChannel' => ['sometimes', 'nullable', 'in:'.implode(',', ReviewChannels::ALL)],
+            ...SocialLinks::rules(),
         ]);
+        // The other social profiles live together in one column.
+        $social = SocialLinks::merge($business, $data);
+        $data = array_diff_key($data, SocialLinks::rules());
 
         // A link pasted into the Place ID box: find the place in it.
         if (! empty($data['googlePlaceId']) && str_contains($data['googlePlaceId'], '/')) {
@@ -125,7 +132,7 @@ class ReviewLinkController extends Controller
             throw ApiException::badRequest("Add your {$label} details before making it the default review channel");
         }
 
-        $business->update($data);
+        $business->update([...$data, 'socialLinks' => $social ?: null]);
 
         return $this->present($actor, $business);
     }

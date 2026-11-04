@@ -18,18 +18,26 @@ use App\Support\Cards\CardEngine;
  */
 class OneReview
 {
-    // Display order. `group` splits the page into "Review us" and "Follow & contact".
+    // Display order. `group` splits the page into "Review us", "Follow us" and "Contact".
     public const LINKS = [
         'GOOGLE' => ['label' => 'Review us on Google', 'sub' => 'Rate us and share your experience', 'group' => 'review'],
         'AI_REVIEW' => ['label' => 'Write it with AI help', 'sub' => 'We draft it, you post it on Google', 'group' => 'review'],
         'FACEBOOK' => ['label' => 'Recommend us on Facebook', 'sub' => 'Leave a recommendation', 'group' => 'review'],
         'MARKKITO_REVIEW' => ['label' => 'Review us on Markkito', 'sub' => 'Rate us on our listing', 'group' => 'review'],
-        'INSTAGRAM' => ['label' => 'Follow on Instagram', 'sub' => null, 'group' => 'follow'],
-        'YOUTUBE' => ['label' => 'Subscribe on YouTube', 'sub' => null, 'group' => 'follow'],
-        'WHATSAPP' => ['label' => 'Chat on WhatsApp', 'sub' => null, 'group' => 'follow'],
-        'CALL' => ['label' => 'Call us', 'sub' => null, 'group' => 'follow'],
-        'WEBSITE' => ['label' => 'Visit our website', 'sub' => null, 'group' => 'follow'],
-        'DIRECTIONS' => ['label' => 'Get directions', 'sub' => null, 'group' => 'follow'],
+        'INSTAGRAM' => ['label' => 'Instagram', 'sub' => 'Follow us', 'group' => 'follow'],
+        'FACEBOOK_PAGE' => ['label' => 'Facebook', 'sub' => 'Like our page', 'group' => 'follow'],
+        'YOUTUBE' => ['label' => 'YouTube', 'sub' => 'Subscribe', 'group' => 'follow'],
+        'TIKTOK' => ['label' => 'TikTok', 'sub' => 'Follow us', 'group' => 'follow'],
+        'X' => ['label' => 'X (Twitter)', 'sub' => 'Follow us', 'group' => 'follow'],
+        'LINKEDIN' => ['label' => 'LinkedIn', 'sub' => 'Connect', 'group' => 'follow'],
+        'SNAPCHAT' => ['label' => 'Snapchat', 'sub' => 'Add us', 'group' => 'follow'],
+        'THREADS' => ['label' => 'Threads', 'sub' => 'Follow us', 'group' => 'follow'],
+        'PINTEREST' => ['label' => 'Pinterest', 'sub' => 'Follow us', 'group' => 'follow'],
+        'TELEGRAM' => ['label' => 'Telegram', 'sub' => 'Join us', 'group' => 'follow'],
+        'WHATSAPP' => ['label' => 'WhatsApp', 'sub' => 'Chat with us', 'group' => 'contact'],
+        'CALL' => ['label' => 'Call us', 'sub' => 'Talk to us', 'group' => 'contact'],
+        'WEBSITE' => ['label' => 'Website', 'sub' => 'Visit us online', 'group' => 'contact'],
+        'DIRECTIONS' => ['label' => 'Directions', 'sub' => 'Find our shop', 'group' => 'contact'],
     ];
 
     public static function url(Business $business): string
@@ -57,7 +65,15 @@ class OneReview
             'FACEBOOK' => ReviewChannels::facebook($business),
             'MARKKITO_REVIEW' => ReviewChannels::markkitoReview($business),
             'INSTAGRAM' => ReviewChannels::instagram($business),
+            'FACEBOOK_PAGE' => self::facebookPage($business),
             'YOUTUBE' => ReviewChannels::youtube($business),
+            'TIKTOK' => SocialLinks::url($business, 'tiktok'),
+            'X' => SocialLinks::url($business, 'x'),
+            'LINKEDIN' => SocialLinks::url($business, 'linkedin'),
+            'SNAPCHAT' => SocialLinks::url($business, 'snapchat'),
+            'THREADS' => SocialLinks::url($business, 'threads'),
+            'PINTEREST' => SocialLinks::url($business, 'pinterest'),
+            'TELEGRAM' => SocialLinks::url($business, 'telegram'),
             'WHATSAPP' => $card['whatsappHref'],
             'CALL' => $card['phoneHref'],
             'WEBSITE' => ReviewChannels::website($business),
@@ -76,6 +92,14 @@ class OneReview
     public static function active(Business $business): array
     {
         return array_values(array_filter(self::links($business), fn ($l) => $l['href'] !== null));
+    }
+
+    // The Facebook page itself (to like and follow), not its reviews tab.
+    private static function facebookPage(Business $business): ?string
+    {
+        $url = ReviewChannels::facebook($business);
+
+        return $url ? preg_replace('#/reviews/?$#', '', $url) : null;
     }
 
     public static function countTap(Business $business, string $key): void

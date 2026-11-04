@@ -490,7 +490,7 @@ class BusinessController extends Controller
                 ...$source->only([
                     'description', 'categoryId', 'subscriptionPlan', 'businessType', 'email', 'phone', 'website',
                     'addressLine1', 'addressLine2', 'city', 'state', 'postalCode', 'country', 'latitude', 'longitude',
-                    'instagramUsername', 'facebookPageUrl', 'youtubeUrl', 'preferredReviewChannel', 'logoUrl', 'coverImageUrl',
+                    'instagramUsername', 'facebookPageUrl', 'youtubeUrl', 'socialLinks', 'preferredReviewChannel', 'logoUrl', 'coverImageUrl',
                 ]),
                 'name' => $name,
                 'slug' => $this->uniqueSlug($name),

@@ -80,6 +80,12 @@
           <label class="mb-1 block text-xs font-semibold text-ink-700">YouTube channel</label>
           <input class="input" name="youtubeUrl" placeholder="@yourshop or a full YouTube link" value="{{ $links['youtubeUrl'] ?? '' }}" />
         </div>
+        @foreach (\App\Support\SocialLinks::NETWORKS as [$label, $field, $placeholder])
+          <div>
+            <label class="mb-1 block text-xs font-semibold text-ink-700">{{ $label }}</label>
+            <input class="input" name="{{ $field }}" placeholder="{{ $placeholder }}" value="{{ $links[$field] ?? '' }}" />
+          </div>
+        @endforeach
         <div>
           <label class="mb-1 block text-xs font-semibold text-ink-700">Default channel for the QR board</label>
           <select class="input" name="preferredReviewChannel">
