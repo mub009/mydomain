@@ -39,11 +39,12 @@ class OneReviewTest extends TestCase
     {
         $this->get('/one/spice-garden')->assertOk()
             ->assertSee('Spice Garden')
-            ->assertSee('Review us on Google')
+            ->assertSee('aria-label="Google"', false)
             ->assertSee('search.google.com/local/writereview?placeid=ChIJ_test_place', false)
             ->assertSee('https://www.instagram.com/spicegarden/', false)
-            ->assertSee('https://wa.me/', false)->assertSee('tel:', false)->assertSee('google.com/maps/dir', false)
-            ->assertDontSee('youtube.com', false)->assertDontSee('Recommend us on Facebook')->assertDontSee('tiktok.com', false);
+            // Only review and social media links: no contact links.
+            ->assertDontSee('https://wa.me/', false)->assertDontSee('tel:', false)->assertDontSee('google.com/maps/dir', false)
+            ->assertDontSee('youtube.com', false)->assertDontSee('tiktok.com', false);
         $this->assertSame(1, $this->business->fresh()->oneReviewViews);
     }
 
@@ -57,7 +58,6 @@ class OneReviewTest extends TestCase
         ], ['Authorization' => "Bearer {$token}"])->assertOk()->assertJsonPath('data.socialTiktok', '@spice.garden');
 
         $this->get('/one/spice-garden')->assertOk()
-            ->assertSee('https://www.facebook.com/spicegardenkochi"', false)
             ->assertSee('https://www.facebook.com/spicegardenkochi/reviews', false)
             ->assertSee('https://www.youtube.com/@spicegarden', false)
             ->assertSee('https://www.tiktok.com/@spice.garden', false)

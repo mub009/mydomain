@@ -23,7 +23,7 @@
     <div class="grid gap-5 lg:grid-cols-[1fr_auto]">
       <div class="card p-5">
         <h3 class="flex items-center gap-1.5 font-bold text-ink-900"><x-icon name="qr-code" :size="16" class="text-brand-600" /> Your One Review page</h3>
-        <p class="mt-0.5 text-sm text-ink-500">One QR code for everything: customers scan it and pick where to review you or follow you — Google, Facebook, Instagram, YouTube, WhatsApp and more.</p>
+        <p class="mt-0.5 text-sm text-ink-500">One QR code for everything: customers scan it and tap the icon for Google, Facebook, Instagram, YouTube, TikTok and your other social media.</p>
 
         <div class="mt-4 flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
           <span class="min-w-0 flex-1 truncate font-mono text-sm text-ink-800">{{ $o['url'] }}</span>

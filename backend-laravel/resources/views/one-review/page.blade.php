@@ -4,9 +4,6 @@
      like the visiting card and AI review page: no app CSS or JS. $b is
      escaped by Blade. --}}
 @php
-    $review = array_values(array_filter($links, fn ($l) => $l['group'] === 'review'));
-    $follow = array_values(array_filter($links, fn ($l) => $l['group'] === 'follow'));
-    $contact = array_values(array_filter($links, fn ($l) => $l['group'] === 'contact'));
     // Brand colours for each link's icon tile.
     $tint = [
         'GOOGLE' => '#ffffff', 'AI_REVIEW' => '#0f9e68', 'FACEBOOK' => '#1877f2', 'MARKKITO_REVIEW' => '#0f172a',
@@ -92,6 +89,15 @@
     .grid .link{flex-direction:column;align-items:flex-start;gap:10px;padding:14px}
     .grid .txt b{font-size:14px}
     .grid .go{display:none}
+    .social{background:#fff;border-radius:22px;padding:18px 14px 16px;box-shadow:0 14px 36px -20px rgba(15,23,42,.25);text-align:center}
+    .social h2{margin:0 0 14px}
+    .icons{display:flex;flex-wrap:wrap;justify-content:center;gap:12px}
+    .icon{width:54px;height:54px;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 14px -8px rgba(15,23,42,.45);transition:transform .12s;-webkit-tap-highlight-color:transparent}
+    .icon:active{transform:scale(.92)}
+    .icon svg{width:26px;height:26px}
+    .icon.google{border:1px solid var(--line)}
+    .icon.google svg{width:28px;height:28px}
+    .hint{margin:14px 0 0;font-size:12.5px;color:var(--muted)}
     .empty{background:#fff;border-radius:16px;padding:18px;text-align:center;color:var(--muted);font-size:14px}
     footer{margin-top:28px;text-align:center;font-size:11.5px;color:var(--muted)}
     footer a{font-weight:700;color:#334155}
@@ -118,44 +124,18 @@
       <section><p class="empty">Links are coming soon.</p></section>
     @endif
 
-    @if ($review)
-      <section>
-        <h2>Review us</h2>
-        <div class="list">
-          @foreach ($review as $l)
-            <a class="link {{ $l['key'] === 'GOOGLE' ? 'featured' : '' }}" href="{{ $l['href'] }}" data-link="{{ $l['key'] }}" rel="noopener">
-              <span class="ico {{ $l['key'] === 'GOOGLE' ? 'google' : '' }}" style="background:{{ $tint[$l['key']] }}">{!! $icons[$l['key']] !!}</span>
-              <span class="txt">
-                <b>{{ $l['label'] }}</b>
-                @if ($l['key'] === 'GOOGLE')
-                  <span class="stars">@for ($i = 0; $i < 5; $i++){!! $star !!}@endfor</span>
-                @elseif ($l['sub'])
-                  <small>{{ $l['sub'] }}</small>
-                @endif
-              </span>
-              {!! $chevron !!}
-            </a>
+    @if ($links)
+      <section class="social">
+        <h2>Review &amp; follow us</h2>
+        <nav class="icons" aria-label="Review and follow {{ $b['name'] }}">
+          @foreach ($links as $l)
+            <a class="icon {{ $l['key'] === 'GOOGLE' ? 'google' : '' }}" href="{{ $l['href'] }}" data-link="{{ $l['key'] }}" rel="noopener"
+               style="background:{{ $tint[$l['key']] }}" aria-label="{{ $l['label'] }}" title="{{ $l['label'] }}">{!! $icons[$l['key']] !!}</a>
           @endforeach
-        </div>
+        </nav>
+        <p class="hint">Tap an icon to review or follow us</p>
       </section>
     @endif
-
-    @foreach ([['Follow us', $follow], ['Contact us', $contact]] as [$heading, $group])
-      @if ($group)
-        <section>
-          <h2>{{ $heading }}</h2>
-          <div class="grid">
-            @foreach ($group as $l)
-              <a class="link" href="{{ $l['href'] }}" data-link="{{ $l['key'] }}" rel="noopener">
-                <span class="ico" style="background:{{ $tint[$l['key']] }}">{!! $icons[$l['key']] !!}</span>
-                <span class="txt"><b>{{ $l['label'] }}</b>@if ($l['sub'])<small>{{ $l['sub'] }}</small>@endif</span>
-                {!! $chevron !!}
-              </a>
-            @endforeach
-          </div>
-        </section>
-      @endif
-    @endforeach
 
     <footer>Powered by <a href="{{ config('frontend.origin') }}" rel="noopener">Markkito</a></footer>
   </div>
