@@ -207,6 +207,7 @@ Route::prefix('businesses')->group(function () {
     Route::middleware('auth.jwt')->group(function () {
         Route::get('/{id}/ai-review', [AiReviewController::class, 'show']);
         Route::get('/{id}/one-review', [\App\Http\Controllers\OneReviewController::class, 'show']);
+        Route::put('/{id}/one-review', [\App\Http\Controllers\OneReviewController::class, 'update'])->middleware('privilege:MANAGE_LISTINGS');
         Route::put('/{id}/ai-review', [AiReviewController::class, 'update'])->middleware('privilege:MANAGE_LISTINGS');
         Route::post('/{id}/ai-review/sample', [AiReviewController::class, 'sample'])->middleware('throttle:30,60');
     });

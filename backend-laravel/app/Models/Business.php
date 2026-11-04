@@ -26,7 +26,7 @@ class Business extends Model
         'instagramUsername', 'facebookPageUrl', 'youtubeUrl', 'preferredReviewChannel',
         'logoUrl', 'coverImageUrl', 'isVerified', 'avgRating', 'reviewCount',
         'leadCount', 'viewCount', 'features', 'aiReview', 'aiReviewViews', 'aiReviewCopies',
-        'oneReviewViews', 'oneReviewTaps', 'socialLinks',
+        'oneReviewViews', 'oneReviewTaps', 'oneReviewStyle', 'socialLinks',
     ];
 
     protected function casts(): array

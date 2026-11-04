@@ -73,6 +73,27 @@ class OneReviewTest extends TestCase
         $this->get('/one/spice-garden')->assertDontSee('tiktok.com', false)->assertSee('https://x.com/spicegarden', false);
     }
 
+    public function test_the_owner_picks_one_of_ten_styles(): void
+    {
+        $this->assertCount(10, \App\Support\OneReview::STYLES);
+        $this->get('/one/spice-garden')->assertSee('class="t-classic"', false);
+
+        $token = $this->postJson('/api/v1/auth/login', ['email' => $this->ownerEmail, 'password' => 'Password123!'])->json('data.accessToken');
+        $auth = ['Authorization' => "Bearer {$token}"];
+        $this->getJson("/api/v1/businesses/{$this->business->id}/one-review", $auth)->assertOk()
+            ->assertJsonPath('data.style', 'classic')->assertJsonCount(10, 'data.styles');
+        $this->putJson("/api/v1/businesses/{$this->business->id}/one-review", ['style' => 'gold'], $auth)->assertOk()->assertJsonPath('data.style', 'gold');
+        $this->putJson("/api/v1/businesses/{$this->business->id}/one-review", ['style' => 'nope'], $auth)->assertStatus(400);
+
+        $this->get('/one/spice-garden')->assertSee('class="t-gold"', false);
+        // The dashboard's Preview shows another style without saving it or counting a visit.
+        $views = $this->business->fresh()->oneReviewViews;
+        $this->get('/one/spice-garden?style=neon')->assertSee('class="t-neon"', false);
+        $this->get('/one/spice-garden?style=bogus')->assertSee('class="t-gold"', false);
+        $this->assertSame('gold', $this->business->fresh()->oneReviewStyle);
+        $this->assertSame($views + 1, $this->business->fresh()->oneReviewViews);
+    }
+
     public function test_taps_are_counted_per_link(): void
     {
         $this->postJson('/api/v1/one-review/spice-garden/tap', ['link' => 'GOOGLE'])->assertOk();

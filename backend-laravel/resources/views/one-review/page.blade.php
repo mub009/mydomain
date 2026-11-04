@@ -48,62 +48,101 @@
   <meta property="og:title" content="{{ $b['name'] }} — review &amp; follow us" />
   @if ($b['logoUrl'])<meta property="og:image" content="{{ $b['logoUrl'] }}" />@endif
   <style>
-    :root{--brand:#0f9e68;--brand-dark:#0d7f56;--ink:#0f172a;--muted:#64748b;--line:#e8edf3;--star:#f5b301;--bg:#f1f5f9;color-scheme:only light}
+    /* Shared layout; each .t-<style> below only changes the variables (and a few touches). */
+    :root{--accent:#0f9e68;--ink:#0f172a;--ink2:#334155;--muted:#64748b;--line:#e8edf3;--star:#f5b301;
+      --bg:#f1f5f9;--card:#ffffff;--pill:#f8fafc;--hero:linear-gradient(135deg,#0f172a,#134e4a 55%,#0f9e68);
+      --logo-bg:#ecfdf5;--radius:22px;--shadow:0 14px 36px -16px rgba(15,23,42,.28);--font:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans",sans-serif;color-scheme:only light}
     *{box-sizing:border-box}
     html,body{margin:0;padding:0}
-    body{min-height:100vh;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans",sans-serif;-webkit-font-smoothing:antialiased;line-height:1.45}
+    body{min-height:100vh;background:var(--bg);background-attachment:fixed;color:var(--ink);font-family:var(--font);-webkit-font-smoothing:antialiased;line-height:1.45}
     a{color:inherit;text-decoration:none}
-    .page{max-width:480px;margin:0 auto;padding:0 0 calc(28px + env(safe-area-inset-bottom))}
-    .hero{position:relative;height:150px;background:linear-gradient(135deg,#0f172a,#134e4a 55%,#0f9e68);overflow:hidden}
+    .page{position:relative;max-width:480px;margin:0 auto;padding:0 0 calc(28px + env(safe-area-inset-bottom))}
+    .hero{position:relative;height:150px;background:var(--hero);overflow:hidden}
     .hero img{width:100%;height:100%;object-fit:cover;display:block}
     .hero::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(15,23,42,0) 40%,rgba(15,23,42,.35))}
-    .profile{position:relative;margin:-56px 16px 0;background:#fff;border-radius:22px;box-shadow:0 14px 36px -16px rgba(15,23,42,.28);padding:0 18px 20px;text-align:center}
-    .logo{width:88px;height:88px;margin:0 auto;transform:translateY(-38px);margin-bottom:-26px;border-radius:24px;overflow:hidden;background:#ecfdf5;border:4px solid #fff;box-shadow:0 6px 18px -6px rgba(15,23,42,.3);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:28px;color:var(--brand-dark)}
+    .profile,.social{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow)}
+    .profile{position:relative;margin:-56px 16px 0;padding:0 18px 20px;text-align:center}
+    .logo{width:88px;height:88px;margin:0 auto;transform:translateY(-38px);margin-bottom:-26px;border-radius:24px;overflow:hidden;background:var(--logo-bg);border:4px solid var(--card);box-shadow:0 6px 18px -6px rgba(15,23,42,.3);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:28px;color:var(--accent)}
     .logo img{width:100%;height:100%;object-fit:cover;display:block}
     h1{margin:0;font-size:22px;line-height:1.2;font-weight:800;letter-spacing:-.01em}
     .tagline{margin:4px 0 0;font-size:13.5px;color:var(--muted)}
     .meta{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:12px}
-    .pill{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;padding:5px 10px;border-radius:999px;background:#f8fafc;border:1px solid var(--line);color:#334155}
-    .pill.ok{background:#ecfdf5;border-color:#d1fae5;color:var(--brand-dark)}
+    .pill{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;padding:5px 10px;border-radius:999px;background:var(--pill);border:1px solid var(--line);color:var(--ink2)}
+    .pill.ok{color:var(--accent)}
     .pill svg{width:13px;height:13px}
     .pill .st{color:var(--star)}
-    .thanks{margin:14px 0 0;font-size:14px;color:#334155}
-    section{margin:22px 16px 0}
-    h2{margin:0 0 10px 4px;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
-    .list{display:grid;gap:10px}
-    .link{display:flex;align-items:center;gap:14px;background:#fff;border:1px solid var(--line);border-radius:16px;padding:13px 14px;box-shadow:0 2px 6px -4px rgba(15,23,42,.12);transition:transform .12s,box-shadow .12s;-webkit-tap-highlight-color:transparent}
-    .link:active{transform:scale(.985)}
-    .link:hover{box-shadow:0 8px 20px -12px rgba(15,23,42,.3)}
-    .ico{width:46px;height:46px;border-radius:13px;flex-shrink:0;display:flex;align-items:center;justify-content:center}
-    .ico svg{width:24px;height:24px}
-    .ico.google{border:1px solid var(--line)}
-    .ico.google svg{width:26px;height:26px}
-    .txt{min-width:0;flex:1}
-    .txt b{display:block;font-size:15.5px;font-weight:700}
-    .txt small{display:block;font-size:12.5px;color:var(--muted);margin-top:1px}
-    .go{width:18px;height:18px;color:#94a3b8;flex-shrink:0}
-    .featured{border:1.5px solid #fde68a;background:linear-gradient(180deg,#fffdf5,#fff)}
-    .featured .stars{display:flex;gap:2px;margin-top:3px;color:var(--star)}
-    .featured .stars svg{width:15px;height:15px}
-    .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-    .grid .link{flex-direction:column;align-items:flex-start;gap:10px;padding:14px}
-    .grid .txt b{font-size:14px}
-    .grid .go{display:none}
-    .social{background:#fff;border-radius:22px;padding:18px 14px 16px;box-shadow:0 14px 36px -20px rgba(15,23,42,.25);text-align:center}
-    .social h2{margin:0 0 14px}
+    .thanks{margin:14px 0 0;font-size:14px;color:var(--ink2)}
+    section{margin:18px 16px 0}
+    h2{margin:0 0 14px;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+    .social{padding:18px 14px 16px;text-align:center}
     .icons{display:flex;flex-wrap:wrap;justify-content:center;gap:12px}
     .icon{width:54px;height:54px;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 14px -8px rgba(15,23,42,.45);transition:transform .12s;-webkit-tap-highlight-color:transparent}
     .icon:active{transform:scale(.92)}
     .icon svg{width:26px;height:26px}
-    .icon.google{border:1px solid var(--line)}
+    .icon.google{border:1px solid #e8edf3}
     .icon.google svg{width:28px;height:28px}
     .hint{margin:14px 0 0;font-size:12.5px;color:var(--muted)}
-    .empty{background:#fff;border-radius:16px;padding:18px;text-align:center;color:var(--muted);font-size:14px}
+    .empty{background:var(--card);border-radius:16px;padding:18px;text-align:center;color:var(--muted);font-size:14px}
     footer{margin-top:28px;text-align:center;font-size:11.5px;color:var(--muted)}
-    footer a{font-weight:700;color:#334155}
+    footer a{font-weight:700;color:var(--ink2)}
+    .backdrop{display:none}
+
+    /* 2 Minimal: plain white, no banner, hairlines instead of shadows, square icons. */
+    .t-minimal{--bg:#ffffff;--shadow:none;--pill:#ffffff;--line:#e5e7eb;--ink:#111827;--ink2:#374151;--accent:#111827;--logo-bg:#f3f4f6}
+    .t-minimal .hero{display:none}
+    .t-minimal .profile{margin-top:36px;padding-top:4px}
+    .t-minimal .logo{transform:none;margin-bottom:14px;border-radius:50%;border-color:#f3f4f6}
+    .t-minimal .social{border-top:1px solid var(--line);border-radius:0;padding-top:22px}
+    .t-minimal .icon{border-radius:14px;box-shadow:none}
+
+    /* 3 Midnight: deep navy, soft glow. */
+    .t-midnight{--bg:#0b1120;--card:#111a2e;--ink:#f1f5f9;--ink2:#cbd5e1;--muted:#94a3b8;--line:#1e293b;--pill:#0f172a;--accent:#22d3ee;--logo-bg:#0f172a;
+      --hero:linear-gradient(135deg,#1e1b4b,#0f172a 60%,#0e7490);--shadow:0 20px 40px -20px rgba(0,0,0,.8)}
+
+    /* 4 Sunset: warm gradient page, white cards. */
+    .t-sunset{--bg:linear-gradient(160deg,#ff9a5a,#ff5e7e 55%,#a855f7);--hero:transparent;--ink:#3b0a2a;--ink2:#5b2140;--muted:#9d4b6c;--accent:#e11d48;--pill:#fff1f2;--line:#fde2e8;--logo-bg:#fff1f2;--radius:26px}
+    .t-sunset .hero::after,.t-ocean .hero::after{display:none}
+    .t-sunset footer,.t-sunset footer a,.t-ocean footer,.t-ocean footer a{color:#fff}
+
+    /* 5 Ocean: blue gradient page, white cards. */
+    .t-ocean{--bg:linear-gradient(160deg,#0ea5e9,#2563eb 60%,#1e3a8a);--hero:transparent;--ink:#0c1e4a;--ink2:#1e3a8a;--muted:#5b6b94;--accent:#2563eb;--pill:#eff6ff;--line:#dbeafe;--logo-bg:#eff6ff}
+
+    /* 6 Forest: deep green with a cream card. */
+    .t-forest{--bg:#14532d;--card:#fefce8;--ink:#1a2e05;--ink2:#3f4f24;--muted:#6b7a4d;--line:#e7e5c8;--pill:#f7f5dc;--accent:#15803d;--logo-bg:#f7f5dc;
+      --hero:linear-gradient(135deg,#052e16,#166534);--font:Georgia,"Times New Roman",serif}
+    .t-forest footer,.t-forest footer a{color:#d9f99d}
+
+    /* 7 Royal Gold: black and gold, serif — suits jewellers. */
+    .t-gold{--bg:#0a0a0a;--card:#141414;--ink:#f5e6c4;--ink2:#e7d3a6;--muted:#a8946b;--line:#3a3224;--pill:#1c1813;--accent:#e7c873;--logo-bg:#1c1813;
+      --hero:linear-gradient(135deg,#3a2a10,#b8860b 50%,#1a1206);--shadow:0 0 0 1px #3a3224,0 20px 40px -20px rgba(0,0,0,.9)}
+    .t-gold h1{font-family:Georgia,"Times New Roman",serif;color:#e7c873;letter-spacing:.02em}
+    .t-gold .logo{border-color:#c9a227}
+    .t-gold .icon{box-shadow:0 0 0 2px #141414,0 0 0 3.5px #c9a227}
+
+    /* 8 Pastel: soft pink and lilac, extra round. */
+    .t-pastel{--bg:linear-gradient(180deg,#fdf2f8,#ede9fe);--ink:#4c1d95;--ink2:#6d28d9;--muted:#8b5cf6;--line:#ede9fe;--pill:#faf5ff;--accent:#a21caf;--logo-bg:#fdf4ff;
+      --hero:linear-gradient(135deg,#fbcfe8,#c4b5fd);--radius:32px;--shadow:0 16px 34px -18px rgba(139,92,246,.45)}
+    .t-pastel .logo{border-radius:50%}
+
+    /* 9 Neon: black with glowing rings. */
+    .t-neon{--bg:#05010f;--card:#0d0620;--ink:#f5f3ff;--ink2:#ddd6fe;--muted:#a78bfa;--line:#2e1065;--pill:#140a2e;--accent:#e879f9;--logo-bg:#140a2e;
+      --hero:linear-gradient(135deg,#7c3aed,#db2777 50%,#06b6d4);--shadow:0 0 0 1px #2e1065,0 0 40px -10px rgba(168,85,247,.55)}
+    .t-neon h1{text-shadow:0 0 14px rgba(232,121,249,.8)}
+    .t-neon .icon{box-shadow:0 0 0 2px #0d0620,0 0 0 4px #a855f7,0 0 18px #a855f7}
+
+    /* 10 Glass: the cover photo (or a gradient) blurred behind frosted cards. */
+    .t-glass{--bg:#0f172a;--card:rgba(255,255,255,.14);--ink:#ffffff;--ink2:rgba(255,255,255,.9);--muted:rgba(255,255,255,.75);--line:rgba(255,255,255,.25);--pill:rgba(255,255,255,.12);--accent:#a7f3d0;--logo-bg:rgba(255,255,255,.2);
+      --hero:transparent;--shadow:0 20px 40px -20px rgba(0,0,0,.6)}
+    .t-glass .backdrop{display:block;position:fixed;inset:-40px;z-index:0;background:linear-gradient(135deg,#334155,#64748b 50%,#0f9e68) center/cover;filter:blur(28px) saturate(1.2);transform:scale(1.1)}
+    .t-glass .hero::after{display:none}
+    .t-glass .profile,.t-glass .social{-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);border:1px solid rgba(255,255,255,.25)}
+    .t-glass .logo{border-color:rgba(255,255,255,.5)}
+    .t-glass .page{z-index:1}
   </style>
 </head>
-<body>
+<body class="t-{{ $style }}">
+  {{-- Glass: the cover photo, blurred, behind everything. --}}
+  <div class="backdrop" @if ($b['coverImageUrl']) style="background-image:url('{{ $b['coverImageUrl'] }}')" @endif></div>
   <div class="page">
     <div class="hero">@if ($b['coverImageUrl'])<img src="{{ $b['coverImageUrl'] }}" alt="" />@endif</div>
 

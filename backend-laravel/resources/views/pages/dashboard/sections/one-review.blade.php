@@ -55,6 +55,46 @@
       </div>
     </div>
 
+    {{-- Page style: 10 looks for the public page. --}}
+    <form class="card p-5" data-one-style>
+      <div class="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 class="font-bold text-ink-900">Page style</h3>
+          <p class="mt-0.5 text-sm text-ink-500">Pick how your page looks to customers. Tap <b>Preview</b> to see it full size.</p>
+        </div>
+        <div class="flex items-center gap-3">
+          <span class="text-xs font-semibold text-brand-700" data-style-saved aria-live="polite"></span>
+          <button type="submit" class="btn-primary px-4 py-2 text-sm" data-style-save disabled><x-icon name="save" :size="15" /> Save style</button>
+        </div>
+      </div>
+      <div class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        @foreach ($o['styles'] as $s)
+          <label class="group relative block cursor-pointer rounded-xl border-2 border-gray-200 p-1.5 transition has-[:checked]:border-brand-500 has-[:checked]:ring-2 has-[:checked]:ring-brand-100">
+            <input type="radio" name="style" value="{{ $s['key'] }}" class="sr-only" @checked($o['style'] === $s['key']) />
+            {{-- A tiny drawing of the page: background, card with a logo and a row of icons. --}}
+            <span class="flex h-28 flex-col items-center justify-end overflow-hidden rounded-lg p-2" style="background:{{ $s['background'] }}">
+              <span class="flex w-full flex-col items-center gap-1 rounded-md px-2 pb-2 pt-1.5 shadow-sm" style="background:{{ $s['card'] }}">
+                <span class="h-3.5 w-3.5 rounded" style="background:{{ $s['text'] }};opacity:.85"></span>
+                <span class="h-1.5 w-12 rounded-full" style="background:{{ $s['text'] }};opacity:.8"></span>
+                <span class="mt-0.5 flex gap-1">
+                  <span class="h-2.5 w-2.5 rounded-full bg-white ring-1 ring-gray-200"></span>
+                  <span class="h-2.5 w-2.5 rounded-full" style="background:#1877f2"></span>
+                  <span class="h-2.5 w-2.5 rounded-full" style="background:#ee2a7b"></span>
+                  <span class="h-2.5 w-2.5 rounded-full" style="background:#ff0000"></span>
+                </span>
+              </span>
+            </span>
+            <span class="mt-1.5 flex items-center justify-between gap-1 px-0.5">
+              <span class="truncate text-xs font-semibold text-ink-900">{{ $s['name'] }}</span>
+              @if ($o['live'])
+                <a href="{{ $o['url'] }}?style={{ $s['key'] }}" target="_blank" rel="noopener" class="shrink-0 text-[11px] font-semibold text-brand-700 hover:underline">Preview</a>
+              @endif
+            </span>
+          </label>
+        @endforeach
+      </div>
+    </form>
+
     <div class="card p-5">
       <h3 class="font-bold text-ink-900">Links on your page</h3>
       <p class="mt-0.5 text-sm text-ink-500">Shown in this order. Only the links you've set up appear to customers.</p>

@@ -15,7 +15,7 @@ use Illuminate\Http\Request;
 // link tapped on the public /one/<slug> page.
 class OneReviewController extends Controller
 {
-    public function show(Request $request, string $id)
+    private function managed(Request $request, string $id): Business
     {
         $business = Business::find($id);
         if (! $business) {
@@ -24,13 +24,37 @@ class OneReviewController extends Controller
         BusinessAccess::assertCanManage($request->attributes->get('auth'), $business);
         BusinessFeatures::assert($business, BusinessFeatures::ONE_REVIEW);
 
+        return $business;
+    }
+
+    private function present(Business $business)
+    {
         return ApiResponse::ok([
             'url' => OneReview::url($business),
             'live' => OneReview::live($business),
             'published' => $business->status === 'PUBLISHED',
             'views' => (int) $business->oneReviewViews,
             'links' => OneReview::links($business),
+            'style' => OneReview::style($business),
+            'styles' => collect(OneReview::STYLES)->map(fn ($s, $key) => [
+                'key' => $key, 'name' => $s[0], 'background' => $s[1], 'card' => $s[2], 'text' => $s[3],
+            ])->values(),
         ]);
+    }
+
+    public function show(Request $request, string $id)
+    {
+        return $this->present($this->managed($request, $id));
+    }
+
+    // Picks the page's style.
+    public function update(Request $request, string $id)
+    {
+        $business = $this->managed($request, $id);
+        $data = $request->validate(['style' => ['required', 'string', 'in:'.implode(',', array_keys(OneReview::STYLES))]]);
+        $business->update(['oneReviewStyle' => $data['style']]);
+
+        return $this->present($business->fresh());
     }
 
     public function tap(Request $request, string $slug)

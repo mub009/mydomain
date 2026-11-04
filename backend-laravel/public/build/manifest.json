@@ -82,7 +82,7 @@
     ]
   },
   "resources/css/app.css": {
-    "file": "assets/app-Bhwq62gB.css",
+    "file": "assets/app-DKH4pF_s.css",
     "src": "resources/css/app.css",
     "isEntry": true
   },
@@ -283,13 +283,15 @@
     ]
   },
   "resources/js/pages/one-review-manager.js": {
-    "file": "assets/one-review-manager-D7VwoCQ7.js",
+    "file": "assets/one-review-manager-CUywUA9w.js",
     "name": "one-review-manager",
     "src": "resources/js/pages/one-review-manager.js",
     "isEntry": true,
     "imports": [
+      "_api-3HrlSN3j.js",
       "_channels-CvUWVcU_.js",
       "_ui-DIxCFilW.js",
+      "_widgets-DR4AA6UJ.js",
       "__commonjsHelpers-CqkleIqs.js"
     ]
   },

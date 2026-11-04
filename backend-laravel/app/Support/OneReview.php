@@ -32,6 +32,28 @@ class OneReview
         'TELEGRAM' => ['label' => 'Telegram'],
     ];
 
+    // The page's looks: key => [name, swatch background, swatch card colour, swatch text colour].
+    public const STYLES = [
+        'classic' => ['Classic', 'linear-gradient(135deg,#0f172a,#134e4a 55%,#0f9e68)', '#ffffff', '#0f172a'],
+        'minimal' => ['Minimal', '#ffffff', '#ffffff', '#111827'],
+        'midnight' => ['Midnight', 'linear-gradient(135deg,#1e1b4b,#0f172a 60%,#0e7490)', '#111a2e', '#f1f5f9'],
+        'sunset' => ['Sunset', 'linear-gradient(160deg,#ff9a5a,#ff5e7e 55%,#a855f7)', '#ffffff', '#3b0a2a'],
+        'ocean' => ['Ocean', 'linear-gradient(160deg,#0ea5e9,#2563eb 60%,#1e3a8a)', '#ffffff', '#0c1e4a'],
+        'forest' => ['Forest', 'linear-gradient(135deg,#052e16,#166534)', '#fefce8', '#1a2e05'],
+        'gold' => ['Royal Gold', 'linear-gradient(135deg,#3a2a10,#b8860b 50%,#1a1206)', '#141414', '#e7c873'],
+        'pastel' => ['Pastel', 'linear-gradient(135deg,#fbcfe8,#c4b5fd)', '#ffffff', '#4c1d95'],
+        'neon' => ['Neon', 'linear-gradient(135deg,#7c3aed,#db2777 50%,#06b6d4)', '#0d0620', '#f5f3ff'],
+        'glass' => ['Glass', 'linear-gradient(135deg,#334155,#64748b 50%,#0f9e68)', 'rgba(255,255,255,.35)', '#ffffff'],
+    ];
+
+    public const DEFAULT_STYLE = 'classic';
+
+    /** The business's style, or the default when unset or unknown. */
+    public static function style(Business $business): string
+    {
+        return isset(self::STYLES[$business->oneReviewStyle]) ? $business->oneReviewStyle : self::DEFAULT_STYLE;
+    }
+
     public static function url(Business $business): string
     {
         return rtrim((string) config('app.url'), '/')."/one/{$business->slug}";
