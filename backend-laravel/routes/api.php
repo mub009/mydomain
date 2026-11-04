@@ -362,6 +362,6 @@ Route::prefix('admin')->middleware(['auth.jwt', 'role:ADMIN'])->group(function (
 // The public AI Google Review page (/review/<slug>): no sign-in. Writing a
 // review calls the AI, so a visitor gets a handful a minute.
 Route::prefix('ai-review')->group(function () {
-    Route::post('/{slug}/generate', [AiReviewController::class, 'generate'])->middleware('throttle:12,1');
+    Route::post('/{slug}/generate', [AiReviewController::class, 'generate'])->middleware('throttle:60,1');
     Route::post('/{slug}/copied', [AiReviewController::class, 'copied'])->middleware('throttle:20,1');
 });
