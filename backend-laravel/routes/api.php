@@ -206,6 +206,7 @@ Route::prefix('businesses')->group(function () {
     // AI Google Review: what the AI's reviews mention, in which languages, and a sample.
     Route::middleware('auth.jwt')->group(function () {
         Route::get('/{id}/ai-review', [AiReviewController::class, 'show']);
+        Route::get('/{id}/one-review', [\App\Http\Controllers\OneReviewController::class, 'show']);
         Route::put('/{id}/ai-review', [AiReviewController::class, 'update'])->middleware('privilege:MANAGE_LISTINGS');
         Route::post('/{id}/ai-review/sample', [AiReviewController::class, 'sample'])->middleware('throttle:30,60');
     });
@@ -361,6 +362,9 @@ Route::prefix('admin')->middleware(['auth.jwt', 'role:ADMIN'])->group(function (
 
 // The public AI Google Review page (/review/<slug>): no sign-in. Writing a
 // review calls the AI, so a visitor gets a handful a minute.
+// The public One Review page counting a tapped link: no sign-in.
+Route::post('/one-review/{slug}/tap', [\App\Http\Controllers\OneReviewController::class, 'tap'])->middleware('throttle:60,1');
+
 Route::prefix('ai-review')->group(function () {
     Route::post('/{slug}/generate', [AiReviewController::class, 'generate'])->middleware('throttle:60,1');
     Route::post('/{slug}/copied', [AiReviewController::class, 'copied'])->middleware('throttle:20,1');

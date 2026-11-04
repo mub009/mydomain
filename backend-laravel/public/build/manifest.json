@@ -282,6 +282,17 @@
       "__commonjsHelpers-CqkleIqs.js"
     ]
   },
+  "resources/js/pages/one-review-manager.js": {
+    "file": "assets/one-review-manager-D7VwoCQ7.js",
+    "name": "one-review-manager",
+    "src": "resources/js/pages/one-review-manager.js",
+    "isEntry": true,
+    "imports": [
+      "_channels-CvUWVcU_.js",
+      "_ui-DIxCFilW.js",
+      "__commonjsHelpers-CqkleIqs.js"
+    ]
+  },
   "resources/js/pages/qr-claim.js": {
     "file": "assets/qr-claim-COMmYvcI.js",
     "name": "qr-claim",

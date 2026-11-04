@@ -24,13 +24,16 @@ class BusinessFeatures
 
     public const AI_REVIEW = 'AI_REVIEW';
 
-    public const ALL = [self::WEBSITE, self::VISITING_CARD, self::GOLD_RATE, self::AI_REVIEW];
+    public const ONE_REVIEW = 'ONE_REVIEW';
+
+    public const ALL = [self::WEBSITE, self::VISITING_CARD, self::GOLD_RATE, self::AI_REVIEW, self::ONE_REVIEW];
 
     public const LABELS = [
         self::WEBSITE => 'Website (subdomain)',
         self::VISITING_CARD => 'Digital visiting card',
         self::GOLD_RATE => 'Gold rate',
         self::AI_REVIEW => 'AI Google Review',
+        self::ONE_REVIEW => 'One Review',
     ];
 
     public const BLURBS = [
@@ -38,6 +41,7 @@ class BusinessFeatures
         self::VISITING_CARD => 'A digital visiting card with its link, QR code and PDF.',
         self::GOLD_RATE => "Today's gold-rate posters with its logo, ready to share.",
         self::AI_REVIEW => 'A review page where AI writes the review for customers to post on Google.',
+        self::ONE_REVIEW => 'One QR code that opens all its review and social media links on one page.',
     ];
 
     // The Manage-page sections each feature brings.
@@ -46,6 +50,7 @@ class BusinessFeatures
         self::VISITING_CARD => ['Visiting Card'],
         self::GOLD_RATE => ['Gold Rate'],
         self::AI_REVIEW => ['AI Google Review'],
+        self::ONE_REVIEW => ['One Review'],
     ];
 
     public static function rules(): array

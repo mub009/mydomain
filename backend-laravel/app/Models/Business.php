@@ -26,6 +26,7 @@ class Business extends Model
         'instagramUsername', 'facebookPageUrl', 'youtubeUrl', 'preferredReviewChannel',
         'logoUrl', 'coverImageUrl', 'isVerified', 'avgRating', 'reviewCount',
         'leadCount', 'viewCount', 'features', 'aiReview', 'aiReviewViews', 'aiReviewCopies',
+        'oneReviewViews', 'oneReviewTaps',
     ];
 
     protected function casts(): array
@@ -43,6 +44,8 @@ class Business extends Model
             'aiReview' => 'array',
             'aiReviewViews' => 'integer',
             'aiReviewCopies' => 'integer',
+            'oneReviewViews' => 'integer',
+            'oneReviewTaps' => 'array',
         ];
     }
 

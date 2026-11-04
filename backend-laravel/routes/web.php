@@ -46,6 +46,9 @@ Route::get('/card/{slug}', [CardPageController::class, 'show'])->where('slug', '
 // to copy and post on the business's Google page.
 Route::get('/review/{slug}', \App\Http\Controllers\Web\AiReviewPageController::class)->where('slug', '[A-Za-z0-9_-]+');
 
+// A business's One Review page: all its review and social links, from one QR code.
+Route::get('/one/{slug}', \App\Http\Controllers\Web\OneReviewPageController::class)->where('slug', '[A-Za-z0-9_-]+');
+
 // Short public path encoded on a printed QR board: /r/q/<code>
 Route::get('/r/q/{code}', [QrCodeController::class, 'scan']);
 
