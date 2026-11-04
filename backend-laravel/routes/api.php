@@ -253,6 +253,8 @@ Route::prefix('bookings')->middleware('auth.jwt')->group(function () {
 
 Route::prefix('points')->middleware(['auth.jwt', 'role:DEALER,ADMIN'])->group(function () {
     Route::get('/mine', [PointsController::class, 'mine']);
+    // The dealer's commission report: collected, commission, paid and due.
+    Route::get('/commission', [\App\Http\Controllers\CommissionController::class, 'mine']);
     Route::get('/mine/transactions', [PointsController::class, 'mineTransactions']);
 });
 
@@ -297,6 +299,10 @@ Route::prefix('admin')->middleware(['auth.jwt', 'role:ADMIN'])->group(function (
     Route::patch('/users/{id}', [AdminController::class, 'updateUser']);
     Route::patch('/users/{id}/points', [AdminController::class, 'adjustPoints']);
     Route::get('/users/{id}/points/transactions', [AdminController::class, 'userTransactions']);
+    // A dealer's commission report, and commission received from them.
+    Route::get('/users/{id}/commission', [\App\Http\Controllers\CommissionController::class, 'forDealer']);
+    Route::post('/users/{id}/commission-payments', [\App\Http\Controllers\CommissionController::class, 'storePayment']);
+    Route::delete('/commission-payments/{id}', [\App\Http\Controllers\CommissionController::class, 'deletePayment']);
 
     Route::get('/businesses', [AdminController::class, 'listBusinesses']);
     Route::get('/businesses/pending', [AdminController::class, 'listPendingBusinesses']);

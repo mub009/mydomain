@@ -108,8 +108,9 @@ class Points
             // A timed purchase (FeaturePlans) is never refunded.
             ->whereNull('durationMonths');
         $paid = (int) -(clone $purchases)->sum('amount');
-        // The sale is undone, so its commission is no longer owed.
+        // The sale is undone, so its price and commission come off again.
         $commission = (int) (clone $purchases)->sum('commissionInr');
+        $price = (int) (clone $purchases)->sum('priceInr');
         $dealer = User::where('id', $actor['sub'])->lockForUpdate()->first();
         if ($paid <= 0 || ! $dealer) {
             return 0;
@@ -125,6 +126,7 @@ class Points
             'businessId' => $business->id,
             'feature' => $feature,
             'commissionInr' => $commission ? -$commission : null,
+            'priceInr' => $price ? -$price : null,
             'note' => (BusinessFeatures::LABELS[$feature] ?? $feature)." removed from “{$business->name}” — point returned",
         ]);
 
@@ -149,6 +151,7 @@ class Points
             ->whereNull('durationMonths');
         $paid = (int) -(clone $purchases)->sum('amount');
         $commission = (int) (clone $purchases)->sum('commissionInr');
+        $price = (int) (clone $purchases)->sum('priceInr');
         $dealer = User::where('id', $actor['sub'])->lockForUpdate()->first();
         if ($paid <= 0 || ! $dealer) {
             return 0;
@@ -163,6 +166,7 @@ class Points
             'balanceAfter' => $dealer->points,
             'businessId' => $business->id,
             'commissionInr' => $commission ? -$commission : null,
+            'priceInr' => $price ? -$price : null,
             'note' => "Deleted “{$business->name}” — ".($paid === 1 ? 'point' : "{$paid} points").' returned',
         ]);
 

@@ -37,6 +37,8 @@ class DashboardController extends Controller
         'bookings' => ['label' => 'Bookings', 'icon' => 'calendar-clock', 'privilege' => 'MANAGE_BOOKINGS'],
         // The accounts a dealer created for business teams (dealers only).
         'logins' => ['label' => 'Business logins', 'icon' => 'key-round', 'privilege' => 'MANAGE_LISTINGS', 'dealerOnly' => true],
+        // Collected, commission, paid and due to the admin (dealers only).
+        'commission' => ['label' => 'Commission', 'icon' => 'receipt', 'privilege' => 'MANAGE_LISTINGS', 'dealerOnly' => true],
     ];
 
     // "Show 5 / 10 / 20 / 50" on the Listings and Business logins lists
@@ -154,23 +156,18 @@ class DashboardController extends Controller
             usort($renewals, fn ($a, $b) => $a['date'] <=> $b['date']);
         }
 
-        // The admin's commission on the dealer's sales and renewals
-        // (FeaturePlans), net of refunds, and the latest entries.
-        $commission = null;
-        if ($isDealer) {
-            $rows = \App\Models\PointTransaction::where('point_transactions.userId', $user->id)
-                ->whereNotNull('point_transactions.commissionInr')
-                ->leftJoin('businesses', 'businesses.id', '=', 'point_transactions.businessId')
-                ->orderByDesc('point_transactions.createdAt')
-                ->limit(10)
-                ->get(['point_transactions.*', 'businesses.name as businessName']);
-            $commission = ['owed' => \App\Support\Points::commissionOwed($user->id), 'recent' => $rows];
-        }
+        // The dealer's commission account with the admin (Commission): the
+        // summary on every tab, the full report on the Commission tab.
+        $commission = $isDealer ? \App\Support\Commission::summary($user->id) : null;
+        $commissionReport = $tab === 'commission'
+            ? (InternalApi::tryCall([\App\Http\Controllers\CommissionController::class, 'mine'], ['page' => $bizPage], [], true)['data'] ?? null)
+            : null;
 
         return view('pages.dashboard.index', [
             'user' => $user,
             'renewals' => $renewals,
             'commission' => $commission,
+            'commissionReport' => $commissionReport,
             'isDealer' => $isDealer,
             'canAssignOwner' => $isDealer || $user->role === 'ADMIN',
             'visibleTabs' => $visibleTabs,

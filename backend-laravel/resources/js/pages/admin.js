@@ -725,3 +725,125 @@ $("[data-group-delete]")?.addEventListener("click", () => {
     }
   });
 });
+
+// --- Dealer commission ----------------------------------------------------------------
+// What a dealer collected, the commission on it, what they've paid and what's
+// due; recording a payment takes it off what's due.
+const inr = (v) => (v === null || v === undefined ? "—" : `${v < 0 ? "−" : ""}₹${Math.abs(v).toLocaleString("en-IN")}`);
+
+$$("[data-commission]").forEach((button) =>
+  button.addEventListener("click", () => {
+    const dealer = JSON.parse(button.dataset.commission);
+    const today = new Date().toISOString().slice(0, 10);
+    const modal = openModal(
+      `Commission — ${dealer.firstName} ${dealer.lastName}`,
+      `<div class="space-y-4">
+        <div class="grid grid-cols-2 gap-2 sm:grid-cols-4" data-summary></div>
+        <form class="space-y-2 rounded-xl border border-gray-200 p-3" data-pay>
+          <div data-form-error></div>
+          <p class="text-sm font-semibold text-ink-900">Record a payment received</p>
+          <div class="flex flex-wrap gap-2">
+            <div class="relative w-36"><span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-ink-400">₹</span>
+              <input required type="number" min="1" step="1" class="input pl-7" name="amount" placeholder="Amount" /></div>
+            <input type="date" class="input w-40" name="paidOn" value="${today}" max="${today}" />
+            <input class="input min-w-0 flex-1" name="note" maxlength="300" placeholder="Note (optional, e.g. UPI ref)" />
+          </div>
+          <div class="flex items-center justify-between gap-2">
+            <button type="button" class="text-xs font-semibold text-brand-700 hover:underline" data-pay-all>Fill in the full amount due</button>
+            <button class="btn-primary px-4 py-2 text-sm" data-submit>Record payment</button>
+          </div>
+        </form>
+        <div data-payments></div>
+        <div data-sales></div>
+      </div>`,
+      { wide: true },
+    );
+    const body = modal.body;
+    const form = $("[data-pay]", body);
+    let due = 0;
+
+    const stat = (label, value, tint = "text-ink-900") =>
+      `<div class="rounded-lg bg-gray-50 px-3 py-2"><p class="text-[10px] font-semibold uppercase tracking-wide text-ink-500">${label}</p><p class="text-lg font-bold tabular-nums ${tint}">${value}</p></div>`;
+
+    async function load() {
+      try {
+        const { data } = await api.get(`/admin/users/${dealer.id}/commission`, { pageSize: 10 });
+        const s = data.summary;
+        due = s.due;
+        $("[data-summary]", body).innerHTML =
+          stat("Collected", inr(s.collected)) + stat("Commission", inr(s.commission)) + stat("Paid", inr(s.paid), "text-emerald-700") +
+          stat("Due", inr(s.due), s.due > 0 ? "text-amber-700" : "text-ink-900");
+        $("[data-payments]", body).innerHTML = data.payments.length
+          ? `<p class="mb-2 text-xs font-bold uppercase tracking-wide text-ink-500">Payments received</p>
+            <div class="max-h-52 divide-y divide-gray-100 overflow-y-auto rounded-lg border border-gray-100">${data.payments
+              .map(
+                (p) => `<div class="flex items-center justify-between gap-2 px-3 py-2">
+                  <div class="min-w-0"><p class="text-sm font-semibold text-emerald-700">${inr(p.amount)}</p>
+                    <p class="truncate text-[11px] text-ink-500">${esc(p.paidOn)}${p.note ? ` · ${esc(p.note)}` : ""}${p.receivedBy ? ` · by ${esc(p.receivedBy)}` : ""}</p></div>
+                  <button type="button" class="shrink-0 text-xs font-semibold text-red-700 hover:underline" data-remove="${esc(p.id)}">Remove</button>
+                </div>`,
+              )
+              .join("")}</div>`
+          : `<p class="text-sm text-ink-500">No payments recorded yet.</p>`;
+        $("[data-sales]", body).innerHTML = data.sales.length
+          ? `<p class="mb-2 text-xs font-bold uppercase tracking-wide text-ink-500">Latest sales and renewals</p>
+            <div class="max-h-52 divide-y divide-gray-100 overflow-y-auto rounded-lg border border-gray-100">${data.sales
+              .map(
+                (t) => `<div class="flex items-center justify-between gap-2 px-3 py-2 text-sm">
+                  <span class="min-w-0 truncate">${esc(t.business ?? "Deleted business")} · ${esc(t.featureLabel ?? "All features")}${
+                    t.type === "FEATURE_RENEWED" ? " (renewal)" : ["FEATURE_REMOVED", "BUSINESS_DELETED"].includes(t.type) ? " (refund)" : ""
+                  }</span>
+                  <span class="shrink-0 tabular-nums text-ink-500">${inr(t.price)} · <b class="text-ink-900">${inr(t.commission)}</b></span>
+                </div>`,
+              )
+              .join("")}</div>`
+          : "";
+      } catch (err) {
+        $("[data-summary]", body).innerHTML = alertBox(errorMessage(err));
+      }
+    }
+
+    $("[data-pay-all]", form).addEventListener("click", () => (form.amount.value = due > 0 ? due : ""));
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const errors = $("[data-form-error]", form);
+      const submit = $("[data-submit]", form);
+      errors.innerHTML = "";
+      submit.disabled = true;
+      try {
+        await api.post(`/admin/users/${dealer.id}/commission-payments`, {
+          amount: Number(form.amount.value),
+          paidOn: form.paidOn.value || undefined,
+          note: form.note.value.trim() || undefined,
+        });
+        form.amount.value = "";
+        form.note.value = "";
+        await load();
+      } catch (err) {
+        errors.innerHTML = alertBox(errorMessage(err));
+      } finally {
+        submit.disabled = false;
+      }
+    });
+    // Removing a payment recorded by mistake: two taps, no browser dialog.
+    $("[data-payments]", body).addEventListener("click", async (e) => {
+      const remove = e.target.closest("[data-remove]");
+      if (!remove) return;
+      if (remove.dataset.armed !== "1") {
+        remove.dataset.armed = "1";
+        remove.textContent = "Tap again to remove";
+        return;
+      }
+      remove.disabled = true;
+      try {
+        await api.delete(`/admin/commission-payments/${remove.dataset.remove}`);
+        await load();
+      } catch (err) {
+        $("[data-form-error]", form).innerHTML = alertBox(errorMessage(err));
+        remove.disabled = false;
+      }
+    });
+
+    load();
+  }),
+);

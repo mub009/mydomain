@@ -264,4 +264,46 @@ class FeaturePlansTest extends TestCase
         $this->get('/admin?tab='.urlencode('Feature Pricing'))->assertOk()->assertSee('Pricing groups')->assertSee('Default');
         $this->get('/admin?tab=Users')->assertOk()->assertSee('admin-pricing-groups', false);
     }
+
+    public function test_the_commission_report_tracks_collected_commission_paid_and_due(): void
+    {
+        // WEBSITE: Rs 1,500 with Rs 300 commission; GOLD_RATE (unlimited): Rs 800 with Rs 100.
+        $this->setPrices();
+        $admin = $this->user(['role' => 'ADMIN']);
+        $dealer = $this->dealer(20);
+        $business = $this->business($dealer);
+        $this->putJson("/api/v1/businesses/{$business->id}/features", ['features' => ['WEBSITE', 'GOLD_RATE']], $this->auth($dealer))->assertOk();
+
+        $this->getJson('/api/v1/points/commission', $this->auth($dealer))->assertOk()
+            ->assertJsonPath('data.summary.collected', 2300)->assertJsonPath('data.summary.commission', 400)
+            ->assertJsonPath('data.summary.paid', 0)->assertJsonPath('data.summary.due', 400)
+            ->assertJsonPath('data.summary.earnings', 1900)->assertJsonCount(2, 'data.sales');
+
+        // The admin records Rs 250 received: it comes off what's due.
+        $auth = $this->auth($admin);
+        $this->postJson("/api/v1/admin/users/{$dealer->id}/commission-payments", ['amount' => 250, 'note' => 'UPI 1234'], $auth)
+            ->assertCreated()->assertJsonPath('data.summary.paid', 250)->assertJsonPath('data.summary.due', 150);
+        // Not more than is due, and only for dealers.
+        $this->postJson("/api/v1/admin/users/{$dealer->id}/commission-payments", ['amount' => 151], $auth)->assertStatus(400);
+        $this->postJson("/api/v1/admin/users/{$admin->id}/commission-payments", ['amount' => 1], $auth)->assertStatus(400);
+        // Dealers can't record payments.
+        $this->postJson("/api/v1/admin/users/{$dealer->id}/commission-payments", ['amount' => 1], $this->auth($dealer))->assertForbidden();
+
+        // Refunding the unlimited feature takes its price and commission off.
+        $this->putJson("/api/v1/businesses/{$business->id}/features", ['features' => ['WEBSITE']], $this->auth($dealer))->assertOk();
+        $report = $this->getJson("/api/v1/admin/users/{$dealer->id}/commission", $auth)->assertOk()
+            ->assertJsonPath('data.summary.collected', 1500)->assertJsonPath('data.summary.commission', 300)
+            ->assertJsonPath('data.summary.due', 50)->assertJsonCount(1, 'data.payments');
+
+        // A payment recorded by mistake can be removed: it's owed again.
+        $paymentId = $report->json('data.payments.0.id');
+        $this->deleteJson("/api/v1/admin/commission-payments/{$paymentId}", [], $auth)->assertOk()->assertJsonPath('data.summary.due', 300);
+
+        // The dealer's Commission tab.
+        $this->withoutVite();
+        $this->post('/login', ['email' => $dealer->email, 'password' => 'Password123!']);
+        $this->get('/dashboard?tab=commission')->assertOk()
+            ->assertSee('Due to admin')->assertSee('Sales and renewals')->assertSee('Payments to admin')->assertSee('₹1,500');
+        $this->get('/dashboard')->assertOk()->assertSee('₹300 due');
+    }
 }

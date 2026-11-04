@@ -57,6 +57,7 @@
           @endif
           @if ($u['role'] === 'DEALER')
             <button type="button" data-points="{{ json_encode($u) }}" class="btn-secondary px-3 py-1.5 text-sm whitespace-nowrap"><x-icon name="coins" :size="14" /> Points</button>
+            <button type="button" data-commission="{{ json_encode(['id' => $u['id'], 'firstName' => $u['firstName'], 'lastName' => $u['lastName']]) }}" class="btn-secondary px-3 py-1.5 text-sm whitespace-nowrap"><x-icon name="receipt" :size="14" /> Commission</button>
           @endif
           <button type="button" data-reset-password="{{ json_encode($u) }}" class="btn-secondary px-3 py-1.5 text-sm whitespace-nowrap">Reset password</button>
           <button type="button" data-edit-user="{{ json_encode($u) }}" class="btn-secondary px-3 py-1.5 text-sm">Edit</button>

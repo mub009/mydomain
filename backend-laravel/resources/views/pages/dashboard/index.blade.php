@@ -86,46 +86,22 @@
     <div class="card p-8 text-center text-sm text-ink-500">Your account doesn’t have any features enabled yet. Please contact your administrator to grant access.</div>
   @endif
 
-  @if ($commission && ($commission['owed'] !== 0 || $commission['recent']->isNotEmpty()))
-    {{-- What the dealer owes the admin in commission (App\Support\FeaturePlans). --}}
-    <details class="card mb-4 p-4" data-commission>
-      <summary class="flex cursor-pointer list-none flex-wrap items-center justify-between gap-3">
-        <span class="flex items-center gap-2">
-          <span class="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-50 text-violet-600"><x-icon name="receipt" :size="17" /></span>
-          <span>
-            <span class="block text-xs font-semibold uppercase tracking-wide text-ink-500">Commission to admin</span>
-            <span class="block text-xl font-bold tabular-nums text-ink-900">₹{{ number_format($commission['owed']) }}</span>
-          </span>
+  @if ($commission && $commission['commission'] !== 0 && $tab !== 'commission')
+    {{-- What the dealer owes the admin in commission (App\Support\Commission). --}}
+    <a href="/dashboard?tab=commission" class="card mb-4 flex flex-wrap items-center justify-between gap-3 p-4 transition hover:ring-1 hover:ring-brand-200" data-commission>
+      <span class="flex items-center gap-2">
+        <span class="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-50 text-violet-600"><x-icon name="receipt" :size="17" /></span>
+        <span>
+          <span class="block text-xs font-semibold uppercase tracking-wide text-ink-500">Commission to admin</span>
+          <span class="block text-xl font-bold tabular-nums {{ $commission['due'] > 0 ? 'text-amber-700' : 'text-ink-900' }}">₹{{ number_format(max(0, $commission['due'])) }} due</span>
         </span>
-        <span class="text-xs font-semibold text-brand-700">Show details</span>
-      </summary>
-      <p class="mt-3 text-xs text-ink-500">The admin's share of each feature you sell or renew. Turning off an unlimited feature, or deleting its business, takes its commission off again.</p>
-      <div class="mt-2 overflow-x-auto">
-        <table class="w-full min-w-[520px] text-sm">
-          <thead>
-            <tr class="border-b border-gray-200 text-left text-[11px] font-semibold uppercase tracking-wide text-ink-500">
-              <th class="py-1.5 pr-3">Date</th>
-              <th class="py-1.5 pr-3">Business · feature</th>
-              <th class="py-1.5 pr-3 text-right">Price</th>
-              <th class="py-1.5 text-right">Commission</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-100">
-            @foreach ($commission['recent'] as $t)
-              <tr>
-                <td class="whitespace-nowrap py-2 pr-3 text-xs text-ink-500">{{ \Illuminate\Support\Carbon::parse($t->createdAt)->format('j M Y') }}</td>
-                <td class="py-2 pr-3">
-                  <span class="font-medium text-ink-900">{{ $t->businessName ?? 'Deleted business' }}</span>
-                  <span class="text-ink-500">· {{ $t->feature ? (\App\Support\BusinessFeatures::LABELS[$t->feature] ?? $t->feature) : 'All features' }}{{ $t->type === 'FEATURE_RENEWED' ? ' (renewal)' : '' }}{{ in_array($t->type, ['FEATURE_REMOVED', 'BUSINESS_DELETED'], true) ? ' (refund)' : '' }}</span>
-                </td>
-                <td class="py-2 pr-3 text-right tabular-nums text-ink-700">{{ $t->priceInr !== null ? '₹'.number_format($t->priceInr) : '—' }}</td>
-                <td @class(['py-2 text-right font-semibold tabular-nums', 'text-emerald-700' => $t->commissionInr < 0, 'text-ink-900' => $t->commissionInr >= 0])>{{ $t->commissionInr < 0 ? '−' : '' }}₹{{ number_format(abs($t->commissionInr)) }}</td>
-              </tr>
-            @endforeach
-          </tbody>
-        </table>
-      </div>
-    </details>
+      </span>
+      <span class="flex items-center gap-4 text-xs text-ink-500">
+        <span>Commission <b class="text-ink-900">₹{{ number_format($commission['commission']) }}</b></span>
+        <span>Paid <b class="text-emerald-700">₹{{ number_format($commission['paid']) }}</b></span>
+        <span class="font-semibold text-brand-700">View report →</span>
+      </span>
+    </a>
   @endif
 
   @if (! empty($renewals))
@@ -219,6 +195,10 @@
       @endif
     </div>
     <x-pager :page="$bizMeta['page']" :total-pages="$bizMeta['totalPages']" />
+  @endif
+
+  @if ($tab === 'commission')
+    @include('pages.dashboard.partials.commission-report')
   @endif
 
   @if ($tab === 'logins')
