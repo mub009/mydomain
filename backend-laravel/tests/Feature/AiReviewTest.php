@@ -197,7 +197,7 @@ class AiReviewTest extends TestCase
         }
         // No exact repeats, and every one written avoids the banned word where it could.
         $this->assertCount(30, array_unique($reviews));
-        $this->assertLessThanOrEqual(3, count(array_filter($reviews, fn ($r) => stripos($r, 'recommended') !== false)));
+        $this->assertCount(0, array_filter($reviews, fn ($r) => stripos($r, 'recommended') !== false));
         $this->assertGreaterThan(0, count(array_filter($reviews, fn ($r) => str_contains($r, 'kerala meals in kochi'))));
         $this->assertGreaterThan(0, count(array_filter($reviews, fn ($r) => str_contains($r, 'Priya'))));
         $this->assertGreaterThan(0.0, \App\Support\AiReview::similarity('a b c d', 'a b c e'));

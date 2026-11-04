@@ -60,8 +60,6 @@
     @include('pages.dashboard.partials.features')
 
     @if (! $section)
-      @include('pages.dashboard.partials.plan')
-
       {{-- The menu: every section as an icon tile. --}}
       <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         @foreach ($sections as $s)
@@ -127,6 +125,7 @@
       @case('Products') @include('pages.dashboard.sections.products') @break
       @case('Orders') @include('pages.dashboard.sections.orders') @break
       @case('Customers') @include('pages.dashboard.sections.customers') @break
+      @case('Your Plan') @include('pages.dashboard.partials.plan') @break
     @endswitch
   </div>
 

@@ -393,7 +393,9 @@ class FeaturePlansTest extends TestCase
 
         $this->withoutVite();
         $this->post('/login', ['email' => $owner->email, 'password' => 'Password123!']);
-        $this->get("/dashboard/businesses/{$business->id}")->assertOk()
+        // The last tile on the business's menu.
+        $this->get("/dashboard/businesses/{$business->id}")->assertOk()->assertSee('Your Plan')->assertDontSee('data-plan-panel', false);
+        $this->get("/dashboard/businesses/{$business->id}?section=".urlencode('Your Plan'))->assertOk()
             ->assertSee('Your plan')->assertSee('2 of 5 features active')
             ->assertSee('Valid until')->assertSee(now()->addMonths(12)->format('j M Y'))
             ->assertSee('Unlimited')->assertSee('Not included')
@@ -402,13 +404,13 @@ class FeaturePlansTest extends TestCase
         // A month before the end: expiring soon, with the dealer to contact, and a reminder on the dashboard.
         $this->travel(11)->months();
         $this->travel(15)->days();
-        $this->get("/dashboard/businesses/{$business->id}")->assertOk()
+        $this->get("/dashboard/businesses/{$business->id}?section=".urlencode('Your Plan'))->assertOk()
             ->assertSee('Expiring soon')->assertSee('To renew or add features, contact your dealer')->assertSee('Ravi Dealer');
         $this->get('/dashboard')->assertOk()->assertSee('Features to renew')->assertSee('View plan');
 
         // Past the end: expired and switched off.
         $this->travel(1)->months();
-        $this->get("/dashboard/businesses/{$business->id}")->assertOk()
+        $this->get("/dashboard/businesses/{$business->id}?section=".urlencode('Your Plan'))->assertOk()
             ->assertSee('Expired on')->assertSee('Switched off until renewed')->assertSee('1 of 5 features active');
     }
 }

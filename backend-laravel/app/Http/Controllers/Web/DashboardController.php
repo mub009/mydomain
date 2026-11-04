@@ -49,7 +49,7 @@ class DashboardController extends Controller
 
     // WhatsApp broadcasts and Poster Studio are not part of the Laravel
     // backend yet (see README), so the manager doesn't offer them.
-    public const SECTIONS = ['Contact', 'Hours', 'Services', 'Photos', 'Slider', 'Our Gallery', 'Reviews & QR', 'AI Google Review', 'One Review', 'Visiting Card', 'Gold Rate', 'Website', 'SEO', 'Products', 'Orders', 'Customers'];
+    public const SECTIONS = ['Contact', 'Hours', 'Services', 'Photos', 'Slider', 'Our Gallery', 'Reviews & QR', 'AI Google Review', 'One Review', 'Visiting Card', 'Gold Rate', 'Website', 'SEO', 'Products', 'Orders', 'Customers', 'Your Plan'];
 
     // How each section appears on the business's menu page: its icon, the
     // icon's colours, and one line on what it is for.
@@ -63,6 +63,7 @@ class DashboardController extends Controller
         'Reviews & QR' => ['icon' => 'qr-code', 'tint' => 'bg-yellow-50 text-yellow-600', 'blurb' => 'Review links and QR boards'],
         'AI Google Review' => ['icon' => 'sparkles', 'tint' => 'bg-emerald-50 text-emerald-700', 'blurb' => 'A page where AI writes the review your customers post on Google'],
         'One Review' => ['icon' => 'qr-code', 'tint' => 'bg-indigo-50 text-indigo-600', 'blurb' => 'One QR code that opens all your review and social links'],
+        'Your Plan' => ['icon' => 'shield-check', 'tint' => 'bg-slate-100 text-slate-700', 'blurb' => 'Your features, which are active and when they expire'],
         'Visiting Card' => ['icon' => 'layout-template', 'tint' => 'bg-fuchsia-50 text-fuchsia-600', 'blurb' => 'Your digital visiting card, its design, link and QR code'],
         'Gold Rate' => ['icon' => 'coins', 'tint' => 'bg-amber-50 text-amber-700', 'blurb' => "Today's gold-rate posters with your logo, to download and share"],
         'Website' => ['icon' => 'globe', 'tint' => 'bg-sky-50 text-sky-600', 'blurb' => 'Design and publish your website'],

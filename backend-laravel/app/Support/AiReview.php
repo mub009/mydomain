@@ -326,7 +326,14 @@ class AiReview
         $what = mb_strtolower(trim((string) ($facts['category'] ?? ''))) ?: 'place';
         $points = collect(self::list((string) ($facts['highlights'] ?? '')))->merge($facts['services'] ?? [])->filter()->values();
         $point = $points->isNotEmpty() ? mb_strtolower($points->random()) : null;
-        $pick = fn (array $options) => $options[array_rand($options)];
+        // Never a phrase with a word the business wants avoided, while there's another to choose.
+        $avoid = $facts['avoid'] ?? [];
+        $pick = function (array $options) use ($avoid) {
+            $allowed = array_values(array_filter($options, fn ($o) => ! self::usesAvoided($o, $avoid)));
+            $from = $allowed ?: $options;
+
+            return $from[array_rand($from)];
+        };
         $band = $rating >= 5 ? 5 : ($rating === 4 ? 4 : ($rating === 3 ? 3 : 1));
 
         $openings = [
