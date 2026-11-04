@@ -16,14 +16,14 @@
 @section('content')
   <div class="space-y-4">
     <div class="flex items-center justify-between gap-3 flex-wrap">
-      <div class="flex items-center gap-3">
-        <a href="{{ $section ? $base : '/dashboard' }}" class="btn-secondary px-3 py-2 text-sm"><x-icon name="arrow-left" :size="15" /> {{ $section ? 'Menu' : 'Back' }}</a>
-        <div>
-          <h2 class="text-lg font-bold text-ink-900">{{ $biz['name'] }}</h2>
+      <div class="flex min-w-0 items-center gap-3">
+        <a href="{{ $section ? $base : '/dashboard' }}" class="btn-secondary shrink-0 px-3 py-2 text-sm"><x-icon name="arrow-left" :size="15" /> {{ $section ? 'Menu' : 'Back' }}</a>
+        <div class="min-w-0">
+          <h2 class="text-lg font-bold text-ink-900 break-words">{{ $biz['name'] }}</h2>
           <span class="badge {{ $statusBadge }}">{{ preg_replace('/_/', ' ', $biz['status'], 1) }}</span>
         </div>
       </div>
-      <div class="flex items-center gap-2">
+      <div class="flex flex-wrap items-center gap-2">
         @if ($canChangeFeatures)
           {{-- Opens the "Features for this business" panel below the header. --}}
           <button type="button" data-features-toggle aria-expanded="false" class="btn-secondary px-3 py-2 text-sm"><x-icon name="sliders-horizontal" :size="15" /> Features
