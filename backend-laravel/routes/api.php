@@ -300,6 +300,8 @@ Route::prefix('admin')->middleware(['auth.jwt', 'role:ADMIN'])->group(function (
     Route::patch('/users/{id}/points', [AdminController::class, 'adjustPoints']);
     Route::get('/users/{id}/points/transactions', [AdminController::class, 'userTransactions']);
     // A dealer's commission report, and commission received from them.
+    // Every dealer's commission, with totals and the latest payments.
+    Route::get('/commission', [\App\Http\Controllers\CommissionController::class, 'adminIndex']);
     Route::get('/users/{id}/commission', [\App\Http\Controllers\CommissionController::class, 'forDealer']);
     Route::post('/users/{id}/commission-payments', [\App\Http\Controllers\CommissionController::class, 'storePayment']);
     Route::delete('/commission-payments/{id}', [\App\Http\Controllers\CommissionController::class, 'deletePayment']);

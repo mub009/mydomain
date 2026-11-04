@@ -306,4 +306,39 @@ class FeaturePlansTest extends TestCase
             ->assertSee('Due to admin')->assertSee('Sales and renewals')->assertSee('Payments to admin')->assertSee('₹1,500');
         $this->get('/dashboard')->assertOk()->assertSee('₹300 due');
     }
+
+    public function test_the_admin_commission_report_covers_every_dealer(): void
+    {
+        $this->setPrices();
+        $admin = $this->user(['role' => 'ADMIN']);
+        $auth = $this->auth($admin);
+        $owes = $this->dealer(20);
+        $owes->update(['firstName' => 'Anil']);
+        $settled = $this->dealer(20);
+        $settled->update(['firstName' => 'Bina']);
+        $idle = $this->dealer(20);
+        $idle->update(['firstName' => 'Chetan']);
+        // Website: Rs 300 commission each; Bina pays hers in full.
+        $this->putJson('/api/v1/businesses/'.$this->business($owes)->id.'/features', ['features' => ['WEBSITE']], $this->auth($owes))->assertOk();
+        $this->putJson('/api/v1/businesses/'.$this->business($settled)->id.'/features', ['features' => ['WEBSITE', 'GOLD_RATE']], $this->auth($settled))->assertOk();
+        $this->postJson("/api/v1/admin/users/{$settled->id}/commission-payments", ['amount' => 400], $auth)->assertCreated();
+
+        $report = $this->getJson('/api/v1/admin/commission', $auth)->assertOk()
+            ->assertJsonPath('data.totals.collected', 3800)->assertJsonPath('data.totals.commission', 700)
+            ->assertJsonPath('data.totals.paid', 400)->assertJsonPath('data.totals.due', 300)
+            ->assertJsonPath('data.totals.paidThisMonth', 400)
+            ->assertJsonCount(3, 'data.dealers')->assertJsonCount(1, 'data.recentPayments');
+        // Most due first.
+        $this->assertSame('Anil', $report->json('data.dealers.0.firstName'));
+        $this->assertSame(300, $report->json('data.dealers.0.due'));
+
+        $this->getJson('/api/v1/admin/commission?due=1', $auth)->assertJsonCount(1, 'data.dealers')->assertJsonPath('data.dealers.0.firstName', 'Anil');
+        $this->getJson('/api/v1/admin/commission?search=Bina', $auth)->assertJsonCount(1, 'data.dealers')->assertJsonPath('data.dealers.0.paid', 400);
+        $this->getJson('/api/v1/admin/commission?sort=name', $auth)->assertJsonPath('data.dealers.2.firstName', 'Chetan');
+        $this->getJson('/api/v1/admin/commission', $this->auth($owes))->assertForbidden();
+
+        $this->withoutVite();
+        $this->post('/login', ['email' => $admin->email, 'password' => 'Password123!']);
+        $this->get('/admin?tab=Commission')->assertOk()->assertSee('Due from dealers')->assertSee('Anil')->assertSee('Record payment')->assertSee('Latest payments received');
+    }
 }

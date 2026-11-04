@@ -19,7 +19,7 @@ use Illuminate\Http\Request;
 class AdminPageController extends Controller
 {
     // Poster Studio is not part of the Laravel backend yet (see README).
-    public const TABS = ['Overview', 'Users', 'Businesses', 'Approvals', 'QR Boards', 'Visitors', 'Analytics', 'SEO', 'Reports', 'Gold Rates', 'Card Templates', 'Feature Pricing'];
+    public const TABS = ['Overview', 'Users', 'Businesses', 'Approvals', 'QR Boards', 'Visitors', 'Analytics', 'SEO', 'Reports', 'Gold Rates', 'Card Templates', 'Feature Pricing', 'Commission'];
 
     public const ROLES = ['CUSTOMER', 'BUSINESS_OWNER', 'DEALER', 'ADMIN'];
 
@@ -88,6 +88,11 @@ class AdminPageController extends Controller
                     'categoryId' => $q('category'), 'status' => $q('status'), 'search' => $q('search'),
                 ]), [], true)['data'] ?? null;
                 $data['categories'] = InternalApi::tryCall([CategoryController::class, 'index'])['data'] ?? [];
+                break;
+            case 'Commission':
+                $data['commissionReport'] = InternalApi::tryCall([\App\Http\Controllers\CommissionController::class, 'adminIndex'], array_filter([
+                    'search' => $q('search'), 'sort' => $q('sort'), 'due' => $request->boolean('due') ? '1' : null, 'page' => $page,
+                ]), [], true)['data'] ?? null;
                 break;
             case 'Feature Pricing':
                 $data['featurePlans'] = InternalApi::tryCall([\App\Http\Controllers\FeaturePlanController::class, 'index'], array_filter(['groupId' => $q('group')]), [], true)['data'] ?? null;

@@ -756,11 +756,13 @@ $$("[data-commission]").forEach((button) =>
         <div data-payments></div>
         <div data-sales></div>
       </div>`,
-      { wide: true },
+      // On the Commission tab, the table refreshes once the dialog closes after a change.
+      { wide: true, onClose: () => changed && button.hasAttribute("data-commission-reload") && window.location.reload() },
     );
     const body = modal.body;
     const form = $("[data-pay]", body);
     let due = 0;
+    let changed = false;
 
     const stat = (label, value, tint = "text-ink-900") =>
       `<div class="rounded-lg bg-gray-50 px-3 py-2"><p class="text-[10px] font-semibold uppercase tracking-wide text-ink-500">${label}</p><p class="text-lg font-bold tabular-nums ${tint}">${value}</p></div>`;
@@ -818,6 +820,7 @@ $$("[data-commission]").forEach((button) =>
         });
         form.amount.value = "";
         form.note.value = "";
+        changed = true;
         await load();
       } catch (err) {
         errors.innerHTML = alertBox(errorMessage(err));
@@ -837,6 +840,7 @@ $$("[data-commission]").forEach((button) =>
       remove.disabled = true;
       try {
         await api.delete(`/admin/commission-payments/${remove.dataset.remove}`);
+        changed = true;
         await load();
       } catch (err) {
         $("[data-form-error]", form).innerHTML = alertBox(errorMessage(err));
