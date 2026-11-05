@@ -233,8 +233,8 @@ class CardPdf
     /**
      * A picture cropped to fill a $w x $h box (cover) and cut to a drawn
      * shape ([x, y] points in percent of the box), as a PNG data URI —
-     * dompdf has no clip-path. $fit moves and zooms the picture inside it,
-     * as the public card's object-position and scale() do (ImageCard::pictureCss).
+     * dompdf has no clip-path. $fit is the picture's rectangle in percent of
+     * the box (moved and zoomed, always covering it — ImageCard::fit); none = centred, covering.
      */
     private static function shapedPng(string $url, float $w, float $h, array $shape, ?array $fit = null): ?string
     {
@@ -255,14 +255,17 @@ class CardPdf
         imagesavealpha($tile, true);
         $clear = imagecolorallocatealpha($tile, 0, 0, 0, 127);
         imagefill($tile, 0, 0, $clear);
-        $fx = ($fit['x'] ?? 50) / 100;
-        $fy = ($fit['y'] ?? 50) / 100;
-        $zoom = max(1, ($fit['zoom'] ?? 100) / 100);
-        // The covering crop at the chosen position, then zoomed about that same point.
-        $vw = $cw / $zoom;
-        $vh = $ch / $zoom;
-        $sx = ($sw - $cw) * $fx + ($cw - $vw) * $fx;
-        $sy = ($sh - $ch) * $fy + ($ch - $vh) * $fy;
+        $fit = ImageCard::fit($fit);
+        if ($fit) {
+            // The part of the picture that shows in the box: the box in the picture's own pixels.
+            $vw = $sw * 100 / $fit['w'];
+            $vh = $sh * 100 / $fit['h'];
+            $sx = -$fit['l'] / 100 * $vw;
+            $sy = -$fit['t'] / 100 * $vh;
+        } else {
+            // Centred, just covering.
+            [$vw, $vh, $sx, $sy] = [$cw, $ch, ($sw - $cw) / 2, ($sh - $ch) / 2];
+        }
         imagecopyresampled($tile, $src, 0, 0, (int) round($sx), (int) round($sy), $ow, $oh, max(1, (int) round($vw)), max(1, (int) round($vh)));
 
         // The shape, filled white on black, then everything outside it cleared.

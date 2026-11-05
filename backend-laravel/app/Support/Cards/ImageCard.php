@@ -36,6 +36,9 @@ class ImageCard
     /** Points in a picture's drawn shape. */
     public const MAX_SHAPE_POINTS = 120;
 
+    /** A free image's picture is at most this wide/high, in percent of its area (10x). */
+    public const FIT_MAX = 1000;
+
     /**
      * What a box can be: label, icon, kind (action / text / image), what its
      * value means (null = it takes none) and, for a detail that links
@@ -143,11 +146,13 @@ class ImageCard
             'hotspots.*.shape' => ['nullable', 'array', 'min:3', 'max:'.self::MAX_SHAPE_POINTS],
             'hotspots.*.shape.*' => ['array', 'size:2'],
             'hotspots.*.shape.*.*' => ['numeric', 'min:0', 'max:100'],
-            // Where a free image's picture sits inside its marked area: moved (0–100, like object-position) and zoomed.
+            // Where a free image's picture sits inside its area: its rectangle in percent of the area
+            // (it always covers the area: at least 100% wide and high, edges never inside).
             'hotspots.*.fit' => ['nullable', 'array'],
-            'hotspots.*.fit.x' => ['required_with:hotspots.*.fit', 'numeric', 'min:0', 'max:100'],
-            'hotspots.*.fit.y' => ['required_with:hotspots.*.fit', 'numeric', 'min:0', 'max:100'],
-            'hotspots.*.fit.zoom' => ['required_with:hotspots.*.fit', 'numeric', 'min:100', 'max:400'],
+            'hotspots.*.fit.l' => ['required_with:hotspots.*.fit', 'numeric', 'min:-'.(self::FIT_MAX - 100), 'max:0'],
+            'hotspots.*.fit.t' => ['required_with:hotspots.*.fit', 'numeric', 'min:-'.(self::FIT_MAX - 100), 'max:0'],
+            'hotspots.*.fit.w' => ['required_with:hotspots.*.fit', 'numeric', 'min:100', 'max:'.self::FIT_MAX],
+            'hotspots.*.fit.h' => ['required_with:hotspots.*.fit', 'numeric', 'min:100', 'max:'.self::FIT_MAX],
         ];
     }
 
@@ -227,19 +232,25 @@ class ImageCard
         return count($out) >= 3 ? $out : null;
     }
 
-    /** A free image's position and zoom inside its area; null = centred, not zoomed. */
+    /**
+     * Where a free image's picture sits inside its area: its rectangle
+     * ['l', 't', 'w', 'h'] in percent of the area, always covering it.
+     * null = centred, just covering (object-fit: cover).
+     */
     public static function fit(mixed $fit): ?array
     {
-        if (! is_array($fit)) {
+        if (! is_array($fit) || ! isset($fit['l'], $fit['t'], $fit['w'], $fit['h'])) {
             return null;
         }
-        $out = [
-            'x' => round(min(100, max(0, (float) ($fit['x'] ?? 50))), 2),
-            'y' => round(min(100, max(0, (float) ($fit['y'] ?? 50))), 2),
-            'zoom' => (int) round(min(400, max(100, (float) ($fit['zoom'] ?? 100)))),
-        ];
+        $w = round(min(self::FIT_MAX, max(100, (float) $fit['w'])), 2);
+        $h = round(min(self::FIT_MAX, max(100, (float) $fit['h'])), 2);
 
-        return $out === ['x' => 50.0, 'y' => 50.0, 'zoom' => 100] ? null : $out;
+        return [
+            'l' => round(min(0, max(100 - $w, (float) $fit['l'])), 2),
+            't' => round(min(0, max(100 - $h, (float) $fit['t'])), 2),
+            'w' => $w,
+            'h' => $h,
+        ];
     }
 
     /**
@@ -254,9 +265,11 @@ class ImageCard
         $shape = ! empty($s['shape']) ? self::clipPath($s['shape']) : null;
         $radius = (int) ($s['radius'] ?? 0);
         $box = $shape ? 'border-radius:0;clip-path:'.$shape : ($radius ? "border-radius:{$radius}%" : (($s['action'] ?? '') === 'custom_image' ? 'border-radius:0' : ''));
-        if (($s['action'] ?? '') === 'custom_image' && ($shape || ! empty($s['fit']))) {
-            $f = ($s['fit'] ?? null) ?: ['x' => 50, 'y' => 50, 'zoom' => 100];
-            $img = sprintf('object-fit:cover;object-position:%s%% %s%%;transform:scale(%s);transform-origin:%s%% %s%%', (float) $f['x'], (float) $f['y'], ((int) $f['zoom']) / 100, (float) $f['x'], (float) $f['y']);
+        $f = ($s['action'] ?? '') === 'custom_image' ? self::fit($s['fit'] ?? null) : null;
+        if ($f) {
+            $img = sprintf('position:absolute;left:%s%%;top:%s%%;width:%s%%;height:%s%%;max-width:none;object-fit:cover', $f['l'], $f['t'], $f['w'], $f['h']);
+        } elseif (($s['action'] ?? '') === 'custom_image' && $shape) {
+            $img = 'object-fit:cover';
         } else {
             $img = $shape ? 'object-fit:cover' : ($radius ? "object-fit:cover;border-radius:{$radius}%" : null);
         }
