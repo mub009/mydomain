@@ -106,7 +106,12 @@ async function loadCardTemplates() {
   }
   const request = ++cardRequest;
   try {
-    const { data } = await api.get("/card-templates", { categoryId, name: slugSource?.value.trim() || undefined });
+    const logoUrl = form.logoUrl?.value.trim();
+    const { data } = await api.get("/card-templates", {
+      categoryId,
+      name: slugSource?.value.trim() || undefined,
+      logoUrl: /^https?:\/\//.test(logoUrl || "") ? logoUrl : undefined,
+    });
     if (request !== cardRequest) return;
     cardTemplates = data;
     // Keep the pick if the new category still offers it; else its default.
@@ -123,6 +128,10 @@ async function loadCardTemplates() {
 form?.categoryId.addEventListener("change", loadCardTemplates);
 // Redrawn with the business's own name once it's typed.
 slugSource?.addEventListener("change", () => cardTemplates.length && loadCardTemplates());
+// …and with its logo, once one is uploaded or pasted.
+form?.logoUrl?.addEventListener("change", () => cardTemplates.length && loadCardTemplates());
+$('[data-upload-field="business-logo"]', form || document)?.addEventListener("upload:done", () => cardTemplates.length && loadCardTemplates());
+$('[data-upload-field="business-logo"]', form || document)?.addEventListener("upload:cleared", () => cardTemplates.length && loadCardTemplates());
 
 pickerOptions?.addEventListener("click", (e) => {
   const option = e.target.closest("[data-card-option]");
@@ -131,7 +140,7 @@ pickerOptions?.addEventListener("click", (e) => {
   pickedInput.value = template.id;
   renderCardOptions();
   cardPreviewModal(template.name, template.previewHtml, {
-    footer: `<p class="text-center text-sm text-ink-500">Selected. Your own details and logo are filled in once the business is created.</p>`,
+    footer: `<p class="text-center text-sm text-ink-500">Selected. Your own details are filled in once the business is created.</p>`,
   });
 });
 

@@ -72,6 +72,12 @@ class BusinessCardTest extends TestCase
         $general = $this->getJson("/api/v1/card-templates?categoryId={$florists->id}", $auth)->assertJsonCount(5, 'data');
         $this->assertNull($general->json('data.0.categoryId'));
         $this->assertStringContainsString('Your Business Name', $general->json('data.0.previewHtml'));
+
+        // The logo uploaded on the create form shows in the previews.
+        $logo = 'https://cdn.example.test/businesses/logos/mine.webp';
+        $withLogo = $this->getJson("/api/v1/card-templates?categoryId={$florists->id}&logoUrl=".urlencode($logo), $auth)->assertOk();
+        $this->assertStringContainsString('<img src="'.$logo.'"', $withLogo->json('data.0.previewHtml'));
+        $this->assertStringNotContainsString($logo, $general->json('data.0.previewHtml'));
     }
 
     public function test_switching_templates_changes_only_the_design_never_the_business_details(): void

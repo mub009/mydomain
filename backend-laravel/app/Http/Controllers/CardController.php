@@ -48,16 +48,17 @@ class CardController extends Controller
     /**
      * The designs for a category before the business exists — the "Add a
      * business" form's picker — each previewed with stand-in details (and
-     * the name typed so far).
+     * the name and logo given so far).
      */
     public function templates(Request $request)
     {
         $data = $request->validate([
             'categoryId' => ['nullable', 'uuid'],
             'name' => ['nullable', 'string', 'max:150'],
+            'logoUrl' => ['nullable', 'url', 'max:500'],
         ]);
         $categoryName = ! empty($data['categoryId']) ? Category::whereKey($data['categoryId'])->value('name') : null;
-        $sample = CardEngine::sampleDetails($data['name'] ?? null, $categoryName);
+        $sample = CardEngine::sampleDetails($data['name'] ?? null, $categoryName, $data['logoUrl'] ?? null);
 
         return ApiResponse::ok(CardEngine::templatesFor($data['categoryId'] ?? null)->map(fn (CardTemplate $t) => [
             ...CardEngine::summary($t),

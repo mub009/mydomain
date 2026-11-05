@@ -294,7 +294,7 @@ class CardEngine
     }
 
     /** Stand-in details for previews before a business exists (admin, the create form). */
-    public static function sampleDetails(?string $name = null, ?string $categoryName = null): array
+    public static function sampleDetails(?string $name = null, ?string $categoryName = null, ?string $logoUrl = null): array
     {
         $name = trim((string) $name) ?: 'Your Business Name';
 
@@ -303,7 +303,8 @@ class CardEngine
             'category' => $categoryName,
             'tagline' => collect([$categoryName ?: 'Your category', 'Your city'])->implode(' · '),
             'description' => 'A short line about what you do and why customers love you.',
-            'logoUrl' => null,
+            // The logo uploaded on the create form so far, so the previews show it.
+            'logoUrl' => self::safeUrl($logoUrl),
             'cardBackgroundUrl' => null,
             'coverImageUrl' => null,
             'phone' => '+91 98765 43210',
