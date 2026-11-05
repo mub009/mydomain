@@ -130,6 +130,7 @@ class ImageCard
             'hotspots.*.color' => ['nullable', 'regex:'.self::HEX],
             'hotspots.*.bg' => ['nullable', 'regex:'.self::HEX],
             'hotspots.*.align' => ['nullable', 'in:'.implode(',', self::ALIGNS)],
+            'hotspots.*.radius' => ['nullable', 'integer', 'min:0', 'max:50'],
         ];
     }
 
@@ -167,6 +168,8 @@ class ImageCard
                 'color' => isset($h['color']) && preg_match(self::HEX, $h['color']) ? strtolower($h['color']) : null,
                 'bg' => isset($h['bg']) && preg_match(self::HEX, $h['bg']) ? strtolower($h['bg']) : null,
                 'align' => in_array($h['align'] ?? null, self::ALIGNS, true) ? $h['align'] : null,
+                // The logo's rounded corners, in percent of its box: 0 = square, 50 = round.
+                'radius' => $h['action'] === 'logo' && ! empty($h['radius']) ? (int) min(50, max(0, (int) $h['radius'])) : null,
             ];
             if ($lenient) {
                 if (! self::valueIsValid($spot)) {

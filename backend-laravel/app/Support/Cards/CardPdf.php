@@ -150,7 +150,9 @@ class CardPdf
                     'text' => $h['text'],
                     'display' => $h['display'],
                     'textStyle' => $text,
-                    'src' => $h['kind'] === 'image' ? ($h['action'] === 'logo' ? self::png($h['src']) : $h['src']) : null,
+                    'src' => $h['kind'] === 'image' ? ($h['action'] === 'logo'
+                        ? (! empty($h['radius']) ? self::roundedPng($h['src'], $h['w'] * $width / 100, $h['h'] * $height / 100, (int) $h['radius']) : self::png($h['src']))
+                        : $h['src']) : null,
                     'box' => sprintf('left:%spt;top:%spt;width:%spt;height:%spt', round($h['x'] * $width / 100, 2), round($h['y'] * $height / 100, 2), round($h['w'] * $width / 100, 2), round($h['h'] * $height / 100, 2)),
                 ];
             })
@@ -172,6 +174,56 @@ class CardPdf
         imagesavealpha($img, true);
         ob_start();
         imagepng($img);
+
+        return 'data:image/png;base64,'.base64_encode((string) ob_get_clean());
+    }
+
+    /**
+     * A logo cropped to fill a $w x $h box (cover) with its corners rounded by
+     * $radius percent of each side (50 = round), as a PNG data URI — dompdf
+     * can't clip an image to rounded corners itself.
+     */
+    private static function roundedPng(string $url, float $w, float $h, int $radius): ?string
+    {
+        $src = self::gd($url);
+        if (! $src || $w <= 0 || $h <= 0) {
+            return null;
+        }
+        // Drawn at up to 4x the box's point size for a crisp edge, capped for memory.
+        $k = min(4, 1200 / max($w, $h));
+        $ow = max(1, (int) round($w * $k));
+        $oh = max(1, (int) round($h * $k));
+        $sw = imagesx($src);
+        $sh = imagesy($src);
+        $scale = max($ow / $sw, $oh / $sh);
+        $cw = (int) round($ow / $scale);
+        $ch = (int) round($oh / $scale);
+        $tile = imagecreatetruecolor($ow, $oh);
+        imagealphablending($tile, false);
+        imagesavealpha($tile, true);
+        imagefill($tile, 0, 0, imagecolorallocatealpha($tile, 0, 0, 0, 127));
+        imagecopyresampled($tile, $src, 0, 0, (int) (($sw - $cw) / 2), (int) (($sh - $ch) / 2), $ow, $oh, $cw, $ch);
+
+        // Clear what lies outside each corner's ellipse.
+        $rx = $ow * $radius / 100;
+        $ry = $oh * $radius / 100;
+        $clear = imagecolorallocatealpha($tile, 0, 0, 0, 127);
+        for ($y = 0; $y < $oh; $y++) {
+            $py = $y + 0.5;
+            $dy = $py < $ry ? $ry - $py : ($py > $oh - $ry ? $py - ($oh - $ry) : 0);
+            if ($dy <= 0) {
+                continue;
+            }
+            for ($x = 0; $x < $ow; $x++) {
+                $px = $x + 0.5;
+                $dx = $px < $rx ? $rx - $px : ($px > $ow - $rx ? $px - ($ow - $rx) : 0);
+                if ($dx > 0 && ($dx / $rx) ** 2 + ($dy / $ry) ** 2 > 1) {
+                    imagesetpixel($tile, $x, $y, $clear);
+                }
+            }
+        }
+        ob_start();
+        imagepng($tile);
 
         return 'data:image/png;base64,'.base64_encode((string) ob_get_clean());
     }

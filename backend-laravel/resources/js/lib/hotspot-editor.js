@@ -156,8 +156,9 @@ export function initHotspotEditor(editor, options) {
     if (kindOf(h) === "image") {
       const src = h.action === "logo" ? h.value || defaults.logo || "" : "";
       const logo = /^https?:/.test(src) ? src : null;
+      const radius = h.action === "logo" ? h.radius || 0 : 0;
       inner = logo
-        ? `<img src="${esc(logo)}" alt="" class="pointer-events-none h-full w-full object-contain" />`
+        ? `<img src="${esc(logo)}" alt="" class="pointer-events-none h-full w-full ${radius ? "object-cover" : "object-contain"}" style="border-radius:${radius}%" />`
         : `<span class="pointer-events-none flex h-full w-full flex-col items-center justify-center gap-0.5 bg-white/80 text-[10px] font-semibold text-ink-700">${icon(actions[h.action].icon, { size: 22 })}${esc(actions[h.action].label)}</span>`;
     } else {
       ensureFont(h.font);
@@ -363,6 +364,15 @@ export function initHotspotEditor(editor, options) {
                 <span class="mb-0.5 flex justify-between text-xs font-semibold text-ink-700">Logo size <span class="font-normal text-ink-500" data-logo-size-label>${Math.round(logoScale(h) * 100)}%</span></span>
                 <input type="range" min="${LOGO_SCALE_MIN * 100}" max="${LOGO_SCALE_MAX * 100}" step="5" value="${Math.round(logoScale(h) * 100)}" class="w-full" data-field="logoSize" aria-label="Logo size" />
                 <span class="mt-0.5 flex justify-between text-[11px] text-ink-400"><span>Smaller</span><button type="button" class="font-semibold text-ink-500 hover:underline" data-logo-size-reset>Reset</button><span>Bigger</span></span>
+              </label>
+              <label class="block">
+                <span class="mb-0.5 flex justify-between text-xs font-semibold text-ink-700">Round corners <span class="font-normal text-ink-500" data-logo-radius-label>${h.radius || 0}%</span></span>
+                <input type="range" min="0" max="50" step="1" value="${h.radius || 0}" class="w-full" data-field="logoRadius" aria-label="Logo corner rounding" />
+                <span class="mt-0.5 flex justify-between text-[11px] text-ink-400">
+                  <button type="button" class="hover:underline" data-logo-radius="0">Square</button>
+                  <button type="button" class="hover:underline" data-logo-radius="15">Rounded</button>
+                  <button type="button" class="hover:underline" data-logo-radius="50">Circle</button>
+                </span>
               </label>`
             : ""
         }
@@ -437,6 +447,16 @@ export function initHotspotEditor(editor, options) {
       $("[data-logo-size-label]", inspector).textContent = "100%";
       changed();
     });
+
+    const logoRadius = $('[data-field="logoRadius"]', inspector);
+    const setRadius = (r) => {
+      h.radius = r || null;
+      logoRadius.value = r;
+      $("[data-logo-radius-label]", inspector).textContent = `${r}%`;
+      changed();
+    };
+    logoRadius?.addEventListener("input", (e) => setRadius(Number(e.target.value)));
+    $$("[data-logo-radius]", inspector).forEach((b) => b.addEventListener("click", () => setRadius(Number(b.dataset.logoRadius))));
 
     $("[data-logo-upload]", inspector)?.addEventListener("click", () => pickLogo(h.id));
     $("[data-logo-reset]", inspector)?.addEventListener("click", () => {
