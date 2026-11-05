@@ -173,6 +173,28 @@ class ImageCardTest extends TestCase
             ->assertOk()->assertJsonPath('data.imageAreaTools', true);
     }
 
+    public function test_facebook_and_youtube_link_however_the_listing_typed_them(): void
+    {
+        $this->save([$this->spot('facebook'), $this->spot('youtube', ['y' => 80])])->assertOk();
+        $this->postJson("/api/v1/businesses/{$this->business->id}/card/publish", [], $this->auth)->assertOk();
+        // The Reviews & QR form asks for "yourshop or https://facebook.com/yourshop".
+        foreach ([
+            ['spicegarden', 'mychannel', 'https://www.facebook.com/spicegarden', 'https://www.youtube.com/@mychannel'],
+            ['www.facebook.com/spicegarden', '@mychannel', 'https://www.facebook.com/spicegarden', 'https://www.youtube.com/@mychannel'],
+            ['https://www.facebook.com/profile.php?id=1000123', 'youtube.com/@mychannel', 'https://www.facebook.com/profile.php?id=1000123', 'https://youtube.com/@mychannel'],
+        ] as [$fb, $yt, $fbHref, $ytHref]) {
+            $this->business->update(['facebookPageUrl' => $fb, 'youtubeUrl' => $yt]);
+            $html = $this->get('/card/spice-garden')->getContent();
+            $this->assertStringContainsString('href="'.e($fbHref).'"', $html, "Facebook typed as {$fb}");
+            $this->assertStringContainsString('href="'.e($ytHref).'"', $html, "YouTube typed as {$yt}");
+        }
+
+        // A box's own address can be typed the same way; nonsense is still refused.
+        $this->save([$this->spot('facebook', ['value' => 'fb.com/otherpage'])])->assertOk();
+        $this->assertStringContainsString('href="https://fb.com/otherpage"', $this->get('/card/spice-garden')->getContent());
+        $this->save([$this->spot('facebook', ['value' => 'javascript:alert(1)'])])->assertStatus(400);
+    }
+
     public function test_the_dealer_can_recolour_the_card_on_its_page(): void
     {
         $this->withoutVite();

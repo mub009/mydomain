@@ -335,7 +335,9 @@ class ImageCard
             'instagram' => $value !== null
                 ? (CardEngine::safeUrl($value) ?? (preg_match('/^@?[A-Za-z0-9._]{1,30}$/', $value) ? 'https://instagram.com/'.ltrim($value, '@') : null))
                 : ($details['social']['instagram'] ?? null),
-            'facebook', 'youtube' => $value !== null ? CardEngine::safeUrl($value) : ($details['social'][$spot['action']] ?? null),
+            // Its own address may be typed like the listing's: a link, with or without https://, or the page name.
+            'facebook' => $value !== null ? CardEngine::facebookUrl($value) : ($details['social']['facebook'] ?? null),
+            'youtube' => $value !== null ? CardEngine::youtubeUrl($value) : ($details['social']['youtube'] ?? null),
             'google_review' => $value !== null ? CardEngine::safeUrl($value) : ($details['googleReviewHref'] ?? null),
             'save_contact' => $details['vcfUrl'] ?? '#',
             'share' => '#',

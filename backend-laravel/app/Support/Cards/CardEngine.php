@@ -254,6 +254,41 @@ class CardEngine
         return $url && preg_match('#^https?://[^\s"\'()<>\\\\]+$#i', $url) ? $url : null;
     }
 
+    /**
+     * A Facebook page as the listing has it — a full link, a link without
+     * https:// (facebook.com/…, www., m., fb.com/…) or just the page name
+     * ("spicegarden", "@spicegarden") — as the page's own web address.
+     */
+    public static function facebookUrl(?string $raw): ?string
+    {
+        return self::socialUrl($raw, '(?:www\.|m\.|web\.)?(?:facebook\.com|fb\.com|fb\.me)', 'https://www.facebook.com/', '');
+    }
+
+    /** A YouTube channel the same way: a link, with or without https://, or "@channel" / "channel". */
+    public static function youtubeUrl(?string $raw): ?string
+    {
+        return self::socialUrl($raw, '(?:www\.|m\.)?(?:youtube\.com|youtu\.be)', 'https://www.youtube.com/', '@');
+    }
+
+    private static function socialUrl(?string $raw, string $hosts, string $home, string $namePrefix): ?string
+    {
+        $raw = trim((string) $raw);
+        if ($raw === '') {
+            return null;
+        }
+        if (preg_match('#^https?://#i', $raw)) {
+            return self::safeUrl($raw);
+        }
+        // A link typed without https://
+        if (preg_match('#^'.$hosts.'(/.*)?$#i', $raw)) {
+            return self::safeUrl('https://'.$raw);
+        }
+        // Just the page or channel name.
+        $name = ltrim($raw, '@/');
+
+        return preg_match('/^[A-Za-z0-9._-]{1,100}$/', $name) ? $home.$namePrefix.$name : null;
+    }
+
     /** Everything a card prints, read from the business. */
     public static function details(Business $business): array
     {
@@ -286,8 +321,8 @@ class CardEngine
             'hours' => $business->relationLoaded('hours') && $business->hours->isNotEmpty() ? (Helpers::summariseHours($business->hours) ?: null) : null,
             'social' => array_filter([
                 'instagram' => $instagram ? "https://instagram.com/{$instagram}" : null,
-                'facebook' => self::safeUrl($business->facebookPageUrl),
-                'youtube' => self::safeUrl($business->youtubeUrl),
+                'facebook' => self::facebookUrl($business->facebookPageUrl),
+                'youtube' => self::youtubeUrl($business->youtubeUrl),
             ]),
             'cardUrl' => self::cardUrl($business->slug),
             'vcfUrl' => self::cardUrl($business->slug).'.vcf',
