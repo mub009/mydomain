@@ -26,6 +26,8 @@ import { $, $$, esc } from "./ui";
 
 const MAX_SPOTS = 40;
 const MIN_SIZE = 3; // percent
+const LOGO_SCALE_MIN = 0.4; // the logo-size slider's range, relative to the box's size when first selected
+const LOGO_SCALE_MAX = 2.5;
 const STYLES = [
   ["invisible", "Invisible", "A clear tap area over a button in the design"],
   ["icon", "Icon", "A round icon drawn on top"],
@@ -350,6 +352,16 @@ export function initHotspotEditor(editor, options) {
               )}.</p>`
         }
         ${
+          // The logo's size: scales its box about its centre. Works even where boxes can't be dragged (a dealer on a business's card).
+          h.action === "logo"
+            ? `<label class="block">
+                <span class="mb-0.5 flex justify-between text-xs font-semibold text-ink-700">Logo size <span class="font-normal text-ink-500" data-logo-size-label>${Math.round(logoScale(h) * 100)}%</span></span>
+                <input type="range" min="${LOGO_SCALE_MIN * 100}" max="${LOGO_SCALE_MAX * 100}" step="5" value="${Math.round(logoScale(h) * 100)}" class="w-full" data-field="logoSize" aria-label="Logo size" />
+                <span class="mt-0.5 flex justify-between text-[11px] text-ink-400"><span>Smaller</span><button type="button" class="font-semibold text-ink-500 hover:underline" data-logo-size-reset>Reset</button><span>Bigger</span></span>
+              </label>`
+            : ""
+        }
+        ${
           isDetail
             ? `${kind === "text" ? textStyleHtml : ""}`
             : `<label class="block">
@@ -407,6 +419,19 @@ export function initHotspotEditor(editor, options) {
         changed({ inspector: true });
       }),
     );
+
+    const logoSize = $('[data-field="logoSize"]', inspector);
+    logoSize?.addEventListener("input", (e) => {
+      scaleLogo(h, Number(e.target.value) / 100);
+      $("[data-logo-size-label]", inspector).textContent = `${Math.round(logoScale(h) * 100)}%`;
+      changed();
+    });
+    $("[data-logo-size-reset]", inspector)?.addEventListener("click", () => {
+      scaleLogo(h, 1);
+      logoSize.value = 100;
+      $("[data-logo-size-label]", inspector).textContent = "100%";
+      changed();
+    });
 
     $("[data-logo-upload]", inspector)?.addEventListener("click", () => pickLogo(h.id));
     $("[data-logo-reset]", inspector)?.addEventListener("click", () => {
@@ -472,6 +497,25 @@ export function initHotspotEditor(editor, options) {
   }
 
   // After an edit: redraw what it affects (the inspector only when its own shape changes, so typing keeps focus).
+  // --- The logo's size --------------------------------------------------------
+  // The slider scales a logo box about its centre, relative to the size it had
+  // when first selected in this session, so sliding back and forth never drifts.
+  const logoBase = new Map(); // id -> { w, h, cx, cy }
+  function logoBaseOf(h) {
+    if (!logoBase.has(h.id)) logoBase.set(h.id, { w: h.w, h: h.h, cx: h.x + h.w / 2, cy: h.y + h.h / 2 });
+    return logoBase.get(h.id);
+  }
+  const logoScale = (h) => h.w / logoBaseOf(h).w;
+  function scaleLogo(h, scale) {
+    const base = logoBaseOf(h);
+    // Keep the box's shape; never larger than the card, never smaller than MIN_SIZE.
+    const s = clamp(scale, Math.max(MIN_SIZE / base.w, MIN_SIZE / base.h), Math.min(100 / base.w, 100 / base.h));
+    h.w = round(base.w * s);
+    h.h = round(base.h * s);
+    h.x = round(clamp(base.cx - h.w / 2, 0, 100 - h.w));
+    h.y = round(clamp(base.cy - h.h / 2, 0, 100 - h.h));
+  }
+
   function changed({ inspector: redrawInspector = false } = {}) {
     markDirty();
     renderStage();
@@ -668,7 +712,10 @@ export function initHotspotEditor(editor, options) {
         Object.assign(target.style, { left: `${h.x}%`, top: `${h.y}%`, width: `${h.w}%`, height: `${h.h}%` });
       },
       () => {
-        if (moved) changed();
+        if (!moved) return;
+        // Dragged or resized by hand: that's the logo slider's new 100%.
+        logoBase.delete(h.id);
+        changed({ inspector: h.action === "logo" });
       },
     );
   });
@@ -694,7 +741,8 @@ export function initHotspotEditor(editor, options) {
       h.y = round(clamp(h.y + d[1], 0, 100 - h.h));
     }
     state.selected = h.id;
-    changed();
+    logoBase.delete(h.id);
+    changed({ inspector: h.action === "logo" });
     $(`[data-spot="${CSS.escape(h.id)}"]`, spotsLayer)?.focus();
   });
 
