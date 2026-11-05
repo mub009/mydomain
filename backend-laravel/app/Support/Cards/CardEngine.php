@@ -124,7 +124,8 @@ class CardEngine
 
     /**
      * The active designs for a category, its default first: its own (and its
-     * parent category's), topped up to MIN_CHOICES with the general ones.
+     * parent category's), then the common ones (offered to every category),
+     * topped up to MIN_CHOICES with the general ones.
      *
      * @return Collection<int, CardTemplate>
      */
@@ -139,10 +140,12 @@ class CardEngine
         $own = $ids ? $order(CardTemplate::where('isActive', true)->whereIn('categoryId', $ids))->get() : collect();
         // The category's own default leads, ahead of its parent's.
         $own = $own->sortBy(fn ($t) => [$t->isDefault && $t->categoryId === $categoryId ? 0 : 1, $t->categoryId === $categoryId ? 0 : 1, $t->sortOrder])->values();
+        // Common designs: in every category, always.
+        $own = $own->concat($order(CardTemplate::where('isActive', true)->where('isCommon', true))->get())->values();
         if ($own->count() >= self::MIN_CHOICES) {
             return $own;
         }
-        $general = $order(CardTemplate::where('isActive', true)->whereNull('categoryId'))
+        $general = $order(CardTemplate::where('isActive', true)->whereNull('categoryId')->where('isCommon', false))
             ->limit(self::MIN_CHOICES - $own->count())->get();
 
         return $own->concat($general)->values();
@@ -177,6 +180,7 @@ class CardEngine
             'slug' => $template->slug,
             'categoryId' => $template->categoryId,
             'categoryName' => $template->category?->name,
+            'isCommon' => (bool) $template->isCommon,
             'layout' => $template->layout,
             'backgroundImageUrl' => $template->backgroundImageUrl,
             // An image template: its artwork and the actions placed on it.

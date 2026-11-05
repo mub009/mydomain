@@ -40,7 +40,9 @@ function values() {
   const f = new FormData(form);
   return {
     name: f.get("name")?.trim(),
-    categoryId: f.get("categoryId") || null,
+    // "common": no category of its own, offered to every category.
+    categoryId: f.get("categoryId") && f.get("categoryId") !== "common" ? f.get("categoryId") : null,
+    isCommon: f.get("categoryId") === "common",
     layout: f.get("layout") || "classic",
     sortOrder: f.get("sortOrder") === "" ? undefined : Number(f.get("sortOrder")),
     isActive: form.isActive.checked,

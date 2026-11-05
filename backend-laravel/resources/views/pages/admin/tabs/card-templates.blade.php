@@ -24,7 +24,8 @@
     <input name="search" value="{{ $filters['search'] }}" placeholder="Search by name" class="input sm:max-w-xs" />
     <select name="category" class="input sm:max-w-xs" data-search-select data-search-placeholder="Search category…">
       <option value="">All categories</option>
-      <option value="general" @selected($filters['category'] === 'general')>General (any category)</option>
+      <option value="common" @selected($filters['category'] === 'common')>Common (every category)</option>
+      <option value="general" @selected($filters['category'] === 'general')>General (fills in)</option>
       @foreach ($categories as $c)
         <option value="{{ $c['id'] }}" @selected($filters['category'] === $c['id'])>{{ $c['name'] }}</option>
       @endforeach
@@ -67,7 +68,7 @@
                 @unless ($t['isActive'])<span class="badge bg-red-50 text-red-700">Inactive</span>@endunless
               </span>
               <span class="block truncate text-xs text-ink-500">
-                {{ $t['categoryName'] ?? 'General' }} ·
+                {{ $t['categoryName'] ?? (! empty($t['isCommon']) ? 'Common — every category' : 'General') }} ·
                 @if ($t['imageUrl'])
                   Image card · {{ count($t['hotspots']) }} {{ count($t['hotspots']) === 1 ? 'action' : 'actions' }}
                 @else

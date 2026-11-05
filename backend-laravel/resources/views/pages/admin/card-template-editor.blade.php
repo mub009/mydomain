@@ -47,7 +47,8 @@
           <label class="block">
             <span class="mb-1 block text-xs font-semibold text-ink-700">Category</span>
             <select name="categoryId" class="input" data-search-select data-search-placeholder="Search category…">
-              <option value="">General — offered to any category</option>
+              <option value="common" @selected(! empty($template['isCommon']))>Common — shown in every category</option>
+              <option value="" @selected(! empty($template) && empty($template['categoryId']) && empty($template['isCommon']))>General — fills in where a category has few designs</option>
               @foreach ($categories as $c)
                 <option value="{{ $c['id'] }}" @selected(($template['categoryId'] ?? null) === $c['id'])>{{ $c['name'] }}</option>
               @endforeach

@@ -28,6 +28,8 @@ class CardTemplateController extends Controller
         return [
             'name' => [$required, 'string', 'min:2', 'max:80'],
             'categoryId' => ['sometimes', 'nullable', 'uuid', 'exists:categories,id'],
+            // Common: offered to every category (only for a design without a category of its own).
+            'isCommon' => ['sometimes', 'boolean'],
             'layout' => [$required, 'in:'.implode(',', array_keys(CardEngine::LAYOUTS))],
             'backgroundImageUrl' => ['sometimes', 'nullable', 'url', 'max:500', 'regex:#^https?://[^\s"\'()<>\\\\]+$#i'],
             'isDefault' => ['sometimes', 'boolean'],
@@ -82,6 +84,10 @@ class CardTemplateController extends Controller
     // One default per category: setting it here clears it on the others.
     private function saveWithDefault(CardTemplate $template): CardTemplate
     {
+        // A design for one category isn't also common to all of them.
+        if ($template->categoryId) {
+            $template->isCommon = false;
+        }
         DB::transaction(function () use ($template) {
             $template->save();
             if ($template->isDefault) {
@@ -105,15 +111,17 @@ class CardTemplateController extends Controller
     public function index(Request $request)
     {
         $data = $request->validate([
-            // A category id, or "general" for the templates without one.
+            // A category id, "general" for the templates without one, or "common" for those offered to every category.
             'categoryId' => ['nullable', 'string', 'max:40'],
             'status' => ['nullable', 'in:active,inactive'],
             'search' => ['nullable', 'string', 'max:80'],
         ]);
         $query = CardTemplate::with('category')
             ->orderByRaw('categoryId is null')->orderBy('categoryId')->orderByDesc('isDefault')->orderBy('sortOrder')->orderBy('name');
-        if (($data['categoryId'] ?? null) === 'general') {
-            $query->whereNull('categoryId');
+        if (($data['categoryId'] ?? null) === 'common') {
+            $query->where('isCommon', true);
+        } elseif (($data['categoryId'] ?? null) === 'general') {
+            $query->whereNull('categoryId')->where('isCommon', false);
         } elseif (! empty($data['categoryId'])) {
             $query->where('categoryId', $data['categoryId']);
         }

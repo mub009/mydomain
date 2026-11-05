@@ -50,6 +50,32 @@ class BusinessCardTest extends TestCase
         ]);
     }
 
+    public function test_a_common_design_is_offered_in_every_category(): void
+    {
+        $restaurants = $this->category('Restaurants', 'restaurants');
+        $florists = $this->category('Florists', 'florists');
+        StarterTemplates::install();
+        $admin = $this->auth($this->user('ADMIN'));
+
+        $common = $this->postJson('/api/v1/admin/card-templates', ['name' => 'Festival Card', 'layout' => 'classic', 'isCommon' => true], $admin)
+            ->assertCreated()->assertJsonPath('data.isCommon', true)->assertJsonPath('data.categoryId', null)->json('data.id');
+
+        $owner = $this->auth($this->user('BUSINESS_OWNER'));
+        // A category with its own five designs gets it too, after them — its own default still leads.
+        $names = $this->getJson("/api/v1/card-templates?categoryId={$restaurants->id}", $owner)->assertOk()->assertJsonCount(6, 'data')->json('data.*.name');
+        $this->assertSame('Premium Restaurant', $names[0]);
+        $this->assertSame('Festival Card', $names[5]);
+        // A category without its own: the common one, topped up with the general ones.
+        $florist = $this->getJson("/api/v1/card-templates?categoryId={$florists->id}", $owner)->assertJsonCount(5, 'data')->json('data.*.name');
+        $this->assertContains('Festival Card', $florist);
+
+        // The admin list filters it; giving it a category makes it that category's only.
+        $this->getJson('/api/v1/admin/card-templates?categoryId=common', $admin)->assertJsonCount(1, 'data')->assertJsonPath('data.0.name', 'Festival Card');
+        $this->assertNotContains('Festival Card', $this->getJson('/api/v1/admin/card-templates?categoryId=general', $admin)->json('data.*.name'));
+        $this->patchJson("/api/v1/admin/card-templates/{$common}", ['categoryId' => $florists->id], $admin)->assertOk()->assertJsonPath('data.isCommon', false);
+        $this->assertNotContains('Festival Card', $this->getJson("/api/v1/card-templates?categoryId={$restaurants->id}", $owner)->json('data.*.name'));
+    }
+
     public function test_each_main_category_gets_five_starter_designs_and_others_get_the_general_set(): void
     {
         $restaurants = $this->category('Restaurants', 'restaurants');
