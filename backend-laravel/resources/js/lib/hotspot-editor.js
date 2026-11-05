@@ -189,10 +189,13 @@ export function initHotspotEditor(editor, options) {
 
   // The logo and free images can always be dragged into place and resized from
   // their corners — even where other boxes are fixed (a dealer on a business's card).
-  const canDrag = (h) => canMove || isPicture(h);
-  const canResize = (h) => canMove || isPicture(h);
-  // A free image can always be removed again — it's the person's own addition.
-  const canRemove = (h) => canDelete || h?.action === "custom_image";
+  // A dealer's free image in an area the admin drew: the area stays exactly
+  // where it is, and the picture only moves and zooms inside it — never over the rest of the card.
+  const areaLocked = (h) => !freeImageEditor && h?.action === "custom_image" && h.shape?.length >= 3;
+  const canDrag = (h) => (canMove || isPicture(h)) && !areaLocked(h);
+  const canResize = (h) => (canMove || isPicture(h)) && !areaLocked(h);
+  // A free image can always be removed again — it's the person's own addition (not an area from the design).
+  const canRemove = (h) => canDelete || (h?.action === "custom_image" && !areaLocked(h));
 
   const handlesHtml = (h) =>
     !canResize(h) ? "" :
@@ -228,7 +231,7 @@ export function initHotspotEditor(editor, options) {
     }
     const align = { left: "justify-start text-left", center: "justify-center text-center", right: "justify-end text-right" }[h.align || "left"];
     return `<div data-spot="${esc(h.id)}" tabindex="0" role="button" aria-label="${esc(actions[h.action].label)} — drag to move"
-        class="absolute flex ${adjustFor === h.id ? "cursor-grab ring-dashed" : canDrag(h) ? "cursor-move" : "cursor-pointer"} touch-none items-center overflow-visible rounded ${kindOf(h) === "text" ? `${align} px-[0.15em] leading-tight text-white` : ""} ring-2 ${ring} focus:outline-none"
+        class="absolute flex ${adjustFor === h.id || (areaLocked(h) && h.value) ? "cursor-grab" : canDrag(h) ? "cursor-move" : "cursor-pointer"} touch-none items-center overflow-visible rounded ${kindOf(h) === "text" ? `${align} px-[0.15em] leading-tight text-white` : ""} ring-2 ${ring} focus:outline-none"
         style="left:${h.x}%;top:${h.y}%;width:${h.w}%;height:${h.h}%;${kindOf(h) === "text" ? esc(textStyle(h)) : ""}">
         ${inner}
         ${!shown ? `<span class="pointer-events-none absolute -top-2.5 left-1 rounded bg-amber-500 px-1 text-[9px] text-white">${h.action === "logo" ? "upload a logo" : h.action === "custom_image" ? "upload a picture" : h.action === "custom_text" ? "type your text" : "not on your listing"}</span>` : ""}
@@ -400,6 +403,26 @@ export function initHotspotEditor(editor, options) {
           // In a template the box shows each business's own logo (defaults.logo is a description, not a picture).
           h.action === "logo" && defaults.logo && !/^https?:/.test(defaults.logo) && !h.value
             ? `<p class="rounded-md bg-gray-50 px-2.5 py-2 text-[11px] text-ink-500">Each business's own logo shows here.</p>`
+            : areaLocked(h)
+            ? `<div class="space-y-2 rounded-lg bg-gray-50 p-2.5">
+                <p class="text-xs font-semibold text-ink-700">Picture area</p>
+                <p class="text-[11px] ${h.value ? "text-ink-500" : "text-amber-700"}">${esc(
+                  h.value
+                    ? "The picture always stays inside this area. Drag it on the card to move it, and use Zoom to make it bigger."
+                    : "This design has an area for a picture — upload one, or drop a picture on it.",
+                )}</p>
+                <button type="button" class="btn-primary px-3 py-1.5 text-xs" data-logo-upload>${icon("upload", { size: 13 })} ${h.value ? "Replace image" : "Upload image"}</button>
+                ${
+                  h.value
+                    ? `<label class="block pt-1">
+                        <span class="mb-0.5 flex justify-between text-xs font-semibold text-ink-700">Zoom <span class="font-normal text-ink-500" data-fit-zoom-label>${(h.fit || FIT_DEFAULT).zoom}%</span></span>
+                        <input type="range" min="100" max="400" step="5" value="${(h.fit || FIT_DEFAULT).zoom}" class="w-full" data-field="fitZoom" aria-label="Zoom the picture" />
+                        <span class="mt-0.5 flex justify-between text-[11px] text-ink-400"><span>Fits the area</span><button type="button" class="font-semibold text-ink-500 hover:underline" data-fit-reset>Reset</button><span>Bigger</span></span>
+                      </label>`
+                    : ""
+                }
+                <p class="text-[11px] text-ink-400">JPG, PNG or WebP.</p>
+              </div>`
             : h.action === "custom_image"
             ? `<div class="space-y-2 rounded-lg bg-gray-50 p-2.5">
                 <p class="text-xs font-semibold text-ink-700">${freeImageEditor ? "Image area" : "Picture"}</p>
@@ -453,7 +476,7 @@ export function initHotspotEditor(editor, options) {
         }
         ${
           // The logo's size: scales its box about its centre. Works even where boxes can't be dragged (a dealer on a business's card).
-          isPicture(h)
+          isPicture(h) && !areaLocked(h)
             ? `<label class="block">
                 <span class="mb-0.5 flex justify-between text-xs font-semibold text-ink-700">${h.action === "logo" ? "Logo size" : "Size"} <span class="font-normal text-ink-500" data-logo-size-label>${Math.round(logoScale(h) * 100)}%</span></span>
                 <input type="range" min="${LOGO_SCALE_MIN * 100}" max="${LOGO_SCALE_MAX * 100}" step="5" value="${Math.round(logoScale(h) * 100)}" class="w-full" data-field="logoSize" aria-label="Logo size" />
@@ -1452,6 +1475,45 @@ export function initHotspotEditor(editor, options) {
         drawingFor = null;
         changed({ inspector: true });
       });
+    },
+    true,
+  );
+
+  // --- Move a picture inside its locked area ------------------------------------
+  // On a dealer's card, dragging a free image in an area from the design moves
+  // the picture inside the area (the area itself stays put). Runs before the
+  // move/resize handler below.
+  spotsLayer.addEventListener(
+    "pointerdown",
+    (e) => {
+      const el = e.target.closest("[data-spot]");
+      const h = el && spotById(el.dataset.spot);
+      if (!h || !areaLocked(h) || e.button > 0) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (state.selected !== h.id) select(h.id);
+      const target = $(`[data-spot="${CSS.escape(h.id)}"]`, spotsLayer);
+      target?.focus({ preventScroll: true });
+      if (!h.value || !target) return;
+      const img = $("img", target);
+      const r = target.getBoundingClientRect();
+      const orig = { ...FIT_DEFAULT, ...(h.fit || {}) };
+      let moved = false;
+      track(
+        (ev) => {
+          moved = true;
+          const k = 100 / (orig.zoom / 100);
+          h.fit = {
+            ...orig,
+            x: round(clamp(orig.x - ((ev.clientX - e.clientX) / (r.width || 1)) * k, 0, 100)),
+            y: round(clamp(orig.y - ((ev.clientY - e.clientY) / (r.height || 1)) * k, 0, 100)),
+          };
+          if (img) img.style.cssText = fitCss(h);
+        },
+        () => {
+          if (moved) changed();
+        },
+      );
     },
     true,
   );
