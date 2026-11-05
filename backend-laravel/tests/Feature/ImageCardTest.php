@@ -23,6 +23,8 @@ class ImageCardTest extends TestCase
 
     private string $ownerEmail;
 
+    private string $dealerEmail;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -43,6 +45,7 @@ class ImageCardTest extends TestCase
             'addressLine1' => '1 Main St', 'city' => 'Kochi', 'state' => 'KL', 'latitude' => 9.9, 'longitude' => 76.2,
         ]);
         $this->ownerEmail = $owner->email;
+        $this->dealerEmail = $dealer->email;
         $token = $this->postJson('/api/v1/auth/login', ['email' => $dealer->email, 'password' => 'Password123!'])->json('data.accessToken');
         $this->auth = ['Authorization' => "Bearer {$token}"];
 
@@ -168,6 +171,18 @@ class ImageCardTest extends TestCase
             ->assertOk()->assertJsonPath('data.canEdit', true)->assertJsonPath('data.imageAreaTools', false);
         $this->getJson("/api/v1/businesses/{$this->business->id}/card", $this->admin())
             ->assertOk()->assertJsonPath('data.imageAreaTools', true);
+    }
+
+    public function test_the_dealer_can_recolour_the_card_on_its_page(): void
+    {
+        $this->withoutVite();
+        $this->save([$this->spot('call')])->assertOk();
+        $this->post('/login', ['email' => $this->dealerEmail, 'password' => 'Password123!']);
+        $page = $this->get("/dashboard/businesses/{$this->business->id}?section=".urlencode('Visiting Card'))->assertOk();
+        $page->assertSee('Card design & actions', false)->assertSee('data-colour-panel', false)->assertSee('Card colour');
+        if (getenv('DUMP_CARD_PAGE')) { file_put_contents(getenv('DUMP_CARD_PAGE'), $page->getContent()); }
+        $this->putJson("/api/v1/businesses/{$this->business->id}/card", ['imageColour' => ['tint' => '#2563eb', 'strength' => 60, 'hue' => 0, 'brightness' => 100, 'saturation' => 100]], $this->auth)
+            ->assertOk();
     }
 
     private function admin(): array
