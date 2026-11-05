@@ -180,9 +180,18 @@ class ImageCardTest extends TestCase
         $this->post('/login', ['email' => $this->dealerEmail, 'password' => 'Password123!']);
         $page = $this->get("/dashboard/businesses/{$this->business->id}?section=".urlencode('Visiting Card'))->assertOk();
         $page->assertSee('Card design & actions', false)->assertSee('data-colour-panel', false)->assertSee('Card colour');
-        if (getenv('DUMP_CARD_PAGE')) { file_put_contents(getenv('DUMP_CARD_PAGE'), $page->getContent()); }
         $this->putJson("/api/v1/businesses/{$this->business->id}/card", ['imageColour' => ['tint' => '#2563eb', 'strength' => 60, 'hue' => 0, 'brightness' => 100, 'saturation' => 100]], $this->auth)
             ->assertOk();
+    }
+
+    public function test_the_colour_panel_shows_for_a_card_still_wearing_its_categorys_image_design(): void
+    {
+        $this->withoutVite();
+        $this->imageTemplate($this->admin());
+        $this->assertNull(BusinessCard::where('businessId', $this->business->id)->first()?->imageUrl);
+        $this->post('/login', ['email' => $this->dealerEmail, 'password' => 'Password123!']);
+        $this->get("/dashboard/businesses/{$this->business->id}?section=".urlencode('Visiting Card'))
+            ->assertOk()->assertSee('cards/images/template.jpg', false)->assertSee('data-colour-panel', false);
     }
 
     private function admin(): array
