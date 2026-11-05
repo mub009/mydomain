@@ -93,7 +93,7 @@ export function initUploadFields(root = document) {
       if (!picked) return;
       error.hidden = true;
       button.disabled = true;
-      $("span", button).textContent = "Uploading…";
+      $("span", button).textContent = $("[data-upload-remove-bg]", field)?.checked ? "Enhancing with AI…" : "Uploading…";
       try {
         const removeBg = $("[data-upload-remove-bg]", field);
         const result = await uploadImageFull(picked, field.dataset.uploadField, removeBg ? { removeBackground: removeBg.checked } : {});
@@ -102,7 +102,12 @@ export function initUploadFields(root = document) {
         if (removeBg?.checked) {
           // Shown until the page's own "saved" note replaces it.
           const note = $("[data-upload-saved]", field);
-          note.textContent = result.backgroundRemoved ? "Background removed and quality enhanced." : "Quality enhanced (the background wasn't plain enough to remove).";
+          note.textContent =
+            result.method === "ai"
+              ? "Background removed and redrawn in high quality by AI. Check it matches your logo."
+              : result.backgroundRemoved
+                ? "Background removed and quality enhanced (AI wasn't available)."
+                : "Quality enhanced. The background couldn't be removed.";
           note.hidden = false;
         }
         // Lets a page save the new image straight away (see manage.js).

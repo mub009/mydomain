@@ -73,6 +73,7 @@ class UploadController extends Controller
             'removeBackground' => ['sometimes', 'boolean'],
         ]);
         $backgroundRemoved = false;
+        $method = null;
         $purpose = self::PURPOSES[$data['purpose']];
         $allowSvg = ! empty($purpose['allowSvg']);
 
@@ -101,11 +102,14 @@ class UploadController extends Controller
                 throw ApiException::badRequest('That file is larger than 20MB');
             }
             $contents = file_get_contents($file->getRealPath());
-            $logo = ! empty($purpose['logo'])
-                ? LogoCleaner::clean($contents, $extension, $request->boolean('removeBackground', true))
-                : null;
+            $logo = null;
+            if (! empty($purpose['logo'])) {
+                // The AI redraw can take a while.
+                @set_time_limit(150);
+                $logo = LogoCleaner::clean($contents, $extension, $request->boolean('removeBackground', true));
+            }
             if ($logo) {
-                ['contents' => $contents, 'extension' => $extension, 'mime' => $mime, 'backgroundRemoved' => $backgroundRemoved] = $logo;
+                ['contents' => $contents, 'extension' => $extension, 'mime' => $mime, 'backgroundRemoved' => $backgroundRemoved, 'method' => $method] = $logo;
             }
             // Downscales anything wider than needed for display and
             // converts it to WebP — a typical phone photo shrinks by
@@ -136,7 +140,8 @@ class UploadController extends Controller
             throw new ApiException(500, 'INTERNAL_ERROR', "Could not upload that file \u{2014} check the server's DigitalOcean Spaces configuration");
         }
 
-        return ApiResponse::ok(['url' => Storage::disk('spaces')->url($path), 'backgroundRemoved' => $backgroundRemoved]);
+        // method (logos): "ai" redrawn by AI, "basic" cleaned without AI, "none" background kept.
+        return ApiResponse::ok(['url' => Storage::disk('spaces')->url($path), 'backgroundRemoved' => $backgroundRemoved, 'method' => $method]);
     }
 
     /**

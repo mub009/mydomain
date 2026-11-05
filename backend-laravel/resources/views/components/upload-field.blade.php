@@ -21,7 +21,7 @@
   @if ($removeBackground)
     {{-- Logos: the server clears a plain background, trims and sharpens the picture (App\Support\Uploads\LogoCleaner). --}}
     <label class="mt-1.5 flex items-center gap-1.5 text-xs text-ink-600">
-      <input type="checkbox" class="rounded border-gray-300" checked data-upload-remove-bg /> Remove background &amp; enhance quality on upload
+      <input type="checkbox" class="rounded border-gray-300" checked data-upload-remove-bg /> Remove background &amp; make high quality with AI
     </label>
   @endif
   @if ($hint)

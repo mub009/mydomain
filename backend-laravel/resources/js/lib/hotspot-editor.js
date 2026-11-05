@@ -342,7 +342,7 @@ export function initHotspotEditor(editor, options) {
                   ${h.value && !defaults.logo ? `<button type="button" class="text-[11px] font-semibold text-red-700 hover:underline" data-logo-reset>Remove picture</button>` : ""}
                 </div>
                 <label class="flex items-center gap-1.5 text-[11px] text-ink-600">
-                  <input type="checkbox" class="rounded border-gray-300" ${removeLogoBg ? "checked" : ""} data-logo-remove-bg /> Remove background &amp; enhance quality
+                  <input type="checkbox" class="rounded border-gray-300" ${removeLogoBg ? "checked" : ""} data-logo-remove-bg /> Remove background &amp; make high quality with AI
                 </label>
                 <p class="text-[11px] text-ink-400" data-logo-note>${esc(logoNote || "JPG, PNG or WebP. A plain background is cleared automatically.")}</p>
               </div>`
@@ -637,9 +637,11 @@ export function initHotspotEditor(editor, options) {
       h.value = result.url;
       logoNote = !removeLogoBg
         ? "Uploaded as it is, quality enhanced."
-        : result.backgroundRemoved
-          ? "Background removed and quality enhanced."
-          : "Quality enhanced. The background wasn't plain enough to remove — a logo on a single-colour background works best.";
+        : result.method === "ai"
+          ? "Background removed and redrawn in high quality by AI. Check it matches your logo — untick the box and upload again to keep the original."
+          : result.backgroundRemoved
+            ? "Background removed and quality enhanced (AI wasn't available)."
+            : "Quality enhanced. The background couldn't be removed.";
       state.selected = id;
       markDirty();
       renderAll();

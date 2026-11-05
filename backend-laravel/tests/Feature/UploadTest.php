@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -32,6 +33,9 @@ class UploadTest extends TestCase
     {
         parent::setUp();
         Storage::fake('spaces');
+        // Never the real AI in tests; the AI tests fake it.
+        config(['services.gemini.key' => null]);
+        Http::preventStrayRequests();
     }
 
     public function test_a_business_owner_uploads_a_photo_and_gets_back_a_url(): void
@@ -348,5 +352,65 @@ class UploadTest extends TestCase
         $token = $this->token($this->user('BUSINESS_OWNER'));
         $this->post('/api/v1/uploads/image', ['purpose' => 'business-logo', 'file' => new UploadedFile($path, 'photo.png', 'image/png', null, true)], ['Authorization' => "Bearer {$token}"])
             ->assertOk()->assertJsonPath('data.backgroundRemoved', false);
+    }
+
+    /** What the image model sends back: a red ring (with a hole) on the flat green asked for. */
+    private function fakeGemini(): void
+    {
+        config(['services.gemini.key' => 'test-key', 'services.ai.provider' => null]);
+        $img = imagecreatetruecolor(512, 512);
+        imagefill($img, 0, 0, imagecolorallocate($img, 2, 250, 4)); // flat, but not exactly #00FF00
+        imagefilledrectangle($img, 128, 128, 384, 384, imagecolorallocate($img, 200, 20, 20));
+        imagefilledrectangle($img, 224, 224, 288, 288, imagecolorallocate($img, 2, 250, 4)); // the hole inside, like an "O"
+        ob_start();
+        imagepng($img);
+        $png = base64_encode(ob_get_clean());
+        Http::fake(['*generativelanguage.googleapis.com/*' => Http::response([
+            'candidates' => [['content' => ['parts' => [['inlineData' => ['mimeType' => 'image/png', 'data' => $png]]]]]],
+        ])]);
+    }
+
+    public function test_ai_redraws_the_logo_and_its_background_is_cut_out_holes_and_all(): void
+    {
+        $this->fakeGemini();
+        $token = $this->token($this->user('DEALER'));
+        $response = $this->post('/api/v1/uploads/image', ['purpose' => 'card-logos', 'file' => $this->logoOnWhite()], ['Authorization' => "Bearer {$token}"])
+            ->assertOk()->assertJsonPath('data.backgroundRemoved', true)->assertJsonPath('data.method', 'ai');
+
+        // Gemini was sent the logo, and asked for the key colour furthest from it (green, for a red logo on white).
+        Http::assertSent(function ($request) {
+            $parts = $request['contents'][0]['parts'];
+
+            return str_contains($request->url(), ':generateContent')
+                && $parts[0]['inlineData']['mimeType'] === 'image/png'
+                && str_contains($parts[1]['text'], '#00FF00')
+                && $request['generationConfig']['imageConfig']['aspectRatio'] === '1:1';
+        });
+
+        $img = $this->stored($response->json('data.url'));
+        $size = imagesx($img);
+        $this->assertGreaterThanOrEqual(1000, $size);
+        $alpha = fn (int $x, int $y) => (imagecolorat($img, $x, $y) >> 24) & 0x7F;
+        $this->assertGreaterThanOrEqual(124, $alpha(0, 0), 'background cleared');
+        $this->assertGreaterThanOrEqual(124, $alpha(intdiv($size, 2), intdiv($size, 2)), 'the hole inside is cleared too');
+        $this->assertSame(0, $alpha(intdiv($size, 8), intdiv($size, 2)), 'the red ring stays');
+    }
+
+    public function test_without_working_ai_the_basic_clean_up_is_used(): void
+    {
+        config(['services.gemini.key' => 'test-key', 'services.ai.provider' => null]);
+        Http::fake(['*' => Http::response(['error' => 'quota'], 429)]);
+        $token = $this->token($this->user('BUSINESS_OWNER'));
+        $this->post('/api/v1/uploads/image', ['purpose' => 'business-logo', 'file' => $this->logoOnWhite()], ['Authorization' => "Bearer {$token}"])
+            ->assertOk()->assertJsonPath('data.backgroundRemoved', true)->assertJsonPath('data.method', 'basic');
+    }
+
+    public function test_keeping_the_background_never_calls_the_ai(): void
+    {
+        $this->fakeGemini();
+        $token = $this->token($this->user('BUSINESS_OWNER'));
+        $this->post('/api/v1/uploads/image', ['purpose' => 'business-logo', 'removeBackground' => '0', 'file' => $this->logoOnWhite()], ['Authorization' => "Bearer {$token}"])
+            ->assertOk()->assertJsonPath('data.method', 'none');
+        Http::assertNothingSent();
     }
 }

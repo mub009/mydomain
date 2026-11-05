@@ -9,6 +9,11 @@ use Throwable;
 /**
  * Makes an uploaded logo ready for a visiting card, website or listing:
  *
+ *  0. With AI available (AiLogoRedraw, Google Gemini), the logo is first
+ *     redrawn sharp and high-resolution on a flat key colour, which is then
+ *     cut away exactly — holes inside letters included. Without AI, or when
+ *     it fails, step 1 does the job instead.
+ *
  *  1. Removes a plain background. The colour around the image's edges is
  *     taken as the background and every pixel of it that's connected to an
  *     edge is cleared (flood fill), with soft, de-fringed edges. A logo on a
@@ -42,7 +47,8 @@ class LogoCleaner
     private const MAX_BYTES = 5 * 1024 * 1024;
 
     /**
-     * @return array{contents: string, extension: string, mime: string, backgroundRemoved: bool}|null
+     * @return array{contents: string, extension: string, mime: string, backgroundRemoved: bool, method: string}|null
+     *               method: "ai" (redrawn by AI), "basic" (cleaned here) or "none" (background kept)
      */
     public static function clean(string $contents, string $extension, bool $removeBackground = true): ?array
     {
@@ -64,11 +70,26 @@ class LogoCleaner
             }
             $img = self::toTrueColourAlpha($src, self::MAX_EDGE);
 
-            $removed = $removeBackground && self::removeBackground($img);
+            $removed = false;
+            $method = $removeBackground ? 'basic' : 'none';
+            if ($removeBackground && AiLogoRedraw::available()) {
+                try {
+                    ['image' => $ai, 'key' => $key] = AiLogoRedraw::redraw($img);
+                    $ai = self::toTrueColourAlpha($ai, self::MAX_EDGE);
+                    if (self::keyOut($ai, $key)) {
+                        [$img, $removed, $method] = [$ai, true, 'ai'];
+                    }
+                } catch (Throwable $e) {
+                    report($e); // fall back to the basic clean-up below
+                }
+            }
+            if ($removeBackground && ! $removed) {
+                $removed = self::removeBackground($img);
+            }
             $img = self::trim($img);
             $img = self::enhance($img);
 
-            return self::encode($img) + ['backgroundRemoved' => $removed];
+            return self::encode($img) + ['backgroundRemoved' => $removed, 'method' => $method];
         } catch (Throwable $e) {
             report($e);
 
@@ -225,6 +246,56 @@ class LogoCleaner
         }
 
         return true;
+    }
+
+    /**
+     * Cuts the AI's flat key colour out of its redraw — everywhere, holes in
+     * letters included, since the key colour isn't in the logo — with soft,
+     * de-tinted edges. False when the redraw isn't on that colour (the AI
+     * didn't follow the brief), so the caller can fall back.
+     */
+    private static function keyOut(GdImage $img, array $key): bool
+    {
+        $w = imagesx($img);
+        $h = imagesy($img);
+
+        // The background actually drawn: the median of the border, which must be close to the key asked for.
+        $border = [];
+        for ($x = 0; $x < $w; $x += 4) {
+            $border[] = imagecolorat($img, $x, 0);
+            $border[] = imagecolorat($img, $x, $h - 1);
+        }
+        for ($y = 0; $y < $h; $y += 4) {
+            $border[] = imagecolorat($img, 0, $y);
+            $border[] = imagecolorat($img, $w - 1, $y);
+        }
+        $bg = [self::median($border, 16), self::median($border, 8), self::median($border, 0)];
+        if (self::distance(($key[0] << 16) | ($key[1] << 8) | $key[2], $bg) > 90) {
+            return false;
+        }
+
+        $tolerance = 70; // generous: AI backgrounds are flat but not exactly one value
+        $feather = 70;
+        $transparent = imagecolorallocatealpha($img, 0, 0, 0, 127);
+        $cleared = 0;
+        for ($y = 0; $y < $h; $y++) {
+            for ($x = 0; $x < $w; $x++) {
+                $c = imagecolorat($img, $x, $y);
+                $d = self::distance($c, $bg);
+                if ($d <= $tolerance) {
+                    imagesetpixel($img, $x, $y, $transparent);
+                    $cleared++;
+                } elseif ($d < $tolerance + $feather) {
+                    $a = ($d - $tolerance) / $feather;
+                    $rgb = [($c >> 16) & 0xFF, ($c >> 8) & 0xFF, $c & 0xFF];
+                    $pure = array_map(fn ($v, $b) => (int) max(0, min(255, round(($v - $b * (1 - $a)) / $a))), $rgb, $bg);
+                    imagesetpixel($img, $x, $y, imagecolorallocatealpha($img, $pure[0], $pure[1], $pure[2], (int) round(127 * (1 - $a))));
+                }
+            }
+        }
+
+        // Nothing left, or nothing removed: not a usable redraw.
+        return $cleared > $w * $h * 0.05 && $cleared < $w * $h * 0.99;
     }
 
     /** Crops to what's visible, with a small even margin. */
