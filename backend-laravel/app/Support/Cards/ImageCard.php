@@ -67,6 +67,8 @@ class ImageCard
         // A logo's value is an uploaded picture; empty = the listing's logo.
         'logo' => ['label' => 'Logo', 'icon' => 'image', 'kind' => 'image', 'value' => 'image'],
         'qr' => ['label' => 'QR code', 'icon' => 'qr-code', 'kind' => 'image', 'value' => null],
+        // A free picture — any photo or graphic, placed and sized freely, in any shape (like Custom text).
+        'custom_image' => ['label' => 'Free image', 'icon' => 'image-plus', 'kind' => 'image', 'value' => 'image'],
     ];
 
     public const ALIGNS = ['left', 'center', 'right'];
@@ -171,8 +173,8 @@ class ImageCard
                 'color' => isset($h['color']) && preg_match(self::HEX, $h['color']) ? strtolower($h['color']) : null,
                 'bg' => isset($h['bg']) && preg_match(self::HEX, $h['bg']) ? strtolower($h['bg']) : null,
                 'align' => in_array($h['align'] ?? null, self::ALIGNS, true) ? $h['align'] : null,
-                // The logo's rounded corners, in percent of its box: 0 = square, 50 = round.
-                'radius' => $h['action'] === 'logo' && ! empty($h['radius']) ? (int) min(50, max(0, (int) $h['radius'])) : null,
+                // A picture's rounded corners (logo or free image), in percent of its box: 0 = none, 50 = round.
+                'radius' => in_array($h['action'], ['logo', 'custom_image'], true) && ! empty($h['radius']) ? (int) min(50, max(0, (int) $h['radius'])) : null,
             ];
             if ($lenient) {
                 if (! self::valueIsValid($spot)) {
@@ -212,7 +214,7 @@ class ImageCard
     {
         return match (self::ACTIONS[$action]['value']) {
             'phone' => 'Enter a phone number with at least 6 digits.',
-            'image' => 'Upload the logo again.',
+            'image' => $action === 'logo' ? 'Upload the logo again.' : 'Upload the picture again.',
             'email' => 'Enter a valid email address.',
             default => 'Enter a full web address starting with https://',
         };
@@ -278,6 +280,7 @@ class ImageCard
     {
         return match ($spot['action']) {
             'logo' => CardEngine::safeUrl($spot['value'] ?? null) ?? CardEngine::safeUrl($details['logoUrl'] ?? null),
+            'custom_image' => CardEngine::safeUrl($spot['value'] ?? null),
             'qr' => CardPdf::qr(($details['cardUrl'] ?? '#') !== '#' ? $details['cardUrl'] : rtrim((string) config('app.url'), '/').'/card/your-business'),
             default => null,
         };

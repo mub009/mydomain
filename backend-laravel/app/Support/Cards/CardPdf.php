@@ -150,7 +150,7 @@ class CardPdf
                     'text' => $h['text'],
                     'display' => $h['display'],
                     'textStyle' => $text,
-                    'src' => $h['kind'] === 'image' ? ($h['action'] === 'logo'
+                    'src' => $h['kind'] === 'image' ? (in_array($h['action'], ['logo', 'custom_image'], true)
                         ? (! empty($h['radius']) ? self::roundedPng($h['src'], $h['w'] * $width / 100, $h['h'] * $height / 100, (int) $h['radius']) : self::png($h['src']))
                         : $h['src']) : null,
                     'box' => sprintf('left:%spt;top:%spt;width:%spt;height:%spt', round($h['x'] * $width / 100, 2), round($h['y'] * $height / 100, 2), round($h['w'] * $width / 100, 2), round($h['h'] * $height / 100, 2)),

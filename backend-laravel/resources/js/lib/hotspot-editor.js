@@ -69,7 +69,7 @@ const VALUE_HELP = {
 const GROUPS = [
   ["action", "Actions"],
   ["text", "Business details"],
-  ["image", "Logo & QR code"],
+  ["image", "Logo, QR code & images"],
 ];
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
@@ -121,11 +121,14 @@ export function initHotspotEditor(editor, options) {
   const spotById = (id) => state.hotspots.find((h) => h.id === id);
   const textOf = (h) => h.label || actions[h.action]?.label || "Action";
   const kindOf = (h) => actions[h.action]?.kind || "action";
+  // Pictures the person uploads (the logo, a free image): they drag, resize and upload even where other boxes are fixed.
+  const isPicture = (h) => h.action === "logo" || h.action === "custom_image";
 
   // What a box shows or where it leads: its own value, or the fallback; null = nothing yet.
   function targetOf(h) {
     if (kindOf(h) === "image") {
       if (h.action === "qr") return "A QR code that opens the card";
+      if (h.action === "custom_image") return h.value ? "Your picture" : null;
       return h.value ? "Your uploaded logo" : defaults.logo ? "The logo from the listing" : null;
     }
     const kind = actions[h.action]?.value;
@@ -134,12 +137,15 @@ export function initHotspotEditor(editor, options) {
     return defaults[h.action] || null;
   }
 
-  // The logo can always be dragged into place — even where other boxes are fixed
-  // (a dealer on a business's card). Its size there comes from the Logo size slider.
-  const canDrag = (h) => canMove || h.action === "logo";
+  // The logo and free images can always be dragged into place and resized from
+  // their corners — even where other boxes are fixed (a dealer on a business's card).
+  const canDrag = (h) => canMove || isPicture(h);
+  const canResize = (h) => canMove || isPicture(h);
+  // A free image can always be removed again — it's the person's own addition.
+  const canRemove = (h) => canDelete || h?.action === "custom_image";
 
-  const handlesHtml = () =>
-    !canMove ? "" :
+  const handlesHtml = (h) =>
+    !canResize(h) ? "" :
     Object.entries({
       nw: "-left-1.5 -top-1.5 cursor-nwse-resize",
       ne: "-right-1.5 -top-1.5 cursor-nesw-resize",
@@ -156,9 +162,9 @@ export function initHotspotEditor(editor, options) {
     const ring = !shown ? "ring-amber-500" : selected ? "ring-brand-600 ring-[3px] z-10" : "ring-brand-500/50";
     let inner;
     if (kindOf(h) === "image") {
-      const src = h.action === "logo" ? h.value || defaults.logo || "" : "";
+      const src = h.action === "logo" ? h.value || defaults.logo || "" : h.action === "custom_image" ? h.value || "" : "";
       const logo = /^https?:/.test(src) ? src : null;
-      const radius = h.action === "logo" ? h.radius || 0 : 0;
+      const radius = isPicture(h) ? h.radius || 0 : 0;
       inner = logo
         ? `<img src="${esc(logo)}" alt="" class="pointer-events-none h-full w-full ${radius ? "object-cover" : "object-contain"}" style="border-radius:${radius}%" />`
         : `<span class="pointer-events-none flex h-full w-full flex-col items-center justify-center gap-0.5 bg-white/80 text-[10px] font-semibold text-ink-700">${icon(actions[h.action].icon, { size: 22 })}${esc(actions[h.action].label)}</span>`;
@@ -171,8 +177,8 @@ export function initHotspotEditor(editor, options) {
         class="absolute flex ${canDrag(h) ? "cursor-move" : "cursor-pointer"} touch-none items-center overflow-visible rounded ${kindOf(h) === "text" ? `${align} px-[0.15em] leading-tight text-white` : ""} ring-2 ${ring} focus:outline-none"
         style="left:${h.x}%;top:${h.y}%;width:${h.w}%;height:${h.h}%;${kindOf(h) === "text" ? esc(textStyle(h)) : ""}">
         ${inner}
-        ${!shown ? `<span class="pointer-events-none absolute -top-2.5 left-1 rounded bg-amber-500 px-1 text-[9px] text-white">${h.action === "logo" ? "upload a logo" : h.action === "custom_text" ? "type your text" : "not on your listing"}</span>` : ""}
-        ${selected ? handlesHtml() : ""}
+        ${!shown ? `<span class="pointer-events-none absolute -top-2.5 left-1 rounded bg-amber-500 px-1 text-[9px] text-white">${h.action === "logo" ? "upload a logo" : h.action === "custom_image" ? "upload a picture" : h.action === "custom_text" ? "type your text" : "not on your listing"}</span>` : ""}
+        ${selected ? handlesHtml(h) : ""}
       </div>`;
   }
 
@@ -320,7 +326,7 @@ export function initHotspotEditor(editor, options) {
       <div class="space-y-3">
         <div class="flex items-center justify-between">
           <p class="text-sm font-bold text-ink-900">${isDetail ? "Edit detail" : "Edit action"}</p>
-          ${canDelete ? `<button type="button" class="flex items-center gap-1 text-xs font-semibold text-red-700 hover:underline" data-delete-spot>${icon("trash-2", { size: 13 })} Remove</button>` : ""}
+          ${canRemove(h) ? `<button type="button" class="flex items-center gap-1 text-xs font-semibold text-red-700 hover:underline" data-delete-spot>${icon("trash-2", { size: 13 })} Remove</button>` : ""}
         </div>
         <label class="block">
           <span class="mb-1 block text-xs font-semibold text-ink-700">${isDetail ? "Shows" : "Action"}</span>
@@ -330,6 +336,18 @@ export function initHotspotEditor(editor, options) {
           // In a template the box shows each business's own logo (defaults.logo is a description, not a picture).
           h.action === "logo" && defaults.logo && !/^https?:/.test(defaults.logo) && !h.value
             ? `<p class="rounded-md bg-gray-50 px-2.5 py-2 text-[11px] text-ink-500">Each business's own logo shows here.</p>`
+            : h.action === "custom_image"
+            ? `<div class="space-y-2 rounded-lg bg-gray-50 p-2.5">
+                <p class="text-xs font-semibold text-ink-700">Picture</p>
+                <p class="text-[11px] ${h.value ? "text-ink-500" : "text-amber-700"}">${esc(
+                  h.value ? "Any photo or graphic, in its own shape. Drag it anywhere and pull its corners to resize it freely." : "No picture yet — upload one, or drop a picture on the box.",
+                )}</p>
+                <div class="flex flex-wrap items-center gap-2">
+                  <button type="button" class="btn-secondary px-3 py-1.5 text-xs" data-logo-upload>${icon("upload", { size: 13 })} ${h.value ? "Replace image" : "Upload image"}</button>
+                  ${h.value ? `<button type="button" class="text-[11px] font-semibold text-ink-500 hover:underline" data-fit-picture>Fit box to picture</button>` : ""}
+                </div>
+                <p class="text-[11px] text-ink-400">JPG, PNG or WebP. A PNG with a see-through background stays see-through.</p>
+              </div>`
             : h.action === "logo"
             ? `<div class="space-y-2 rounded-lg bg-gray-50 p-2.5">
                 <p class="text-xs font-semibold text-ink-700">Logo picture</p>
@@ -364,9 +382,9 @@ export function initHotspotEditor(editor, options) {
         }
         ${
           // The logo's size: scales its box about its centre. Works even where boxes can't be dragged (a dealer on a business's card).
-          h.action === "logo"
+          isPicture(h)
             ? `<label class="block">
-                <span class="mb-0.5 flex justify-between text-xs font-semibold text-ink-700">Logo size <span class="font-normal text-ink-500" data-logo-size-label>${Math.round(logoScale(h) * 100)}%</span></span>
+                <span class="mb-0.5 flex justify-between text-xs font-semibold text-ink-700">${h.action === "logo" ? "Logo size" : "Size"} <span class="font-normal text-ink-500" data-logo-size-label>${Math.round(logoScale(h) * 100)}%</span></span>
                 <input type="range" min="${LOGO_SCALE_MIN * 100}" max="${LOGO_SCALE_MAX * 100}" step="5" value="${Math.round(logoScale(h) * 100)}" class="w-full" data-field="logoSize" aria-label="Logo size" />
                 <span class="mt-0.5 flex justify-between text-[11px] text-ink-400"><span>Smaller</span><button type="button" class="font-semibold text-ink-500 hover:underline" data-logo-size-reset>Reset</button><span>Bigger</span></span>
               </label>
@@ -374,7 +392,7 @@ export function initHotspotEditor(editor, options) {
                 <span class="mb-0.5 flex justify-between text-xs font-semibold text-ink-700">Round corners <span class="font-normal text-ink-500" data-logo-radius-label>${h.radius || 0}%</span></span>
                 <input type="range" min="0" max="50" step="1" value="${h.radius || 0}" class="w-full" data-field="logoRadius" aria-label="Logo corner rounding" />
                 <span class="mt-0.5 flex justify-between text-[11px] text-ink-400">
-                  <button type="button" class="hover:underline" data-logo-radius="0">Square</button>
+                  <button type="button" class="hover:underline" data-logo-radius="0">None</button>
                   <button type="button" class="hover:underline" data-logo-radius="15">Rounded</button>
                   <button type="button" class="hover:underline" data-logo-radius="50">Circle</button>
                 </span>
@@ -465,6 +483,11 @@ export function initHotspotEditor(editor, options) {
 
     $("[data-logo-remove-bg]", inspector)?.addEventListener("change", (e) => (removeLogoBg = e.target.checked));
     $("[data-logo-upload]", inspector)?.addEventListener("click", () => pickLogo(h.id));
+    $("[data-fit-picture]", inspector)?.addEventListener("click", async () => {
+      await fitToPicture(h);
+      logoBase.delete(h.id);
+      changed({ inspector: true });
+    });
     $("[data-logo-reset]", inspector)?.addEventListener("click", () => {
       h.value = null;
       changed({ inspector: true });
@@ -566,7 +589,7 @@ export function initHotspotEditor(editor, options) {
   }
 
   function removeSpot(id) {
-    if (!canDelete) return;
+    if (!canRemove(spotById(id))) return;
     state.hotspots = state.hotspots.filter((h) => h.id !== id);
     if (state.selected === id) state.selected = null;
     markDirty();
@@ -609,7 +632,7 @@ export function initHotspotEditor(editor, options) {
     markDirty();
     renderAll();
     $(`[data-spot="${CSS.escape(spot.id)}"]`, spotsLayer)?.focus();
-    if (action === "logo" && !defaults.logo) pickLogo(spot.id);
+    if ((action === "logo" && !defaults.logo) || action === "custom_image") pickLogo(spot.id);
   }
 
   // --- The logo's own picture -------------------------------------------------
@@ -625,12 +648,56 @@ export function initHotspotEditor(editor, options) {
     logoInput.value = "";
   });
 
+  // Resizes a picture box to the picture's own proportions, keeping its centre
+  // and width (or height, if the width won't fit) — so it shows with no empty bands.
+  async function fitToPicture(h) {
+    if (!h.value) return;
+    let size;
+    try {
+      size = await naturalSize(h.value);
+    } catch {
+      return;
+    }
+    const rect = stage.getBoundingClientRect();
+    if (!size.width || !size.height || !rect.width || !rect.height) return;
+    const ratio = (size.height / size.width) * (rect.width / rect.height); // h% per w%
+    const cx = h.x + h.w / 2;
+    const cy = h.y + h.h / 2;
+    let w = h.w;
+    let hh = w * ratio;
+    if (hh > 100) {
+      hh = 100;
+      w = hh / ratio;
+    }
+    w = clamp(w, MIN_SIZE, 100);
+    hh = clamp(hh, MIN_SIZE, 100);
+    Object.assign(h, {
+      w: round(w),
+      h: round(hh),
+      x: round(clamp(cx - w / 2, 0, 100 - w)),
+      y: round(clamp(cy - hh / 2, 0, 100 - hh)),
+    });
+  }
+
   async function useLogo(id, file) {
     if (!file || !spotById(id)) return;
     if (!/^image\/(jpeg|png|webp)$/.test(file.type)) return onError("Choose a JPG, PNG or WebP image.");
     onError("");
     uploading.classList.replace("hidden", "flex");
     try {
+      // A free image goes up as a plain picture (no logo clean-up) and its box takes the picture's own shape.
+      if (spotById(id).action === "custom_image") {
+        const url = await uploadImage(file, "card-images");
+        const spot = spotById(id);
+        if (!spot) return;
+        spot.value = url;
+        await fitToPicture(spot);
+        logoBase.delete(spot.id);
+        state.selected = id;
+        markDirty();
+        renderAll();
+        return;
+      }
       const result = await uploadImageFull(file, "card-logos", { removeBackground: removeLogoBg });
       const h = spotById(id);
       if (!h) return;
@@ -722,7 +789,7 @@ export function initHotspotEditor(editor, options) {
     target.focus({ preventScroll: true });
     // Where positions are fixed, a press only selects the box (the logo still drags).
     if (!canDrag(h)) return;
-    const handle = canMove ? e.target.closest("[data-handle]")?.dataset.handle : null;
+    const handle = canResize(h) ? e.target.closest("[data-handle]")?.dataset.handle : null;
     const start = toStage(e);
     const orig = { x: h.x, y: h.y, w: h.w, h: h.h };
     let moved = false;
@@ -758,7 +825,7 @@ export function initHotspotEditor(editor, options) {
         // Resized by hand: that's the logo slider's new 100%. Moved: the slider scales about the new centre.
         if (handle) logoBase.delete(h.id);
         else moveLogoBase(h, h.x - orig.x, h.y - orig.y);
-        changed({ inspector: h.action === "logo" });
+        changed({ inspector: isPicture(h) });
       },
     );
   });
@@ -774,7 +841,7 @@ export function initHotspotEditor(editor, options) {
     }
     const step = e.shiftKey ? 2 : 0.5;
     const d = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[e.key];
-    if (!d || !canDrag(h) || (e.altKey && !canMove)) return;
+    if (!d || !canDrag(h) || (e.altKey && !canResize(h))) return;
     e.preventDefault();
     const was = { x: h.x, y: h.y };
     if (e.altKey) {
@@ -787,7 +854,7 @@ export function initHotspotEditor(editor, options) {
     state.selected = h.id;
     if (e.altKey) logoBase.delete(h.id);
     else moveLogoBase(h, h.x - was.x, h.y - was.y);
-    changed({ inspector: h.action === "logo" });
+    changed({ inspector: isPicture(h) });
     $(`[data-spot="${CSS.escape(h.id)}"]`, spotsLayer)?.focus();
   });
 
@@ -902,7 +969,7 @@ export function initHotspotEditor(editor, options) {
     stage.classList.remove("ring-4", "ring-brand-300");
     const file = e.dataTransfer?.files?.[0];
     const onLogo = spotById(e.target.closest?.("[data-spot]")?.dataset.spot);
-    if (onLogo?.action === "logo") useLogo(onLogo.id, file);
+    if (onLogo && isPicture(onLogo)) useLogo(onLogo.id, file);
     else useFile(file);
   });
 
@@ -942,7 +1009,7 @@ export function initHotspotEditor(editor, options) {
         imageUrl: state.imageUrl,
         imageWidth: state.imageWidth,
         imageHeight: state.imageHeight,
-        hotspots: state.hotspots.map(({ id, action, x, y, w, h, value, label, style, font, fontSize, bold, italic, color, bg, align }) => ({
+        hotspots: state.hotspots.map(({ id, action, x, y, w, h, value, label, style, font, fontSize, bold, italic, color, bg, align, radius }) => ({
           id,
           action,
           x,
@@ -959,6 +1026,7 @@ export function initHotspotEditor(editor, options) {
           color: color || null,
           bg: bg || null,
           align: align || null,
+          radius: radius || null,
         })),
       };
     },

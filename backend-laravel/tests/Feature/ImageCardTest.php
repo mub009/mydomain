@@ -456,6 +456,26 @@ class ImageCardTest extends TestCase
         $this->save([$this->spot('call', ['radius' => 20])])->assertOk()->assertJsonPath('data.hotspots.0.radius', null);
     }
 
+    public function test_a_free_image_is_drawn_in_its_own_shape_anywhere_on_the_card(): void
+    {
+        // Without a picture it's left off the card.
+        $this->save([$this->spot('custom_image')])->assertOk();
+        $this->assertStringNotContainsString('class="spot pic"', $this->get('/card/spice-garden')->getContent());
+
+        // A wide picture in a wide box: shown whole, with no rounding or shape.
+        $pic = ['value' => 'https://cdn.example.test/cards/images/offer.png', 'x' => 5, 'y' => 40, 'w' => 90, 'h' => 12];
+        $this->save([$this->spot('custom_image', $pic)])->assertOk()
+            ->assertJsonPath('data.hotspots.0.value', 'https://cdn.example.test/cards/images/offer.png')
+            ->assertJsonPath('data.hotspots.0.w', 90);
+        $html = $this->get('/card/spice-garden')->getContent();
+        $this->assertStringContainsString('width:90%;height:12%;border-radius:0">', $html);
+        $this->assertStringContainsString('<img src="https://cdn.example.test/cards/images/offer.png" alt=""', $html);
+
+        // It can be rounded like the logo, and must be a picture address.
+        $this->save([$this->spot('custom_image', $pic + ['radius' => 20])])->assertOk()->assertJsonPath('data.hotspots.0.radius', 20);
+        $this->save([$this->spot('custom_image', ['value' => 'javascript:alert(1)'])])->assertStatus(400);
+    }
+
     public function test_review_us_on_google_and_location_actions(): void
     {
         $this->save([
