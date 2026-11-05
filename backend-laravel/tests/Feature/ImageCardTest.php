@@ -460,6 +460,7 @@ class ImageCardTest extends TestCase
     {
         // Without a picture it's left off the card.
         $this->save([$this->spot('custom_image')])->assertOk();
+        $this->postJson("/api/v1/businesses/{$this->business->id}/card/publish", [], $this->auth)->assertOk();
         $this->assertStringNotContainsString('class="spot pic"', $this->get('/card/spice-garden')->getContent());
 
         // A wide picture in a wide box: shown whole, with no rounding or shape.
