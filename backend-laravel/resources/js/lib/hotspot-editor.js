@@ -109,7 +109,7 @@ export function initHotspotEditor(editor, options) {
     selected: null,
   };
   let dirty = false;
-  let removeLogoBg = true; // the server clears a logo's plain background (LogoCleaner)
+  let removeLogoBg = false; // ticked: the server removes the background and redraws the logo with AI (LogoCleaner)
   let logoNote = "";
 
   function markDirty() {

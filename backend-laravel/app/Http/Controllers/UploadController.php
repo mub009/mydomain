@@ -69,7 +69,7 @@ class UploadController extends Controller
 
         $data = $request->validate([
             'purpose' => ['required', 'string', 'in:'.implode(',', array_keys(self::PURPOSES))],
-            // Logos only: false keeps the background as uploaded.
+            // Logos only: true removes the background and redraws the logo in high quality with AI (off unless asked).
             'removeBackground' => ['sometimes', 'boolean'],
         ]);
         $backgroundRemoved = false;
@@ -106,7 +106,7 @@ class UploadController extends Controller
             if (! empty($purpose['logo'])) {
                 // The AI redraw can take a while.
                 @set_time_limit(150);
-                $logo = LogoCleaner::clean($contents, $extension, $request->boolean('removeBackground', true));
+                $logo = LogoCleaner::clean($contents, $extension, $request->boolean('removeBackground', false));
             }
             if ($logo) {
                 ['contents' => $contents, 'extension' => $extension, 'mime' => $mime, 'backgroundRemoved' => $backgroundRemoved, 'method' => $method] = $logo;

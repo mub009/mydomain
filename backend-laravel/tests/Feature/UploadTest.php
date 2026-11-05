@@ -309,7 +309,7 @@ class UploadTest extends TestCase
     public function test_a_logo_upload_has_its_plain_background_removed_and_is_enlarged(): void
     {
         $token = $this->token($this->user('DEALER'));
-        $response = $this->post('/api/v1/uploads/image', ['purpose' => 'card-logos', 'file' => $this->logoOnWhite()], ['Authorization' => "Bearer {$token}"])
+        $response = $this->post('/api/v1/uploads/image', ['purpose' => 'card-logos', 'removeBackground' => '1', 'file' => $this->logoOnWhite()], ['Authorization' => "Bearer {$token}"])
             ->assertOk()->assertJsonPath('data.backgroundRemoved', true);
         $this->assertStringContainsString('cards/logos/', $response->json('data.url'));
 
@@ -350,7 +350,7 @@ class UploadTest extends TestCase
         imagepng($img, $path);
 
         $token = $this->token($this->user('BUSINESS_OWNER'));
-        $this->post('/api/v1/uploads/image', ['purpose' => 'business-logo', 'file' => new UploadedFile($path, 'photo.png', 'image/png', null, true)], ['Authorization' => "Bearer {$token}"])
+        $this->post('/api/v1/uploads/image', ['purpose' => 'business-logo', 'removeBackground' => '1', 'file' => new UploadedFile($path, 'photo.png', 'image/png', null, true)], ['Authorization' => "Bearer {$token}"])
             ->assertOk()->assertJsonPath('data.backgroundRemoved', false);
     }
 
@@ -374,7 +374,7 @@ class UploadTest extends TestCase
     {
         $this->fakeGemini();
         $token = $this->token($this->user('DEALER'));
-        $response = $this->post('/api/v1/uploads/image', ['purpose' => 'card-logos', 'file' => $this->logoOnWhite()], ['Authorization' => "Bearer {$token}"])
+        $response = $this->post('/api/v1/uploads/image', ['purpose' => 'card-logos', 'removeBackground' => '1', 'file' => $this->logoOnWhite()], ['Authorization' => "Bearer {$token}"])
             ->assertOk()->assertJsonPath('data.backgroundRemoved', true)->assertJsonPath('data.method', 'ai');
 
         // Gemini was sent the logo, and asked for the key colour furthest from it (green, for a red logo on white).
@@ -401,7 +401,7 @@ class UploadTest extends TestCase
         config(['services.gemini.key' => 'test-key', 'services.ai.provider' => null]);
         Http::fake(['*' => Http::response(['error' => 'quota'], 429)]);
         $token = $this->token($this->user('BUSINESS_OWNER'));
-        $this->post('/api/v1/uploads/image', ['purpose' => 'business-logo', 'file' => $this->logoOnWhite()], ['Authorization' => "Bearer {$token}"])
+        $this->post('/api/v1/uploads/image', ['purpose' => 'business-logo', 'removeBackground' => '1', 'file' => $this->logoOnWhite()], ['Authorization' => "Bearer {$token}"])
             ->assertOk()->assertJsonPath('data.backgroundRemoved', true)->assertJsonPath('data.method', 'basic');
     }
 
