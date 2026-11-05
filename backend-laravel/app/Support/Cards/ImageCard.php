@@ -557,6 +557,11 @@ class ImageCard
     public static function renderSource(array $source, array $details, bool $preview = false, bool $marks = true): string
     {
         $marks = $preview && $marks;
+        // In a preview, "Save contact" downloads the contact from the dashboard — the
+        // public file only exists once the card is live.
+        if ($preview && ! empty($details['previewVcfUrl'])) {
+            $details['vcfUrl'] = $details['previewVcfUrl'];
+        }
         $w = $source['imageWidth'] ?? null;
         $h = $source['imageHeight'] ?? null;
         $colour = ImageColour::normalize($source['colour'] ?? null);

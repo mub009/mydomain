@@ -195,6 +195,36 @@ class ImageCardTest extends TestCase
         $this->save([$this->spot('facebook', ['value' => 'javascript:alert(1)'])])->assertStatus(400);
     }
 
+    public function test_save_contact_works_in_previews_before_the_card_is_published(): void
+    {
+        $this->save([$this->spot('save_contact', ['style' => 'button'])])->assertOk();
+        // Not public yet: the public contact file isn't there…
+        $this->get('/card/spice-garden.vcf')->assertNotFound();
+        // …so the preview's Save contact downloads it from the dashboard instead.
+        $html = $this->postJson("/api/v1/businesses/{$this->business->id}/card/preview", [
+            'imageUrl' => 'https://cdn.example.test/cards/images/card.jpg', 'imageWidth' => 600, 'imageHeight' => 1000,
+            'hotspots' => [$this->spot('save_contact', ['style' => 'button'])],
+        ], $this->auth)->assertOk()->json('data.html');
+        $this->assertStringContainsString("/dashboard/businesses/{$this->business->id}/card.vcf", $html);
+
+        $this->post('/login', ['email' => $this->dealerEmail, 'password' => 'Password123!']);
+        $vcf = $this->get("/dashboard/businesses/{$this->business->id}/card.vcf")->assertOk()
+            ->assertHeader('Content-Type', 'text/vcard; charset=UTF-8');
+        $this->assertStringContainsString('FN:Spice Garden', $vcf->getContent());
+        $this->assertStringContainsString('BEGIN:VCARD', $vcf->getContent());
+
+        // Someone who doesn't manage the business can't fetch it.
+        $this->post('/logout');
+        $stranger = User::create(['email' => 'x-'.uniqid().'@example.com', 'passwordHash' => Hash::make('Password123!'), 'firstName' => 'X', 'lastName' => 'Y', 'status' => 'ACTIVE', 'role' => 'BUSINESS_OWNER']);
+        $this->post('/login', ['email' => $stranger->email, 'password' => 'Password123!']);
+        $this->get("/dashboard/businesses/{$this->business->id}/card.vcf")->assertForbidden();
+
+        // Once live, the public card links the public file.
+        $this->postJson("/api/v1/businesses/{$this->business->id}/card/publish", [], $this->auth)->assertOk();
+        $this->assertStringContainsString('/card/spice-garden.vcf', $this->get('/card/spice-garden')->getContent());
+        $this->get('/card/spice-garden.vcf')->assertOk();
+    }
+
     public function test_the_dealer_can_recolour_the_card_on_its_page(): void
     {
         $this->withoutVite();

@@ -330,6 +330,8 @@ class CardEngine
             ]),
             'cardUrl' => self::cardUrl($business->slug),
             'vcfUrl' => self::cardUrl($business->slug).'.vcf',
+            // For the editors' previews: the same contact file from the dashboard, before the card is public.
+            'previewVcfUrl' => url("/dashboard/businesses/{$business->id}/card.vcf"),
             'pdfUrl' => self::cardUrl($business->slug).'.pdf',
             'initials' => self::initials($business->name),
         ];

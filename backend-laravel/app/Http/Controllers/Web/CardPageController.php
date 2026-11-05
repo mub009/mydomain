@@ -58,6 +58,26 @@ class CardPageController extends Controller
         return self::pdfResponse($business, $business->status === 'PUBLISHED' && (bool) $business->card?->isPublished);
     }
 
+    // The card's contact file for the people who manage the business — works
+    // before the card is published (the editors' "Save contact" in previews).
+    public function ownerVcard(string $id)
+    {
+        $business = Business::with(['category', 'hours' => fn ($q) => $q->orderBy('dayOfWeek')])->find($id);
+        abort_unless($business, 404);
+        $user = WebAuth::user();
+        abort_unless(BusinessAccess::canManage(['role' => $user->role, 'sub' => $user->id], $business), 403);
+        abort_unless(BusinessFeatures::has($business, BusinessFeatures::VISITING_CARD), 404);
+
+        return self::vcardResponse($business);
+    }
+
+    private static function vcardResponse(Business $business)
+    {
+        return response(CardEngine::vcard(CardEngine::details($business)))
+            ->header('Content-Type', 'text/vcard; charset=UTF-8')
+            ->header('Content-Disposition', 'attachment; filename="'.$business->slug.'.vcf"');
+    }
+
     private static function pdfResponse(Business $business, bool $live)
     {
         $disposition = request()->boolean('inline') ? 'inline' : 'attachment';
@@ -70,10 +90,6 @@ class CardPageController extends Controller
 
     public function vcard(string $slug)
     {
-        $business = $this->liveBusiness($slug);
-
-        return response(CardEngine::vcard(CardEngine::details($business)))
-            ->header('Content-Type', 'text/vcard; charset=UTF-8')
-            ->header('Content-Disposition', 'attachment; filename="'.$business->slug.'.vcf"');
+        return self::vcardResponse($this->liveBusiness($slug));
     }
 }
