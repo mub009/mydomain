@@ -895,10 +895,13 @@ export function initHotspotEditor(editor, options) {
   });
 
   // --- Full-screen image editor for a free image --------------------------------
-  // Opens over the whole screen with the card shown large: draw the area
-  // freehand (like a lasso selection in Photoshop), upload the picture into
-  // it, then drag the picture inside the area and zoom it. "Done" puts it on
-  // the card; "Cancel" (or Esc) leaves the card as it was.
+  // Opens over the whole screen with the card shown large. Tools, like in
+  // Photoshop: Freehand (a lasso), Pen (click point by point), Edit points
+  // (drag a point, click the line to add one, double-click to delete one),
+  // Move picture (choose which part shows, and zoom it) and Hand (pan). The
+  // view itself zooms in for precise work. "Done" puts it on the card;
+  // "Cancel" (or Esc) leaves the card as it was. The outline is kept in card
+  // percent while editing, and saved as the box plus points in percent of it.
   const pictureInput = Object.assign(document.createElement("input"), { type: "file", accept: "image/jpeg,image/png,image/webp", hidden: true });
   editor.append(pictureInput);
   let onPicture = null;
@@ -909,103 +912,258 @@ export function initHotspotEditor(editor, options) {
   });
   const FULL_AREA = [[0, 0], [100, 0], [100, 100], [0, 100]];
 
+  // Ramer–Douglas–Peucker: only the points of a drawn line that matter (tolerance in card %).
+  function simplifyOutline(points, tol = 0.35) {
+    if (points.length < 4) return points;
+    const keep = points.map((_, i) => i === 0 || i === points.length - 1);
+    const stack = [[0, points.length - 1]];
+    while (stack.length) {
+      const [a, b] = stack.pop();
+      const [x1, y1] = points[a];
+      const [x2, y2] = points[b];
+      const len = Math.hypot(x2 - x1, y2 - y1);
+      let max = 0;
+      let idx = -1;
+      for (let i = a + 1; i < b; i++) {
+        const [px, py] = points[i];
+        const d = len < 1e-6 ? Math.hypot(px - x1, py - y1) : Math.abs((y2 - y1) * px - (x2 - x1) * py + x2 * y1 - y2 * x1) / len;
+        if (d > max) [max, idx] = [d, i];
+      }
+      if (idx > 0 && max > tol) {
+        keep[idx] = true;
+        stack.push([a, idx], [idx, b]);
+      }
+    }
+    let out = points.filter((_, i) => keep[i]);
+    // The line ends where it began: drop the closing point when it sits on the first.
+    if (out.length > 3 && Math.hypot(out[0][0] - out.at(-1)[0], out[0][1] - out.at(-1)[1]) < 1) out = out.slice(0, -1);
+    const step = Math.ceil(out.length / MAX_SHAPE_POINTS);
+    return out.filter((_, i) => i % step === 0);
+  }
+
   function startMarking(forId) {
     if (!state.imageUrl) return;
     closeMenu();
     drawingFor = null;
     const spot = spotById(forId);
-    const draft = spot
-      ? {
-          x: spot.x, y: spot.y, w: spot.w, h: spot.h,
-          // An older free image without a marked area: its whole box is the area.
-          shape: (spot.shape || (spot.value ? FULL_AREA : null))?.map((pt) => [...pt]) || null,
-          value: spot.value || null,
-          fit: spot.fit ? { ...spot.fit } : null,
-        }
-      : { shape: null, value: null, fit: null };
-    let mode = draft.shape && draft.value ? "move" : "draw";
+    // The outline in card percent; an older free image without a drawn area uses its whole box.
+    let pts =
+      spot && (spot.shape || spot.value)
+        ? (spot.shape || FULL_AREA).map(([px, py]) => [spot.x + (px * spot.w) / 100, spot.y + (py * spot.h) / 100])
+        : null;
+    const draft = { value: spot?.value || null, fit: spot?.fit ? { ...spot.fit } : null };
+    let mode = pts ? (draft.value ? "move" : "edit") : "draw";
+    let pen = []; // the Pen tool's points so far, until the shape is closed
+    let selectedPt = null;
     let busy = false;
     let problem = "";
+    let view = 1; // view zoom: 1 = the whole card fits the screen
+    let spaceDown = false;
 
     const el = document.createElement("div");
     el.className = "fixed inset-0 z-[1000] flex flex-col bg-gray-950/95 text-white";
     el.setAttribute("role", "dialog");
     el.setAttribute("aria-modal", "true");
     el.setAttribute("aria-label", "Image editor");
+    el.innerHTML = `
+      <div data-head class="border-b border-white/10 px-4 py-2.5"></div>
+      <div data-scroll class="flex min-h-0 flex-1 overflow-auto p-4">
+        <div data-canvas class="relative m-auto shrink-0 touch-none select-none">
+          <img src="${esc(state.imageUrl)}" alt="Your card" draggable="false" class="pointer-events-none block h-auto w-full rounded" />
+          <div data-overlay class="absolute inset-0"></div>
+        </div>
+      </div>
+      <div data-foot class="border-t border-white/10 px-4 py-2.5 text-sm"></div>`;
     document.body.appendChild(el);
+    const head = $("[data-head]", el);
+    const foot = $("[data-foot]", el);
+    const scroll = $("[data-scroll]", el);
+    const canvas = $("[data-canvas]", el);
+    const overlay = $("[data-overlay]", el);
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
-    const onKey = (e) => {
-      if (e.key !== "Escape") return;
-      e.stopPropagation();
-      close();
+    // --- View zoom
+    const ratio = state.imageWidth && state.imageHeight ? state.imageWidth / state.imageHeight : 0.6;
+    const fitWidth = () => {
+      const r = scroll.getBoundingClientRect();
+      return Math.max(160, Math.min(r.width - 32, (r.height - 32) * ratio));
     };
-    document.addEventListener("keydown", onKey, true);
+    function setView(z, anchor) {
+      const old = canvas.getBoundingClientRect();
+      const sr = scroll.getBoundingClientRect();
+      const ax = anchor ? anchor.x : sr.left + sr.width / 2;
+      const ay = anchor ? anchor.y : sr.top + sr.height / 2;
+      const fx = old.width ? (ax - old.left) / old.width : 0.5;
+      const fy = old.height ? (ay - old.top) / old.height : 0.5;
+      view = clamp(Math.round(z * 100) / 100, 1, 8);
+      canvas.style.width = `${fitWidth() * view}px`;
+      const nr = canvas.getBoundingClientRect();
+      scroll.scrollLeft += nr.left + fx * nr.width - ax;
+      scroll.scrollTop += nr.top + fy * nr.height - ay;
+      const label = $("[data-view-label]", el);
+      if (label) label.textContent = `${Math.round(view * 100)}%`;
+    }
+    const onResize = () => setView(view);
+    window.addEventListener("resize", onResize);
+    scroll.addEventListener(
+      "wheel",
+      (e) => {
+        if (!e.ctrlKey && !e.metaKey) return; // plain wheel scrolls the zoomed view
+        e.preventDefault();
+        setView(view * (e.deltaY < 0 ? 1.15 : 1 / 1.15), { x: e.clientX, y: e.clientY });
+      },
+      { passive: false },
+    );
+
     function close() {
       el.remove();
       onPicture = null;
       document.body.style.overflow = prevOverflow;
       document.removeEventListener("keydown", onKey, true);
+      document.removeEventListener("keyup", onKeyUp, true);
+      window.removeEventListener("resize", onResize);
     }
 
-    const btn = (on) =>
-      `flex items-center gap-1.5 rounded-lg border px-3 py-2 font-semibold ${on ? "border-white bg-white text-gray-900" : "border-white/30 text-white hover:bg-white/10"}`;
-    function render() {
-      const has = !!draft.shape;
-      const zoom = (draft.fit || FIT_DEFAULT).zoom;
-      const area = has ? `left:${draft.x}%;top:${draft.y}%;width:${draft.w}%;height:${draft.h}%` : "";
-      el.innerHTML = `
-        <div class="flex flex-wrap items-center gap-3 border-b border-white/10 px-4 py-3">
+    // --- The outline
+    const bounds = () => {
+      const xs = pts.map((pt) => pt[0]);
+      const ys = pts.map((pt) => pt[1]);
+      const x = Math.min(...xs);
+      const y = Math.min(...ys);
+      return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y };
+    };
+    const relShape = (b) => pts.map(([x, y]) => [Math.round(((x - b.x) / (b.w || 1)) * 1000) / 10, Math.round(((y - b.y) / (b.h || 1)) * 1000) / 10]);
+    const tooSmall = (list) => {
+      const xs = list.map((pt) => pt[0]);
+      const ys = list.map((pt) => pt[1]);
+      return list.length < 3 || Math.max(...xs) - Math.min(...xs) < MIN_SIZE || Math.max(...ys) - Math.min(...ys) < MIN_SIZE;
+    };
+    function useOutline(list) {
+      if (tooSmall(list)) {
+        problem = "That area is too small — go all the way around it.";
+        return render();
+      }
+      problem = "";
+      pts = list;
+      pen = [];
+      selectedPt = null;
+      mode = "edit"; // fix any point that's off, like with Photoshop's pen
+      render();
+      if (!draft.value) pick(); // area drawn: now the picture
+    }
+    function deletePoint(i) {
+      if (!pts || pts.length <= 3) {
+        problem = "An area needs at least 3 points.";
+        return render();
+      }
+      pts.splice(i, 1);
+      selectedPt = null;
+      render();
+    }
+
+    const HELP = {
+      draw: "Freehand: hold down and draw around the area where the picture should go.",
+      pen: "Pen: click to place points around the area (drag while placing to adjust). Click the first point or press Enter to close it. Backspace removes the last point.",
+      edit: "Edit points: drag a point to move it, click the line to add a point, double-click a point (or select it and press Delete) to remove it.",
+      move: "Move picture: drag to choose which part of the picture shows, and zoom it with the slider.",
+      pan: "Hand: drag to move around the zoomed view. Tip: hold Space to do this with any tool.",
+    };
+    const tool = (on) =>
+      `flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 font-semibold ${on ? "border-white bg-white text-gray-900" : "border-white/30 text-white hover:bg-white/10"}`;
+    const small = "rounded-md border border-white/30 px-2 py-1 font-semibold hover:bg-white/10";
+
+    function renderHead() {
+      head.innerHTML = `
+        <div class="flex flex-wrap items-center gap-3">
           <div class="min-w-0 flex-1">
             <p class="font-bold">Image editor</p>
-            <p class="text-xs text-white/70">${
-              mode === "draw"
-                ? "Hold down and draw around the area where the picture should go."
-                : "Drag the picture to choose which part shows, and zoom with the slider."
-            }</p>
-            ${problem ? `<p class="mt-1 text-xs font-semibold text-red-300">${esc(problem)}</p>` : ""}
+            <p class="text-xs text-white/70">${esc(HELP[mode])}</p>
+            ${problem ? `<p class="mt-0.5 text-xs font-semibold text-red-300">${esc(problem)}</p>` : ""}
+          </div>
+          <div class="flex items-center gap-1 text-xs" role="group" aria-label="View zoom">
+            <button type="button" data-x="view-out" class="${small}" title="Zoom out (−)">−</button>
+            <span data-view-label class="w-12 text-center">${Math.round(view * 100)}%</span>
+            <button type="button" data-x="view-in" class="${small}" title="Zoom in (+)">+</button>
+            <button type="button" data-x="view-fit" class="${small}" title="Fit the card to the screen">Fit</button>
           </div>
           <button type="button" data-x="cancel" class="rounded-lg px-3 py-2 text-sm font-semibold text-white/80 hover:bg-white/10">Cancel</button>
-          <button type="button" data-x="done" class="rounded-lg bg-brand-600 px-5 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-40" ${has && !busy ? "" : "disabled"}>Done</button>
-        </div>
-        <div class="flex min-h-0 flex-1 items-center justify-center overflow-hidden p-4">
-          <div data-canvas class="relative touch-none select-none ${mode === "draw" ? "cursor-crosshair" : "cursor-grab"}">
-            <img src="${esc(state.imageUrl)}" alt="Your card" draggable="false" class="pointer-events-none block max-h-[calc(100vh-170px)] max-w-[calc(100vw-32px)] rounded" />
-            ${
-              has
-                ? `<div data-pic class="pointer-events-none absolute overflow-hidden" style="${area};clip-path:${clipPath(draft.shape)}">
-                    ${
-                      draft.value
-                        ? `<img src="${esc(draft.value)}" alt="" draggable="false" class="block h-full w-full" style="${fitCss(draft)}" />`
-                        : `<span class="flex h-full w-full items-center justify-center bg-white/30 text-xs font-semibold">Upload a picture</span>`
-                    }
-                  </div>
-                  <svg viewBox="0 0 100 100" preserveAspectRatio="none" class="pointer-events-none absolute overflow-visible" style="${area}">
-                    <polygon points="${draft.shape.map((pt) => pt.join(",")).join(" ")}" fill="none" stroke="#fff" stroke-width="1.5" stroke-dasharray="6 4" vector-effect="non-scaling-stroke" stroke-linejoin="round" />
-                  </svg>`
-                : ""
-            }
-            <svg viewBox="0 0 100 100" preserveAspectRatio="none" class="pointer-events-none absolute inset-0 h-full w-full overflow-visible">
-              <polygon data-line points="" fill="rgba(255,255,255,.2)" stroke="#fff" stroke-width="2" stroke-dasharray="6 4" vector-effect="non-scaling-stroke" stroke-linejoin="round" />
-            </svg>
-            ${busy ? `<div class="absolute inset-0 flex items-center justify-center rounded bg-black/60 text-sm font-semibold">Uploading…</div>` : ""}
-          </div>
-        </div>
-        <div class="flex flex-wrap items-center justify-center gap-2 border-t border-white/10 px-4 py-3 text-sm">
-          <button type="button" data-x="draw" class="${btn(mode === "draw")}">${icon("pencil", { size: 14 })} ${has ? "Redraw area" : "Draw area"}</button>
-          ${has ? `<button type="button" data-x="upload" class="${btn(false)}">${icon("upload", { size: 14 })} ${draft.value ? "Replace image" : "Upload image"}</button>` : ""}
-          ${
-            draft.value
-              ? `<button type="button" data-x="move" class="${btn(mode === "move")}">${icon("move", { size: 14 })} Move picture</button>
-                <label class="flex items-center gap-2 px-2">Zoom
-                  <input type="range" min="100" max="400" step="5" value="${zoom}" data-x="zoom" class="w-32" aria-label="Zoom the picture" />
-                  <span data-zoom-label class="w-10 text-xs">${zoom}%</span>
-                </label>
-                <button type="button" data-x="reset" class="px-2 py-2 text-xs font-semibold text-white/70 hover:underline">Reset</button>`
-              : ""
-          }
+          <button type="button" data-x="done" class="rounded-lg bg-brand-600 px-5 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-40" ${pts && !busy ? "" : "disabled"}>Done</button>
         </div>`;
+    }
+
+    function renderFoot() {
+      const zoom = (draft.fit || FIT_DEFAULT).zoom;
+      foot.innerHTML = `
+        <div class="flex flex-wrap items-center justify-center gap-2">
+          <button type="button" data-x="draw" class="${tool(mode === "draw")}">${icon("pencil", { size: 14 })} Freehand</button>
+          <button type="button" data-x="pen" class="${tool(mode === "pen")}">${icon("pen-tool", { size: 14 })} Pen</button>
+          ${pts ? `<button type="button" data-x="edit" class="${tool(mode === "edit")}">${icon("mouse-pointer-2", { size: 14 })} Edit points</button>` : ""}
+          ${draft.value ? `<button type="button" data-x="move" class="${tool(mode === "move")}">${icon("move", { size: 14 })} Move picture</button>` : ""}
+          <button type="button" data-x="pan" class="${tool(mode === "pan")}">${icon("hand", { size: 14 })} Hand</button>
+          <span class="mx-1 hidden h-6 w-px bg-white/20 sm:block"></span>
+          ${pts ? `<button type="button" data-x="upload" class="${tool(false)}">${icon("upload", { size: 14 })} ${draft.value ? "Replace image" : "Upload image"}</button>` : ""}
+        </div>
+        <div class="mt-2 flex flex-wrap items-center justify-center gap-2 text-xs empty:hidden">${
+          mode === "pen"
+            ? `<span class="text-white/70">${pen.length} ${pen.length === 1 ? "point" : "points"}</span>
+               <button type="button" data-x="pen-undo" class="${small}" ${pen.length ? "" : "disabled"}>Undo point</button>
+               <button type="button" data-x="pen-close" class="${small}" ${pen.length >= 3 ? "" : "disabled"}>Close shape</button>`
+            : mode === "edit" && pts
+              ? `<span class="text-white/70">${pts.length} points</span>
+                 ${selectedPt !== null ? `<button type="button" data-x="pt-delete" class="${small}">Delete point</button>` : ""}`
+              : mode === "move" && draft.value
+                ? `<label class="flex items-center gap-2">Picture zoom
+                     <input type="range" min="100" max="400" step="5" value="${zoom}" data-x="zoom" class="w-36" aria-label="Zoom the picture" />
+                     <span data-zoom-label class="w-10">${zoom}%</span>
+                   </label>
+                   <button type="button" data-x="reset" class="${small}">Reset</button>`
+                : ""
+        }</div>`;
+    }
+
+    function renderOverlay() {
+      canvas.style.cursor = spaceDown || mode === "pan" || mode === "move" ? "grab" : mode === "edit" ? "default" : "crosshair";
+      const line = (list) => list.map((pt) => pt.join(",")).join(" ");
+      const dot = (pt, attr, i, cls) =>
+        `<span ${attr}="${i}" class="absolute -translate-x-1/2 -translate-y-1/2 rounded-sm border-2 shadow ${cls}" style="left:${pt[0]}%;top:${pt[1]}%"></span>`;
+      let html = "";
+      if (pts) {
+        const b = bounds();
+        html += `<div class="pointer-events-none absolute overflow-hidden" style="left:${b.x}%;top:${b.y}%;width:${b.w}%;height:${b.h}%;clip-path:${clipPath(relShape(b))}">${
+          draft.value
+            ? `<img data-pic-img src="${esc(draft.value)}" alt="" draggable="false" class="block h-full w-full" style="${fitCss(draft)}" />`
+            : `<span class="flex h-full w-full items-center justify-center bg-white/30 text-xs font-semibold">Upload a picture</span>`
+        }</div>`;
+      }
+      html += `<svg viewBox="0 0 100 100" preserveAspectRatio="none" class="absolute inset-0 h-full w-full overflow-visible" style="pointer-events:${mode === "edit" ? "auto" : "none"}">`;
+      if (pts) html += `<polygon points="${line(pts)}" fill="none" stroke="#fff" stroke-width="1.5" stroke-dasharray="6 4" vector-effect="non-scaling-stroke" pointer-events="none" />`;
+      if (pts && mode === "edit") {
+        html += pts
+          .map((pt, i) => {
+            const q = pts[(i + 1) % pts.length];
+            return `<line data-seg="${i}" x1="${pt[0]}" y1="${pt[1]}" x2="${q[0]}" y2="${q[1]}" stroke="transparent" stroke-width="14" vector-effect="non-scaling-stroke" pointer-events="stroke" style="cursor:copy" />`;
+          })
+          .join("");
+      }
+      if (mode === "pen" && pen.length) html += `<polyline points="${line(pen)}" fill="none" stroke="#38bdf8" stroke-width="2" vector-effect="non-scaling-stroke" pointer-events="none" />`;
+      html += `<polygon data-line points="" fill="rgba(255,255,255,.2)" stroke="#fff" stroke-width="2" stroke-dasharray="6 4" vector-effect="non-scaling-stroke" stroke-linejoin="round" pointer-events="none" /></svg>`;
+      if (pts && mode === "edit") {
+        html += pts.map((pt, i) => dot(pt, "data-pt", i, i === selectedPt ? "h-4 w-4 border-white bg-sky-500" : "h-3.5 w-3.5 cursor-move border-sky-500 bg-white")).join("");
+      }
+      if (mode === "pen") {
+        html += pen
+          .map((pt, i) => dot(pt, "data-pen-pt", i, i === 0 && pen.length >= 3 ? "h-4 w-4 cursor-pointer border-white bg-emerald-500" : "h-3 w-3 border-sky-400 bg-white"))
+          .join("");
+      }
+      if (busy) html += `<div class="absolute inset-0 flex items-center justify-center rounded bg-black/60 text-sm font-semibold">Uploading…</div>`;
+      overlay.innerHTML = html;
+    }
+
+    function render() {
+      renderHead();
+      renderFoot();
+      renderOverlay();
     }
 
     async function usePicture(file) {
@@ -1032,22 +1190,44 @@ export function initHotspotEditor(editor, options) {
       pictureInput.click();
     };
 
+    function setMode(m) {
+      if (mode === "pen" && m !== "pen") pen = [];
+      mode = m;
+      selectedPt = null;
+      problem = "";
+      render();
+    }
+
     el.addEventListener("click", (e) => {
       const b = e.target.closest("[data-x]");
-      if (!b || busy) return;
+      if (!b || busy || b.dataset.x === "zoom") return;
       const x = b.dataset.x;
       if (x === "cancel") return close();
       if (x === "upload") return pick();
-      if (x === "draw" || x === "move") {
-        mode = x;
+      if (["draw", "pen", "edit", "move", "pan"].includes(x)) return setMode(x);
+      if (x === "view-in") return setView(view * 1.25);
+      if (x === "view-out") return setView(view / 1.25);
+      if (x === "view-fit") return setView(1);
+      if (x === "pen-undo") {
+        pen.pop();
         return render();
       }
+      if (x === "pen-close") return useOutline(pen);
+      if (x === "pt-delete" && selectedPt !== null) return deletePoint(selectedPt);
       if (x === "reset") {
         draft.fit = null;
         return render();
       }
-      if (x === "done" && draft.shape) {
-        const values = { x: draft.x, y: draft.y, w: draft.w, h: draft.h, shape: draft.shape, shapeName: null, radius: null, value: draft.value, fit: draft.fit };
+      if (x === "done" && pts) {
+        const b = bounds();
+        if (b.w < MIN_SIZE || b.h < MIN_SIZE) {
+          problem = "That area is too small.";
+          return render();
+        }
+        const values = {
+          x: round(b.x), y: round(b.y), w: round(b.w), h: round(b.h),
+          shape: relShape(b), shapeName: null, radius: null, value: draft.value, fit: draft.fit,
+        };
         let target = spotById(forId);
         if (target) Object.assign(target, values);
         else {
@@ -1066,63 +1246,156 @@ export function initHotspotEditor(editor, options) {
       if (e.target.dataset.x !== "zoom") return;
       draft.fit = { ...FIT_DEFAULT, ...(draft.fit || {}), zoom: Number(e.target.value) };
       $("[data-zoom-label]", el).textContent = `${draft.fit.zoom}%`;
-      const img = $("[data-pic] img", el);
+      const img = $("[data-pic-img]", el);
       if (img) img.style.cssText = fitCss(draft);
     });
+    el.addEventListener("dblclick", (e) => {
+      const dot = e.target.closest("[data-pt]");
+      if (mode === "edit" && dot) deletePoint(Number(dot.dataset.pt));
+    });
 
-    el.addEventListener("pointerdown", (e) => {
-      const canvas = e.target.closest("[data-canvas]");
-      if (!canvas || busy || e.button > 0) return;
-      e.preventDefault();
+    const toCanvas = (ev) => {
       const r = canvas.getBoundingClientRect();
+      return [round(clamp(((ev.clientX - r.left) / r.width) * 100, 0, 100)), round(clamp(((ev.clientY - r.top) / r.height) * 100, 0, 100))];
+    };
+    el.addEventListener("pointerdown", (e) => {
+      if (!e.target.closest("[data-canvas]") || busy || e.button > 0) return;
+      e.preventDefault();
+      // Hand (or Space held): pan the zoomed view.
+      if (mode === "pan" || spaceDown) {
+        const start = { x: scroll.scrollLeft, y: scroll.scrollTop };
+        canvas.style.cursor = "grabbing";
+        track(
+          (ev) => {
+            scroll.scrollLeft = start.x - (ev.clientX - e.clientX);
+            scroll.scrollTop = start.y - (ev.clientY - e.clientY);
+          },
+          () => renderOverlay(),
+        );
+        return;
+      }
       if (mode === "draw") {
-        // Freehand, like a lasso: every point of the line, closed when let go.
         const line = $("[data-line]", el);
         const points = [];
         const add = (ev) => {
-          points.push([clamp(((ev.clientX - r.left) / r.width) * 100, 0, 100), clamp(((ev.clientY - r.top) / r.height) * 100, 0, 100)]);
+          points.push(toCanvas(ev));
           line.setAttribute("points", points.map((pt) => pt.join(",")).join(" "));
         };
         add(e);
-        track(add, () => {
-          const xs = points.map((pt) => pt[0]);
-          const ys = points.map((pt) => pt[1]);
-          const [bx, by] = [Math.min(...xs), Math.min(...ys)];
-          const [bw, bh] = [Math.max(...xs) - bx, Math.max(...ys) - by];
-          const shape = bw >= MIN_SIZE && bh >= MIN_SIZE ? simplifyStroke(points.map(([x, y]) => [((x - bx) / bw) * 100, ((y - by) / bh) * 100])) : [];
-          if (shape.length < 3) {
-            problem = "Draw a bigger area — hold down and go all the way around it.";
-            return render();
-          }
-          problem = "";
-          Object.assign(draft, { x: round(bx), y: round(by), w: round(bw), h: round(bh), shape });
-          mode = draft.value ? "move" : "draw";
-          render();
-          if (!draft.value) pick(); // area marked: now the picture
-        });
+        track(add, () => useOutline(simplifyOutline(points)));
         return;
       }
-      // Move: drag the picture inside its area.
-      if (!draft.value) return;
-      const orig = { ...FIT_DEFAULT, ...(draft.fit || {}) };
-      const areaW = (r.width * draft.w) / 100;
-      const areaH = (r.height * draft.h) / 100;
-      const img = $("[data-pic] img", el);
-      track(
-        (ev) => {
-          const k = 100 / (orig.zoom / 100);
-          draft.fit = {
-            ...orig,
-            x: round(clamp(orig.x - ((ev.clientX - e.clientX) / areaW) * k, 0, 100)),
-            y: round(clamp(orig.y - ((ev.clientY - e.clientY) / areaH) * k, 0, 100)),
-          };
-          if (img) img.style.cssText = fitCss(draft);
-        },
-        () => {},
-      );
+      if (mode === "pen") {
+        if (e.target.closest('[data-pen-pt="0"]') && pen.length >= 3) return useOutline(pen);
+        if (pen.length >= MAX_SHAPE_POINTS) return;
+        pen.push(toCanvas(e));
+        const i = pen.length - 1;
+        renderOverlay();
+        renderFoot();
+        track(
+          (ev) => {
+            pen[i] = toCanvas(ev);
+            renderOverlay();
+          },
+          () => {},
+        );
+        return;
+      }
+      if (mode === "edit" && pts) {
+        const dot = e.target.closest("[data-pt]");
+        const seg = e.target.closest("[data-seg]");
+        let i;
+        if (dot) i = Number(dot.dataset.pt);
+        else if (seg && pts.length < MAX_SHAPE_POINTS) {
+          i = Number(seg.dataset.seg) + 1; // a new point on the line, where it was clicked
+          pts.splice(i, 0, toCanvas(e));
+        } else {
+          selectedPt = null;
+          renderOverlay();
+          renderFoot();
+          return;
+        }
+        selectedPt = i;
+        renderOverlay();
+        renderFoot();
+        track(
+          (ev) => {
+            pts[i] = toCanvas(ev);
+            renderOverlay();
+          },
+          () => renderHead(),
+        );
+        return;
+      }
+      if (mode === "move" && draft.value && pts) {
+        const orig = { ...FIT_DEFAULT, ...(draft.fit || {}) };
+        const r = canvas.getBoundingClientRect();
+        const b = bounds();
+        const areaW = (r.width * b.w) / 100 || 1;
+        const areaH = (r.height * b.h) / 100 || 1;
+        const img = $("[data-pic-img]", el);
+        track(
+          (ev) => {
+            const k = 100 / (orig.zoom / 100);
+            draft.fit = {
+              ...orig,
+              x: round(clamp(orig.x - ((ev.clientX - e.clientX) / areaW) * k, 0, 100)),
+              y: round(clamp(orig.y - ((ev.clientY - e.clientY) / areaH) * k, 0, 100)),
+            };
+            if (img) img.style.cssText = fitCss(draft);
+          },
+          () => {},
+        );
+      }
     });
 
+    function onKey(e) {
+      if (e.target.closest?.("input, textarea, select") && e.key !== "Escape") return;
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        if (mode === "pen" && pen.length) {
+          pen = [];
+          return render();
+        }
+        return close();
+      }
+      if (e.key === " ") {
+        e.preventDefault();
+        if (!spaceDown) {
+          spaceDown = true;
+          renderOverlay();
+        }
+        return;
+      }
+      if (e.key === "Enter" && mode === "pen" && pen.length >= 3) {
+        e.preventDefault();
+        return useOutline(pen);
+      }
+      if (e.key === "Backspace" || e.key === "Delete") {
+        if (mode === "pen" && pen.length) {
+          e.preventDefault();
+          pen.pop();
+          return render();
+        }
+        if (mode === "edit" && selectedPt !== null) {
+          e.preventDefault();
+          return deletePoint(selectedPt);
+        }
+      }
+      if (e.key === "+" || e.key === "=") setView(view * 1.25);
+      if (e.key === "-") setView(view / 1.25);
+    }
+    function onKeyUp(e) {
+      if (e.key === " " && spaceDown) {
+        spaceDown = false;
+        renderOverlay();
+      }
+    }
+    document.addEventListener("keydown", onKey, true);
+    document.addEventListener("keyup", onKeyUp, true);
+
     render();
+    setView(1);
   }
 
   // --- Draw a picture's shape by hand ------------------------------------------
