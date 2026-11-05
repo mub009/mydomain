@@ -131,6 +131,7 @@ export function initHotspotEditor(editor, options) {
     canReplaceImage = true, // false where the editor offers no "Replace image" (a business's card)
     canDelete = true, // false: placed actions and details can't be removed (a business's card)
     canMove = true, // false: placed boxes keep their position and size (a business's card)
+    freeImageEditor = true, // false: a free image is just uploaded, dragged and resized — no area drawing (a dealer)
   } = options;
   const actionList = options.actions;
   const fonts = options.fonts || [];
@@ -401,12 +402,21 @@ export function initHotspotEditor(editor, options) {
             ? `<p class="rounded-md bg-gray-50 px-2.5 py-2 text-[11px] text-ink-500">Each business's own logo shows here.</p>`
             : h.action === "custom_image"
             ? `<div class="space-y-2 rounded-lg bg-gray-50 p-2.5">
-                <p class="text-xs font-semibold text-ink-700">Image area</p>
+                <p class="text-xs font-semibold text-ink-700">${freeImageEditor ? "Image area" : "Picture"}</p>
                 <p class="text-[11px] ${h.value ? "text-ink-500" : "text-amber-700"}">${esc(
-                  h.value ? "Your picture fills the area you drew. Drag it on the card to move it, pull its corners to resize it." : "Area drawn — open the editor to upload the picture into it.",
+                  !freeImageEditor
+                    ? h.value ? "Drag the picture on the card to move it, and pull its corners (or use Size below) to resize it." : "No picture yet — upload one, or drop a picture on the box."
+                    : h.value ? "Your picture fills the area you drew. Drag it on the card to move it, pull its corners to resize it." : "Area drawn — open the editor to upload the picture into it.",
                 )}</p>
-                <button type="button" class="btn-primary w-full px-3 py-2 text-xs" data-remark>${icon("maximize", { size: 13 })} Edit image full screen</button>
-                <p class="text-[11px] text-ink-500">Redraw the area, replace the picture, or move and zoom it inside the area.</p>
+                ${
+                  freeImageEditor
+                    ? `<button type="button" class="btn-primary w-full px-3 py-2 text-xs" data-remark>${icon("maximize", { size: 13 })} Edit image full screen</button>
+                       <p class="text-[11px] text-ink-500">Redraw the area, replace the picture, or move and zoom it inside the area.</p>`
+                    : `<div class="flex flex-wrap items-center gap-2">
+                         <button type="button" class="btn-primary px-3 py-1.5 text-xs" data-logo-upload>${icon("upload", { size: 13 })} ${h.value ? "Replace image" : "Upload image"}</button>
+                         ${h.value && !h.shape ? `<button type="button" class="text-[11px] font-semibold text-ink-500 hover:underline" data-fit-picture>Fit box to picture</button>` : ""}
+                       </div>`
+                }
                 <p class="text-[11px] text-ink-400">JPG, PNG or WebP. A PNG with a see-through background stays see-through.</p>
               </div>`
             : h.action === "logo"
@@ -713,7 +723,7 @@ export function initHotspotEditor(editor, options) {
   // A new action centred on (cx, cy) in percent, sized to suit a phone-card button.
   function addSpot(action, cx = 50, cy = 50) {
     if (state.hotspots.length >= MAX_SPOTS) return onError(`A card can have up to ${MAX_SPOTS} items.`);
-    if (action === "custom_image") return startMarking(null); // first the area, then the picture
+    if (action === "custom_image" && freeImageEditor) return startMarking(null); // first the area, then the picture
     const rect = stage.getBoundingClientRect();
     const kind = actions[action]?.kind || "action";
     const px = (n) => (n / 480) * rect.width; // editor sizes are px at a 480px-wide card
@@ -747,7 +757,7 @@ export function initHotspotEditor(editor, options) {
     markDirty();
     renderAll();
     $(`[data-spot="${CSS.escape(spot.id)}"]`, spotsLayer)?.focus();
-    if (action === "logo" && !defaults.logo) pickLogo(spot.id);
+    if ((action === "logo" && !defaults.logo) || action === "custom_image") pickLogo(spot.id);
   }
 
   // --- The logo's own picture -------------------------------------------------

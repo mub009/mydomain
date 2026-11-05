@@ -42,6 +42,7 @@ if (root && card) {
         canReplaceImage: false,
         canDelete: false,
         canMove: false,
+        freeImageEditor: !!card.imageAreaTools, // dealers: a free image is just placed and resized
         onChange: () => {
           saveBtn.disabled = false;
           dirtyNote.classList.remove("hidden");

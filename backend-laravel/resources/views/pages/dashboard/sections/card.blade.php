@@ -199,6 +199,7 @@
           'previewHtml' => $card['imagePreviewHtml'],
           'templateId' => $card['templateId'],
           'canEdit' => $card['canEdit'],
+          'imageAreaTools' => $card['imageAreaTools'] ?? false,
           'imageColour' => $card['imageColour'],
           'imageColourDefaults' => $card['imageColourDefaults'],
       ];

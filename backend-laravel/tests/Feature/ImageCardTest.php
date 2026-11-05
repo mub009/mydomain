@@ -162,6 +162,14 @@ class ImageCardTest extends TestCase
         $this->get('/card/spice-garden')->assertOk()->assertDontSee('cards/images/card.jpg', false)->assertSee('Spice Garden');
     }
 
+    public function test_only_admins_draw_a_free_images_area_dealers_just_place_and_resize_it(): void
+    {
+        $this->getJson("/api/v1/businesses/{$this->business->id}/card", $this->auth)
+            ->assertOk()->assertJsonPath('data.canEdit', true)->assertJsonPath('data.imageAreaTools', false);
+        $this->getJson("/api/v1/businesses/{$this->business->id}/card", $this->admin())
+            ->assertOk()->assertJsonPath('data.imageAreaTools', true);
+    }
+
     private function admin(): array
     {
         $admin = User::create([

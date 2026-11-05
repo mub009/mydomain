@@ -99,6 +99,8 @@ class CardController extends Controller
             'listingDefaults' => ImageCard::listingDefaults($details),
             // Business owners wear the design they're given; dealers and admins edit it.
             'canEdit' => self::canEditDesign($actor),
+            // Admins draw a free image's area (full-screen editor); dealers just place a picture and resize it.
+            'imageAreaTools' => $actor['role'] === 'ADMIN',
             // The image's recolouring — the whole business team, owners too, can change it.
             'imageColour' => ImageColour::normalize($card?->imageColour),
             'imageColourDefaults' => ImageColour::DEFAULTS,
