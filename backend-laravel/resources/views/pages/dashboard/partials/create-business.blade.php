@@ -139,7 +139,7 @@
     </div>
   @endif
 
-  <x-upload-field name="logoUrl" purpose="business-logo" label="Logo (optional)" placeholder="https://…/logo.png" hint="Shown on your visiting card, website and listing. Square images work best." />
+  <x-upload-field name="logoUrl" purpose="business-logo" remove-background label="Logo (optional)" placeholder="https://…/logo.png" hint="Shown on your visiting card, website and listing. Square images work best." />
 
   <p class="text-sm text-red-700 bg-red-50 rounded-md px-3 py-2" data-create-error hidden></p>
   <button class="btn-primary w-full py-2.5">Create listing</button>

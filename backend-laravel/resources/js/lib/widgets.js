@@ -1,4 +1,4 @@
-import { api, errorMessage, uploadImage } from "./api";
+import { api, errorMessage, uploadImageFull } from "./api";
 import { boardHeadline, boardUrl, downloadDataUrl, renderQrDataUrl } from "./channels";
 import { icon } from "./icons";
 import { $, $$, alertBox, esc, openModal, spinner } from "./ui";
@@ -95,8 +95,16 @@ export function initUploadFields(root = document) {
       button.disabled = true;
       $("span", button).textContent = "Uploading…";
       try {
-        url.value = await uploadImage(picked, field.dataset.uploadField);
+        const removeBg = $("[data-upload-remove-bg]", field);
+        const result = await uploadImageFull(picked, field.dataset.uploadField, removeBg ? { removeBackground: removeBg.checked } : {});
+        url.value = result.url;
         url.dispatchEvent(new Event("input", { bubbles: true }));
+        if (removeBg?.checked) {
+          // Shown until the page's own "saved" note replaces it.
+          const note = $("[data-upload-saved]", field);
+          note.textContent = result.backgroundRemoved ? "Background removed and quality enhanced." : "Quality enhanced (the background wasn't plain enough to remove).";
+          note.hidden = false;
+        }
         // Lets a page save the new image straight away (see manage.js).
         field.dispatchEvent(new CustomEvent("upload:done", { detail: { url: url.value } }));
       } catch (err) {

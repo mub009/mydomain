@@ -439,4 +439,20 @@ class ImageCardTest extends TestCase
         $this->assertStringContainsString('cards/images/my-logo.png', $this->get('/card/spice-garden')->getContent());
         $this->save([$this->spot('logo', ['value' => 'javascript:alert(1)'])])->assertStatus(400);
     }
+
+    public function test_a_logo_can_have_rounded_corners(): void
+    {
+        $logo = ['value' => 'https://cdn.example.test/cards/images/my-logo.png'];
+        $this->save([$this->spot('logo', $logo + ['radius' => 50])])->assertOk()->assertJsonPath('data.hotspots.0.radius', 50);
+        $this->postJson("/api/v1/businesses/{$this->business->id}/card/publish", [], $this->auth)->assertOk();
+        $html = $this->get('/card/spice-garden')->getContent();
+        $this->assertStringContainsString('height:8%;border-radius:50%">', $html);
+        $this->assertStringContainsString('style="object-fit:cover;border-radius:50%"', $html);
+
+        // Square again: no rounding drawn; more than round is refused; only a logo keeps it.
+        $this->save([$this->spot('logo', $logo + ['radius' => 0])])->assertOk()->assertJsonPath('data.hotspots.0.radius', null);
+        $this->assertStringNotContainsString('border-radius:0%', $this->get('/card/spice-garden')->getContent());
+        $this->save([$this->spot('logo', $logo + ['radius' => 80])])->assertStatus(400);
+        $this->save([$this->spot('call', ['radius' => 20])])->assertOk()->assertJsonPath('data.hotspots.0.radius', null);
+    }
 }

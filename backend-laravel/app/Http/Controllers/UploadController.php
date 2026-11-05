@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Exceptions\ApiException;
 use App\Support\ApiResponse;
 use App\Support\Uploads\ImageOptimizer;
+use App\Support\Uploads\LogoCleaner;
 use App\Support\Uploads\SvgSanitizer;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -24,7 +25,8 @@ class UploadController extends Controller
 {
     private const PURPOSES = [
         'business-photos' => ['folder' => 'businesses/photos', 'roles' => ['BUSINESS_OWNER', 'DEALER', 'ADMIN']],
-        'business-logo' => ['folder' => 'businesses/logos', 'roles' => ['BUSINESS_OWNER', 'DEALER', 'ADMIN']],
+        // Logos are cleaned up (LogoCleaner): plain background removed, trimmed, enlarged and stored lossless.
+        'business-logo' => ['folder' => 'businesses/logos', 'roles' => ['BUSINESS_OWNER', 'DEALER', 'ADMIN'], 'logo' => true],
         'business-cover' => ['folder' => 'businesses/covers', 'roles' => ['BUSINESS_OWNER', 'DEALER', 'ADMIN']],
         'site-slider' => ['folder' => 'businesses/slider', 'roles' => ['BUSINESS_OWNER', 'DEALER', 'ADMIN']],
         'site-gallery' => ['folder' => 'businesses/gallery', 'roles' => ['BUSINESS_OWNER', 'DEALER', 'ADMIN']],
@@ -37,6 +39,8 @@ class UploadController extends Controller
         'card-backgrounds' => ['folder' => 'cards/backgrounds', 'roles' => ['ADMIN']],
         // A business's own card artwork, with actions placed on it (ImageCard).
         'card-images' => ['folder' => 'cards/images', 'roles' => ['BUSINESS_OWNER', 'DEALER', 'ADMIN']],
+        // A logo uploaded onto a card's logo box.
+        'card-logos' => ['folder' => 'cards/logos', 'roles' => ['BUSINESS_OWNER', 'DEALER', 'ADMIN'], 'logo' => true],
         // Poster Studio itself isn't ported yet (see README), but its
         // artwork uploads need SVG + sanitization once it is, so that
         // path is ready ahead of the rest of the module.
@@ -65,7 +69,10 @@ class UploadController extends Controller
 
         $data = $request->validate([
             'purpose' => ['required', 'string', 'in:'.implode(',', array_keys(self::PURPOSES))],
+            // Logos only: false keeps the background as uploaded.
+            'removeBackground' => ['sometimes', 'boolean'],
         ]);
+        $backgroundRemoved = false;
         $purpose = self::PURPOSES[$data['purpose']];
         $allowSvg = ! empty($purpose['allowSvg']);
 
@@ -94,16 +101,24 @@ class UploadController extends Controller
                 throw ApiException::badRequest('That file is larger than 20MB');
             }
             $contents = file_get_contents($file->getRealPath());
+            $logo = ! empty($purpose['logo'])
+                ? LogoCleaner::clean($contents, $extension, $request->boolean('removeBackground', true))
+                : null;
+            if ($logo) {
+                ['contents' => $contents, 'extension' => $extension, 'mime' => $mime, 'backgroundRemoved' => $backgroundRemoved] = $logo;
+            }
             // Downscales anything wider than needed for display and
             // converts it to WebP — a typical phone photo shrinks by
             // 70-90% with no visible quality loss. Falls back to a
             // same-format re-encode, and finally the original bytes
             // untouched, if GD can't process it for any reason.
-            $optimized = ImageOptimizer::optimize($contents, $extension);
-            $contents = $optimized['contents'];
-            if ($optimized['extension'] !== $extension) {
-                $extension = $optimized['extension'];
-                $mime = 'image/webp';
+            if (! $logo) {
+                $optimized = ImageOptimizer::optimize($contents, $extension);
+                $contents = $optimized['contents'];
+                if ($optimized['extension'] !== $extension) {
+                    $extension = $optimized['extension'];
+                    $mime = 'image/webp';
+                }
             }
             if (strlen($contents) > self::MAX_RASTER_BYTES) {
                 throw ApiException::badRequest('That file is larger than 5MB, even after compression');
@@ -121,7 +136,7 @@ class UploadController extends Controller
             throw new ApiException(500, 'INTERNAL_ERROR', "Could not upload that file \u{2014} check the server's DigitalOcean Spaces configuration");
         }
 
-        return ApiResponse::ok(['url' => Storage::disk('spaces')->url($path)]);
+        return ApiResponse::ok(['url' => Storage::disk('spaces')->url($path), 'backgroundRemoved' => $backgroundRemoved]);
     }
 
     /**

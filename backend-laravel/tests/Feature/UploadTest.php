@@ -282,4 +282,71 @@ class UploadTest extends TestCase
             'file' => UploadedFile::fake()->image('x.png', 5, 5),
         ], ['Authorization' => "Bearer {$token}"])->assertStatus(400);
     }
+
+    /** A logo: a red square in the middle of a white $size x $size picture. */
+    private function logoOnWhite(int $size = 200): UploadedFile
+    {
+        $img = imagecreatetruecolor($size, $size);
+        imagefill($img, 0, 0, imagecolorallocate($img, 255, 255, 255));
+        imagefilledrectangle($img, (int) ($size * 0.3), (int) ($size * 0.3), (int) ($size * 0.7), (int) ($size * 0.7), imagecolorallocate($img, 220, 30, 30));
+        $path = tempnam(sys_get_temp_dir(), 'logo').'.png';
+        imagepng($img, $path);
+
+        return new UploadedFile($path, 'logo.png', 'image/png', null, true);
+    }
+
+    private function stored(string $url): \GdImage
+    {
+        $bytes = Storage::disk('spaces')->get(str_replace(Storage::disk('spaces')->url(''), '', $url));
+
+        return imagecreatefromstring($bytes);
+    }
+
+    public function test_a_logo_upload_has_its_plain_background_removed_and_is_enlarged(): void
+    {
+        $token = $this->token($this->user('DEALER'));
+        $response = $this->post('/api/v1/uploads/image', ['purpose' => 'card-logos', 'file' => $this->logoOnWhite()], ['Authorization' => "Bearer {$token}"])
+            ->assertOk()->assertJsonPath('data.backgroundRemoved', true);
+        $this->assertStringContainsString('cards/logos/', $response->json('data.url'));
+
+        $img = $this->stored($response->json('data.url'));
+        // Trimmed to the red square (plus a small margin) and enlarged to a crisp size.
+        $this->assertGreaterThanOrEqual(1000, max(imagesx($img), imagesy($img)));
+        $this->assertEqualsWithDelta(imagesx($img), imagesy($img), 2);
+        // The corner is see-through, the middle is the logo's red.
+        $this->assertSame(127, (imagecolorat($img, 0, 0) >> 24) & 0x7F);
+        $middle = imagecolorat($img, intdiv(imagesx($img), 2), intdiv(imagesy($img), 2));
+        $this->assertSame(0, ($middle >> 24) & 0x7F);
+        $this->assertGreaterThan(180, ($middle >> 16) & 0xFF);
+    }
+
+    public function test_a_logo_can_keep_its_background(): void
+    {
+        $token = $this->token($this->user('BUSINESS_OWNER'));
+        $response = $this->post('/api/v1/uploads/image', ['purpose' => 'business-logo', 'removeBackground' => '0', 'file' => $this->logoOnWhite()], ['Authorization' => "Bearer {$token}"])
+            ->assertOk()->assertJsonPath('data.backgroundRemoved', false);
+
+        $img = $this->stored($response->json('data.url'));
+        $corner = imagecolorat($img, 0, 0);
+        $this->assertSame(0, ($corner >> 24) & 0x7F);
+        $this->assertGreaterThan(240, $corner & 0xFF);
+    }
+
+    public function test_a_photo_logo_is_not_cut_out(): void
+    {
+        // Random noise: no plain background anywhere along the edges.
+        $img = imagecreatetruecolor(120, 120);
+        mt_srand(7);
+        for ($y = 0; $y < 120; $y++) {
+            for ($x = 0; $x < 120; $x++) {
+                imagesetpixel($img, $x, $y, imagecolorallocate($img, mt_rand(0, 255), mt_rand(0, 255), mt_rand(0, 255)));
+            }
+        }
+        $path = tempnam(sys_get_temp_dir(), 'photo').'.png';
+        imagepng($img, $path);
+
+        $token = $this->token($this->user('BUSINESS_OWNER'));
+        $this->post('/api/v1/uploads/image', ['purpose' => 'business-logo', 'file' => new UploadedFile($path, 'photo.png', 'image/png', null, true)], ['Authorization' => "Bearer {$token}"])
+            ->assertOk()->assertJsonPath('data.backgroundRemoved', false);
+    }
 }

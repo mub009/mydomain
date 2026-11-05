@@ -117,9 +117,15 @@ export const api = {
   delete: (path) => send("DELETE", path),
 };
 
-export function uploadImage(file, purpose) {
+export function uploadImage(file, purpose, extra = {}) {
+  return uploadImageFull(file, purpose, extra).then((d) => d.url);
+}
+
+// The upload's whole answer: { url, backgroundRemoved } (logos have their background cleared on the server).
+export function uploadImageFull(file, purpose, extra = {}) {
   const form = new FormData();
   form.append("purpose", purpose);
+  for (const [k, v] of Object.entries(extra)) form.append(k, typeof v === "boolean" ? (v ? "1" : "0") : v);
   form.append("file", file);
-  return api.post("/uploads/image", form).then((r) => r.data.url);
+  return api.post("/uploads/image", form).then((r) => r.data);
 }

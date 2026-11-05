@@ -150,7 +150,7 @@ class ImageOptimizer
     // the pixels. Re-encoding without honouring that tag would make the
     // stored copy display sideways or upside-down in any viewer that
     // doesn't itself apply EXIF rotation (most <img> tags don't).
-    private static function applyExifOrientation(GdImage $image, string $contents): GdImage
+    public static function applyExifOrientation(GdImage $image, string $contents): GdImage
     {
         if (! function_exists('exif_read_data')) {
             return $image;

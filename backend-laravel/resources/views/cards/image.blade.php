@@ -89,7 +89,7 @@
             $inert = $preview && ($s['action'] === 'share' || ! $live);
         @endphp
         @if ($s['kind'] === 'image')
-          <div class="spot pic" style="{{ $box }}@if (! empty($s['radius']));border-radius:{{ (int) $s['radius'] }}%@endif"><img src="{{ $s['src'] }}" @if (! empty($s['radius'])) style="object-fit:cover;border-radius:{{ (int) $s['radius'] }}%" @endif alt="{{ $s['action'] === 'qr' ? 'QR code for this card' : $b['name'].' logo' }}" /></div>
+          <div class="spot pic" style="{{ $box }}@if (! empty($s['radius']));border-radius:{{ (int) $s['radius'] }}%@endif"><img src="{{ $s['src'] }}" alt="{{ $s['action'] === 'qr' ? 'QR code for this card' : $b['name'].' logo' }}"@if (! empty($s['radius'])) style="object-fit:cover;border-radius:{{ (int) $s['radius'] }}%"@endif /></div>
         @elseif ($s['kind'] === 'text')
           @if ($live && ! ($preview && $inert))
             <a class="spot detail" style="{{ $box }};{{ \App\Support\Cards\ImageCard::textStyle($s, $colour) }}" href="{{ $s['href'] }}" @if ($external || $preview) target="_blank" rel="noopener" @endif><span>{{ $s['display'] }}</span></a>

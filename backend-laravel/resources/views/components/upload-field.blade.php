@@ -1,4 +1,4 @@
-@props(['name', 'purpose', 'value' => '', 'label' => null, 'hint' => null, 'placeholder' => 'https://… or upload a file', 'clearable' => false])
+@props(['name', 'purpose', 'value' => '', 'label' => null, 'hint' => null, 'placeholder' => 'https://… or upload a file', 'clearable' => false, 'removeBackground' => false])
 {{-- A URL field with an "Upload" button next to it: the picked file goes to
      /uploads/image and the returned URL lands in the same field. Wired up by
      initUploadFields() in resources/js/lib/widgets.js. --}}
@@ -18,6 +18,12 @@
     @endif
     <input type="file" accept="image/png,image/jpeg,image/gif,image/webp" class="hidden" data-upload-file />
   </div>
+  @if ($removeBackground)
+    {{-- Logos: the server clears a plain background, trims and sharpens the picture (App\Support\Uploads\LogoCleaner). --}}
+    <label class="mt-1.5 flex items-center gap-1.5 text-xs text-ink-600">
+      <input type="checkbox" class="rounded border-gray-300" checked data-upload-remove-bg /> Remove background &amp; enhance quality on upload
+    </label>
+  @endif
   @if ($hint)
     <p class="mt-1 text-[11px] text-ink-400">{{ $hint }}</p>
   @endif

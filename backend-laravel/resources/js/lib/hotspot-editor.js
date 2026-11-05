@@ -1,4 +1,4 @@
-import { uploadImage } from "./api";
+import { uploadImage, uploadImageFull } from "./api";
 import { icon } from "./icons";
 import { $, $$, esc } from "./ui";
 
@@ -109,6 +109,8 @@ export function initHotspotEditor(editor, options) {
     selected: null,
   };
   let dirty = false;
+  let removeLogoBg = true; // the server clears a logo's plain background (LogoCleaner)
+  let logoNote = "";
 
   function markDirty() {
     dirty = true;
@@ -339,7 +341,10 @@ export function initHotspotEditor(editor, options) {
                   ${h.value && defaults.logo ? `<button type="button" class="text-[11px] font-semibold text-ink-500 hover:underline" data-logo-reset>Use the listing's logo</button>` : ""}
                   ${h.value && !defaults.logo ? `<button type="button" class="text-[11px] font-semibold text-red-700 hover:underline" data-logo-reset>Remove picture</button>` : ""}
                 </div>
-                <p class="text-[11px] text-ink-400">JPG, PNG or WebP. A PNG with a transparent background looks best.</p>
+                <label class="flex items-center gap-1.5 text-[11px] text-ink-600">
+                  <input type="checkbox" class="rounded border-gray-300" ${removeLogoBg ? "checked" : ""} data-logo-remove-bg /> Remove background &amp; enhance quality
+                </label>
+                <p class="text-[11px] text-ink-400" data-logo-note>${esc(logoNote || "JPG, PNG or WebP. A plain background is cleared automatically.")}</p>
               </div>`
             : help
             ? `<label class="block">
@@ -458,6 +463,7 @@ export function initHotspotEditor(editor, options) {
     logoRadius?.addEventListener("input", (e) => setRadius(Number(e.target.value)));
     $$("[data-logo-radius]", inspector).forEach((b) => b.addEventListener("click", () => setRadius(Number(b.dataset.logoRadius))));
 
+    $("[data-logo-remove-bg]", inspector)?.addEventListener("change", (e) => (removeLogoBg = e.target.checked));
     $("[data-logo-upload]", inspector)?.addEventListener("click", () => pickLogo(h.id));
     $("[data-logo-reset]", inspector)?.addEventListener("click", () => {
       h.value = null;
@@ -625,10 +631,15 @@ export function initHotspotEditor(editor, options) {
     onError("");
     uploading.classList.replace("hidden", "flex");
     try {
-      const url = await uploadImage(file, "card-images");
+      const result = await uploadImageFull(file, "card-logos", { removeBackground: removeLogoBg });
       const h = spotById(id);
       if (!h) return;
-      h.value = url;
+      h.value = result.url;
+      logoNote = !removeLogoBg
+        ? "Uploaded as it is, quality enhanced."
+        : result.backgroundRemoved
+          ? "Background removed and quality enhanced."
+          : "Quality enhanced. The background wasn't plain enough to remove — a logo on a single-colour background works best.";
       state.selected = id;
       markDirty();
       renderAll();
