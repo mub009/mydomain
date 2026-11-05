@@ -22,7 +22,8 @@ import { $, $$, esc } from "./ui";
 //   onError(msg|err)
 //   canReplaceImage false: once there's an image, a new one can't be dropped on it
 //   canDelete       false: no "Remove" for placed boxes
-//   canMove         false: placed boxes can't be dragged, resized or nudged
+//   canMove         false: placed boxes can't be dragged, resized or nudged —
+//                   except the logo, which still drags (and sizes by its slider)
 
 const MAX_SPOTS = 40;
 const MIN_SIZE = 3; // percent
@@ -131,6 +132,10 @@ export function initHotspotEditor(editor, options) {
     return defaults[h.action] || null;
   }
 
+  // The logo can always be dragged into place — even where other boxes are fixed
+  // (a dealer on a business's card). Its size there comes from the Logo size slider.
+  const canDrag = (h) => canMove || h.action === "logo";
+
   const handlesHtml = () =>
     !canMove ? "" :
     Object.entries({
@@ -160,7 +165,7 @@ export function initHotspotEditor(editor, options) {
     }
     const align = { left: "justify-start text-left", center: "justify-center text-center", right: "justify-end text-right" }[h.align || "left"];
     return `<div data-spot="${esc(h.id)}" tabindex="0" role="button" aria-label="${esc(actions[h.action].label)} — drag to move"
-        class="absolute flex ${canMove ? "cursor-move" : "cursor-pointer"} touch-none items-center overflow-visible rounded ${kindOf(h) === "text" ? `${align} px-[0.15em] leading-tight text-white` : ""} ring-2 ${ring} focus:outline-none"
+        class="absolute flex ${canDrag(h) ? "cursor-move" : "cursor-pointer"} touch-none items-center overflow-visible rounded ${kindOf(h) === "text" ? `${align} px-[0.15em] leading-tight text-white` : ""} ring-2 ${ring} focus:outline-none"
         style="left:${h.x}%;top:${h.y}%;width:${h.w}%;height:${h.h}%;${kindOf(h) === "text" ? esc(textStyle(h)) : ""}">
         ${inner}
         ${!shown ? `<span class="pointer-events-none absolute -top-2.5 left-1 rounded bg-amber-500 px-1 text-[9px] text-white">${h.action === "logo" ? "upload a logo" : h.action === "custom_text" ? "type your text" : "not on your listing"}</span>` : ""}
@@ -505,6 +510,10 @@ export function initHotspotEditor(editor, options) {
     if (!logoBase.has(h.id)) logoBase.set(h.id, { w: h.w, h: h.h, cx: h.x + h.w / 2, cy: h.y + h.h / 2 });
     return logoBase.get(h.id);
   }
+  function moveLogoBase(h, dx, dy) {
+    const base = logoBase.get(h.id);
+    if (base) Object.assign(base, { cx: base.cx + dx, cy: base.cy + dy });
+  }
   const logoScale = (h) => h.w / logoBaseOf(h).w;
   function scaleLogo(h, scale) {
     const base = logoBaseOf(h);
@@ -678,9 +687,9 @@ export function initHotspotEditor(editor, options) {
     if (state.selected !== h.id) select(h.id);
     const target = $(`[data-spot="${CSS.escape(h.id)}"]`, spotsLayer);
     target.focus({ preventScroll: true });
-    // Where positions are fixed, a press only selects the box.
-    if (!canMove) return;
-    const handle = e.target.closest("[data-handle]")?.dataset.handle;
+    // Where positions are fixed, a press only selects the box (the logo still drags).
+    if (!canDrag(h)) return;
+    const handle = canMove ? e.target.closest("[data-handle]")?.dataset.handle : null;
     const start = toStage(e);
     const orig = { x: h.x, y: h.y, w: h.w, h: h.h };
     let moved = false;
@@ -713,8 +722,9 @@ export function initHotspotEditor(editor, options) {
       },
       () => {
         if (!moved) return;
-        // Dragged or resized by hand: that's the logo slider's new 100%.
-        logoBase.delete(h.id);
+        // Resized by hand: that's the logo slider's new 100%. Moved: the slider scales about the new centre.
+        if (handle) logoBase.delete(h.id);
+        else moveLogoBase(h, h.x - orig.x, h.y - orig.y);
         changed({ inspector: h.action === "logo" });
       },
     );
@@ -731,8 +741,9 @@ export function initHotspotEditor(editor, options) {
     }
     const step = e.shiftKey ? 2 : 0.5;
     const d = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[e.key];
-    if (!d || !canMove) return;
+    if (!d || !canDrag(h) || (e.altKey && !canMove)) return;
     e.preventDefault();
+    const was = { x: h.x, y: h.y };
     if (e.altKey) {
       h.w = round(clamp(h.w + d[0], MIN_SIZE, 100 - h.x));
       h.h = round(clamp(h.h + d[1], MIN_SIZE, 100 - h.y));
@@ -741,7 +752,8 @@ export function initHotspotEditor(editor, options) {
       h.y = round(clamp(h.y + d[1], 0, 100 - h.h));
     }
     state.selected = h.id;
-    logoBase.delete(h.id);
+    if (e.altKey) logoBase.delete(h.id);
+    else moveLogoBase(h, h.x - was.x, h.y - was.y);
     changed({ inspector: h.action === "logo" });
     $(`[data-spot="${CSS.escape(h.id)}"]`, spotsLayer)?.focus();
   });

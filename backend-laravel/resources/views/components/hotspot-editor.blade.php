@@ -21,7 +21,7 @@
         </div>
       </div>
       <div class="mt-3 hidden flex-wrap items-center justify-between gap-2 text-xs" data-image-tools>
-        <span class="text-ink-500"><span class="font-semibold text-ink-700">Click the image to add an action or a business detail.</span>{{ $movable ? ' Drag a box to move it, pull its corners to resize.' : ' Click a box to change its settings — positions are fixed, but the logo can be resized from its settings.' }}</span>
+        <span class="text-ink-500"><span class="font-semibold text-ink-700">Click the image to add an action or a business detail.</span>{{ $movable ? ' Drag a box to move it, pull its corners to resize.' : ' Click a box to change its settings — positions are fixed, but the logo can be dragged into place and resized from its settings.' }}</span>
         <span class="flex gap-3">
           {{-- Not on a business's own card: its image stays as set up. --}}
           @if ($replaceable)
