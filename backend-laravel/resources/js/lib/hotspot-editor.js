@@ -478,9 +478,14 @@ export function initHotspotEditor(editor, options) {
                               }"><span class="block h-4 w-4 bg-current" style="clip-path:${clipPath(pts)}"></span>${label}</button>`,
                           )
                           .join("")}
-                        <button type="button" data-shape-draw class="col-span-4 flex items-center justify-center gap-1.5 rounded-lg border px-2 py-1.5 text-xs font-semibold ${
-                          h.shape && !h.shapeName ? "border-brand-500 bg-brand-50 text-brand-800" : "border-gray-300 bg-white text-ink-700 hover:bg-gray-50"
-                        }">${icon("pencil", { size: 13 })} Draw your own shape</button>
+                        ${
+                          // Drawing a shape by hand is for admins; a dealer picks a ready-made one.
+                          freeImageEditor
+                            ? `<button type="button" data-shape-draw class="col-span-4 flex items-center justify-center gap-1.5 rounded-lg border px-2 py-1.5 text-xs font-semibold ${
+                                h.shape && !h.shapeName ? "border-brand-500 bg-brand-50 text-brand-800" : "border-gray-300 bg-white text-ink-700 hover:bg-gray-50"
+                              }">${icon("pencil", { size: 13 })} Draw your own shape</button>`
+                            : ""
+                        }
                       </div>`
                 }
               </div>
