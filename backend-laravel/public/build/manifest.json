@@ -89,7 +89,7 @@
     ]
   },
   "resources/css/app.css": {
-    "file": "assets/app-BWLjmzl5.css",
+    "file": "assets/app-ChgCCeMb.css",
     "src": "resources/css/app.css",
     "isEntry": true
   },
@@ -165,7 +165,7 @@
     ]
   },
   "resources/js/pages/card-manager.js": {
-    "file": "assets/card-manager-CVoHLkSw.js",
+    "file": "assets/card-manager-BBqH63Ri.js",
     "name": "card-manager",
     "src": "resources/js/pages/card-manager.js",
     "isEntry": true,

@@ -44,6 +44,28 @@
               <button type="button" class="btn-secondary shrink-0 px-3 py-2 text-sm" data-copy-card><x-icon name="copy" :size="14" /> <span>Copy</span></button>
             </div>
           </div>
+          {{-- Multi card view: the link shows other ready-made designs after the card, as a slider. --}}
+          @if (count($card['extraDesigns'] ?? []))
+            <div class="rounded-lg border border-gray-200 p-3" data-multi-view>
+              <label class="flex cursor-pointer items-start justify-between gap-3">
+                <span>
+                  <span class="flex items-center gap-1.5 text-sm font-semibold text-ink-900"><x-icon name="layout-grid" :size="15" class="text-brand-600" /> Multi card view</span>
+                  <span class="mt-0.5 block text-xs text-ink-500">People who open your link can swipe through your card and the designs you pick below, and download any of them as a PDF.</span>
+                </span>
+                <input type="checkbox" class="mt-1 h-5 w-5 shrink-0 accent-brand-600" data-multi-toggle @checked($card['multiView']) />
+              </label>
+              <div class="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4" data-multi-designs @if (! $card['multiView']) hidden @endif>
+                @foreach ($card['extraDesigns'] as $d)
+                  <label class="relative cursor-pointer overflow-hidden rounded-lg border border-gray-200 bg-gray-50 has-[:checked]:border-brand-500 has-[:checked]:ring-2 has-[:checked]:ring-brand-200">
+                    <img src="{{ $d['imageUrl'] }}" alt="" loading="lazy" class="aspect-[3/5] w-full object-cover object-top" />
+                    <input type="checkbox" class="absolute right-1.5 top-1.5 h-4 w-4 accent-brand-600" value="{{ $d['id'] }}" data-multi-design @checked($d['selected']) />
+                    <span class="block truncate bg-white px-2 py-1 text-[11px] font-semibold text-ink-700">{{ $d['name'] }}</span>
+                  </label>
+                @endforeach
+              </div>
+              <p class="mt-2 text-xs" data-multi-status></p>
+            </div>
+          @endif
           <div class="flex flex-wrap gap-2">
             @if ($card['isPublished'])
               @if ($card['live'])

@@ -3,6 +3,7 @@
 namespace App\Support\Cards;
 
 use App\Models\Business;
+use App\Models\CardTemplate;
 use App\Support\GoldRates\BusinessCard as LogoSource;
 use chillerlan\QRCode\Common\EccLevel;
 use chillerlan\QRCode\Output\QRGdImagePNG;
@@ -36,14 +37,20 @@ class CardPdf
 
     private const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 
-    public static function filename(Business $business): string
+    public static function filename(Business $business, ?CardTemplate $design = null): string
     {
-        return "{$business->slug}-visiting-card.pdf";
+        return $design ? "{$business->slug}-{$design->slug}-visiting-card.pdf" : "{$business->slug}-visiting-card.pdf";
     }
 
-    /** The PDF's bytes. $live: the card is public, so its own link, QR code and "Save contact" can be included. */
-    public static function render(Business $business, bool $live): string
+    /**
+     * The PDF's bytes. $live: the card is public, so its own link, QR code and "Save contact" can be included.
+     * $design: another ready-made image design from Multi card view, drawn with the business's details, instead of its own card.
+     */
+    public static function render(Business $business, bool $live, ?CardTemplate $design = null): string
     {
+        if ($design && ($source = ImageCard::fromTemplate($design)) && ($pdf = self::renderImage($business, $source, $live)) !== null) {
+            return $pdf;
+        }
         // An image card prints as its own artwork; if that can't be read, the template is the fallback.
         if (($source = ImageCard::source($business)) && ($pdf = self::renderImage($business, $source, $live)) !== null) {
             return $pdf;

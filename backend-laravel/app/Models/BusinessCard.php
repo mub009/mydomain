@@ -23,12 +23,16 @@ class BusinessCard extends Model
     // actions placed on it (App\Support\Cards\ImageCard). Shown instead of
     // the template whenever an image is set.
     // imageColour: the business's recolouring of that image (ImageColour).
-    protected $fillable = ['businessId', 'templateId', 'backgroundImageUrl', 'imageUrl', 'imageWidth', 'imageHeight', 'hotspots', 'imageColour', 'isPublished', 'publishedAt', 'viewCount'];
+    // multiView + extraTemplateIds: the public link shows other ready-made
+    // designs after the card, as a slider (ImageCard::slides()).
+    protected $fillable = ['businessId', 'templateId', 'backgroundImageUrl', 'imageUrl', 'imageWidth', 'imageHeight', 'hotspots', 'imageColour', 'isPublished', 'multiView', 'extraTemplateIds', 'publishedAt', 'viewCount'];
 
     protected function casts(): array
     {
         return [
             'isPublished' => 'boolean',
+            'multiView' => 'boolean',
+            'extraTemplateIds' => 'array',
             'publishedAt' => 'datetime',
             'viewCount' => 'integer',
             'imageWidth' => 'integer',

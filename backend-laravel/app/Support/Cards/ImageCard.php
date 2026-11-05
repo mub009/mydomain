@@ -109,6 +109,68 @@ class ImageCard
         return $source ? [...$source, 'colour' => ImageColour::normalize($card?->imageColour)] : null;
     }
 
+    /**
+     * The ready-made image designs a business can show after its own card in
+     * "Multi card view": those offered for its category, minus the one its
+     * card already wears.
+     *
+     * @return \Illuminate\Support\Collection<int, CardTemplate>
+     */
+    public static function extraDesignOptions(Business $business, ?BusinessCard $card = null): \Illuminate\Support\Collection
+    {
+        $card ??= $business->card;
+        $current = CardEngine::templateFor($business, $card);
+
+        return CardEngine::templatesFor($business->categoryId)
+            ->filter(fn (CardTemplate $t) => (bool) $t->imageUrl && $t->id !== $current?->id)
+            ->values();
+    }
+
+    /**
+     * The cards the public link shows: the business's own first ('main'),
+     * then — with Multi card view on — the extra designs it picked (all of
+     * them when it picked none), each drawn with the business's details.
+     *
+     * @return list<array{id: string, name: string, template: ?CardTemplate}>
+     */
+    public static function slides(Business $business, ?BusinessCard $card = null): array
+    {
+        $card ??= $business->card;
+        $slides = [['id' => 'main', 'name' => $business->name, 'template' => null]];
+        if (! $card?->multiView) {
+            return $slides;
+        }
+        $options = self::extraDesignOptions($business, $card);
+        $picked = $card->extraTemplateIds;
+        if (is_array($picked) && $picked) {
+            $options = $options->filter(fn (CardTemplate $t) => in_array($t->id, $picked, true));
+        }
+        foreach ($options as $t) {
+            $slides[] = ['id' => $t->id, 'name' => $t->name, 'template' => $t];
+        }
+
+        return $slides;
+    }
+
+    /** One of the business's slides as a standalone HTML document; null = no such slide. */
+    public static function renderSlide(Business $business, string $id, bool $embedded = false): ?string
+    {
+        $slide = collect(self::slides($business))->firstWhere('id', $id);
+        if (! $slide) {
+            return null;
+        }
+        $details = CardEngine::details($business);
+        if (! $slide['template']) {
+            $source = self::source($business);
+
+            return $source
+                ? self::renderSource($source, $details, false, true, $embedded)
+                : CardEngine::render(CardEngine::templateFor($business), $details);
+        }
+
+        return self::renderSource(self::fromTemplate($slide['template']), $details, false, true, $embedded);
+    }
+
     public static function fromTemplate(CardTemplate $template): ?array
     {
         return $template->imageUrl
@@ -554,7 +616,7 @@ class ImageCard
      * actions that have nowhere to go yet — what the editor needs. Without
      * it a preview looks just like the public card (what an owner sees).
      */
-    public static function renderSource(array $source, array $details, bool $preview = false, bool $marks = true): string
+    public static function renderSource(array $source, array $details, bool $preview = false, bool $marks = true, bool $embedded = false): string
     {
         $marks = $preview && $marks;
         // In a preview, "Save contact" downloads the contact from the dashboard — the
@@ -579,6 +641,8 @@ class ImageCard
             'spotChip' => implode(',', sscanf($colour ? ImageColour::hex('#111827', $colour) : '#111827', '#%02x%02x%02x')),
             'preview' => $preview,
             'marks' => $marks,
+            // A slide inside the Multi card view slider (cards/slider.blade.php).
+            'embedded' => $embedded,
         ])->render();
     }
 }

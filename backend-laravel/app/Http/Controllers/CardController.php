@@ -119,6 +119,15 @@ class CardController extends Controller
             'aiProvider' => BackgroundGenerator::provider(),
             'aiStyles' => BackgroundGenerator::STYLES,
             'aiDefaultStyle' => BackgroundGenerator::defaultStyle($current?->layout ?? 'classic'),
+            // Multi card view: the link shows these other designs after the card, as a slider.
+            'multiView' => (bool) $card?->multiView,
+            'extraDesigns' => ImageCard::extraDesignOptions($business, $card)->map(fn (CardTemplate $t) => [
+                'id' => $t->id,
+                'name' => $t->name,
+                'imageUrl' => $t->imageUrl,
+                // None picked = every design is shown.
+                'selected' => ! $card?->extraTemplateIds || in_array($t->id, $card->extraTemplateIds, true),
+            ])->values(),
             'isPublished' => (bool) $card?->isPublished,
             'live' => self::isLive($business, $card),
             'listingLive' => $business->status === 'PUBLISHED',
@@ -151,9 +160,12 @@ class CardController extends Controller
             'imageHeight' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:20000'],
             ...ImageCard::rules(),
             ...ImageColour::rules(),
+            'multiView' => ['sometimes', 'boolean'],
+            'extraTemplateIds' => ['sometimes', 'nullable', 'array', 'max:50'],
+            'extraTemplateIds.*' => ['uuid'],
         ]);
         if (! $data) {
-            throw ApiException::badRequest('Send a templateId, backgroundImageUrl, imageUrl, hotspots or imageColour');
+            throw ApiException::badRequest('Send a templateId, backgroundImageUrl, imageUrl, hotspots, imageColour or multiView');
         }
         if (! self::canEditDesign($actor) && array_intersect_key($data, array_flip(['imageUrl', 'imageWidth', 'imageHeight', 'hotspots']))) {
             throw ApiException::forbidden('The card design can only be changed by your dealer or an admin. You can pick a ready-made design.');
@@ -196,6 +208,18 @@ class CardController extends Controller
         if (array_key_exists('imageColour', $data)) {
             $changes['imageColour'] = ImageColour::normalize($data['imageColour']);
         }
+        // Multi card view is about sharing, not the design: the whole business team can set it.
+        if (array_key_exists('multiView', $data)) {
+            $changes['multiView'] = $data['multiView'];
+        }
+        if (array_key_exists('extraTemplateIds', $data)) {
+            $offered = ImageCard::extraDesignOptions($business)->pluck('id')->all();
+            $ids = array_values(array_intersect(array_unique($data['extraTemplateIds'] ?? []), $offered));
+            if ($data['extraTemplateIds'] && ! $ids) {
+                throw ApiException::badRequest('Pick at least one of the designs offered');
+            }
+            $changes['extraTemplateIds'] = $ids ?: null;
+        }
 
         $card = BusinessCard::updateOrCreate(['businessId' => $business->id], $changes);
 
@@ -207,6 +231,8 @@ class CardController extends Controller
             'imageHeight' => $card->imageHeight,
             'hotspots' => $card->hotspots ?? [],
             'imageColour' => ImageColour::normalize($card->imageColour),
+            'multiView' => (bool) $card->multiView,
+            'extraTemplateIds' => $card->extraTemplateIds,
             'isPublished' => $card->isPublished,
         ]);
     }

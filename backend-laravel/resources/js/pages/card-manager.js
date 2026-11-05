@@ -284,6 +284,43 @@ if (root && card) {
     }
   });
 
+  // --- Multi card view ---------------------------------------------------------
+  // The card link shows the card, then the designs ticked here, as a slider.
+  // Saved on each change; all ticked is sent as null (= every design, new ones too).
+  const multi = $("[data-multi-view]", root);
+  if (multi) {
+    const toggle = $("[data-multi-toggle]", multi);
+    const grid = $("[data-multi-designs]", multi);
+    const boxes = $$("[data-multi-design]", multi);
+    const status = $("[data-multi-status]", multi);
+    const setStatus = (text, tone) => {
+      status.textContent = text;
+      status.className = `mt-2 text-xs font-semibold ${tone}`;
+    };
+    let request = 0;
+    const saveMulti = async () => {
+      const picked = boxes.filter((b) => b.checked).map((b) => b.value);
+      if (toggle.checked && !picked.length) return setStatus("Pick at least one design.", "text-red-700");
+      const mine = ++request;
+      setStatus("Saving…", "text-ink-500");
+      try {
+        await api.put(base, {
+          multiView: toggle.checked,
+          extraTemplateIds: picked.length === boxes.length ? null : picked,
+        });
+        if (mine === request) setStatus("✓ Saved", "text-emerald-700");
+      } catch (err) {
+        if (mine === request) setStatus("Not saved", "text-red-700");
+        fail(err);
+      }
+    };
+    toggle.addEventListener("change", () => {
+      grid.hidden = !toggle.checked;
+      saveMulti();
+    });
+    boxes.forEach((b) => b.addEventListener("change", saveMulti));
+  }
+
   $("[data-copy-card]", root)?.addEventListener("click", async (e) => {
     const label = $("span", e.currentTarget);
     try {

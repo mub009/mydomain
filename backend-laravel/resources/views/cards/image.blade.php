@@ -59,6 +59,10 @@
     /* A brief glow on load shows where the invisible tap areas are. */
     .card.hint .spot.invisible{animation:hint 1.6s ease-out .4s 1}
     @keyframes hint{0%,100%{box-shadow:inset 0 0 0 0 rgba(250,204,21,0)}35%{box-shadow:inset 0 0 0 3px rgba(250,204,21,.9);background:rgba(250,204,21,.18)}}
+    @if ($embedded ?? false)
+      {{-- A slide in the slider: room at the bottom for its dots and Download PDF button. --}}
+      .page{padding-bottom:84px}
+    @endif
     .powered{margin-top:14px;font-size:11px;color:rgba(255,255,255,.7)}
     .powered a{color:inherit}
     @if ($preview)
@@ -104,14 +108,15 @@
         @endif
       @endforeach
     </main>
-    @unless ($preview)
+    @unless ($preview || ($embedded ?? false))
       <p class="powered">Digital card by <a href="{{ rtrim((string) config('app.url'), '/') ?: '/' }}" target="_blank" rel="noopener">Markkito</a></p>
     @endunless
   </div>
   @unless ($preview)
     <script>
       document.querySelectorAll("[data-share]").forEach((btn) => btn.addEventListener("click", async () => {
-        const url = location.href.split("#")[0];
+        // The card's own link — also from a slide inside the Multi card view slider.
+        const url = @json($b['cardUrl'] ?? null) || location.href.split("#")[0];
         try {
           if (navigator.share) return await navigator.share({ title: document.title, url });
           await navigator.clipboard.writeText(url);
@@ -119,6 +124,21 @@
         } catch (e) {}
       }));
     </script>
+    @if ($embedded ?? false)
+      <script>
+        // A slide in the Multi card view slider: a sideways swipe on the card moves to the next/previous card.
+        (() => {
+          let x0 = null, y0 = null;
+          addEventListener("touchstart", (e) => { x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; }, { passive: true });
+          addEventListener("touchend", (e) => {
+            if (x0 === null) return;
+            const dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0;
+            x0 = null;
+            if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) parent.postMessage({ markkitoCard: dx < 0 ? "next" : "prev" }, location.origin);
+          }, { passive: true });
+        })();
+      </script>
+    @endif
   @endunless
 </body>
 </html>

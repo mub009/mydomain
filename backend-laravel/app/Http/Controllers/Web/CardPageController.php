@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Models\Business;
 use App\Models\BusinessCard;
+use App\Models\CardTemplate;
 use App\Support\BusinessAccess;
 use App\Support\BusinessFeatures;
 use App\Support\Cards\CardEngine;
@@ -29,7 +30,33 @@ class CardPageController extends Controller
     public function show(string $slug)
     {
         $business = $this->liveBusiness($slug);
+
+        // A slide of the Multi card view slider: /card/<slug>?design=<id>&embed=1.
+        if (request()->boolean('embed')) {
+            $html = ImageCard::renderSlide($business, (string) request()->query('design', 'main'), true);
+            abort_unless($html !== null, 404);
+
+            return response($html)->header('Content-Type', 'text/html; charset=UTF-8');
+        }
+
         BusinessCard::whereKey($business->card->id)->increment('viewCount');
+
+        // Multi card view: the business's card, then its other designs, as a slider.
+        $slides = ImageCard::slides($business);
+        if (count($slides) > 1) {
+            $details = CardEngine::details($business);
+
+            return response(view('cards.slider', [
+                'b' => $details,
+                'slides' => array_map(fn ($s) => [
+                    'id' => $s['id'],
+                    'name' => $s['name'],
+                    'src' => $details['cardUrl'].'?'.http_build_query(['design' => $s['id'], 'embed' => 1]),
+                    'pdf' => $details['pdfUrl'].($s['id'] === 'main' ? '' : '?'.http_build_query(['design' => $s['id']])),
+                ], $slides),
+                'image' => ImageCard::source($business)['imageUrl'] ?? ($slides[1]['template']->imageUrl ?? null),
+            ])->render())->header('Content-Type', 'text/html; charset=UTF-8');
+        }
 
         // The business's own artwork with its actions, when it has uploaded one; else its template.
         // Its image (its own, or its image template's) with the actions on it; else the template's layout.
@@ -39,10 +66,18 @@ class CardPageController extends Controller
         return response($html)->header('Content-Type', 'text/html; charset=UTF-8');
     }
 
-    // The card as a PDF, every action a working link.
+    // The card as a PDF, every action a working link. ?design=<id>: one of
+    // the other designs shown in Multi card view.
     public function pdf(string $slug)
     {
-        return self::pdfResponse($this->liveBusiness($slug), true);
+        $business = $this->liveBusiness($slug);
+        $design = null;
+        if (($id = request()->query('design')) && $id !== 'main') {
+            $design = collect(ImageCard::slides($business))->firstWhere('id', (string) $id)['template'] ?? null;
+            abort_unless($design, 404);
+        }
+
+        return self::pdfResponse($business, true, $design);
     }
 
     // The same PDF for the people who manage the business, before the card
@@ -78,13 +113,13 @@ class CardPageController extends Controller
             ->header('Content-Disposition', 'attachment; filename="'.$business->slug.'.vcf"');
     }
 
-    private static function pdfResponse(Business $business, bool $live)
+    private static function pdfResponse(Business $business, bool $live, ?CardTemplate $design = null)
     {
         $disposition = request()->boolean('inline') ? 'inline' : 'attachment';
 
-        return response(CardPdf::render($business, $live))
+        return response(CardPdf::render($business, $live, $design))
             ->header('Content-Type', 'application/pdf')
-            ->header('Content-Disposition', $disposition.'; filename="'.CardPdf::filename($business).'"')
+            ->header('Content-Disposition', $disposition.'; filename="'.CardPdf::filename($business, $design).'"')
             ->header('Cache-Control', 'private, max-age=0, no-store');
     }
 
