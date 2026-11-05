@@ -151,7 +151,8 @@ class CardPdf
                     'display' => $h['display'],
                     'textStyle' => $text,
                     'src' => $h['kind'] === 'image' ? (in_array($h['action'], ['logo', 'custom_image'], true)
-                        ? (! empty($h['radius']) ? self::roundedPng($h['src'], $h['w'] * $width / 100, $h['h'] * $height / 100, (int) $h['radius']) : self::png($h['src']))
+                        ? (! empty($h['shape']) ? self::shapedPng($h['src'], $h['w'] * $width / 100, $h['h'] * $height / 100, $h['shape'])
+                            : (! empty($h['radius']) ? self::roundedPng($h['src'], $h['w'] * $width / 100, $h['h'] * $height / 100, (int) $h['radius']) : self::png($h['src'])))
                         : $h['src']) : null,
                     'box' => sprintf('left:%spt;top:%spt;width:%spt;height:%spt', round($h['x'] * $width / 100, 2), round($h['y'] * $height / 100, 2), round($h['w'] * $width / 100, 2), round($h['h'] * $height / 100, 2)),
                 ];
@@ -218,6 +219,53 @@ class CardPdf
                 $px = $x + 0.5;
                 $dx = $px < $rx ? $rx - $px : ($px > $ow - $rx ? $px - ($ow - $rx) : 0);
                 if ($dx > 0 && ($dx / $rx) ** 2 + ($dy / $ry) ** 2 > 1) {
+                    imagesetpixel($tile, $x, $y, $clear);
+                }
+            }
+        }
+        ob_start();
+        imagepng($tile);
+
+        return 'data:image/png;base64,'.base64_encode((string) ob_get_clean());
+    }
+
+    /**
+     * A picture cropped to fill a $w x $h box (cover) and cut to a drawn
+     * shape ([x, y] points in percent of the box), as a PNG data URI —
+     * dompdf has no clip-path.
+     */
+    private static function shapedPng(string $url, float $w, float $h, array $shape): ?string
+    {
+        $src = self::gd($url);
+        if (! $src || $w <= 0 || $h <= 0 || count($shape) < 3) {
+            return null;
+        }
+        $k = min(4, 1000 / max($w, $h));
+        $ow = max(1, (int) round($w * $k));
+        $oh = max(1, (int) round($h * $k));
+        $sw = imagesx($src);
+        $sh = imagesy($src);
+        $scale = max($ow / $sw, $oh / $sh);
+        $cw = (int) round($ow / $scale);
+        $ch = (int) round($oh / $scale);
+        $tile = imagecreatetruecolor($ow, $oh);
+        imagealphablending($tile, false);
+        imagesavealpha($tile, true);
+        $clear = imagecolorallocatealpha($tile, 0, 0, 0, 127);
+        imagefill($tile, 0, 0, $clear);
+        imagecopyresampled($tile, $src, 0, 0, (int) (($sw - $cw) / 2), (int) (($sh - $ch) / 2), $ow, $oh, $cw, $ch);
+
+        // The shape, filled white on black, then everything outside it cleared.
+        $mask = imagecreatetruecolor($ow, $oh);
+        $points = [];
+        foreach ($shape as [$x, $y]) {
+            $points[] = (int) round($x * $ow / 100);
+            $points[] = (int) round($y * $oh / 100);
+        }
+        imagefilledpolygon($mask, $points, imagecolorallocate($mask, 255, 255, 255));
+        for ($y = 0; $y < $oh; $y++) {
+            for ($x = 0; $x < $ow; $x++) {
+                if ((imagecolorat($mask, $x, $y) & 0xFF) === 0) {
                     imagesetpixel($tile, $x, $y, $clear);
                 }
             }

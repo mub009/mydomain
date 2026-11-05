@@ -477,6 +477,25 @@ class ImageCardTest extends TestCase
         $this->save([$this->spot('custom_image', ['value' => 'javascript:alert(1)'])])->assertStatus(400);
     }
 
+    public function test_a_picture_can_be_cut_to_a_shape_drawn_on_the_card(): void
+    {
+        $pic = ['value' => 'https://cdn.example.test/cards/images/offer.png'];
+        $triangle = [[50, 0], [100, 100], [0, 100]];
+        $this->save([$this->spot('custom_image', $pic + ['shape' => $triangle]), $this->spot('logo', $pic + ['shape' => [[0, 0], [100, 0], [50, 100]]])])
+            ->assertOk()
+            ->assertJsonPath('data.hotspots.0.shape', [[50, 0], [100, 100], [0, 100]])
+            ->assertJsonPath('data.hotspots.1.shape.2', [50, 100]);
+        $this->postJson("/api/v1/businesses/{$this->business->id}/card/publish", [], $this->auth)->assertOk();
+        $html = $this->get('/card/spice-garden')->getContent();
+        $this->assertStringContainsString('clip-path:polygon(50% 0%,100% 100%,0% 100%)', $html);
+        $this->assertStringContainsString('style="object-fit:cover"', $html);
+
+        // Fewer than 3 points, or points outside the box, are refused; other boxes never keep a shape.
+        $this->save([$this->spot('custom_image', $pic + ['shape' => [[0, 0], [10, 10]]])])->assertStatus(400);
+        $this->save([$this->spot('custom_image', $pic + ['shape' => [[0, 0], [10, 10], [150, 5]]])])->assertStatus(400);
+        $this->save([$this->spot('call', ['shape' => $triangle])])->assertOk()->assertJsonPath('data.hotspots.0.shape', null);
+    }
+
     public function test_review_us_on_google_and_location_actions(): void
     {
         $this->save([

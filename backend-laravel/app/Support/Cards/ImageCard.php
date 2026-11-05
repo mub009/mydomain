@@ -33,6 +33,9 @@ class ImageCard
 {
     public const MAX_HOTSPOTS = 40;
 
+    /** Points in a picture's drawn shape. */
+    public const MAX_SHAPE_POINTS = 120;
+
     /**
      * What a box can be: label, icon, kind (action / text / image), what its
      * value means (null = it takes none) and, for a detail that links
@@ -136,6 +139,10 @@ class ImageCard
             'hotspots.*.bg' => ['nullable', 'regex:'.self::HEX],
             'hotspots.*.align' => ['nullable', 'in:'.implode(',', self::ALIGNS)],
             'hotspots.*.radius' => ['nullable', 'integer', 'min:0', 'max:50'],
+            // A picture cut to a shape: [x, y] points in percent of its box.
+            'hotspots.*.shape' => ['nullable', 'array', 'min:3', 'max:'.self::MAX_SHAPE_POINTS],
+            'hotspots.*.shape.*' => ['array', 'size:2'],
+            'hotspots.*.shape.*.*' => ['numeric', 'min:0', 'max:100'],
         ];
     }
 
@@ -175,6 +182,8 @@ class ImageCard
                 'align' => in_array($h['align'] ?? null, self::ALIGNS, true) ? $h['align'] : null,
                 // A picture's rounded corners (logo or free image), in percent of its box: 0 = none, 50 = round.
                 'radius' => in_array($h['action'], ['logo', 'custom_image'], true) && ! empty($h['radius']) ? (int) min(50, max(0, (int) $h['radius'])) : null,
+                // A picture cut to a shape drawn in the editor (a preset or by hand).
+                'shape' => in_array($h['action'], ['logo', 'custom_image'], true) ? self::shape($h['shape'] ?? null) : null,
             ];
             if ($lenient) {
                 if (! self::valueIsValid($spot)) {
@@ -194,6 +203,28 @@ class ImageCard
         }
 
         return $out;
+    }
+
+    /** A drawn shape as [[x, y], …] in percent of the box, each 0–100; null = none (fewer than 3 points). */
+    public static function shape(mixed $points): ?array
+    {
+        if (! is_array($points)) {
+            return null;
+        }
+        $out = [];
+        foreach (array_slice(array_values($points), 0, self::MAX_SHAPE_POINTS) as $p) {
+            if (is_array($p) && count($p) === 2 && is_numeric($p[0] ?? null) && is_numeric($p[1] ?? null)) {
+                $out[] = [round(min(100, max(0, (float) $p[0])), 1), round(min(100, max(0, (float) $p[1])), 1)];
+            }
+        }
+
+        return count($out) >= 3 ? $out : null;
+    }
+
+    /** A drawn shape as a CSS clip-path (only numbers reach the CSS). */
+    public static function clipPath(array $shape): string
+    {
+        return 'polygon('.implode(',', array_map(fn ($p) => ((float) $p[0]).'% '.((float) $p[1]).'%', $shape)).')';
     }
 
     /** Whether a box's own value suits it: a real phone number, email, web address… (free text always does). */

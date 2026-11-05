@@ -75,6 +75,45 @@ const GROUPS = [
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const round = (v) => Math.round(v * 100) / 100;
 
+// --- Picture shapes ------------------------------------------------------------
+// A picture (logo or free image) can be cut to a shape: a list of [x, y]
+// points in percent of its box, drawn as a CSS clip-path polygon (and cut the
+// same way in the PDF — ImageCard::clipPath / CardPdf::shapedPng).
+const MAX_SHAPE_POINTS = 120;
+// Scales any outline to fill the whole box (0–100 both ways).
+function fitShape(points) {
+  const xs = points.map((p) => p[0]);
+  const ys = points.map((p) => p[1]);
+  const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+  return points.map(([x, y]) => [
+    Math.round(((x - x0) / (x1 - x0 || 1)) * 1000) / 10,
+    Math.round(((y - y0) / (y1 - y0 || 1)) * 1000) / 10,
+  ]);
+}
+const around = (n, f) => Array.from({ length: n }, (_, i) => f((i / n) * Math.PI * 2, i));
+const SHAPES = {
+  circle: ["Circle", around(48, (t) => [50 + 50 * Math.cos(t), 50 + 50 * Math.sin(t)])],
+  heart: [
+    "Heart",
+    fitShape(around(60, (t) => [16 * Math.sin(t) ** 3, -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t))])),
+  ],
+  star: ["Star", fitShape(around(10, (t, i) => [(i % 2 ? 20 : 50) * Math.cos(t - Math.PI / 2), (i % 2 ? 20 : 50) * Math.sin(t - Math.PI / 2)]))],
+  hexagon: ["Hexagon", around(6, (t) => [50 + 50 * Math.cos(t), 50 + 50 * Math.sin(t)])],
+  diamond: ["Diamond", [[50, 0], [100, 50], [50, 100], [0, 50]]],
+  arch: ["Arch", [...around(24, (t) => [50 + 50 * Math.cos(Math.PI + t / 2), 50 + 50 * Math.sin(Math.PI + t / 2)]), [100, 50], [100, 100], [0, 100]]],
+};
+const clipPath = (shape) => `polygon(${shape.map(([x, y]) => `${x}% ${y}%`).join(",")})`;
+// A hand-drawn line, thinned: points closer than 1% to the last kept one are dropped, then at most MAX_SHAPE_POINTS remain.
+function simplifyStroke(points) {
+  const kept = [];
+  for (const p of points) {
+    const last = kept[kept.length - 1];
+    if (!last || Math.hypot(p[0] - last[0], p[1] - last[1]) >= 1) kept.push(p);
+  }
+  const step = Math.ceil(kept.length / MAX_SHAPE_POINTS);
+  return kept.filter((_, i) => i % step === 0).map(([x, y]) => [Math.round(x * 10) / 10, Math.round(y * 10) / 10]);
+}
+
 export function initHotspotEditor(editor, options) {
   const {
     defaults = {},
@@ -111,6 +150,8 @@ export function initHotspotEditor(editor, options) {
   let dirty = false;
   let removeLogoBg = false; // ticked: the server removes the background and redraws the logo with AI (LogoCleaner)
   let logoNote = "";
+  let drawingFor = null;
+  let drewAt = 0; // when a hand-drawn outline was finished: the click that ends it mustn't open the add menu // the picture box being outlined by hand ("Draw your own" shape)
 
   function markDirty() {
     dirty = true;
@@ -165,8 +206,9 @@ export function initHotspotEditor(editor, options) {
       const src = h.action === "logo" ? h.value || defaults.logo || "" : h.action === "custom_image" ? h.value || "" : "";
       const logo = /^https?:/.test(src) ? src : null;
       const radius = isPicture(h) ? h.radius || 0 : 0;
+      const shape = isPicture(h) && h.shape?.length >= 3 ? h.shape : null;
       inner = logo
-        ? `<img src="${esc(logo)}" alt="" class="pointer-events-none h-full w-full ${radius ? "object-cover" : "object-contain"}" style="border-radius:${radius}%" />`
+        ? `<img src="${esc(logo)}" alt="" class="pointer-events-none h-full w-full ${radius || shape ? "object-cover" : "object-contain"}" style="${shape ? `clip-path:${clipPath(shape)}` : `border-radius:${radius}%`}" />`
         : `<span class="pointer-events-none flex h-full w-full flex-col items-center justify-center gap-0.5 bg-white/80 text-[10px] font-semibold text-ink-700">${icon(actions[h.action].icon, { size: 22 })}${esc(actions[h.action].label)}</span>`;
     } else {
       ensureFont(h.font);
@@ -178,7 +220,17 @@ export function initHotspotEditor(editor, options) {
         style="left:${h.x}%;top:${h.y}%;width:${h.w}%;height:${h.h}%;${kindOf(h) === "text" ? esc(textStyle(h)) : ""}">
         ${inner}
         ${!shown ? `<span class="pointer-events-none absolute -top-2.5 left-1 rounded bg-amber-500 px-1 text-[9px] text-white">${h.action === "logo" ? "upload a logo" : h.action === "custom_image" ? "upload a picture" : h.action === "custom_text" ? "type your text" : "not on your listing"}</span>` : ""}
-        ${selected ? handlesHtml(h) : ""}
+        ${selected && drawingFor !== h.id ? handlesHtml(h) : ""}
+        ${
+          drawingFor === h.id
+            ? `<div data-draw-surface class="absolute inset-0 z-20 cursor-crosshair rounded bg-brand-500/10 ring-2 ring-dashed ring-brand-600">
+                <svg viewBox="0 0 100 100" preserveAspectRatio="none" class="pointer-events-none absolute inset-0 h-full w-full overflow-visible">
+                  <polygon data-draw-line points="" fill="rgba(37,99,235,.18)" stroke="#2563eb" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round" />
+                </svg>
+                <span class="pointer-events-none absolute inset-x-0 -bottom-6 text-center text-[10px] font-semibold text-brand-800"><span class="rounded bg-white/90 px-1.5 py-0.5 shadow">Draw the outline here</span></span>
+              </div>`
+            : ""
+        }
       </div>`;
   }
 
@@ -388,7 +440,32 @@ export function initHotspotEditor(editor, options) {
                 <input type="range" min="${LOGO_SCALE_MIN * 100}" max="${LOGO_SCALE_MAX * 100}" step="5" value="${Math.round(logoScale(h) * 100)}" class="w-full" data-field="logoSize" aria-label="Logo size" />
                 <span class="mt-0.5 flex justify-between text-[11px] text-ink-400"><span>Smaller</span><button type="button" class="font-semibold text-ink-500 hover:underline" data-logo-size-reset>Reset</button><span>Bigger</span></span>
               </label>
-              <label class="block">
+              <div class="space-y-1.5" data-shape-panel>
+                <span class="flex justify-between text-xs font-semibold text-ink-700">Shape <span class="font-normal text-ink-500">${h.shape ? "Your own shape" : h.radius ? "Rounded" : "None"}</span></span>
+                ${
+                  drawingFor === h.id
+                    ? `<div class="rounded-lg border border-brand-300 bg-brand-50 p-2 text-[11px] text-brand-900">
+                        <p class="font-semibold">Draw the shape on the picture</p>
+                        <p class="mt-0.5">Hold down and trace an outline over the picture with your mouse or finger. When you let go the picture is cut to that shape.</p>
+                        <button type="button" class="mt-1.5 font-semibold text-ink-600 hover:underline" data-shape-cancel>Cancel</button>
+                      </div>`
+                    : `<div class="grid grid-cols-4 gap-1.5">
+                        <button type="button" data-shape="none" class="rounded-lg border px-1 py-1.5 text-[11px] font-semibold ${!h.shape ? "border-brand-500 bg-brand-50 text-brand-800" : "border-gray-300 bg-white text-ink-700 hover:bg-gray-50"}">None</button>
+                        ${Object.entries(SHAPES)
+                          .map(
+                            ([key, [label, pts]]) =>
+                              `<button type="button" data-shape="${key}" title="${label}" class="flex flex-col items-center gap-0.5 rounded-lg border px-1 py-1 text-[10px] font-semibold ${
+                                h.shapeName === key ? "border-brand-500 bg-brand-50 text-brand-800" : "border-gray-300 bg-white text-ink-700 hover:bg-gray-50"
+                              }"><span class="block h-4 w-4 bg-current" style="clip-path:${clipPath(pts)}"></span>${label}</button>`,
+                          )
+                          .join("")}
+                        <button type="button" data-shape-draw class="col-span-4 flex items-center justify-center gap-1.5 rounded-lg border px-2 py-1.5 text-xs font-semibold ${
+                          h.shape && !h.shapeName ? "border-brand-500 bg-brand-50 text-brand-800" : "border-gray-300 bg-white text-ink-700 hover:bg-gray-50"
+                        }">${icon("pencil", { size: 13 })} Draw your own shape</button>
+                      </div>`
+                }
+              </div>
+              <label class="block ${h.shape ? "hidden" : ""}">
                 <span class="mb-0.5 flex justify-between text-xs font-semibold text-ink-700">Round corners <span class="font-normal text-ink-500" data-logo-radius-label>${h.radius || 0}%</span></span>
                 <input type="range" min="0" max="50" step="1" value="${h.radius || 0}" class="w-full" data-field="logoRadius" aria-label="Logo corner rounding" />
                 <span class="mt-0.5 flex justify-between text-[11px] text-ink-400">
@@ -480,6 +557,17 @@ export function initHotspotEditor(editor, options) {
     };
     logoRadius?.addEventListener("input", (e) => setRadius(Number(e.target.value)));
     $$("[data-logo-radius]", inspector).forEach((b) => b.addEventListener("click", () => setRadius(Number(b.dataset.logoRadius))));
+
+    $$("[data-shape]", inspector).forEach((b) =>
+      b.addEventListener("click", () => {
+        const key = b.dataset.shape;
+        h.shape = key === "none" ? null : SHAPES[key][1].map((pt) => [...pt]);
+        h.shapeName = key === "none" ? null : key;
+        changed({ inspector: true });
+      }),
+    );
+    $("[data-shape-draw]", inspector)?.addEventListener("click", () => startDrawing(h.id));
+    $("[data-shape-cancel]", inspector)?.addEventListener("click", () => stopDrawing());
 
     $("[data-logo-remove-bg]", inspector)?.addEventListener("change", (e) => (removeLogoBg = e.target.checked));
     $("[data-logo-upload]", inspector)?.addEventListener("click", () => pickLogo(h.id));
@@ -582,6 +670,7 @@ export function initHotspotEditor(editor, options) {
   }
 
   function select(id) {
+    if (drawingFor && drawingFor !== id) drawingFor = null;
     state.selected = id;
     renderStage();
     renderInspector();
@@ -778,6 +867,49 @@ export function initHotspotEditor(editor, options) {
     if (chip && !chip.disabled && e.detail === 0) addSpot(chip.dataset.paletteAction);
   });
 
+  // --- Draw a picture's shape by hand ------------------------------------------
+  function startDrawing(id) {
+    drawingFor = id;
+    state.selected = id;
+    renderStage();
+    renderInspector();
+  }
+  function stopDrawing() {
+    drawingFor = null;
+    renderStage();
+    renderInspector();
+  }
+  // Runs before the move/resize handler (capture), so drawing never drags the box.
+  spotsLayer.addEventListener(
+    "pointerdown",
+    (e) => {
+      const surface = e.target.closest("[data-draw-surface]");
+      if (!surface || e.button > 0) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const h = spotById(drawingFor);
+      const line = $("[data-draw-line]", surface);
+      const points = [];
+      const add = (ev) => {
+        const r = surface.getBoundingClientRect();
+        points.push([clamp(((ev.clientX - r.left) / r.width) * 100, 0, 100), clamp(((ev.clientY - r.top) / r.height) * 100, 0, 100)]);
+        line.setAttribute("points", points.map((p) => p.join(",")).join(" "));
+      };
+      add(e);
+      track(add, () => {
+        drewAt = Date.now();
+        const shape = simplifyStroke(points);
+        if (!h || shape.length < 3) return; // a tap, not an outline: keep drawing
+        h.shape = shape;
+        h.shapeName = null;
+        h.radius = null;
+        drawingFor = null;
+        changed({ inspector: true });
+      });
+    },
+    true,
+  );
+
   // --- Move and resize placed actions ----------------------------------------
   spotsLayer.addEventListener("pointerdown", (e) => {
     const el = e.target.closest("[data-spot]");
@@ -900,7 +1032,7 @@ export function initHotspotEditor(editor, options) {
     $("[data-menu-action]", menu)?.focus({ preventScroll: true });
   }
   stage.addEventListener("click", (e) => {
-    if (!state.imageUrl || e.target.closest("[data-spot], [data-spot-menu]")) return;
+    if (!state.imageUrl || e.target.closest("[data-spot], [data-spot-menu]") || Date.now() - drewAt < 500) return;
     const p = toStage(e);
     if (state.selected) select(null);
     openMenu(clamp(p.x, 0, 100), clamp(p.y, 0, 100));
@@ -911,6 +1043,7 @@ export function initHotspotEditor(editor, options) {
   });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") closeMenu();
+    if (e.key === "Escape" && drawingFor) stopDrawing();
   });
   spotsLayer.addEventListener("pointerdown", (e) => {
     if (e.target.closest("[data-spot]")) closeMenu();
@@ -1009,7 +1142,7 @@ export function initHotspotEditor(editor, options) {
         imageUrl: state.imageUrl,
         imageWidth: state.imageWidth,
         imageHeight: state.imageHeight,
-        hotspots: state.hotspots.map(({ id, action, x, y, w, h, value, label, style, font, fontSize, bold, italic, color, bg, align, radius }) => ({
+        hotspots: state.hotspots.map(({ id, action, x, y, w, h, value, label, style, font, fontSize, bold, italic, color, bg, align, radius, shape }) => ({
           id,
           action,
           x,
@@ -1027,6 +1160,7 @@ export function initHotspotEditor(editor, options) {
           bg: bg || null,
           align: align || null,
           radius: radius || null,
+          shape: shape?.length >= 3 ? shape : null,
         })),
       };
     },
