@@ -158,7 +158,6 @@ export function initHotspotEditor(editor, options) {
   let removeLogoBg = false; // ticked: the server removes the background and redraws the logo with AI (LogoCleaner)
   let logoNote = "";
   let drawingFor = null;
-  let marking = null; // { forId, tool }: marking an area on the card for a free image (lasso / rectangle / ellipse)
   let adjustFor = null; // the free image whose picture is being moved inside its area
   let drewAt = 0; // when a hand-drawn outline was finished: the click that ends it mustn't open the add menu // the picture box being outlined by hand ("Draw your own" shape)
 
@@ -321,16 +320,6 @@ export function initHotspotEditor(editor, options) {
   }
 
   function renderInspector() {
-    if (marking) {
-      inspector.innerHTML = `<div class="space-y-1.5 py-1 text-xs text-ink-600">
-          <p class="font-bold text-ink-900">Mark the image area</p>
-          <p>1. Pick <b>Freehand</b>, <b>Rectangle</b> or <b>Ellipse</b> at the top of the card.</p>
-          <p>2. Draw the area on the card — hold down and drag.</p>
-          <p>3. Choose the picture: it's placed inside that area.</p>
-          <p class="text-ink-400">Press Esc to cancel.</p>
-        </div>`;
-      return;
-    }
     const h = spotById(state.selected);
     if (!h) {
       inspector.innerHTML = `<p class="py-3 text-center text-xs text-ink-500">${
@@ -414,28 +403,10 @@ export function initHotspotEditor(editor, options) {
             ? `<div class="space-y-2 rounded-lg bg-gray-50 p-2.5">
                 <p class="text-xs font-semibold text-ink-700">Image area</p>
                 <p class="text-[11px] ${h.value ? "text-ink-500" : "text-amber-700"}">${esc(
-                  h.value ? "Your picture fills the area you marked. Drag the area to move it, pull its corners to resize it." : "Area marked — now upload the picture to place in it.",
+                  h.value ? "Your picture fills the area you drew. Drag it on the card to move it, pull its corners to resize it." : "Area drawn — open the editor to upload the picture into it.",
                 )}</p>
-                <div class="flex flex-wrap items-center gap-2">
-                  <button type="button" class="btn-primary px-3 py-1.5 text-xs" data-logo-upload>${icon("upload", { size: 13 })} ${h.value ? "Replace image" : "Upload image"}</button>
-                  <button type="button" class="btn-secondary px-3 py-1.5 text-xs" data-remark>${icon("pencil", { size: 13 })} Mark a new area</button>
-                </div>
-                ${
-                  h.value
-                    ? `<div class="space-y-1.5 border-t border-gray-200 pt-2">
-                        <p class="text-xs font-semibold text-ink-700">Picture inside the area</p>
-                        <button type="button" data-adjust aria-pressed="${adjustFor === h.id}" class="flex w-full items-center justify-center gap-1.5 rounded-lg border px-2 py-1.5 text-xs font-semibold ${
-                          adjustFor === h.id ? "border-brand-500 bg-brand-50 text-brand-800" : "border-gray-300 bg-white text-ink-700 hover:bg-gray-50"
-                        }">${icon("move", { size: 13 })} ${adjustFor === h.id ? "Done moving the picture" : "Move the picture inside the area"}</button>
-                        ${adjustFor === h.id ? `<p class="text-[11px] text-brand-800">Drag the picture on the card to choose which part shows.</p>` : ""}
-                        <label class="block">
-                          <span class="mb-0.5 flex justify-between text-[11px] text-ink-600">Zoom <span data-fit-zoom-label>${(h.fit || FIT_DEFAULT).zoom}%</span></span>
-                          <input type="range" min="100" max="400" step="5" value="${(h.fit || FIT_DEFAULT).zoom}" class="w-full" data-field="fitZoom" aria-label="Zoom the picture" />
-                        </label>
-                        <button type="button" class="text-[11px] font-semibold text-ink-500 hover:underline" data-fit-reset>Reset position &amp; zoom</button>
-                      </div>`
-                    : ""
-                }
+                <button type="button" class="btn-primary w-full px-3 py-2 text-xs" data-remark>${icon("maximize", { size: 13 })} Edit image full screen</button>
+                <p class="text-[11px] text-ink-500">Redraw the area, replace the picture, or move and zoom it inside the area.</p>
                 <p class="text-[11px] text-ink-400">JPG, PNG or WebP. A PNG with a see-through background stays see-through.</p>
               </div>`
             : h.action === "logo"
@@ -923,142 +894,236 @@ export function initHotspotEditor(editor, options) {
     if (chip && !chip.disabled && e.detail === 0) addSpot(chip.dataset.paletteAction);
   });
 
-  // --- Mark an area on the card for a free image (like a selection in Photoshop) --
-  // Lasso (freehand), rectangle or ellipse, drawn right on the card. The area
-  // becomes the box (its bounds) and its shape; the picture uploaded next fills it.
-  const MARK_TOOLS = [
-    ["lasso", "Freehand", "pencil"],
-    ["rect", "Rectangle", "square"],
-    ["ellipse", "Ellipse", "circle"],
-  ];
-  let markLayer = null;
+  // --- Full-screen image editor for a free image --------------------------------
+  // Opens over the whole screen with the card shown large: draw the area
+  // freehand (like a lasso selection in Photoshop), upload the picture into
+  // it, then drag the picture inside the area and zoom it. "Done" puts it on
+  // the card; "Cancel" (or Esc) leaves the card as it was.
+  const pictureInput = Object.assign(document.createElement("input"), { type: "file", accept: "image/jpeg,image/png,image/webp", hidden: true });
+  editor.append(pictureInput);
+  let onPicture = null;
+  pictureInput.addEventListener("change", () => {
+    const file = pictureInput.files[0];
+    pictureInput.value = "";
+    if (file) onPicture?.(file);
+  });
+  const FULL_AREA = [[0, 0], [100, 0], [100, 100], [0, 100]];
+
   function startMarking(forId) {
     if (!state.imageUrl) return;
     closeMenu();
     drawingFor = null;
-    adjustFor = null;
-    marking = { forId, tool: marking?.tool || "lasso" };
-    markLayer?.remove();
-    markLayer = document.createElement("div");
-    markLayer.dataset.markLayer = "";
-    markLayer.className = "absolute inset-0 z-30 cursor-crosshair touch-none bg-gray-900/25";
-    stage.appendChild(markLayer);
-    renderMarkLayer();
-    renderInspector();
-  }
-  function stopMarking() {
-    marking = null;
-    markLayer?.remove();
-    markLayer = null;
-    renderInspector();
-  }
-  function renderMarkLayer() {
-    markLayer.innerHTML = `
-      <svg viewBox="0 0 100 100" preserveAspectRatio="none" class="pointer-events-none absolute inset-0 h-full w-full overflow-visible">
-        <polygon data-mark-line points="" fill="rgba(255,255,255,.25)" stroke="#fff" stroke-width="2" stroke-dasharray="6 4" vector-effect="non-scaling-stroke" stroke-linejoin="round" />
-      </svg>
-      <div data-mark-bar class="absolute inset-x-2 top-2 cursor-default rounded-lg bg-white/95 p-2 text-xs shadow-lg">
-        <p class="mb-1.5 font-semibold text-ink-900">Mark the area for your picture, then upload it</p>
-        <div class="flex flex-wrap items-center gap-1">
-          ${MARK_TOOLS.map(
-            ([key, label, ic]) =>
-              `<button type="button" data-mark-tool="${key}" class="flex items-center gap-1 rounded-md border px-2 py-1 font-semibold ${
-                marking.tool === key ? "border-brand-500 bg-brand-50 text-brand-800" : "border-gray-300 bg-white text-ink-700 hover:bg-gray-50"
-              }">${icon(ic, { size: 12 })} ${label}</button>`,
-          ).join("")}
-          <button type="button" data-mark-cancel class="ml-auto rounded-md px-2 py-1 font-semibold text-ink-500 hover:underline">Cancel</button>
-        </div>
-      </div>`;
-  }
-  // The outline as the pointer goes: every point for the lasso, two corners for a rectangle or ellipse.
-  function markOutline(tool, points) {
-    if (tool === "lasso") return points;
-    const [a, b] = [points[0], points[points.length - 1]];
-    const [x0, x1, y0, y1] = [Math.min(a[0], b[0]), Math.max(a[0], b[0]), Math.min(a[1], b[1]), Math.max(a[1], b[1])];
-    if (tool === "rect") return [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
-    return around(48, (t) => [(x0 + x1) / 2 + ((x1 - x0) / 2) * Math.cos(t), (y0 + y1) / 2 + ((y1 - y0) / 2) * Math.sin(t)]);
-  }
-  function finishMarking(outline) {
-    const xs = outline.map((p) => p[0]);
-    const ys = outline.map((p) => p[1]);
-    const [bx, by] = [Math.min(...xs), Math.min(...ys)];
-    const [bw, bh] = [Math.max(...xs) - bx, Math.max(...ys) - by];
-    if (bw < MIN_SIZE || bh < MIN_SIZE) return false; // too small: keep marking
-    const rel = outline.map(([x, y]) => [((x - bx) / bw) * 100, ((y - by) / bh) * 100]);
-    const shape = marking.tool === "lasso" ? simplifyStroke(rel) : rel.map(([x, y]) => [Math.round(x * 10) / 10, Math.round(y * 10) / 10]);
-    if (shape.length < 3) return false;
-    const box = { x: round(bx), y: round(by), w: round(bw), h: round(bh), shape, shapeName: null, radius: null };
-    let spot = spotById(marking.forId);
-    if (spot) Object.assign(spot, box);
-    else {
-      spot = { id: newId(), action: "custom_image", value: null, label: null, style: null, fit: null, ...box };
-      state.hotspots.push(spot);
-    }
-    logoBase.delete(spot.id);
-    state.selected = spot.id;
-    stopMarking();
-    markDirty();
-    renderAll();
-    if (!spot.value) pickLogo(spot.id);
-    return true;
-  }
-  stage.addEventListener("pointerdown", (e) => {
-    if (!marking || !markLayer?.contains(e.target)) return;
-    e.stopPropagation();
-    const tool = e.target.closest("[data-mark-tool]");
-    if (tool) {
-      marking.tool = tool.dataset.markTool;
-      return renderMarkLayer();
-    }
-    if (e.target.closest("[data-mark-cancel]")) return stopMarking();
-    if (e.target.closest("[data-mark-bar]") || e.button > 0) return;
-    e.preventDefault();
-    const line = $("[data-mark-line]", markLayer);
-    const points = [];
-    const add = (ev) => {
-      const p = toStage(ev);
-      points.push([clamp(p.x, 0, 100), clamp(p.y, 0, 100)]);
-      line.setAttribute("points", markOutline(marking.tool, points).map((q) => q.join(",")).join(" "));
-    };
-    add(e);
-    track(add, () => {
-      drewAt = Date.now();
-      if (marking && points.length > 1) finishMarking(markOutline(marking.tool, points));
-    });
-  });
+    const spot = spotById(forId);
+    const draft = spot
+      ? {
+          x: spot.x, y: spot.y, w: spot.w, h: spot.h,
+          // An older free image without a marked area: its whole box is the area.
+          shape: (spot.shape || (spot.value ? FULL_AREA : null))?.map((pt) => [...pt]) || null,
+          value: spot.value || null,
+          fit: spot.fit ? { ...spot.fit } : null,
+        }
+      : { shape: null, value: null, fit: null };
+    let mode = draft.shape && draft.value ? "move" : "draw";
+    let busy = false;
+    let problem = "";
 
-  // --- Move the picture inside its area ----------------------------------------
-  // While "Move the picture" is on, dragging the free image pans the picture, not the box.
-  spotsLayer.addEventListener(
-    "pointerdown",
-    (e) => {
-      const el = e.target.closest("[data-spot]");
-      if (!adjustFor || !el || el.dataset.spot !== adjustFor || e.target.closest("[data-draw-surface]") || e.button > 0) return;
-      e.preventDefault();
+    const el = document.createElement("div");
+    el.className = "fixed inset-0 z-[1000] flex flex-col bg-gray-950/95 text-white";
+    el.setAttribute("role", "dialog");
+    el.setAttribute("aria-modal", "true");
+    el.setAttribute("aria-label", "Image editor");
+    document.body.appendChild(el);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const onKey = (e) => {
+      if (e.key !== "Escape") return;
       e.stopPropagation();
-      const h = spotById(adjustFor);
-      const img = $("img", el);
-      const r = el.getBoundingClientRect();
-      const orig = { ...FIT_DEFAULT, ...(h.fit || {}) };
-      let moved = false;
+      close();
+    };
+    document.addEventListener("keydown", onKey, true);
+    function close() {
+      el.remove();
+      onPicture = null;
+      document.body.style.overflow = prevOverflow;
+      document.removeEventListener("keydown", onKey, true);
+    }
+
+    const btn = (on) =>
+      `flex items-center gap-1.5 rounded-lg border px-3 py-2 font-semibold ${on ? "border-white bg-white text-gray-900" : "border-white/30 text-white hover:bg-white/10"}`;
+    function render() {
+      const has = !!draft.shape;
+      const zoom = (draft.fit || FIT_DEFAULT).zoom;
+      const area = has ? `left:${draft.x}%;top:${draft.y}%;width:${draft.w}%;height:${draft.h}%` : "";
+      el.innerHTML = `
+        <div class="flex flex-wrap items-center gap-3 border-b border-white/10 px-4 py-3">
+          <div class="min-w-0 flex-1">
+            <p class="font-bold">Image editor</p>
+            <p class="text-xs text-white/70">${
+              mode === "draw"
+                ? "Hold down and draw around the area where the picture should go."
+                : "Drag the picture to choose which part shows, and zoom with the slider."
+            }</p>
+            ${problem ? `<p class="mt-1 text-xs font-semibold text-red-300">${esc(problem)}</p>` : ""}
+          </div>
+          <button type="button" data-x="cancel" class="rounded-lg px-3 py-2 text-sm font-semibold text-white/80 hover:bg-white/10">Cancel</button>
+          <button type="button" data-x="done" class="rounded-lg bg-brand-600 px-5 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-40" ${has && !busy ? "" : "disabled"}>Done</button>
+        </div>
+        <div class="flex min-h-0 flex-1 items-center justify-center overflow-hidden p-4">
+          <div data-canvas class="relative touch-none select-none ${mode === "draw" ? "cursor-crosshair" : "cursor-grab"}">
+            <img src="${esc(state.imageUrl)}" alt="Your card" draggable="false" class="pointer-events-none block max-h-[calc(100vh-170px)] max-w-[calc(100vw-32px)] rounded" />
+            ${
+              has
+                ? `<div data-pic class="pointer-events-none absolute overflow-hidden" style="${area};clip-path:${clipPath(draft.shape)}">
+                    ${
+                      draft.value
+                        ? `<img src="${esc(draft.value)}" alt="" draggable="false" class="block h-full w-full" style="${fitCss(draft)}" />`
+                        : `<span class="flex h-full w-full items-center justify-center bg-white/30 text-xs font-semibold">Upload a picture</span>`
+                    }
+                  </div>
+                  <svg viewBox="0 0 100 100" preserveAspectRatio="none" class="pointer-events-none absolute overflow-visible" style="${area}">
+                    <polygon points="${draft.shape.map((pt) => pt.join(",")).join(" ")}" fill="none" stroke="#fff" stroke-width="1.5" stroke-dasharray="6 4" vector-effect="non-scaling-stroke" stroke-linejoin="round" />
+                  </svg>`
+                : ""
+            }
+            <svg viewBox="0 0 100 100" preserveAspectRatio="none" class="pointer-events-none absolute inset-0 h-full w-full overflow-visible">
+              <polygon data-line points="" fill="rgba(255,255,255,.2)" stroke="#fff" stroke-width="2" stroke-dasharray="6 4" vector-effect="non-scaling-stroke" stroke-linejoin="round" />
+            </svg>
+            ${busy ? `<div class="absolute inset-0 flex items-center justify-center rounded bg-black/60 text-sm font-semibold">Uploading…</div>` : ""}
+          </div>
+        </div>
+        <div class="flex flex-wrap items-center justify-center gap-2 border-t border-white/10 px-4 py-3 text-sm">
+          <button type="button" data-x="draw" class="${btn(mode === "draw")}">${icon("pencil", { size: 14 })} ${has ? "Redraw area" : "Draw area"}</button>
+          ${has ? `<button type="button" data-x="upload" class="${btn(false)}">${icon("upload", { size: 14 })} ${draft.value ? "Replace image" : "Upload image"}</button>` : ""}
+          ${
+            draft.value
+              ? `<button type="button" data-x="move" class="${btn(mode === "move")}">${icon("move", { size: 14 })} Move picture</button>
+                <label class="flex items-center gap-2 px-2">Zoom
+                  <input type="range" min="100" max="400" step="5" value="${zoom}" data-x="zoom" class="w-32" aria-label="Zoom the picture" />
+                  <span data-zoom-label class="w-10 text-xs">${zoom}%</span>
+                </label>
+                <button type="button" data-x="reset" class="px-2 py-2 text-xs font-semibold text-white/70 hover:underline">Reset</button>`
+              : ""
+          }
+        </div>`;
+    }
+
+    async function usePicture(file) {
+      if (!/^image\/(jpeg|png|webp)$/.test(file.type)) {
+        problem = "Choose a JPG, PNG or WebP image.";
+        return render();
+      }
+      problem = "";
+      busy = true;
+      render();
+      try {
+        draft.value = await uploadImage(file, "card-images");
+        draft.fit = null; // a new picture starts centred in the area
+        mode = "move";
+      } catch (err) {
+        problem = err?.message || "The picture couldn't be uploaded.";
+      } finally {
+        busy = false;
+        render();
+      }
+    }
+    const pick = () => {
+      onPicture = usePicture;
+      pictureInput.click();
+    };
+
+    el.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-x]");
+      if (!b || busy) return;
+      const x = b.dataset.x;
+      if (x === "cancel") return close();
+      if (x === "upload") return pick();
+      if (x === "draw" || x === "move") {
+        mode = x;
+        return render();
+      }
+      if (x === "reset") {
+        draft.fit = null;
+        return render();
+      }
+      if (x === "done" && draft.shape) {
+        const values = { x: draft.x, y: draft.y, w: draft.w, h: draft.h, shape: draft.shape, shapeName: null, radius: null, value: draft.value, fit: draft.fit };
+        let target = spotById(forId);
+        if (target) Object.assign(target, values);
+        else {
+          if (state.hotspots.length >= MAX_SPOTS) return onError(`A card can have up to ${MAX_SPOTS} items.`);
+          target = { id: newId(), action: "custom_image", label: null, style: null, ...values };
+          state.hotspots.push(target);
+        }
+        logoBase.delete(target.id);
+        state.selected = target.id;
+        close();
+        markDirty();
+        renderAll();
+      }
+    });
+    el.addEventListener("input", (e) => {
+      if (e.target.dataset.x !== "zoom") return;
+      draft.fit = { ...FIT_DEFAULT, ...(draft.fit || {}), zoom: Number(e.target.value) };
+      $("[data-zoom-label]", el).textContent = `${draft.fit.zoom}%`;
+      const img = $("[data-pic] img", el);
+      if (img) img.style.cssText = fitCss(draft);
+    });
+
+    el.addEventListener("pointerdown", (e) => {
+      const canvas = e.target.closest("[data-canvas]");
+      if (!canvas || busy || e.button > 0) return;
+      e.preventDefault();
+      const r = canvas.getBoundingClientRect();
+      if (mode === "draw") {
+        // Freehand, like a lasso: every point of the line, closed when let go.
+        const line = $("[data-line]", el);
+        const points = [];
+        const add = (ev) => {
+          points.push([clamp(((ev.clientX - r.left) / r.width) * 100, 0, 100), clamp(((ev.clientY - r.top) / r.height) * 100, 0, 100)]);
+          line.setAttribute("points", points.map((pt) => pt.join(",")).join(" "));
+        };
+        add(e);
+        track(add, () => {
+          const xs = points.map((pt) => pt[0]);
+          const ys = points.map((pt) => pt[1]);
+          const [bx, by] = [Math.min(...xs), Math.min(...ys)];
+          const [bw, bh] = [Math.max(...xs) - bx, Math.max(...ys) - by];
+          const shape = bw >= MIN_SIZE && bh >= MIN_SIZE ? simplifyStroke(points.map(([x, y]) => [((x - bx) / bw) * 100, ((y - by) / bh) * 100])) : [];
+          if (shape.length < 3) {
+            problem = "Draw a bigger area — hold down and go all the way around it.";
+            return render();
+          }
+          problem = "";
+          Object.assign(draft, { x: round(bx), y: round(by), w: round(bw), h: round(bh), shape });
+          mode = draft.value ? "move" : "draw";
+          render();
+          if (!draft.value) pick(); // area marked: now the picture
+        });
+        return;
+      }
+      // Move: drag the picture inside its area.
+      if (!draft.value) return;
+      const orig = { ...FIT_DEFAULT, ...(draft.fit || {}) };
+      const areaW = (r.width * draft.w) / 100;
+      const areaH = (r.height * draft.h) / 100;
+      const img = $("[data-pic] img", el);
       track(
         (ev) => {
-          moved = true;
           const k = 100 / (orig.zoom / 100);
-          h.fit = {
+          draft.fit = {
             ...orig,
-            x: round(clamp(orig.x - ((ev.clientX - e.clientX) / r.width) * k, 0, 100)),
-            y: round(clamp(orig.y - ((ev.clientY - e.clientY) / r.height) * k, 0, 100)),
+            x: round(clamp(orig.x - ((ev.clientX - e.clientX) / areaW) * k, 0, 100)),
+            y: round(clamp(orig.y - ((ev.clientY - e.clientY) / areaH) * k, 0, 100)),
           };
-          if (img) img.style.cssText = fitCss(h);
+          if (img) img.style.cssText = fitCss(draft);
         },
-        () => {
-          if (moved) changed();
-        },
+        () => {},
       );
-    },
-    true,
-  );
+    });
+
+    render();
+  }
 
   // --- Draw a picture's shape by hand ------------------------------------------
   function startDrawing(id) {
@@ -1225,7 +1290,7 @@ export function initHotspotEditor(editor, options) {
     $("[data-menu-action]", menu)?.focus({ preventScroll: true });
   }
   stage.addEventListener("click", (e) => {
-    if (!state.imageUrl || marking || e.target.closest("[data-spot], [data-spot-menu], [data-mark-layer]") || Date.now() - drewAt < 500) return;
+    if (!state.imageUrl || e.target.closest("[data-spot], [data-spot-menu]") || Date.now() - drewAt < 500) return;
     const p = toStage(e);
     if (state.selected) select(null);
     openMenu(clamp(p.x, 0, 100), clamp(p.y, 0, 100));
@@ -1237,7 +1302,6 @@ export function initHotspotEditor(editor, options) {
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") closeMenu();
     if (e.key === "Escape" && drawingFor) stopDrawing();
-    if (e.key === "Escape" && marking) stopMarking();
     if (e.key === "Escape" && adjustFor) {
       adjustFor = null;
       renderStage();
