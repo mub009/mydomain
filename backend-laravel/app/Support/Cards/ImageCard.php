@@ -43,7 +43,10 @@ class ImageCard
         'whatsapp' => ['label' => 'WhatsApp', 'icon' => 'message-square', 'kind' => 'action', 'value' => 'phone'],
         'email' => ['label' => 'Email', 'icon' => 'mail', 'kind' => 'action', 'value' => 'email'],
         'website' => ['label' => 'Website', 'icon' => 'globe', 'kind' => 'action', 'value' => 'url'],
-        'directions' => ['label' => 'Directions', 'icon' => 'navigation', 'kind' => 'action', 'value' => 'place'],
+        // "Location": opens the business on Google Maps (key kept as "directions" for saved cards).
+        'directions' => ['label' => 'Location', 'icon' => 'map-pin', 'kind' => 'action', 'value' => 'place'],
+        // Opens Google's "write a review" page for the business (Reviews & QR), or a link typed on the card.
+        'google_review' => ['label' => 'Review us on Google', 'icon' => 'star', 'kind' => 'action', 'value' => 'url'],
         'instagram' => ['label' => 'Instagram', 'icon' => 'instagram', 'kind' => 'action', 'value' => 'url'],
         'facebook' => ['label' => 'Facebook', 'icon' => 'facebook', 'kind' => 'action', 'value' => 'url'],
         'youtube' => ['label' => 'YouTube', 'icon' => 'youtube', 'kind' => 'action', 'value' => 'url'],
@@ -244,6 +247,7 @@ class ImageCard
                 ? (CardEngine::safeUrl($value) ?? (preg_match('/^@?[A-Za-z0-9._]{1,30}$/', $value) ? 'https://instagram.com/'.ltrim($value, '@') : null))
                 : ($details['social']['instagram'] ?? null),
             'facebook', 'youtube' => $value !== null ? CardEngine::safeUrl($value) : ($details['social'][$spot['action']] ?? null),
+            'google_review' => $value !== null ? CardEngine::safeUrl($value) : ($details['googleReviewHref'] ?? null),
             'save_contact' => $details['vcfUrl'] ?? '#',
             'share' => '#',
             default => null,
@@ -299,6 +303,7 @@ class ImageCard
             'instagram' => $details['social']['instagram'] ?? null,
             'facebook' => $details['social']['facebook'] ?? null,
             'youtube' => $details['social']['youtube'] ?? null,
+            'google_review' => $details['googleReviewHref'] ?? null,
         ];
     }
 
@@ -322,6 +327,7 @@ class ImageCard
         'instagram' => ['Instagram', 'Reviews & QR'],
         'facebook' => ['Facebook page', 'Reviews & QR'],
         'youtube' => ['YouTube channel', 'Reviews & QR'],
+        'google_review' => ['Google review link', 'Reviews & QR'],
     ];
 
     /**
@@ -356,6 +362,7 @@ class ImageCard
         'instagram' => "the business's Instagram",
         'facebook' => "the business's Facebook page",
         'youtube' => "the business's YouTube channel",
+        'google_review' => "the business's Google review link",
         'name' => "the business's name",
         'tagline' => "the business's category and city",
         'phone_text' => "the business's phone",

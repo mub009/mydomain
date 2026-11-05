@@ -35,7 +35,8 @@
     $actions = array_values(array_filter([
         $b['phoneHref'] ? ['Call', 'phone', $b['phoneHref'], $c['primary']] : null,
         $b['whatsappHref'] ? ['WhatsApp', 'message-square', $b['whatsappHref'], $c['accent']] : null,
-        $b['mapsHref'] ? ['Directions', 'navigation', $b['mapsHref'], $c['primary']] : null,
+        $b['mapsHref'] ? ['Location', 'map-pin', $b['mapsHref'], $c['primary']] : null,
+        ($b['googleReviewHref'] ?? null) && $b['googleReviewHref'] !== '#' ? ['Review us', 'star', $b['googleReviewHref'], $c['accent']] : null,
         $b['email'] ? ['Email', 'mail', 'mailto:'.$b['email'], $c['primary']] : ($b['website'] ? ['Website', 'globe', $b['website'], $c['primary']] : null),
     ]));
     $info = array_values(array_filter([

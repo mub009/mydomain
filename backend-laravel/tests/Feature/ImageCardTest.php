@@ -455,4 +455,42 @@ class ImageCardTest extends TestCase
         $this->save([$this->spot('logo', $logo + ['radius' => 80])])->assertStatus(400);
         $this->save([$this->spot('call', ['radius' => 20])])->assertOk()->assertJsonPath('data.hotspots.0.radius', null);
     }
+
+    public function test_review_us_on_google_and_location_actions(): void
+    {
+        $this->save([
+            $this->spot('google_review', ['style' => 'button']),
+            ['id' => 'h-loc', 'action' => 'directions', 'x' => 50, 'y' => 70, 'w' => 30, 'h' => 8, 'style' => 'button'],
+        ])->assertOk();
+        $this->postJson("/api/v1/businesses/{$this->business->id}/card/publish", [], $this->auth)->assertOk();
+
+        // No review link on the listing yet: the box is left off, and the editor says where to add it.
+        $html = $this->get('/card/spice-garden')->getContent();
+        $this->assertStringNotContainsString('writereview', $html);
+        $this->assertStringContainsString('<span>Location</span>', $html);
+        $this->assertStringContainsString('query=9.9,76.2', $html);
+        $this->getJson("/api/v1/businesses/{$this->business->id}/card", $this->auth)
+            ->assertJsonFragment(['label' => 'Google review link', 'section' => 'Reviews & QR']);
+
+        // With a Google Place ID, it opens Google's "write a review" page.
+        $this->business->update(['googlePlaceId' => 'ChIJ123abc']);
+        $html = $this->get('/card/spice-garden')->getContent();
+        $this->assertStringContainsString('href="https://search.google.com/local/writereview?placeid=ChIJ123abc"', $html);
+        $this->assertStringContainsString('<span>Review us on Google</span>', $html);
+
+        // A link typed on the card wins; it must be a web address.
+        $this->save([$this->spot('google_review', ['value' => 'https://g.page/r/spice/review'])])->assertOk();
+        $this->assertStringContainsString('href="https://g.page/r/spice/review"', $this->get('/card/spice-garden')->getContent());
+        $this->save([$this->spot('google_review', ['value' => 'javascript:alert(1)'])])->assertStatus(400);
+    }
+
+    public function test_layout_cards_show_location_and_review_buttons(): void
+    {
+        $this->business->update(['googleReviewUrl' => 'https://g.page/r/spice/review']);
+        $details = \App\Support\Cards\CardEngine::details($this->business->fresh());
+        $html = \App\Support\Cards\CardEngine::render(null, $details);
+        $this->assertStringContainsString('<span>Location</span>', $html);
+        $this->assertStringContainsString('href="https://g.page/r/spice/review"', $html);
+        $this->assertStringContainsString('<span>Review us</span>', $html);
+    }
 }

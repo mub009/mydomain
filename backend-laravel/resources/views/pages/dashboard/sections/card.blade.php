@@ -1,5 +1,5 @@
 {{-- The business's digital visiting card: upload its own card artwork (a
-     JPG), drag actions — Call, WhatsApp, Directions, … — onto it, publish
+     JPG), drag actions — Call, WhatsApp, Location, Review us on Google, … — onto it, publish
      it, and hand out its link and QR code. Driven by
      resources/js/pages/card-manager.js; the actions are stored as
      percent-of-image rectangles (App\Support\Cards\ImageCard). --}}

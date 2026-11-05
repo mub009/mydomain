@@ -7,7 +7,10 @@
     <a class="btn alt" href="{{ $b['whatsappHref'] }}" target="_blank" rel="noopener"><x-icon name="message-square" :size="17" /> <span>WhatsApp</span></a>
   @endif
   @if ($b['mapsHref'])
-    <a class="btn" href="{{ $b['mapsHref'] }}" target="_blank" rel="noopener"><x-icon name="navigation" :size="17" /> <span>Directions</span></a>
+    <a class="btn" href="{{ $b['mapsHref'] }}" target="_blank" rel="noopener"><x-icon name="map-pin" :size="17" /> <span>Location</span></a>
+  @endif
+  @if ($b['googleReviewHref'] ?? null)
+    <a class="btn alt" href="{{ $b['googleReviewHref'] }}" target="_blank" rel="noopener"><x-icon name="star" :size="17" /> <span>Review us</span></a>
   @endif
   @if ($b['email'])
     <a class="btn" href="mailto:{{ $b['email'] }}"><x-icon name="mail" :size="17" /> <span>Email</span></a>

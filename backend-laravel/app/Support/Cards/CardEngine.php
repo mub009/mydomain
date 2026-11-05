@@ -6,6 +6,7 @@ use App\Models\Business;
 use App\Models\BusinessCard;
 use App\Models\Category;
 use App\Models\CardTemplate;
+use App\Support\ReviewChannels;
 use App\Support\SiteBuilder\Helpers;
 use Illuminate\Support\Collection;
 
@@ -280,6 +281,8 @@ class CardEngine
             'mapsHref' => $business->latitude !== null && $business->longitude !== null
                 ? "https://www.google.com/maps/search/?api=1&query={$business->latitude},{$business->longitude}"
                 : ($address ? 'https://www.google.com/maps/search/?api=1&query='.rawurlencode($address) : null),
+            // Google's "write a review" page for the business (set in Reviews & QR).
+            'googleReviewHref' => self::safeUrl(ReviewChannels::google($business)),
             'hours' => $business->relationLoaded('hours') && $business->hours->isNotEmpty() ? (Helpers::summariseHours($business->hours) ?: null) : null,
             'social' => array_filter([
                 'instagram' => $instagram ? "https://instagram.com/{$instagram}" : null,
@@ -314,6 +317,7 @@ class CardEngine
             'website' => 'https://example.com',
             'address' => '12 Main Road, Your City, State',
             'mapsHref' => '#',
+            'googleReviewHref' => '#',
             'hours' => 'Mon–Sat · 9:00 AM – 9:00 PM',
             'social' => ['instagram' => '#', 'facebook' => '#', 'youtube' => '#'],
             'cardUrl' => '#',
