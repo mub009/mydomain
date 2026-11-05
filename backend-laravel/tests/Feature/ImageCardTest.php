@@ -399,7 +399,7 @@ class ImageCardTest extends TestCase
         $this->getJson("/api/v1/businesses/{$this->business->id}/card", $this->auth)
             ->assertJsonPath('data.listingDefaults.name', 'Spice Garden')
             ->assertJsonPath('data.listingDefaults.address', '1 Main St, Kochi, KL')
-            ->assertJsonPath('data.actions.11.kind', 'text');
+            ->assertJsonPath('data.actions.12.kind', 'text');
 
         $this->postJson("/api/v1/businesses/{$this->business->id}/card/publish", [], $this->auth)->assertOk();
         $html = $this->get('/card/spice-garden')->assertOk()->getContent();
