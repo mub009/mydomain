@@ -40,9 +40,13 @@ if (root && card) {
         imageHeight: card.imageHeight,
         hotspots: card.hotspots,
         canReplaceImage: false,
-        canDelete: false,
-        canMove: false,
-        freeImageEditor: !!card.imageAreaTools, // dealers: a free image is just placed and resized
+        // Admins arrange the card freely (move, resize, remove) in a full-screen workspace;
+        // dealers fill in what the design has, and just place and resize a free image.
+        canDelete: !!card.imageAreaTools,
+        canMove: !!card.imageAreaTools,
+        freeImageEditor: !!card.imageAreaTools,
+        fullScreen: !!card.imageAreaTools,
+        onSave: () => save({ reload: false }),
         onChange: () => {
           saveBtn.disabled = false;
           dirtyNote.classList.remove("hidden");

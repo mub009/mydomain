@@ -137,7 +137,8 @@
         </p>
       @endif
 
-      <x-hotspot-editor subject="your card" :replaceable="false" :palette="false" :movable="false" />
+      {{-- Admins arrange the card freely (and get the full-screen editor); dealers fill in what the design has. --}}
+      <x-hotspot-editor subject="your card" :replaceable="false" :palette="false" :movable="$card['imageAreaTools'] ?? false" />
 
     </div>
     @endunless

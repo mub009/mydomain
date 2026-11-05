@@ -148,7 +148,14 @@ export function initHotspotEditor(editor, options) {
     canDelete = true, // false: placed actions and details can't be removed (a business's card)
     canMove = true, // false: placed boxes keep their position and size (a business's card)
     freeImageEditor = true, // false: a free image is just uploaded, dragged and resized — no area drawing (a dealer)
+    fullScreen = false, // true: a "Full screen editor" button opens the whole editor as a workspace (admins)
+    onSave = null, // the workspace's Save button: saves the card or template the editor belongs to
   } = options;
+  // Errors go to the page — and into the full-screen workspace when it's open (it covers the page).
+  const reportError = (err) => {
+    onError(err);
+    workspace?.showError(err);
+  };
   const actionList = options.actions;
   const fonts = options.fonts || [];
   const actions = Object.fromEntries(actionList.map((a) => [a.key, a]));
@@ -159,9 +166,22 @@ export function initHotspotEditor(editor, options) {
   const dropzone = $("[data-dropzone]", editor);
   const uploading = $("[data-uploading]", editor);
   const imageTools = $("[data-image-tools]", editor);
-  const palette = $("[data-palette]", editor);
   const inspector = $("[data-inspector]", editor);
+  let palette = $("[data-palette]", editor);
+  // The full-screen workspace shows the palette on the left, even where the
+  // page itself has none (a business's card, where boxes are added by clicking).
+  let paletteBox = palette?.parentElement || null;
+  if (!palette && fullScreen) {
+    paletteBox = document.createElement("div");
+    paletteBox.className = "hidden";
+    paletteBox.dataset.workspaceOnly = "";
+    paletteBox.innerHTML = `<p class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-ink-500">Drag onto the card</p><div class="flex flex-wrap gap-1.5" data-palette></div>
+      <p class="mt-1.5 text-[11px] text-ink-400">Or click right on the card to add one at that spot.</p>`;
+    inspector.parentElement.prepend(paletteBox);
+    palette = $("[data-palette]", paletteBox);
+  }
   const list = $("[data-spot-list]", editor);
+  const spotCount = $("[data-spot-count]", editor); // found once: the full-screen workspace moves it out of the editor
   stage.style.containerType = "inline-size"; // font sizes scale with the card, as on the public page
 
   const state = {
@@ -181,6 +201,7 @@ export function initHotspotEditor(editor, options) {
   function markDirty() {
     dirty = true;
     onChange();
+    workspace?.markDirty();
   }
 
   const newId = () => `h${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
@@ -738,7 +759,7 @@ export function initHotspotEditor(editor, options) {
   }
 
   function renderList() {
-    $("[data-spot-count]", editor).textContent = state.hotspots.length ? `(${state.hotspots.length})` : "";
+    if (spotCount) spotCount.textContent = state.hotspots.length ? `(${state.hotspots.length})` : "";
     list.innerHTML = state.hotspots.length
       ? state.hotspots
           .map((h) => {
@@ -817,7 +838,7 @@ export function initHotspotEditor(editor, options) {
 
   // A new action centred on (cx, cy) in percent, sized to suit a phone-card button.
   function addSpot(action, cx = 50, cy = 50) {
-    if (state.hotspots.length >= MAX_SPOTS) return onError(`A card can have up to ${MAX_SPOTS} items.`);
+    if (state.hotspots.length >= MAX_SPOTS) return reportError(`A card can have up to ${MAX_SPOTS} items.`);
     if (action === "custom_image" && freeImageEditor) return startMarking(null); // first the area, then the picture
     const rect = stage.getBoundingClientRect();
     const kind = actions[action]?.kind || "action";
@@ -901,8 +922,8 @@ export function initHotspotEditor(editor, options) {
 
   async function useLogo(id, file) {
     if (!file || !spotById(id)) return;
-    if (!/^image\/(jpeg|png|webp)$/.test(file.type)) return onError("Choose a JPG, PNG or WebP image.");
-    onError("");
+    if (!/^image\/(jpeg|png|webp)$/.test(file.type)) return reportError("Choose a JPG, PNG or WebP image.");
+    reportError("");
     uploading.classList.replace("hidden", "flex");
     try {
       // A free image goes up as a plain picture (no logo clean-up) and its box takes the picture's own shape.
@@ -934,7 +955,7 @@ export function initHotspotEditor(editor, options) {
       markDirty();
       renderAll();
     } catch (err) {
-      onError(err);
+      reportError(err);
     } finally {
       uploading.classList.replace("flex", "hidden");
     }
@@ -973,7 +994,7 @@ export function initHotspotEditor(editor, options) {
       (ev) => {
         if (!ghost && Math.hypot(ev.clientX - startX, ev.clientY - startY) > 5) {
           ghost = chip.cloneNode(true);
-          ghost.className += " pointer-events-none fixed z-50 -translate-x-1/2 -translate-y-1/2 shadow-lg ring-2 ring-brand-500";
+          ghost.className += " pointer-events-none fixed z-[1100] -translate-x-1/2 -translate-y-1/2 shadow-lg ring-2 ring-brand-500";
           document.body.appendChild(ghost);
         }
         if (ghost) {
@@ -1346,7 +1367,7 @@ export function initHotspotEditor(editor, options) {
         let target = spotById(forId);
         if (target) Object.assign(target, values);
         else {
-          if (state.hotspots.length >= MAX_SPOTS) return onError(`A card can have up to ${MAX_SPOTS} items.`);
+          if (state.hotspots.length >= MAX_SPOTS) return reportError(`A card can have up to ${MAX_SPOTS} items.`);
           target = { id: newId(), action: "custom_image", label: null, style: null, ...values };
           state.hotspots.push(target);
         }
@@ -1747,8 +1768,8 @@ export function initHotspotEditor(editor, options) {
     if (!file) return;
     // Where the image can't be replaced, a file dropped on it is ignored.
     if (state.imageUrl && !canReplaceImage) return;
-    if (!/^image\/(jpeg|png|webp)$/.test(file.type)) return onError("Choose a JPG, PNG or WebP image.");
-    onError("");
+    if (!/^image\/(jpeg|png|webp)$/.test(file.type)) return reportError("Choose a JPG, PNG or WebP image.");
+    reportError("");
     uploading.classList.replace("hidden", "flex");
     try {
       const url = await uploadImage(file, "card-images");
@@ -1757,7 +1778,7 @@ export function initHotspotEditor(editor, options) {
       markDirty();
       renderAll();
     } catch (err) {
-      onError(err);
+      reportError(err);
     } finally {
       uploading.classList.replace("flex", "hidden");
     }
@@ -1793,6 +1814,148 @@ export function initHotspotEditor(editor, options) {
     renderAll();
   });
 
+  // --- Full-screen workspace (admins) --------------------------------------------
+  // The whole editor over the screen, laid out like Photoshop: the things to
+  // add on the left (actions, business details, logo, QR code, images), the
+  // card in the middle — zoomable, scrolls when zoomed — and the selected
+  // item's settings with the list of everything on the card on the right.
+  // The same editor parts are moved in and put back on exit, so nothing is lost.
+  let workspace = null;
+  function openWorkspace() {
+    if (workspace || !state.imageUrl) return;
+    closeMenu();
+    const stageBox = stage.parentElement;
+    const listBox = list.parentElement;
+    const moved = [paletteBox, stageBox, inspector, listBox].filter(Boolean).map((node) => ({ node, parent: node.parentElement, next: node.nextSibling }));
+    const el = document.createElement("div");
+    el.className = "fixed inset-0 z-[900] flex flex-col bg-gray-100 text-ink-900";
+    el.setAttribute("role", "dialog");
+    el.setAttribute("aria-modal", "true");
+    el.setAttribute("aria-label", "Card editor");
+    const btn = "rounded-md border border-gray-300 bg-white px-2 py-1 text-xs font-semibold text-ink-700 hover:bg-gray-50";
+    el.innerHTML = `
+      <div class="flex flex-wrap items-center gap-3 border-b border-gray-200 bg-white px-4 py-2.5 shadow-sm">
+        <p class="flex items-center gap-1.5 font-bold">${icon("layout-template", { size: 16, className: "text-brand-600" })} Card editor</p>
+        <span class="hidden text-xs text-ink-500 md:inline">Drag items from the left onto the card · click a box to edit it · Ctrl + wheel to zoom</span>
+        <span class="ml-auto flex items-center gap-1" role="group" aria-label="View zoom">
+          <button type="button" data-ws="out" class="${btn}" title="Zoom out (−)">−</button>
+          <span data-ws-zoom class="w-12 text-center text-xs font-semibold">100%</span>
+          <button type="button" data-ws="in" class="${btn}" title="Zoom in (+)">+</button>
+          <button type="button" data-ws="fit" class="${btn}" title="Fit the card to the screen">Fit</button>
+        </span>
+        <span data-ws-error class="hidden max-w-xs text-xs font-semibold text-red-700" role="alert"></span>
+        <span data-ws-dirty class="hidden text-xs font-semibold text-amber-700">Unsaved changes</span>
+        ${onSave ? `<button type="button" data-ws="save" class="btn-primary px-4 py-2 text-sm">${icon("save", { size: 15 })} Save</button>` : ""}
+        <button type="button" data-ws="close" class="btn-secondary px-4 py-2 text-sm">${icon("x", { size: 15 })} Close</button>
+      </div>
+      <div class="flex min-h-0 flex-1">
+        <aside data-ws-left class="w-64 shrink-0 overflow-y-auto border-r border-gray-200 bg-white p-3"></aside>
+        <main data-ws-centre class="flex min-w-0 flex-1 overflow-auto p-6"></main>
+        <aside data-ws-right class="w-80 shrink-0 space-y-4 overflow-y-auto border-l border-gray-200 bg-white p-3"></aside>
+      </div>`;
+    document.body.appendChild(el);
+    const left = $("[data-ws-left]", el);
+    const centre = $("[data-ws-centre]", el);
+    const right = $("[data-ws-right]", el);
+    if (paletteBox) {
+      left.append(paletteBox);
+      paletteBox.classList.remove("hidden");
+    }
+    centre.append(stageBox);
+    right.append(inspector, listBox);
+    stageBox.classList.add("m-auto", "shrink-0");
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    let view = 1;
+    const ratio = state.imageWidth && state.imageHeight ? state.imageWidth / state.imageHeight : 0.6;
+    const fitWidth = () => {
+      const r = centre.getBoundingClientRect();
+      return Math.max(200, Math.min(r.width - 48, (r.height - 48) * ratio));
+    };
+    function setView(z, anchor) {
+      const old = stageBox.getBoundingClientRect();
+      const cr = centre.getBoundingClientRect();
+      const ax = anchor ? anchor.x : cr.left + cr.width / 2;
+      const ay = anchor ? anchor.y : cr.top + cr.height / 2;
+      const fx = old.width ? (ax - old.left) / old.width : 0.5;
+      const fy = old.height ? (ay - old.top) / old.height : 0.5;
+      view = clamp(Math.round(z * 100) / 100, 0.5, 6);
+      stageBox.style.maxWidth = "none";
+      stageBox.style.width = `${fitWidth() * view}px`;
+      const nr = stageBox.getBoundingClientRect();
+      centre.scrollLeft += nr.left + fx * nr.width - ax;
+      centre.scrollTop += nr.top + fy * nr.height - ay;
+      $("[data-ws-zoom]", el).textContent = `${Math.round(view * 100)}%`;
+    }
+    const onResize = () => setView(view);
+    window.addEventListener("resize", onResize);
+    centre.addEventListener(
+      "wheel",
+      (e) => {
+        if (!e.ctrlKey && !e.metaKey) return;
+        e.preventDefault();
+        setView(view * (e.deltaY < 0 ? 1.15 : 1 / 1.15), { x: e.clientX, y: e.clientY });
+      },
+      { passive: false },
+    );
+    const onKey = (e) => {
+      if (e.target.closest?.("input, textarea, select, [contenteditable]")) return;
+      if (document.querySelector('[aria-label="Image editor"]')) return; // the image editor on top handles its own keys
+      if (e.key === "Escape" && !menu) close();
+      else if (e.key === "+" || e.key === "=") setView(view * 1.25);
+      else if (e.key === "-") setView(view / 1.25);
+    };
+    document.addEventListener("keydown", onKey, true); // before the add-menu's own Esc, so Esc closes that first
+
+    function close() {
+      for (const { node, parent, next } of moved) parent.insertBefore(node, next);
+      if (paletteBox?.dataset.workspaceOnly !== undefined) paletteBox.classList.add("hidden");
+      stageBox.classList.remove("m-auto", "shrink-0");
+      stageBox.style.maxWidth = "";
+      stageBox.style.width = "";
+      el.remove();
+      workspace = null;
+      document.body.style.overflow = prevOverflow;
+      document.removeEventListener("keydown", onKey, true);
+      window.removeEventListener("resize", onResize);
+    }
+    el.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-ws]");
+      if (!b) return;
+      const x = b.dataset.ws;
+      if (x === "close") close();
+      else if (x === "in") setView(view * 1.25);
+      else if (x === "out") setView(view / 1.25);
+      else if (x === "fit") setView(1);
+      else if (x === "save") {
+        showError("");
+        Promise.resolve(onSave?.()).then((ok) => {
+          if (ok === false) showError("Not saved — fix the highlighted item, or close the editor to see the message.");
+        });
+      }
+    });
+    function showError(err) {
+      const box = $("[data-ws-error]", el);
+      const msg = !err ? "" : typeof err === "string" ? err : err.message || "Something went wrong.";
+      box.textContent = msg;
+      box.classList.toggle("hidden", !msg);
+    }
+    workspace = { el, close, showError, markDirty: () => $("[data-ws-dirty]", el)?.classList.remove("hidden"), markClean: () => $("[data-ws-dirty]", el)?.classList.add("hidden") };
+    if (dirty) workspace.markDirty();
+    renderAll();
+    setView(1);
+  }
+  if (fullScreen) {
+    const open = document.createElement("button");
+    open.type = "button";
+    open.dataset.openWorkspace = "";
+    open.className = "btn-primary px-3 py-1.5 text-xs";
+    open.innerHTML = `${icon("maximize", { size: 13 })} Full screen editor`;
+    open.addEventListener("click", openWorkspace);
+    imageTools.append(open);
+  }
+
   // Open with a box already selected, so its settings show right away:
   // the first one that still needs details, else the first one.
   if (state.imageUrl && state.hotspots.length) {
@@ -1806,6 +1969,7 @@ export function initHotspotEditor(editor, options) {
     },
     markClean() {
       dirty = false;
+      workspace?.markClean();
     },
     // Before saving: a message (and the action selected) when something must be fixed first.
     check() {

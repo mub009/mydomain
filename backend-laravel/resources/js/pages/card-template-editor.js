@@ -32,6 +32,8 @@ const imageEditor = initHotspotEditor($("[data-hotspot-editor]"), {
   hotspots: templateData.hotspots,
   onChange: () => schedulePreview(),
   onError: fail,
+  fullScreen: true, // the whole editor as a Photoshop-like workspace
+  onSave: () => $("[data-save]")?.click(),
 });
 
 function values() {
