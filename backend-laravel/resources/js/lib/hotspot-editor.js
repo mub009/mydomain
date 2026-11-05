@@ -102,12 +102,28 @@ const SHAPES = {
   diamond: ["Diamond", [[50, 0], [100, 50], [50, 100], [0, 50]]],
   arch: ["Arch", [...around(24, (t) => [50 + 50 * Math.cos(Math.PI + t / 2), 50 + 50 * Math.sin(Math.PI + t / 2)]), [100, 50], [100, 100], [0, 100]]],
 };
-// How a free image sits inside its marked area: moved (x, y: 0–100, like
-// object-position) and zoomed (100–400%) — the same CSS the public card uses (ImageCard::pictureCss).
-const FIT_DEFAULT = { x: 50, y: 50, zoom: 100 };
+// Where a free image's picture sits inside its area, like a placed image in
+// Photoshop: its rectangle { l, t, w, h } in percent of the area. It keeps the
+// picture's proportions and always covers the whole area (no empty gaps), so
+// w, h >= 100 and the edges never come inside. null = centred, just covering.
+// The public card draws it with the same CSS (ImageCard::pictureCss).
+const FIT_MAX = 1000; // percent of the area: up to 10x
+const ZOOM_MAX = 400; // the zoom slider's top, relative to just covering
+function coverRect(imgW, imgH, areaW, areaH) {
+  const ia = imgW / imgH;
+  const aa = areaW / areaH;
+  return ia > aa ? { w: (100 * ia) / aa, h: 100 } : { w: 100, h: (100 * aa) / ia };
+}
+function clampFit(f) {
+  const w = clamp(f.w, 100, FIT_MAX);
+  const h = clamp(f.h, 100, FIT_MAX);
+  return { l: round(clamp(f.l, 100 - w, 0)), t: round(clamp(f.t, 100 - h, 0)), w: round(w), h: round(h) };
+}
 function fitCss(h) {
-  const f = { ...FIT_DEFAULT, ...(h.fit || {}) };
-  return `object-fit:cover;object-position:${f.x}% ${f.y}%;transform:scale(${f.zoom / 100});transform-origin:${f.x}% ${f.y}%`;
+  const f = h.fit;
+  return f?.w
+    ? `position:absolute;left:${f.l}%;top:${f.t}%;width:${f.w}%;height:${f.h}%;max-width:none;object-fit:cover`
+    : "position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover";
 }
 const clipPath = (shape) => `polygon(${shape.map(([x, y]) => `${x}% ${y}%`).join(",")})`;
 // A hand-drawn line, thinned: points closer than 1% to the last kept one are dropped, then at most MAX_SHAPE_POINTS remain.
@@ -174,6 +190,56 @@ export function initHotspotEditor(editor, options) {
   // Pictures the person uploads (the logo, a free image): they drag, resize and upload even where other boxes are fixed.
   const isPicture = (h) => h.action === "logo" || h.action === "custom_image";
 
+  // The picture's natural size, loaded once per picture (needed to keep its proportions when moved or zoomed).
+  const sizes = new Map();
+  function sizeOf(url) {
+    if (!url) return null;
+    if (!sizes.has(url)) {
+      sizes.set(url, null);
+      const img = new Image();
+      img.onload = () => sizes.set(url, { width: img.naturalWidth, height: img.naturalHeight });
+      img.src = url;
+    }
+    return sizes.get(url);
+  }
+  // The picture's rectangle in an area of areaW x areaH pixels; null until its size is known.
+  function pictureRect(fit, url, areaW, areaH) {
+    if (fit?.w) return fit;
+    const sz = sizeOf(url);
+    if (!sz?.width || !areaW || !areaH) return null;
+    const c = coverRect(sz.width, sz.height, areaW, areaH);
+    return { l: (100 - c.w) / 2, t: (100 - c.h) / 2, ...c };
+  }
+  function zoomOf(fit, url, areaW, areaH) {
+    const r = pictureRect(fit, url, areaW, areaH);
+    const sz = sizeOf(url);
+    if (!r || !sz?.width) return 100;
+    return Math.round((r.w / coverRect(sz.width, sz.height, areaW, areaH).w) * 100);
+  }
+  // Zoomed about the centre of what shows, still covering the area.
+  function zoomFit(fit, url, areaW, areaH, zoom) {
+    const r = pictureRect(fit, url, areaW, areaH);
+    const sz = sizeOf(url);
+    if (!r || !sz?.width) return fit;
+    const c = coverRect(sz.width, sz.height, areaW, areaH);
+    const ox = (50 - r.l) / r.w; // the point of the picture at the area's centre
+    const oy = (50 - r.t) / r.h;
+    const w = (c.w * zoom) / 100;
+    const hh = (c.h * zoom) / 100;
+    return clampFit({ l: 50 - ox * w, t: 50 - oy * hh, w, h: hh });
+  }
+  // Moved by (dx, dy) pixels: it follows the pointer exactly.
+  function panFit(fit, url, areaW, areaH, dx, dy) {
+    const r = pictureRect(fit, url, areaW, areaH);
+    if (!r) return fit;
+    return clampFit({ ...r, l: r.l + (dx / areaW) * 100, t: r.t + (dy / areaH) * 100 });
+  }
+  // A box's size on the card, in pixels.
+  function areaPx(h) {
+    const r = stage.getBoundingClientRect();
+    return [(r.width * h.w) / 100, (r.height * h.h) / 100];
+  }
+
   // What a box shows or where it leads: its own value, or the fallback; null = nothing yet.
   function targetOf(h) {
     if (kindOf(h) === "image") {
@@ -220,10 +286,11 @@ export function initHotspotEditor(editor, options) {
       const radius = isPicture(h) ? h.radius || 0 : 0;
       const shape = isPicture(h) && h.shape?.length >= 3 ? h.shape : null;
       const free = h.action === "custom_image" && (shape || h.fit);
+      if (h.action === "custom_image") sizeOf(h.value);
       // The shape clips a wrapper, so zooming the picture inside doesn't zoom its outline.
       const clip = shape ? `clip-path:${clipPath(shape)}` : "";
       inner = logo
-        ? `<span class="pointer-events-none block h-full w-full overflow-hidden" style="${clip}"><img src="${esc(logo)}" alt="" class="block h-full w-full ${radius || shape ? "object-cover" : "object-contain"}" style="${free ? fitCss(h) : shape ? "" : `border-radius:${radius}%`}" /></span>`
+        ? `<span class="pointer-events-none relative block h-full w-full overflow-hidden" style="${clip}"><img src="${esc(logo)}" alt="" class="block h-full w-full ${radius || shape ? "object-cover" : "object-contain"}" style="${free ? fitCss(h) : shape ? "" : `border-radius:${radius}%`}" /></span>`
         : `<span class="pointer-events-none flex h-full w-full flex-col items-center justify-center gap-0.5 bg-white/80 text-[10px] font-semibold text-ink-700" style="${clip}">${icon(actions[h.action].icon, { size: 22 })}${esc(h.action === "custom_image" ? "Upload a picture" : actions[h.action].label)}</span>`;
     } else {
       ensureFont(h.font);
@@ -415,8 +482,8 @@ export function initHotspotEditor(editor, options) {
                 ${
                   h.value
                     ? `<label class="block pt-1">
-                        <span class="mb-0.5 flex justify-between text-xs font-semibold text-ink-700">Zoom <span class="font-normal text-ink-500" data-fit-zoom-label>${(h.fit || FIT_DEFAULT).zoom}%</span></span>
-                        <input type="range" min="100" max="400" step="5" value="${(h.fit || FIT_DEFAULT).zoom}" class="w-full" data-field="fitZoom" aria-label="Zoom the picture" />
+                        <span class="mb-0.5 flex justify-between text-xs font-semibold text-ink-700">Zoom <span class="font-normal text-ink-500" data-fit-zoom-label>${zoomOf(h.fit, h.value, ...areaPx(h))}%</span></span>
+                        <input type="range" min="100" max="${ZOOM_MAX}" step="5" value="${zoomOf(h.fit, h.value, ...areaPx(h))}" class="w-full" data-field="fitZoom" aria-label="Zoom the picture" />
                         <span class="mt-0.5 flex justify-between text-[11px] text-ink-400"><span>Fits the area</span><button type="button" class="font-semibold text-ink-500 hover:underline" data-fit-reset>Reset</button><span>Bigger</span></span>
                       </label>`
                     : ""
@@ -621,8 +688,8 @@ export function initHotspotEditor(editor, options) {
       renderInspector();
     });
     $('[data-field="fitZoom"]', inspector)?.addEventListener("input", (e) => {
-      h.fit = { ...FIT_DEFAULT, ...(h.fit || {}), zoom: Number(e.target.value) };
-      $("[data-fit-zoom-label]", inspector).textContent = `${h.fit.zoom}%`;
+      h.fit = zoomFit(h.fit, h.value, ...areaPx(h), Number(e.target.value));
+      $("[data-fit-zoom-label]", inspector).textContent = `${e.target.value}%`;
       changed();
     });
     $("[data-fit-reset]", inspector)?.addEventListener("click", () => {
@@ -989,7 +1056,8 @@ export function initHotspotEditor(editor, options) {
       spot && (spot.shape || spot.value)
         ? (spot.shape || FULL_AREA).map(([px, py]) => [spot.x + (px * spot.w) / 100, spot.y + (py * spot.h) / 100])
         : null;
-    const draft = { value: spot?.value || null, fit: spot?.fit ? { ...spot.fit } : null };
+    const draft = { value: spot?.value || null, fit: spot?.fit?.w ? { ...spot.fit } : null };
+    sizeOf(draft.value);
     let mode = pts ? (draft.value ? "move" : "edit") : "draw";
     let pen = []; // the Pen tool's points so far, until the shape is closed
     let selectedPt = null;
@@ -1071,6 +1139,12 @@ export function initHotspotEditor(editor, options) {
       const y = Math.min(...ys);
       return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y };
     };
+    // The drawn area's size on screen, in pixels.
+    const draftAreaPx = () => {
+      const r = canvas.getBoundingClientRect();
+      const b = bounds();
+      return [(r.width * b.w) / 100 || 1, (r.height * b.h) / 100 || 1];
+    };
     const relShape = (b) => pts.map(([x, y]) => [Math.round(((x - b.x) / (b.w || 1)) * 1000) / 10, Math.round(((y - b.y) / (b.h || 1)) * 1000) / 10]);
     const tooSmall = (list) => {
       const xs = list.map((pt) => pt[0]);
@@ -1084,6 +1158,7 @@ export function initHotspotEditor(editor, options) {
       }
       problem = "";
       pts = list;
+      draft.fit = null;
       pen = [];
       selectedPt = null;
       mode = "edit"; // fix any point that's off, like with Photoshop's pen
@@ -1096,6 +1171,7 @@ export function initHotspotEditor(editor, options) {
         return render();
       }
       pts.splice(i, 1);
+      draft.fit = null;
       selectedPt = null;
       render();
     }
@@ -1131,7 +1207,7 @@ export function initHotspotEditor(editor, options) {
     }
 
     function renderFoot() {
-      const zoom = (draft.fit || FIT_DEFAULT).zoom;
+      const zoom = draft.value && pts ? zoomOf(draft.fit, draft.value, ...draftAreaPx()) : 100;
       foot.innerHTML = `
         <div class="flex flex-wrap items-center justify-center gap-2">
           <button type="button" data-x="draw" class="${tool(mode === "draw")}">${icon("pencil", { size: 14 })} Freehand</button>
@@ -1152,7 +1228,7 @@ export function initHotspotEditor(editor, options) {
                  ${selectedPt !== null ? `<button type="button" data-x="pt-delete" class="${small}">Delete point</button>` : ""}`
               : mode === "move" && draft.value
                 ? `<label class="flex items-center gap-2">Picture zoom
-                     <input type="range" min="100" max="400" step="5" value="${zoom}" data-x="zoom" class="w-36" aria-label="Zoom the picture" />
+                     <input type="range" min="100" max="${ZOOM_MAX}" step="5" value="${zoom}" data-x="zoom" class="w-36" aria-label="Zoom the picture" />
                      <span data-zoom-label class="w-10">${zoom}%</span>
                    </label>
                    <button type="button" data-x="reset" class="${small}">Reset</button>`
@@ -1214,6 +1290,7 @@ export function initHotspotEditor(editor, options) {
       render();
       try {
         draft.value = await uploadImage(file, "card-images");
+        sizeOf(draft.value);
         draft.fit = null; // a new picture starts centred in the area
         mode = "move";
       } catch (err) {
@@ -1282,8 +1359,8 @@ export function initHotspotEditor(editor, options) {
     });
     el.addEventListener("input", (e) => {
       if (e.target.dataset.x !== "zoom") return;
-      draft.fit = { ...FIT_DEFAULT, ...(draft.fit || {}), zoom: Number(e.target.value) };
-      $("[data-zoom-label]", el).textContent = `${draft.fit.zoom}%`;
+      draft.fit = zoomFit(draft.fit, draft.value, ...draftAreaPx(), Number(e.target.value));
+      $("[data-zoom-label]", el).textContent = `${e.target.value}%`;
       const img = $("[data-pic-img]", el);
       if (img) img.style.cssText = fitCss(draft);
     });
@@ -1359,6 +1436,7 @@ export function initHotspotEditor(editor, options) {
         track(
           (ev) => {
             pts[i] = toCanvas(ev);
+            draft.fit = null;
             renderOverlay();
           },
           () => renderHead(),
@@ -1366,20 +1444,12 @@ export function initHotspotEditor(editor, options) {
         return;
       }
       if (mode === "move" && draft.value && pts) {
-        const orig = { ...FIT_DEFAULT, ...(draft.fit || {}) };
-        const r = canvas.getBoundingClientRect();
-        const b = bounds();
-        const areaW = (r.width * b.w) / 100 || 1;
-        const areaH = (r.height * b.h) / 100 || 1;
+        const orig = draft.fit;
+        const [areaW, areaH] = draftAreaPx();
         const img = $("[data-pic-img]", el);
         track(
           (ev) => {
-            const k = 100 / (orig.zoom / 100);
-            draft.fit = {
-              ...orig,
-              x: round(clamp(orig.x - ((ev.clientX - e.clientX) / areaW) * k, 0, 100)),
-              y: round(clamp(orig.y - ((ev.clientY - e.clientY) / areaH) * k, 0, 100)),
-            };
+            draft.fit = panFit(orig, draft.value, areaW, areaH, ev.clientX - e.clientX, ev.clientY - e.clientY);
             if (img) img.style.cssText = fitCss(draft);
           },
           () => {},
@@ -1497,17 +1567,12 @@ export function initHotspotEditor(editor, options) {
       if (!h.value || !target) return;
       const img = $("img", target);
       const r = target.getBoundingClientRect();
-      const orig = { ...FIT_DEFAULT, ...(h.fit || {}) };
+      const orig = h.fit;
       let moved = false;
       track(
         (ev) => {
           moved = true;
-          const k = 100 / (orig.zoom / 100);
-          h.fit = {
-            ...orig,
-            x: round(clamp(orig.x - ((ev.clientX - e.clientX) / (r.width || 1)) * k, 0, 100)),
-            y: round(clamp(orig.y - ((ev.clientY - e.clientY) / (r.height || 1)) * k, 0, 100)),
-          };
+          h.fit = panFit(orig, h.value, r.width, r.height, ev.clientX - e.clientX, ev.clientY - e.clientY);
           if (img) img.style.cssText = fitCss(h);
         },
         () => {
@@ -1564,6 +1629,7 @@ export function initHotspotEditor(editor, options) {
         if (!moved) return;
         // Resized by hand: that's the logo slider's new 100%. Moved: the slider scales about the new centre.
         if (handle) logoBase.delete(h.id);
+        if (handle && h.action === "custom_image") h.fit = null; // a new box shape: the picture re-centres rather than stretch
         else moveLogoBase(h, h.x - orig.x, h.y - orig.y);
         changed({ inspector: isPicture(h) });
       },
@@ -1593,6 +1659,7 @@ export function initHotspotEditor(editor, options) {
     }
     state.selected = h.id;
     if (e.altKey) logoBase.delete(h.id);
+    if (e.altKey && h.action === "custom_image") h.fit = null;
     else moveLogoBase(h, h.x - was.x, h.y - was.y);
     changed({ inspector: isPicture(h) });
     $(`[data-spot="${CSS.escape(h.id)}"]`, spotsLayer)?.focus();
