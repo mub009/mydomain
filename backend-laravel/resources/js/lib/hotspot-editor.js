@@ -102,6 +102,13 @@ const SHAPES = {
   diamond: ["Diamond", [[50, 0], [100, 50], [50, 100], [0, 50]]],
   arch: ["Arch", [...around(24, (t) => [50 + 50 * Math.cos(Math.PI + t / 2), 50 + 50 * Math.sin(Math.PI + t / 2)]), [100, 50], [100, 100], [0, 100]]],
 };
+// How a free image sits inside its marked area: moved (x, y: 0–100, like
+// object-position) and zoomed (100–400%) — the same CSS the public card uses (ImageCard::pictureCss).
+const FIT_DEFAULT = { x: 50, y: 50, zoom: 100 };
+function fitCss(h) {
+  const f = { ...FIT_DEFAULT, ...(h.fit || {}) };
+  return `object-fit:cover;object-position:${f.x}% ${f.y}%;transform:scale(${f.zoom / 100});transform-origin:${f.x}% ${f.y}%`;
+}
 const clipPath = (shape) => `polygon(${shape.map(([x, y]) => `${x}% ${y}%`).join(",")})`;
 // A hand-drawn line, thinned: points closer than 1% to the last kept one are dropped, then at most MAX_SHAPE_POINTS remain.
 function simplifyStroke(points) {
@@ -151,6 +158,8 @@ export function initHotspotEditor(editor, options) {
   let removeLogoBg = false; // ticked: the server removes the background and redraws the logo with AI (LogoCleaner)
   let logoNote = "";
   let drawingFor = null;
+  let marking = null; // { forId, tool }: marking an area on the card for a free image (lasso / rectangle / ellipse)
+  let adjustFor = null; // the free image whose picture is being moved inside its area
   let drewAt = 0; // when a hand-drawn outline was finished: the click that ends it mustn't open the add menu // the picture box being outlined by hand ("Draw your own" shape)
 
   function markDirty() {
@@ -207,20 +216,23 @@ export function initHotspotEditor(editor, options) {
       const logo = /^https?:/.test(src) ? src : null;
       const radius = isPicture(h) ? h.radius || 0 : 0;
       const shape = isPicture(h) && h.shape?.length >= 3 ? h.shape : null;
+      const free = h.action === "custom_image" && (shape || h.fit);
+      // The shape clips a wrapper, so zooming the picture inside doesn't zoom its outline.
+      const clip = shape ? `clip-path:${clipPath(shape)}` : "";
       inner = logo
-        ? `<img src="${esc(logo)}" alt="" class="pointer-events-none h-full w-full ${radius || shape ? "object-cover" : "object-contain"}" style="${shape ? `clip-path:${clipPath(shape)}` : `border-radius:${radius}%`}" />`
-        : `<span class="pointer-events-none flex h-full w-full flex-col items-center justify-center gap-0.5 bg-white/80 text-[10px] font-semibold text-ink-700">${icon(actions[h.action].icon, { size: 22 })}${esc(actions[h.action].label)}</span>`;
+        ? `<span class="pointer-events-none block h-full w-full overflow-hidden" style="${clip}"><img src="${esc(logo)}" alt="" class="block h-full w-full ${radius || shape ? "object-cover" : "object-contain"}" style="${free ? fitCss(h) : shape ? "" : `border-radius:${radius}%`}" /></span>`
+        : `<span class="pointer-events-none flex h-full w-full flex-col items-center justify-center gap-0.5 bg-white/80 text-[10px] font-semibold text-ink-700" style="${clip}">${icon(actions[h.action].icon, { size: 22 })}${esc(h.action === "custom_image" ? "Upload a picture" : actions[h.action].label)}</span>`;
     } else {
       ensureFont(h.font);
       inner = `<span class="pointer-events-none line-clamp-6 whitespace-pre-line">${esc(shown || actions[h.action].label)}</span>`;
     }
     const align = { left: "justify-start text-left", center: "justify-center text-center", right: "justify-end text-right" }[h.align || "left"];
     return `<div data-spot="${esc(h.id)}" tabindex="0" role="button" aria-label="${esc(actions[h.action].label)} — drag to move"
-        class="absolute flex ${canDrag(h) ? "cursor-move" : "cursor-pointer"} touch-none items-center overflow-visible rounded ${kindOf(h) === "text" ? `${align} px-[0.15em] leading-tight text-white` : ""} ring-2 ${ring} focus:outline-none"
+        class="absolute flex ${adjustFor === h.id ? "cursor-grab ring-dashed" : canDrag(h) ? "cursor-move" : "cursor-pointer"} touch-none items-center overflow-visible rounded ${kindOf(h) === "text" ? `${align} px-[0.15em] leading-tight text-white` : ""} ring-2 ${ring} focus:outline-none"
         style="left:${h.x}%;top:${h.y}%;width:${h.w}%;height:${h.h}%;${kindOf(h) === "text" ? esc(textStyle(h)) : ""}">
         ${inner}
         ${!shown ? `<span class="pointer-events-none absolute -top-2.5 left-1 rounded bg-amber-500 px-1 text-[9px] text-white">${h.action === "logo" ? "upload a logo" : h.action === "custom_image" ? "upload a picture" : h.action === "custom_text" ? "type your text" : "not on your listing"}</span>` : ""}
-        ${selected && drawingFor !== h.id ? handlesHtml(h) : ""}
+        ${selected && drawingFor !== h.id && adjustFor !== h.id ? handlesHtml(h) : ""}
         ${
           drawingFor === h.id
             ? `<div data-draw-surface class="absolute inset-0 z-20 cursor-crosshair rounded bg-brand-500/10 ring-2 ring-dashed ring-brand-600">
@@ -309,6 +321,16 @@ export function initHotspotEditor(editor, options) {
   }
 
   function renderInspector() {
+    if (marking) {
+      inspector.innerHTML = `<div class="space-y-1.5 py-1 text-xs text-ink-600">
+          <p class="font-bold text-ink-900">Mark the image area</p>
+          <p>1. Pick <b>Freehand</b>, <b>Rectangle</b> or <b>Ellipse</b> at the top of the card.</p>
+          <p>2. Draw the area on the card — hold down and drag.</p>
+          <p>3. Choose the picture: it's placed inside that area.</p>
+          <p class="text-ink-400">Press Esc to cancel.</p>
+        </div>`;
+      return;
+    }
     const h = spotById(state.selected);
     if (!h) {
       inspector.innerHTML = `<p class="py-3 text-center text-xs text-ink-500">${
@@ -390,14 +412,30 @@ export function initHotspotEditor(editor, options) {
             ? `<p class="rounded-md bg-gray-50 px-2.5 py-2 text-[11px] text-ink-500">Each business's own logo shows here.</p>`
             : h.action === "custom_image"
             ? `<div class="space-y-2 rounded-lg bg-gray-50 p-2.5">
-                <p class="text-xs font-semibold text-ink-700">Picture</p>
+                <p class="text-xs font-semibold text-ink-700">Image area</p>
                 <p class="text-[11px] ${h.value ? "text-ink-500" : "text-amber-700"}">${esc(
-                  h.value ? "Any photo or graphic, in its own shape. Drag it anywhere and pull its corners to resize it freely." : "No picture yet — upload one, or drop a picture on the box.",
+                  h.value ? "Your picture fills the area you marked. Drag the area to move it, pull its corners to resize it." : "Area marked — now upload the picture to place in it.",
                 )}</p>
                 <div class="flex flex-wrap items-center gap-2">
-                  <button type="button" class="btn-secondary px-3 py-1.5 text-xs" data-logo-upload>${icon("upload", { size: 13 })} ${h.value ? "Replace image" : "Upload image"}</button>
-                  ${h.value ? `<button type="button" class="text-[11px] font-semibold text-ink-500 hover:underline" data-fit-picture>Fit box to picture</button>` : ""}
+                  <button type="button" class="btn-primary px-3 py-1.5 text-xs" data-logo-upload>${icon("upload", { size: 13 })} ${h.value ? "Replace image" : "Upload image"}</button>
+                  <button type="button" class="btn-secondary px-3 py-1.5 text-xs" data-remark>${icon("pencil", { size: 13 })} Mark a new area</button>
                 </div>
+                ${
+                  h.value
+                    ? `<div class="space-y-1.5 border-t border-gray-200 pt-2">
+                        <p class="text-xs font-semibold text-ink-700">Picture inside the area</p>
+                        <button type="button" data-adjust aria-pressed="${adjustFor === h.id}" class="flex w-full items-center justify-center gap-1.5 rounded-lg border px-2 py-1.5 text-xs font-semibold ${
+                          adjustFor === h.id ? "border-brand-500 bg-brand-50 text-brand-800" : "border-gray-300 bg-white text-ink-700 hover:bg-gray-50"
+                        }">${icon("move", { size: 13 })} ${adjustFor === h.id ? "Done moving the picture" : "Move the picture inside the area"}</button>
+                        ${adjustFor === h.id ? `<p class="text-[11px] text-brand-800">Drag the picture on the card to choose which part shows.</p>` : ""}
+                        <label class="block">
+                          <span class="mb-0.5 flex justify-between text-[11px] text-ink-600">Zoom <span data-fit-zoom-label>${(h.fit || FIT_DEFAULT).zoom}%</span></span>
+                          <input type="range" min="100" max="400" step="5" value="${(h.fit || FIT_DEFAULT).zoom}" class="w-full" data-field="fitZoom" aria-label="Zoom the picture" />
+                        </label>
+                        <button type="button" class="text-[11px] font-semibold text-ink-500 hover:underline" data-fit-reset>Reset position &amp; zoom</button>
+                      </div>`
+                    : ""
+                }
                 <p class="text-[11px] text-ink-400">JPG, PNG or WebP. A PNG with a see-through background stays see-through.</p>
               </div>`
             : h.action === "logo"
@@ -440,7 +478,7 @@ export function initHotspotEditor(editor, options) {
                 <input type="range" min="${LOGO_SCALE_MIN * 100}" max="${LOGO_SCALE_MAX * 100}" step="5" value="${Math.round(logoScale(h) * 100)}" class="w-full" data-field="logoSize" aria-label="Logo size" />
                 <span class="mt-0.5 flex justify-between text-[11px] text-ink-400"><span>Smaller</span><button type="button" class="font-semibold text-ink-500 hover:underline" data-logo-size-reset>Reset</button><span>Bigger</span></span>
               </label>
-              <div class="space-y-1.5" data-shape-panel>
+              ${h.action !== "logo" ? "" : `<div class="space-y-1.5" data-shape-panel>
                 <span class="flex justify-between text-xs font-semibold text-ink-700">Shape <span class="font-normal text-ink-500">${h.shape ? "Your own shape" : h.radius ? "Rounded" : "None"}</span></span>
                 ${
                   drawingFor === h.id
@@ -473,7 +511,7 @@ export function initHotspotEditor(editor, options) {
                   <button type="button" class="hover:underline" data-logo-radius="15">Rounded</button>
                   <button type="button" class="hover:underline" data-logo-radius="50">Circle</button>
                 </span>
-              </label>`
+              </label>`}`
             : ""
         }
         ${
@@ -567,6 +605,21 @@ export function initHotspotEditor(editor, options) {
       }),
     );
     $("[data-shape-draw]", inspector)?.addEventListener("click", () => startDrawing(h.id));
+    $("[data-remark]", inspector)?.addEventListener("click", () => startMarking(h.id));
+    $("[data-adjust]", inspector)?.addEventListener("click", () => {
+      adjustFor = adjustFor === h.id ? null : h.id;
+      renderStage();
+      renderInspector();
+    });
+    $('[data-field="fitZoom"]', inspector)?.addEventListener("input", (e) => {
+      h.fit = { ...FIT_DEFAULT, ...(h.fit || {}), zoom: Number(e.target.value) };
+      $("[data-fit-zoom-label]", inspector).textContent = `${h.fit.zoom}%`;
+      changed();
+    });
+    $("[data-fit-reset]", inspector)?.addEventListener("click", () => {
+      h.fit = null;
+      changed({ inspector: true });
+    });
     $("[data-shape-cancel]", inspector)?.addEventListener("click", () => stopDrawing());
 
     $("[data-logo-remove-bg]", inspector)?.addEventListener("change", (e) => (removeLogoBg = e.target.checked));
@@ -671,6 +724,7 @@ export function initHotspotEditor(editor, options) {
 
   function select(id) {
     if (drawingFor && drawingFor !== id) drawingFor = null;
+    if (adjustFor && adjustFor !== id) adjustFor = null;
     state.selected = id;
     renderStage();
     renderInspector();
@@ -688,6 +742,7 @@ export function initHotspotEditor(editor, options) {
   // A new action centred on (cx, cy) in percent, sized to suit a phone-card button.
   function addSpot(action, cx = 50, cy = 50) {
     if (state.hotspots.length >= MAX_SPOTS) return onError(`A card can have up to ${MAX_SPOTS} items.`);
+    if (action === "custom_image") return startMarking(null); // first the area, then the picture
     const rect = stage.getBoundingClientRect();
     const kind = actions[action]?.kind || "action";
     const px = (n) => (n / 480) * rect.width; // editor sizes are px at a 480px-wide card
@@ -721,7 +776,7 @@ export function initHotspotEditor(editor, options) {
     markDirty();
     renderAll();
     $(`[data-spot="${CSS.escape(spot.id)}"]`, spotsLayer)?.focus();
-    if ((action === "logo" && !defaults.logo) || action === "custom_image") pickLogo(spot.id);
+    if (action === "logo" && !defaults.logo) pickLogo(spot.id);
   }
 
   // --- The logo's own picture -------------------------------------------------
@@ -780,7 +835,8 @@ export function initHotspotEditor(editor, options) {
         const spot = spotById(id);
         if (!spot) return;
         spot.value = url;
-        await fitToPicture(spot);
+        spot.fit = null; // a new picture starts centred in the area
+        if (!spot.shape) await fitToPicture(spot); // no marked area (an older box): take the picture's own proportions
         logoBase.delete(spot.id);
         state.selected = id;
         markDirty();
@@ -866,6 +922,143 @@ export function initHotspotEditor(editor, options) {
     const chip = e.target.closest("[data-palette-action]");
     if (chip && !chip.disabled && e.detail === 0) addSpot(chip.dataset.paletteAction);
   });
+
+  // --- Mark an area on the card for a free image (like a selection in Photoshop) --
+  // Lasso (freehand), rectangle or ellipse, drawn right on the card. The area
+  // becomes the box (its bounds) and its shape; the picture uploaded next fills it.
+  const MARK_TOOLS = [
+    ["lasso", "Freehand", "pencil"],
+    ["rect", "Rectangle", "square"],
+    ["ellipse", "Ellipse", "circle"],
+  ];
+  let markLayer = null;
+  function startMarking(forId) {
+    if (!state.imageUrl) return;
+    closeMenu();
+    drawingFor = null;
+    adjustFor = null;
+    marking = { forId, tool: marking?.tool || "lasso" };
+    markLayer?.remove();
+    markLayer = document.createElement("div");
+    markLayer.dataset.markLayer = "";
+    markLayer.className = "absolute inset-0 z-30 cursor-crosshair touch-none bg-gray-900/25";
+    stage.appendChild(markLayer);
+    renderMarkLayer();
+    renderInspector();
+  }
+  function stopMarking() {
+    marking = null;
+    markLayer?.remove();
+    markLayer = null;
+    renderInspector();
+  }
+  function renderMarkLayer() {
+    markLayer.innerHTML = `
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none" class="pointer-events-none absolute inset-0 h-full w-full overflow-visible">
+        <polygon data-mark-line points="" fill="rgba(255,255,255,.25)" stroke="#fff" stroke-width="2" stroke-dasharray="6 4" vector-effect="non-scaling-stroke" stroke-linejoin="round" />
+      </svg>
+      <div data-mark-bar class="absolute inset-x-2 top-2 cursor-default rounded-lg bg-white/95 p-2 text-xs shadow-lg">
+        <p class="mb-1.5 font-semibold text-ink-900">Mark the area for your picture, then upload it</p>
+        <div class="flex flex-wrap items-center gap-1">
+          ${MARK_TOOLS.map(
+            ([key, label, ic]) =>
+              `<button type="button" data-mark-tool="${key}" class="flex items-center gap-1 rounded-md border px-2 py-1 font-semibold ${
+                marking.tool === key ? "border-brand-500 bg-brand-50 text-brand-800" : "border-gray-300 bg-white text-ink-700 hover:bg-gray-50"
+              }">${icon(ic, { size: 12 })} ${label}</button>`,
+          ).join("")}
+          <button type="button" data-mark-cancel class="ml-auto rounded-md px-2 py-1 font-semibold text-ink-500 hover:underline">Cancel</button>
+        </div>
+      </div>`;
+  }
+  // The outline as the pointer goes: every point for the lasso, two corners for a rectangle or ellipse.
+  function markOutline(tool, points) {
+    if (tool === "lasso") return points;
+    const [a, b] = [points[0], points[points.length - 1]];
+    const [x0, x1, y0, y1] = [Math.min(a[0], b[0]), Math.max(a[0], b[0]), Math.min(a[1], b[1]), Math.max(a[1], b[1])];
+    if (tool === "rect") return [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
+    return around(48, (t) => [(x0 + x1) / 2 + ((x1 - x0) / 2) * Math.cos(t), (y0 + y1) / 2 + ((y1 - y0) / 2) * Math.sin(t)]);
+  }
+  function finishMarking(outline) {
+    const xs = outline.map((p) => p[0]);
+    const ys = outline.map((p) => p[1]);
+    const [bx, by] = [Math.min(...xs), Math.min(...ys)];
+    const [bw, bh] = [Math.max(...xs) - bx, Math.max(...ys) - by];
+    if (bw < MIN_SIZE || bh < MIN_SIZE) return false; // too small: keep marking
+    const rel = outline.map(([x, y]) => [((x - bx) / bw) * 100, ((y - by) / bh) * 100]);
+    const shape = marking.tool === "lasso" ? simplifyStroke(rel) : rel.map(([x, y]) => [Math.round(x * 10) / 10, Math.round(y * 10) / 10]);
+    if (shape.length < 3) return false;
+    const box = { x: round(bx), y: round(by), w: round(bw), h: round(bh), shape, shapeName: null, radius: null };
+    let spot = spotById(marking.forId);
+    if (spot) Object.assign(spot, box);
+    else {
+      spot = { id: newId(), action: "custom_image", value: null, label: null, style: null, fit: null, ...box };
+      state.hotspots.push(spot);
+    }
+    logoBase.delete(spot.id);
+    state.selected = spot.id;
+    stopMarking();
+    markDirty();
+    renderAll();
+    if (!spot.value) pickLogo(spot.id);
+    return true;
+  }
+  stage.addEventListener("pointerdown", (e) => {
+    if (!marking || !markLayer?.contains(e.target)) return;
+    e.stopPropagation();
+    const tool = e.target.closest("[data-mark-tool]");
+    if (tool) {
+      marking.tool = tool.dataset.markTool;
+      return renderMarkLayer();
+    }
+    if (e.target.closest("[data-mark-cancel]")) return stopMarking();
+    if (e.target.closest("[data-mark-bar]") || e.button > 0) return;
+    e.preventDefault();
+    const line = $("[data-mark-line]", markLayer);
+    const points = [];
+    const add = (ev) => {
+      const p = toStage(ev);
+      points.push([clamp(p.x, 0, 100), clamp(p.y, 0, 100)]);
+      line.setAttribute("points", markOutline(marking.tool, points).map((q) => q.join(",")).join(" "));
+    };
+    add(e);
+    track(add, () => {
+      drewAt = Date.now();
+      if (marking && points.length > 1) finishMarking(markOutline(marking.tool, points));
+    });
+  });
+
+  // --- Move the picture inside its area ----------------------------------------
+  // While "Move the picture" is on, dragging the free image pans the picture, not the box.
+  spotsLayer.addEventListener(
+    "pointerdown",
+    (e) => {
+      const el = e.target.closest("[data-spot]");
+      if (!adjustFor || !el || el.dataset.spot !== adjustFor || e.target.closest("[data-draw-surface]") || e.button > 0) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const h = spotById(adjustFor);
+      const img = $("img", el);
+      const r = el.getBoundingClientRect();
+      const orig = { ...FIT_DEFAULT, ...(h.fit || {}) };
+      let moved = false;
+      track(
+        (ev) => {
+          moved = true;
+          const k = 100 / (orig.zoom / 100);
+          h.fit = {
+            ...orig,
+            x: round(clamp(orig.x - ((ev.clientX - e.clientX) / r.width) * k, 0, 100)),
+            y: round(clamp(orig.y - ((ev.clientY - e.clientY) / r.height) * k, 0, 100)),
+          };
+          if (img) img.style.cssText = fitCss(h);
+        },
+        () => {
+          if (moved) changed();
+        },
+      );
+    },
+    true,
+  );
 
   // --- Draw a picture's shape by hand ------------------------------------------
   function startDrawing(id) {
@@ -1032,7 +1225,7 @@ export function initHotspotEditor(editor, options) {
     $("[data-menu-action]", menu)?.focus({ preventScroll: true });
   }
   stage.addEventListener("click", (e) => {
-    if (!state.imageUrl || e.target.closest("[data-spot], [data-spot-menu]") || Date.now() - drewAt < 500) return;
+    if (!state.imageUrl || marking || e.target.closest("[data-spot], [data-spot-menu], [data-mark-layer]") || Date.now() - drewAt < 500) return;
     const p = toStage(e);
     if (state.selected) select(null);
     openMenu(clamp(p.x, 0, 100), clamp(p.y, 0, 100));
@@ -1044,6 +1237,12 @@ export function initHotspotEditor(editor, options) {
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") closeMenu();
     if (e.key === "Escape" && drawingFor) stopDrawing();
+    if (e.key === "Escape" && marking) stopMarking();
+    if (e.key === "Escape" && adjustFor) {
+      adjustFor = null;
+      renderStage();
+      renderInspector();
+    }
   });
   spotsLayer.addEventListener("pointerdown", (e) => {
     if (e.target.closest("[data-spot]")) closeMenu();
@@ -1142,7 +1341,7 @@ export function initHotspotEditor(editor, options) {
         imageUrl: state.imageUrl,
         imageWidth: state.imageWidth,
         imageHeight: state.imageHeight,
-        hotspots: state.hotspots.map(({ id, action, x, y, w, h, value, label, style, font, fontSize, bold, italic, color, bg, align, radius, shape }) => ({
+        hotspots: state.hotspots.map(({ id, action, x, y, w, h, value, label, style, font, fontSize, bold, italic, color, bg, align, radius, shape, fit }) => ({
           id,
           action,
           x,
@@ -1161,6 +1360,7 @@ export function initHotspotEditor(editor, options) {
           align: align || null,
           radius: radius || null,
           shape: shape?.length >= 3 ? shape : null,
+          fit: fit || null,
         })),
       };
     },

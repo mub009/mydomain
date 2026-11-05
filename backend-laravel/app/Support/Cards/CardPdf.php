@@ -151,7 +151,8 @@ class CardPdf
                     'display' => $h['display'],
                     'textStyle' => $text,
                     'src' => $h['kind'] === 'image' ? (in_array($h['action'], ['logo', 'custom_image'], true)
-                        ? (! empty($h['shape']) ? self::shapedPng($h['src'], $h['w'] * $width / 100, $h['h'] * $height / 100, $h['shape'])
+                        ? (! empty($h['shape']) || ! empty($h['fit'])
+                            ? self::shapedPng($h['src'], $h['w'] * $width / 100, $h['h'] * $height / 100, $h['shape'] ?: [[0, 0], [100, 0], [100, 100], [0, 100]], $h['fit'] ?? null)
                             : (! empty($h['radius']) ? self::roundedPng($h['src'], $h['w'] * $width / 100, $h['h'] * $height / 100, (int) $h['radius']) : self::png($h['src'])))
                         : $h['src']) : null,
                     'box' => sprintf('left:%spt;top:%spt;width:%spt;height:%spt', round($h['x'] * $width / 100, 2), round($h['y'] * $height / 100, 2), round($h['w'] * $width / 100, 2), round($h['h'] * $height / 100, 2)),
@@ -232,9 +233,10 @@ class CardPdf
     /**
      * A picture cropped to fill a $w x $h box (cover) and cut to a drawn
      * shape ([x, y] points in percent of the box), as a PNG data URI —
-     * dompdf has no clip-path.
+     * dompdf has no clip-path. $fit moves and zooms the picture inside it,
+     * as the public card's object-position and scale() do (ImageCard::pictureCss).
      */
-    private static function shapedPng(string $url, float $w, float $h, array $shape): ?string
+    private static function shapedPng(string $url, float $w, float $h, array $shape, ?array $fit = null): ?string
     {
         $src = self::gd($url);
         if (! $src || $w <= 0 || $h <= 0 || count($shape) < 3) {
@@ -253,7 +255,15 @@ class CardPdf
         imagesavealpha($tile, true);
         $clear = imagecolorallocatealpha($tile, 0, 0, 0, 127);
         imagefill($tile, 0, 0, $clear);
-        imagecopyresampled($tile, $src, 0, 0, (int) (($sw - $cw) / 2), (int) (($sh - $ch) / 2), $ow, $oh, $cw, $ch);
+        $fx = ($fit['x'] ?? 50) / 100;
+        $fy = ($fit['y'] ?? 50) / 100;
+        $zoom = max(1, ($fit['zoom'] ?? 100) / 100);
+        // The covering crop at the chosen position, then zoomed about that same point.
+        $vw = $cw / $zoom;
+        $vh = $ch / $zoom;
+        $sx = ($sw - $cw) * $fx + ($cw - $vw) * $fx;
+        $sy = ($sh - $ch) * $fy + ($ch - $vh) * $fy;
+        imagecopyresampled($tile, $src, 0, 0, (int) round($sx), (int) round($sy), $ow, $oh, max(1, (int) round($vw)), max(1, (int) round($vh)));
 
         // The shape, filled white on black, then everything outside it cleared.
         $mask = imagecreatetruecolor($ow, $oh);

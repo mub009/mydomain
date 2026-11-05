@@ -89,8 +89,8 @@
             $inert = $preview && ($s['action'] === 'share' || ! $live);
         @endphp
         @if ($s['kind'] === 'image')
-          @php($shapeCss = ! empty($s['shape']) ? \App\Support\Cards\ImageCard::clipPath($s['shape']) : null)
-          <div class="spot pic" style="{{ $box }}{{ $shapeCss ? ';border-radius:0;clip-path:'.$shapeCss : (! empty($s['radius']) ? ';border-radius:'.(int) $s['radius'].'%' : ($s['action'] === 'custom_image' ? ';border-radius:0' : '')) }}"><img src="{{ $s['src'] }}" alt="{{ $s['action'] === 'qr' ? 'QR code for this card' : ($s['action'] === 'custom_image' ? '' : $b['name'].' logo') }}"@if ($shapeCss) style="object-fit:cover"@elseif (! empty($s['radius'])) style="object-fit:cover;border-radius:{{ (int) $s['radius'] }}%"@endif /></div>
+          @php($pic = \App\Support\Cards\ImageCard::pictureCss($s))
+          <div class="spot pic" style="{{ $box }}{{ $pic['box'] !== '' ? ';'.$pic['box'] : '' }}"><img src="{{ $s['src'] }}" alt="{{ $s['action'] === 'qr' ? 'QR code for this card' : ($s['action'] === 'custom_image' ? '' : $b['name'].' logo') }}"@if ($pic['img']) style="{{ $pic['img'] }}"@endif /></div>
         @elseif ($s['kind'] === 'text')
           @if ($live && ! ($preview && $inert))
             <a class="spot detail" style="{{ $box }};{{ \App\Support\Cards\ImageCard::textStyle($s, $colour) }}" href="{{ $s['href'] }}" @if ($external || $preview) target="_blank" rel="noopener" @endif><span>{{ $s['display'] }}</span></a>

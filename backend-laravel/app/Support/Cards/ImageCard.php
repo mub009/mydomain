@@ -143,6 +143,11 @@ class ImageCard
             'hotspots.*.shape' => ['nullable', 'array', 'min:3', 'max:'.self::MAX_SHAPE_POINTS],
             'hotspots.*.shape.*' => ['array', 'size:2'],
             'hotspots.*.shape.*.*' => ['numeric', 'min:0', 'max:100'],
+            // Where a free image's picture sits inside its marked area: moved (0–100, like object-position) and zoomed.
+            'hotspots.*.fit' => ['nullable', 'array'],
+            'hotspots.*.fit.x' => ['required_with:hotspots.*.fit', 'numeric', 'min:0', 'max:100'],
+            'hotspots.*.fit.y' => ['required_with:hotspots.*.fit', 'numeric', 'min:0', 'max:100'],
+            'hotspots.*.fit.zoom' => ['required_with:hotspots.*.fit', 'numeric', 'min:100', 'max:400'],
         ];
     }
 
@@ -184,6 +189,7 @@ class ImageCard
                 'radius' => in_array($h['action'], ['logo', 'custom_image'], true) && ! empty($h['radius']) ? (int) min(50, max(0, (int) $h['radius'])) : null,
                 // A picture cut to a shape drawn in the editor (a preset or by hand).
                 'shape' => in_array($h['action'], ['logo', 'custom_image'], true) ? self::shape($h['shape'] ?? null) : null,
+                'fit' => $h['action'] === 'custom_image' ? self::fit($h['fit'] ?? null) : null,
             ];
             if ($lenient) {
                 if (! self::valueIsValid($spot)) {
@@ -219,6 +225,43 @@ class ImageCard
         }
 
         return count($out) >= 3 ? $out : null;
+    }
+
+    /** A free image's position and zoom inside its area; null = centred, not zoomed. */
+    public static function fit(mixed $fit): ?array
+    {
+        if (! is_array($fit)) {
+            return null;
+        }
+        $out = [
+            'x' => round(min(100, max(0, (float) ($fit['x'] ?? 50))), 2),
+            'y' => round(min(100, max(0, (float) ($fit['y'] ?? 50))), 2),
+            'zoom' => (int) round(min(400, max(100, (float) ($fit['zoom'] ?? 100)))),
+        ];
+
+        return $out === ['x' => 50.0, 'y' => 50.0, 'zoom' => 100] ? null : $out;
+    }
+
+    /**
+     * How a picture box is drawn on the public card: the CSS for the box
+     * (its shape or rounded corners) and for the picture in it (cover,
+     * moved and zoomed, for a free image). Only numbers reach the CSS.
+     *
+     * @return array{box: string, img: ?string}
+     */
+    public static function pictureCss(array $s): array
+    {
+        $shape = ! empty($s['shape']) ? self::clipPath($s['shape']) : null;
+        $radius = (int) ($s['radius'] ?? 0);
+        $box = $shape ? 'border-radius:0;clip-path:'.$shape : ($radius ? "border-radius:{$radius}%" : (($s['action'] ?? '') === 'custom_image' ? 'border-radius:0' : ''));
+        if (($s['action'] ?? '') === 'custom_image' && ($shape || ! empty($s['fit']))) {
+            $f = ($s['fit'] ?? null) ?: ['x' => 50, 'y' => 50, 'zoom' => 100];
+            $img = sprintf('object-fit:cover;object-position:%s%% %s%%;transform:scale(%s);transform-origin:%s%% %s%%', (float) $f['x'], (float) $f['y'], ((int) $f['zoom']) / 100, (float) $f['x'], (float) $f['y']);
+        } else {
+            $img = $shape ? 'object-fit:cover' : ($radius ? "object-fit:cover;border-radius:{$radius}%" : null);
+        }
+
+        return ['box' => $box, 'img' => $img];
     }
 
     /** A drawn shape as a CSS clip-path (only numbers reach the CSS). */

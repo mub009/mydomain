@@ -496,6 +496,24 @@ class ImageCardTest extends TestCase
         $this->save([$this->spot('call', ['shape' => $triangle])])->assertOk()->assertJsonPath('data.hotspots.0.shape', null);
     }
 
+    public function test_a_picture_fills_the_area_marked_for_it_moved_and_zoomed(): void
+    {
+        $area = ['value' => 'https://cdn.example.test/cards/images/shop.jpg', 'shape' => [[0, 0], [100, 0], [100, 100], [0, 100]]];
+        $this->save([$this->spot('custom_image', $area + ['fit' => ['x' => 20, 'y' => 75, 'zoom' => 150]])])
+            ->assertOk()->assertJsonPath('data.hotspots.0.fit', ['x' => 20, 'y' => 75, 'zoom' => 150]);
+        $this->postJson("/api/v1/businesses/{$this->business->id}/card/publish", [], $this->auth)->assertOk();
+        $this->assertStringContainsString(
+            'style="object-fit:cover;object-position:20% 75%;transform:scale(1.5);transform-origin:20% 75%"',
+            $this->get('/card/spice-garden')->getContent(),
+        );
+
+        // Centred and not zoomed is the default (stored as none); out-of-range zoom is refused; only free images keep it.
+        $this->save([$this->spot('custom_image', $area + ['fit' => ['x' => 50, 'y' => 50, 'zoom' => 100]])])->assertOk()->assertJsonPath('data.hotspots.0.fit', null);
+        $this->assertStringContainsString('object-position:50% 50%;transform:scale(1)', $this->get('/card/spice-garden')->getContent());
+        $this->save([$this->spot('custom_image', $area + ['fit' => ['x' => 50, 'y' => 50, 'zoom' => 900]])])->assertStatus(400);
+        $this->save([$this->spot('logo', $area + ['fit' => ['x' => 10, 'y' => 10, 'zoom' => 200]])])->assertOk()->assertJsonPath('data.hotspots.0.fit', null);
+    }
+
     public function test_review_us_on_google_and_location_actions(): void
     {
         $this->save([
