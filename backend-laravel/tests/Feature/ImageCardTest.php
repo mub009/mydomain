@@ -641,4 +641,46 @@ class ImageCardTest extends TestCase
         $this->assertStringContainsString('href="https://g.page/r/spice/review"', $html);
         $this->assertStringContainsString('<span>Review us</span>', $html);
     }
+
+    public function test_the_owner_changes_the_colour_from_the_public_card_link(): void
+    {
+        $this->save([$this->spot('call')])->assertOk();
+        $this->putJson("/api/v1/businesses/{$this->business->id}/card", ['imageColour' => ['tint' => '#16a34a', 'strength' => 60]], $this->auth)->assertOk();
+        $this->postJson("/api/v1/businesses/{$this->business->id}/card/publish", [], $this->auth)->assertOk();
+
+        // Visitors: just the card.
+        $this->assertStringNotContainsString('mk-owner-bar', $this->get('/card/spice-garden')->assertOk()->getContent());
+
+        // Signed in as the owner: the colour bar, with the card's colour picked, and never cached.
+        $this->post('/login', ['email' => $this->ownerEmail, 'password' => 'Password123!']);
+        $page = $this->get('/card/spice-garden')->assertOk()
+            ->assertSee('id="mk-owner-bar"', false)
+            ->assertSee("/api/v1/businesses/{$this->business->id}/card", false)
+            ->assertSee('?section=Visiting+Card', false);
+        $this->assertStringContainsString('no-store', $page->headers->get('Cache-Control'));
+        $this->assertMatchesRegularExpression('~title="Green" aria-label="Green" aria-checked="true"~', $page->getContent());
+        $this->assertStringContainsString('</div>'."
+".'</body>', str_replace("", '', $page->getContent()) ?: '</div>'."
+".'</body>');
+
+        // Someone signed in who doesn't manage it: no bar.
+        $this->post('/logout');
+        $stranger = User::create([
+            'email' => 'other-'.uniqid().'@example.com', 'passwordHash' => Hash::make('Password123!'),
+            'firstName' => 'S', 'lastName' => 'T', 'status' => 'ACTIVE', 'role' => 'BUSINESS_OWNER',
+        ]);
+        $this->post('/login', ['email' => $stranger->email, 'password' => 'Password123!']);
+        $this->assertStringNotContainsString('mk-owner-bar', $this->get('/card/spice-garden')->assertOk()->getContent());
+    }
+
+    public function test_missing_card_details_get_a_textbox_on_the_visiting_card_section(): void
+    {
+        $this->save([$this->spot('instagram'), $this->spot('logo'), $this->spot('whatsapp')])->assertOk();
+        $this->post('/login', ['email' => $this->ownerEmail, 'password' => 'Password123!']);
+        $this->get("/dashboard/businesses/{$this->business->id}?section=".urlencode('Visiting Card'))->assertOk()
+            ->assertSee('data-missing-form data-via="links"', false)
+            ->assertSee('name="instagramUsername"', false)
+            // A logo needs an upload: it keeps its link to Contact.
+            ->assertSee('Add in Contact', false);
+    }
 }
