@@ -659,9 +659,8 @@ class ImageCardTest extends TestCase
             ->assertSee('?section=Visiting+Card', false);
         $this->assertStringContainsString('no-store', $page->headers->get('Cache-Control'));
         $this->assertMatchesRegularExpression('~title="Green" aria-label="Green" aria-checked="true"~', $page->getContent());
-        $this->assertStringContainsString('</div>'."
-".'</body>', str_replace("", '', $page->getContent()) ?: '</div>'."
-".'</body>');
+        // Inside the page, not after it.
+        $this->assertLessThan(strrpos($page->getContent(), '</body>'), strpos($page->getContent(), 'id="mk-owner-bar"'));
 
         // Someone signed in who doesn't manage it: no bar.
         $this->post('/logout');

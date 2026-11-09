@@ -385,7 +385,50 @@ export function initHotspotEditor(editor, options) {
     stage.classList.toggle("border-transparent", has);
     if (has && stageImage.getAttribute("src") !== state.imageUrl) stageImage.src = state.imageUrl;
     spotsLayer.classList.toggle("hidden", !has);
-    spotsLayer.innerHTML = has ? state.hotspots.map(spotHtml).join("") : "";
+    spotsLayer.innerHTML = has ? state.hotspots.map(spotHtml).join("") + quickValueHtml() : "";
+    wireQuickValue();
+  }
+
+  // The selected box's link or text, typed in a small box right beside it on
+  // the card — so it's plain what to enter for it (a phone number for Call, a
+  // link for Instagram, …). The same value as the "Edit action" panel.
+  function quickValueHtml() {
+    const h = spotById(state.selected);
+    const a = h && actions[h.action];
+    const help = a?.value ? VALUE_HELP[a.value] : null;
+    if (!help || kindOf(h) === "image" || drawingFor || adjustFor) return "";
+    const fallback = defaults[h.action];
+    const below = h.y + h.h < 72;
+    const title = h.action === "custom_text" ? "Your text" : `${a.label} — ${help.label.toLowerCase()}`;
+    const hint = fallback ? fallbackPrefix + fallback : h.action === "custom_text" || h.action === "link" ? "" : missingHint;
+    const field =
+      a.value === "text"
+        ? `<textarea rows="2" maxlength="300" class="input py-1.5 text-xs" data-quick-value placeholder="${esc(fallback || "")}">${esc(h.value || "")}</textarea>`
+        : `<input type="${help.type}" maxlength="300" class="input py-1.5 text-xs" data-quick-value value="${esc(h.value || "")}" placeholder="${esc(fallback || help.placeholder)}" />`;
+    return `<div data-quick-box class="absolute z-20 w-60 max-w-[95%] rounded-lg border border-brand-300 bg-white p-2 text-left shadow-lg"
+        style="left:min(${h.x}%, calc(100% - 15rem));${below ? `top:calc(${h.y + h.h}% + 6px)` : `bottom:calc(${100 - h.y}% + 6px)`}">
+        <label class="mb-1 flex items-center gap-1 text-[11px] font-bold text-ink-900">${icon(a.icon, { size: 12, className: "text-brand-600" })} ${esc(title)}</label>
+        ${field}
+        ${hint ? `<p class="mt-1 text-[10px] ${fallback ? "text-ink-500" : "text-amber-700"}">${esc(hint)}</p>` : ""}
+      </div>`;
+  }
+
+  function wireQuickValue() {
+    const box = $("[data-quick-box]", spotsLayer);
+    if (!box) return;
+    // Typing here isn't a click on the card: no dragging, no "add" menu.
+    for (const type of ["pointerdown", "click", "keydown", "dblclick"]) box.addEventListener(type, (e) => e.stopPropagation());
+    const field = $("[data-quick-value]", box);
+    const h = spotById(state.selected);
+    field.addEventListener("input", () => {
+      h.value = field.value.trim() || null;
+      markDirty();
+      renderList();
+      const twin = $('[data-field="value"]', inspector);
+      if (twin) twin.value = field.value;
+    });
+    // Redrawn once done, so the box's "needs details" mark updates.
+    field.addEventListener("change", () => renderStage());
   }
 
   function renderPalette() {
