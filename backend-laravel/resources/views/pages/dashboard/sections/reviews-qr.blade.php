@@ -68,24 +68,10 @@
             Easiest: open your business in Google Maps, tap <b>Share</b>, copy the link and paste it here. We find your place and fill in the Place ID for you.
           </p>
         </div>
-        <div>
-          <label class="mb-1 block text-xs font-semibold text-ink-700">Instagram username</label>
-          <input class="input" name="instagramUsername" placeholder="@yourshop" value="{{ $links['instagramUsername'] ?? '' }}" />
-        </div>
-        <div>
-          <label class="mb-1 block text-xs font-semibold text-ink-700">Facebook page</label>
-          <input class="input" name="facebookPageUrl" placeholder="yourshop or https://facebook.com/yourshop" value="{{ $links['facebookPageUrl'] ?? '' }}" />
-        </div>
-        <div>
-          <label class="mb-1 block text-xs font-semibold text-ink-700">YouTube channel</label>
-          <input class="input" name="youtubeUrl" placeholder="@yourshop or a full YouTube link" value="{{ $links['youtubeUrl'] ?? '' }}" />
-        </div>
-        @foreach (\App\Support\SocialLinks::NETWORKS as [$label, $field, $placeholder])
-          <div>
-            <label class="mb-1 block text-xs font-semibold text-ink-700">{{ $label }}</label>
-            <input class="input" name="{{ $field }}" placeholder="{{ $placeholder }}" value="{{ $links[$field] ?? '' }}" />
-          </div>
-        @endforeach
+        <p class="rounded-lg bg-gray-50 px-3 py-2 text-[11px] text-ink-500">
+          Instagram, Facebook, YouTube and your other social profiles are set in
+          <a href="?section={{ urlencode('Social Media') }}" class="font-semibold text-brand-600 hover:underline">Social Media</a>.
+        </p>
         <div>
           <label class="mb-1 block text-xs font-semibold text-ink-700">Default channel for the QR board</label>
           <select class="input" name="preferredReviewChannel">

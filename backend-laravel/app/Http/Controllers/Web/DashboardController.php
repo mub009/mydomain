@@ -49,7 +49,7 @@ class DashboardController extends Controller
 
     // WhatsApp broadcasts and Poster Studio are not part of the Laravel
     // backend yet (see README), so the manager doesn't offer them.
-    public const SECTIONS = ['Contact', 'Hours', 'Services', 'Photos', 'Slider', 'Our Gallery', 'Reviews & QR', 'AI Google Review', 'One Review', 'Visiting Card', 'Gold Rate', 'Website', 'SEO', 'Products', 'Orders', 'Customers', 'Your Plan'];
+    public const SECTIONS = ['Contact', 'Hours', 'Services', 'Photos', 'Slider', 'Our Gallery', 'Reviews & QR', 'Social Media', 'AI Google Review', 'One Review', 'Visiting Card', 'Gold Rate', 'Website', 'SEO', 'Products', 'Orders', 'Customers', 'Your Plan'];
 
     // How each section appears on the business's menu page: its icon, the
     // icon's colours, and one line on what it is for.
@@ -61,6 +61,7 @@ class DashboardController extends Controller
         'Slider' => ['icon' => 'play', 'tint' => 'bg-orange-50 text-orange-600', 'blurb' => 'Banner photos that slide on your website'],
         'Our Gallery' => ['icon' => 'layout-grid', 'tint' => 'bg-teal-50 text-teal-600', 'blurb' => 'The gallery section of your website'],
         'Reviews & QR' => ['icon' => 'qr-code', 'tint' => 'bg-yellow-50 text-yellow-600', 'blurb' => 'Review links and QR boards'],
+        'Social Media' => ['icon' => 'share-2', 'tint' => 'bg-pink-50 text-pink-600', 'blurb' => 'Instagram, Facebook, YouTube and your other social profiles'],
         'AI Google Review' => ['icon' => 'sparkles', 'tint' => 'bg-emerald-50 text-emerald-700', 'blurb' => 'A page where AI writes the review your customers post on Google'],
         'One Review' => ['icon' => 'qr-code', 'tint' => 'bg-indigo-50 text-indigo-600', 'blurb' => 'One QR code that opens all your review and social links'],
         'Your Plan' => ['icon' => 'shield-check', 'tint' => 'bg-slate-100 text-slate-700', 'blurb' => 'Your features, which are active and when they expire'],
@@ -246,6 +247,9 @@ class DashboardController extends Controller
             case 'Reviews & QR':
                 $data['links'] = InternalApi::tryCall([ReviewLinkController::class, 'show'], [], ['id' => $id], true)['data'] ?? null;
                 $data['boards'] = InternalApi::tryCall([QrCodeController::class, 'businessQrCodes'], [], ['id' => $id], true)['data'] ?? [];
+                break;
+            case 'Social Media':
+                $data['links'] = InternalApi::tryCall([ReviewLinkController::class, 'show'], [], ['id' => $id], true)['data'] ?? null;
                 break;
             case 'Slider':
             case 'Our Gallery':

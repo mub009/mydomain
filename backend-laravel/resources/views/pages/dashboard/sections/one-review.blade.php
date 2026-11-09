@@ -1,7 +1,7 @@
 {{-- One Review (a feature the dealer gives the business, App\Support\OneReview):
      the page's link and QR code, and which review and social links it shows,
      each with how often it was tapped. The links themselves are edited in
-     Reviews & QR and Contact. Driven by resources/js/pages/one-review-manager.js. --}}
+     Reviews & QR, Social Media and Contact. Driven by resources/js/pages/one-review-manager.js. --}}
 @php $o = $oneReview ?? null; @endphp
 
 @if (! $o)
@@ -11,8 +11,8 @@
       $active = collect($o['links'])->whereNotNull('href');
       $missing = collect($o['links'])->whereNull('href');
       // Where each link is set up.
-      $editIn = ['GOOGLE' => 'Reviews & QR', 'FACEBOOK' => 'Reviews & QR', 'FACEBOOK_PAGE' => 'Reviews & QR', 'INSTAGRAM' => 'Reviews & QR', 'YOUTUBE' => 'Reviews & QR',
-          'TIKTOK' => 'Reviews & QR', 'X' => 'Reviews & QR', 'LINKEDIN' => 'Reviews & QR', 'SNAPCHAT' => 'Reviews & QR', 'THREADS' => 'Reviews & QR', 'PINTEREST' => 'Reviews & QR', 'TELEGRAM' => 'Reviews & QR',
+      $editIn = ['GOOGLE' => 'Reviews & QR', 'FACEBOOK' => 'Social Media', 'FACEBOOK_PAGE' => 'Social Media', 'INSTAGRAM' => 'Social Media', 'YOUTUBE' => 'Social Media',
+          'TIKTOK' => 'Social Media', 'X' => 'Social Media', 'LINKEDIN' => 'Social Media', 'SNAPCHAT' => 'Social Media', 'THREADS' => 'Social Media', 'PINTEREST' => 'Social Media', 'TELEGRAM' => 'Social Media',
           'AI_REVIEW' => 'AI Google Review', 'WHATSAPP' => 'Contact', 'CALL' => 'Contact', 'WEBSITE' => 'Contact', 'DIRECTIONS' => 'Contact'];
   @endphp
   <div class="space-y-5" data-one-review>

@@ -198,7 +198,7 @@ class WebPagesTest extends TestCase
         $this->get('/dashboard?tab=leads')->assertOk()->assertSee('No leads yet.');
         $this->get('/dashboard?tab=bookings')->assertOk()->assertSee('No bookings yet.');
 
-        foreach (['Contact', 'Hours', 'Services', 'Photos', 'Slider', 'Our Gallery', 'Reviews & QR', 'Website', 'SEO', 'Products', 'Orders', 'Customers'] as $section) {
+        foreach (['Contact', 'Hours', 'Services', 'Photos', 'Slider', 'Our Gallery', 'Reviews & QR', 'Social Media', 'Website', 'SEO', 'Products', 'Orders', 'Customers'] as $section) {
             $this->get("/dashboard/businesses/{$business->id}?section=".urlencode($section))
                 ->assertOk()->assertDontSee('Could not', false);
         }

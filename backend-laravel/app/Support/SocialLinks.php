@@ -9,7 +9,7 @@ use App\Models\Business;
  * Facebook and YouTube columns: TikTok, X, LinkedIn, Snapchat, Threads,
  * Pinterest and Telegram. Stored in businesses.socialLinks as what the owner
  * typed — a username or a full link — keyed by network, and turned into a
- * profile URL here. Edited in Reviews & QR; shown on the One Review page.
+ * profile URL here. Edited in Social Media; shown on the One Review page.
  */
 class SocialLinks
 {

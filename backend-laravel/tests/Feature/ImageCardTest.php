@@ -76,7 +76,7 @@ class ImageCardTest extends TestCase
         $this->getJson("/api/v1/businesses/{$this->business->id}/card", $owner)->assertOk()
             ->assertJsonPath('data.canEdit', false)
             ->assertJsonPath('data.missingDetails', [
-                ['key' => 'instagram', 'label' => 'Instagram', 'section' => 'Reviews & QR'],
+                ['key' => 'instagram', 'label' => 'Instagram', 'section' => 'Social Media'],
                 ['key' => 'logo', 'label' => 'Logo', 'section' => 'Contact'],
             ]);
         $this->getJson("/api/v1/businesses/{$this->business->id}/card", $this->auth)->assertOk()->assertJsonPath('data.canEdit', true);

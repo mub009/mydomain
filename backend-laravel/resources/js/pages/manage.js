@@ -357,6 +357,21 @@ $("[data-review-links-form]")?.addEventListener("submit", async (e) => {
   }
 });
 
+// --- Social Media -----------------------------------------------------------
+// Same endpoint as Reviews & QR; it only changes the fields this form sends.
+$("[data-social-links-form]")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const form = e.currentTarget;
+  try {
+    await busy($("[data-save]", form), "Saving…", () =>
+      api.patch(`${base}/review-links`, Object.fromEntries(new FormData(form))),
+    );
+    reloadWithFlash("Social media links saved.");
+  } catch (err) {
+    fail(err);
+  }
+});
+
 // "Find your business on Google" (Google Places): pick a match, its Place ID is saved.
 const places = $("[data-places-search]");
 if (places) {

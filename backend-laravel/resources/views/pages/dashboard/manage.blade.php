@@ -116,6 +116,7 @@
           'hint' => 'Square or landscape photos look best.',
       ]) @break
       @case('Reviews & QR') @include('pages.dashboard.sections.reviews-qr') @break
+      @case('Social Media') @include('pages.dashboard.sections.social-media') @break
       @case('AI Google Review') @include('pages.dashboard.sections.ai-review') @break
       @case('One Review') @include('pages.dashboard.sections.one-review') @break
       @case('Visiting Card') @include('pages.dashboard.sections.card') @break

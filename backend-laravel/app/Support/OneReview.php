@@ -11,7 +11,7 @@ use App\Models\Business;
  * profiles as one row of icons, so a customer picks where to review or
  * follow it.
  *
- * The links come from what the business entered in Reviews & QR; a network
+ * The links come from what the business entered in Reviews & QR and Social Media; a network
  * it hasn't set up is simply not shown.
  * businesses.oneReviewTaps counts taps per link: { GOOGLE: 12, ... }.
  */

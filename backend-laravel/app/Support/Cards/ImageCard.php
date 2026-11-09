@@ -478,9 +478,9 @@ class ImageCard
         'about' => ['Description', 'Contact'],
         'logo' => ['Logo', 'Contact'],
         'hours' => ['Opening hours', 'Hours'],
-        'instagram' => ['Instagram', 'Reviews & QR'],
-        'facebook' => ['Facebook page', 'Reviews & QR'],
-        'youtube' => ['YouTube channel', 'Reviews & QR'],
+        'instagram' => ['Instagram', 'Social Media'],
+        'facebook' => ['Facebook page', 'Social Media'],
+        'youtube' => ['YouTube channel', 'Social Media'],
         'google_review' => ['Google review link', 'Reviews & QR'],
     ];
 
