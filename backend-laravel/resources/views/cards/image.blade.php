@@ -94,7 +94,7 @@
         @endphp
         @if ($s['kind'] === 'image')
           @php($pic = \App\Support\Cards\ImageCard::pictureCss($s))
-          <div class="spot pic" style="{{ $box }}{{ $pic['box'] !== '' ? ';'.$pic['box'] : '' }}"><img src="{{ $s['src'] }}" alt="{{ $s['action'] === 'qr' ? 'QR code for this card' : ($s['action'] === 'custom_image' ? '' : $b['name'].' logo') }}"@if ($pic['img']) style="{{ $pic['img'] }}"@endif /></div>
+          <div class="spot pic" style="{{ $box }}{{ $pic['box'] !== '' ? ';'.$pic['box'] : '' }}"><img src="{{ $s['src'] }}" alt="{{ $s['action'] === 'qr' ? 'QR code for this card' : ($s['action'] === 'custom_image' ? ($s['label'] ?? '') : $b['name'].' logo') }}"@if ($pic['img']) style="{{ $pic['img'] }}"@endif /></div>
         @elseif ($s['kind'] === 'text')
           @if ($live && ! ($preview && $inert))
             <a class="spot detail" style="{{ $box }};{{ \App\Support\Cards\ImageCard::textStyle($s, $colour) }}" href="{{ $s['href'] }}" @if ($external || $preview) target="_blank" rel="noopener" @endif><span>{{ $s['display'] }}</span></a>

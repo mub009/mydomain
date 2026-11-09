@@ -551,7 +551,11 @@ export function initHotspotEditor(editor, options) {
           h.action === "logo" && defaults.logo && !/^https?:/.test(defaults.logo) && !h.value
             ? `<p class="rounded-md bg-gray-50 px-2.5 py-2 text-[11px] text-ink-500">Each business's own logo shows here.</p>`
             : areaLocked(h)
-            ? `<div class="space-y-2 rounded-lg bg-gray-50 p-2.5">
+            ? `<label class="block">
+                <span class="mb-1 block text-xs font-semibold text-ink-700">Name <span class="font-normal text-ink-400">(for you, and read aloud on the card)</span></span>
+                <input class="input py-2" maxlength="60" data-field="label" value="${esc(h.label || "")}" placeholder="e.g. Shop photo, Owner photo, Offer banner" />
+              </label>
+              <div class="space-y-2 rounded-lg bg-gray-50 p-2.5">
                 <p class="text-xs font-semibold text-ink-700">Picture area</p>
                 <p class="text-[11px] ${h.value ? "text-ink-500" : "text-amber-700"}">${esc(
                   h.value
@@ -571,7 +575,11 @@ export function initHotspotEditor(editor, options) {
                 <p class="text-[11px] text-ink-400">JPG, PNG or WebP.</p>
               </div>`
             : h.action === "custom_image"
-            ? `<div class="space-y-2 rounded-lg bg-gray-50 p-2.5">
+            ? `<label class="block">
+                <span class="mb-1 block text-xs font-semibold text-ink-700">Name <span class="font-normal text-ink-400">(for you, and read aloud on the card)</span></span>
+                <input class="input py-2" maxlength="60" data-field="label" value="${esc(h.label || "")}" placeholder="e.g. Shop photo, Owner photo, Offer banner" />
+              </label>
+              <div class="space-y-2 rounded-lg bg-gray-50 p-2.5">
                 <p class="text-xs font-semibold text-ink-700">${freeImageEditor ? "Image area" : "Picture"}</p>
                 <p class="text-[11px] ${h.value ? "text-ink-500" : "text-amber-700"}">${esc(
                   !freeImageEditor
