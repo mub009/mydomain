@@ -120,6 +120,8 @@ class CardController extends Controller
             'imageColour' => ImageColour::normalize($card?->imageColour),
             'imageColourDefaults' => ImageColour::DEFAULTS,
             'missingDetails' => ImageCard::missingDetails($image['hotspots'] ?? [], ImageCard::listingDefaults($details)),
+            // Every listing detail the card shows, with its current value, to update from the card section.
+            'cardDetails' => ImageCard::cardDetails($image['hotspots'] ?? [], ImageCard::listingDefaults($details), $business),
             // The preview looks like the public card, in its saved colour: no outlines over the tap areas.
             'imagePreviewHtml' => $image ? ImageCard::renderSource($image, $details, true, false) : null,
             // Ready-made image designs from the admin, for "Start from a design".

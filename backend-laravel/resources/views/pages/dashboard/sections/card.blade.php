@@ -118,13 +118,8 @@
           @endif
         </div>
         <div>
-          @if (count($card['missingDetails']))
+          @if (count($card['cardDetails'] ?? []))
             @include('pages.dashboard.partials.card-missing')
-          @elseif ($card['imagePreviewHtml'])
-            <div class="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
-              <p class="flex items-center gap-1.5 text-sm font-bold text-emerald-900"><x-icon name="check-circle-2" :size="15" /> Your card has everything it needs</p>
-              <p class="mt-1 text-xs text-emerald-800">Every button and detail on it is filled from your listing.</p>
-            </div>
           @endif
         </div>
       </div>

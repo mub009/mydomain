@@ -67,7 +67,7 @@ if (root && card) {
           const path = form.dataset.via === "links" ? `/businesses/${biz.id}/review-links` : `/businesses/${biz.id}`;
           await api.patch(path, { [input.name]: value });
         }
-        reloadWithFlash(`${$("label", form).textContent.trim()} saved — it's on your card now.`);
+        reloadWithFlash(`${form.dataset.label} saved — it's on your card now.`);
       } catch (err) {
         button.disabled = false;
         button.textContent = "Save";

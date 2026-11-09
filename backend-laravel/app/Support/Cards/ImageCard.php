@@ -550,6 +550,46 @@ class ImageCard
     }
 
     /**
+     * Every detail the card's boxes show from the listing (plus its free
+     * images), each once, with its current value — to update right on the
+     * Visiting Card section. The missing ones come first. A box whose value
+     * is set on the design itself isn't a listing detail and isn't listed.
+     *
+     * @return list<array{key: string, label: string, section: string, value: ?string, missing: bool, spot?: string}>
+     */
+    public static function cardDetails(array $hotspots, array $defaults, Business $business): array
+    {
+        $out = [];
+        foreach ($hotspots as $h) {
+            $action = $h['action'] ?? null;
+            if ($action === 'custom_image' && ! empty($h['id'])) {
+                $out['spot:'.$h['id']] = [
+                    'key' => 'custom_image', 'spot' => (string) $h['id'], 'label' => ($h['label'] ?? null) ?: 'Free image',
+                    'section' => 'Visiting Card', 'value' => ($h['value'] ?? null) ?: null, 'missing' => empty($h['value']),
+                ];
+
+                continue;
+            }
+            if (! isset(self::DETAIL_SOURCES[$action]) || ! empty($h['value'])) {
+                continue;
+            }
+            [$label, $section] = self::DETAIL_SOURCES[$action];
+            $field = self::DETAIL_INPUTS[$action][0] ?? null;
+            $value = $field ? $business->getAttribute($field) : ($defaults[$action] ?? null);
+            $out[$label] ??= [
+                'key' => $action, 'label' => $label, 'section' => $section,
+                'value' => is_scalar($value) && trim((string) $value) !== '' ? (string) $value : null,
+                'missing' => empty($defaults[$action]),
+            ];
+        }
+
+        $out = array_values($out);
+        usort($out, fn ($a, $b) => $b['missing'] <=> $a['missing']);
+
+        return $out;
+    }
+
+    /**
      * The card's spots with a picture put into one free-image spot — what
      * the business team saves from "Missing on your listing" without the
      * design editor. null = no such free-image spot.

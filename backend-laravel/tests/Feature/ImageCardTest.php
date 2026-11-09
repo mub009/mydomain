@@ -111,7 +111,9 @@ class ImageCardTest extends TestCase
         ]);
         $this->post('/login', ['email' => $this->ownerEmail, 'password' => 'Password123!']);
         $this->get("/dashboard/businesses/{$this->business->id}?section=".urlencode('Visiting Card'))->assertOk()
-            ->assertSee('data-via="spot" data-spot="h-custom_image"', false)->assertSee('data-upload-field="card-images"', false);
+            ->assertSee('data-via="spot"  data-spot="h-custom_image"', false)->assertSee('data-upload-field="card-images"', false)
+            // Details already filled are listed too, with their value, to update.
+            ->assertSee('Card details')->assertSee('value="98765 43210"', false);
 
         // Only that kind of spot, and only a safe picture.
         $this->putJson($url, ['spotImage' => ['id' => 'h-call', 'url' => 'https://cdn.example.test/p.jpg']], $owner)->assertStatus(400);
@@ -121,8 +123,12 @@ class ImageCardTest extends TestCase
         $card = BusinessCard::where('businessId', $this->business->id)->first();
         $this->assertSame('https://cdn.example.test/cards/images/template.jpg', $card->imageUrl);
         $this->assertSame('https://cdn.example.test/cards/images/shop.jpg', collect($card->hotspots)->firstWhere('id', 'h-custom_image')['value']);
-        $this->getJson($url, $owner)->assertJsonPath('data.missingDetails', []);
+        $this->getJson($url, $owner)->assertJsonPath('data.missingDetails', [])
+            ->assertJsonPath('data.cardDetails.0.missing', false);
         $this->assertStringContainsString('cards/images/shop.jpg', $this->getJson($url, $owner)->json('data.imagePreviewHtml'));
+        // Still listed, to change the picture.
+        $this->get("/dashboard/businesses/{$this->business->id}?section=".urlencode('Visiting Card'))->assertOk()
+            ->assertSee('data-spot="h-custom_image"', false)->assertSee('value="https://cdn.example.test/cards/images/shop.jpg"', false);
     }
 
     public function test_a_logo_box_shows_the_business_photo_when_it_has_no_logo(): void
@@ -784,7 +790,7 @@ class ImageCardTest extends TestCase
         $this->save([$this->spot('instagram'), $this->spot('logo'), $this->spot('whatsapp')])->assertOk();
         $this->post('/login', ['email' => $this->ownerEmail, 'password' => 'Password123!']);
         $this->get("/dashboard/businesses/{$this->business->id}?section=".urlencode('Visiting Card'))->assertOk()
-            ->assertSee('data-missing-form data-via="links"', false)
+            ->assertSee('data-via="links"', false)
             ->assertSee('name="instagramUsername"', false)
             // The logo is uploaded right here too; only opening hours link to their section.
             ->assertSee('data-upload-field="business-logo"', false)->assertSee('name="logoUrl"', false)
@@ -793,7 +799,7 @@ class ImageCardTest extends TestCase
         $this->business->update(['description' => null]);
         $this->save([$this->spot('hours'), $this->spot('about')])->assertOk();
         $this->get("/dashboard/businesses/{$this->business->id}?section=".urlencode('Visiting Card'))->assertOk()
-            ->assertSee('<textarea id="missing-about" name="description"', false)
+            ->assertSee('<textarea id="card-detail-about" name="description"', false)
             ->assertSee('Add in Hours', false);
     }
 
