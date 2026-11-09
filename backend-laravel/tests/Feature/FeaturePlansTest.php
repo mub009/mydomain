@@ -97,6 +97,25 @@ class FeaturePlansTest extends TestCase
         $this->assertSame(17, $dealer->fresh()->points);
     }
 
+    public function test_a_visiting_card_only_business_skips_the_listing_sections(): void
+    {
+        $hidden = ['Hours', 'Services', 'Photos', 'Reviews & QR', 'SEO'];
+        $cardOnly = ['features' => ['VISITING_CARD']];
+        foreach ($hidden as $section) {
+            $this->assertFalse(BusinessFeatures::allowsSection($cardOnly, $section), $section);
+        }
+        $this->assertTrue(BusinessFeatures::allowsSection($cardOnly, 'Contact'));
+        $this->assertTrue(BusinessFeatures::allowsSection($cardOnly, 'Social Media'));
+        $this->assertTrue(BusinessFeatures::allowsSection($cardOnly, 'Visiting Card'));
+
+        // With a website too, or no card, they are all back.
+        foreach ([['features' => ['VISITING_CARD', 'WEBSITE']], ['features' => ['GOLD_RATE']], ['features' => null]] as $biz) {
+            foreach ($hidden as $section) {
+                $this->assertTrue(BusinessFeatures::allowsSection($biz, $section), $section);
+            }
+        }
+    }
+
     public function test_an_expired_feature_switches_off_until_renewed(): void
     {
         $this->setPrices();

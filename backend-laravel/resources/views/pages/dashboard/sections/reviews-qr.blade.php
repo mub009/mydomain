@@ -26,7 +26,7 @@
       {{-- Platform IDs --}}
       <form class="card space-y-3 p-5" data-review-links-form>
         <div>
-          <h3 class="flex items-center gap-1.5 font-bold text-ink-900"><x-icon name="link-2" :size="16" class="text-brand-600" /> Connect your review pages</h3>
+          <h3 class="flex items-center gap-1.5 font-bold text-ink-900"><x-icon name="link-2" :size="16" class="text-brand-600" /> Your QR board</h3>
           <p class="mt-0.5 text-xs text-ink-500">Customers who scan your QR board land straight on the page you choose.</p>
         </div>
 
@@ -41,35 +41,8 @@
           </p>
         </div>
 
-        {{-- Google Places search (GooglePlaces): pick the business, its Place ID is saved. --}}
-        @if (! empty($links['placesSearch']))
-          <div class="rounded-lg border border-amber-200 bg-amber-50/60 p-3" data-places-search>
-            <p class="flex items-center gap-1.5 text-xs font-bold text-ink-900"><x-icon name="search" :size="13" class="text-amber-600" /> Find your business on Google</p>
-            <p class="mt-0.5 text-[11px] text-ink-500">Search, tap your business, done. We save its Place ID for you.</p>
-            <div class="mt-2 flex gap-2">
-              <input class="input py-2" data-places-query value="{{ trim($biz['name'].' '.($biz['city'] ?? '')) }}" aria-label="Business name and city" />
-              <button type="button" class="btn-primary shrink-0 px-3 py-2 text-sm" data-places-go><x-icon name="search" :size="14" /> <span>Search</span></button>
-            </div>
-            <ul class="mt-2 space-y-1.5" data-places-results></ul>
-          </div>
-        @endif
-
-        <div>
-          <label class="mb-1 block text-xs font-semibold text-ink-700">Google Place ID</label>
-          <input class="input" name="googlePlaceId" placeholder="ChIJN1t_tDeuEmsRUsoyG83frY4 — or paste a Google Maps link" value="{{ $links['googlePlaceId'] ?? '' }}" />
-          <p class="mt-1 text-[11px] text-ink-400">
-            Find it at <a href="https://developers.google.com/maps/documentation/places/web-service/place-id" target="_blank" rel="noreferrer" class="text-brand-600 hover:underline">Google's Place ID finder</a>. We build the “write a review” link from it.
-          </p>
-        </div>
-        <div>
-          <label class="mb-1 block text-xs font-semibold text-ink-700">Google Maps share link or review link</label>
-          <input class="input" name="googleReviewUrl" placeholder="https://maps.app.goo.gl/…" value="{{ $links['googleReviewUrl'] ?? '' }}" />
-          <p class="mt-1 text-[11px] text-ink-400">
-            Easiest: open your business in Google Maps, tap <b>Share</b>, copy the link and paste it here. We find your place and fill in the Place ID for you.
-          </p>
-        </div>
         <p class="rounded-lg bg-gray-50 px-3 py-2 text-[11px] text-ink-500">
-          Instagram, Facebook, YouTube and your other social profiles are set in
+          Google Maps, Instagram, Facebook, YouTube and your other social profiles are set in
           <a href="?section={{ urlencode('Social Media') }}" class="font-semibold text-brand-600 hover:underline">Social Media</a>.
         </p>
         <div>
@@ -81,7 +54,7 @@
             @endforeach
           </select>
         </div>
-        <button class="btn-primary w-full py-2.5" data-save>Save review links</button>
+        <button class="btn-primary w-full py-2.5" data-save>Save default channel</button>
       </form>
 
       {{-- Boards, scans and warnings --}}
@@ -148,7 +121,7 @@
         </div>
 
         @if (count($configured) === 0)
-          <p class="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">No review pages connected yet — scans will open your Markkito listing until you add one above.</p>
+          <p class="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">No review pages connected yet — scans will open your Markkito listing until you add one in <a href="?section={{ urlencode('Social Media') }}" class="font-semibold underline">Social Media</a>.</p>
         @endif
       </div>
     </div>

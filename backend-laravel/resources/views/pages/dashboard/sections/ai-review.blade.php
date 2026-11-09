@@ -14,7 +14,7 @@
       <div class="flex flex-wrap items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
         <x-icon name="alert-triangle" :size="18" class="shrink-0 text-amber-600" />
         <p class="min-w-0 flex-1">Add your <b>Google review link</b> first. Customers are sent there to post the review the AI writes for them.</p>
-        <a href="?section={{ urlencode('Reviews & QR') }}" class="btn-primary px-3 py-1.5 text-xs">Add Google link</a>
+        <a href="?section={{ urlencode('Social Media') }}" class="btn-primary px-3 py-1.5 text-xs">Add Google link</a>
       </div>
     @elseif (! $r['published'])
       <p class="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">Your review page goes live once your listing is published.</p>

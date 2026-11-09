@@ -618,7 +618,7 @@ class ImageCardTest extends TestCase
         $this->assertStringContainsString('<span>Location</span>', $html);
         $this->assertStringContainsString('query=9.9,76.2', $html);
         $this->getJson("/api/v1/businesses/{$this->business->id}/card", $this->auth)
-            ->assertJsonFragment(['label' => 'Google review link', 'section' => 'Reviews & QR']);
+            ->assertJsonFragment(['label' => 'Google review link', 'section' => 'Social Media']);
 
         // With a Google Place ID, it opens Google's "write a review" page.
         $this->business->update(['googlePlaceId' => 'ChIJ123abc']);

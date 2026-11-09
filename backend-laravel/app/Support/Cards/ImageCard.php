@@ -51,7 +51,7 @@ class ImageCard
         'website' => ['label' => 'Website', 'icon' => 'globe', 'kind' => 'action', 'value' => 'url'],
         // "Location": opens the business on Google Maps (key kept as "directions" for saved cards).
         'directions' => ['label' => 'Location', 'icon' => 'map-pin', 'kind' => 'action', 'value' => 'place'],
-        // Opens Google's "write a review" page for the business (Reviews & QR), or a link typed on the card.
+        // Opens Google's "write a review" page for the business (Social Media), or a link typed on the card.
         'google_review' => ['label' => 'Review us on Google', 'icon' => 'star', 'kind' => 'action', 'value' => 'url'],
         'instagram' => ['label' => 'Instagram', 'icon' => 'instagram', 'kind' => 'action', 'value' => 'url'],
         'facebook' => ['label' => 'Facebook', 'icon' => 'facebook', 'kind' => 'action', 'value' => 'url'],
@@ -481,7 +481,7 @@ class ImageCard
         'instagram' => ['Instagram', 'Social Media'],
         'facebook' => ['Facebook page', 'Social Media'],
         'youtube' => ['YouTube channel', 'Social Media'],
-        'google_review' => ['Google review link', 'Reviews & QR'],
+        'google_review' => ['Google review link', 'Social Media'],
     ];
 
     /**

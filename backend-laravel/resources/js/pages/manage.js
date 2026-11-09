@@ -351,7 +351,7 @@ $("[data-review-links-form]")?.addEventListener("submit", async (e) => {
     await busy($("[data-save]", form), "Saving…", () =>
       api.patch(`${base}/review-links`, { ...f, preferredReviewChannel: f.preferredReviewChannel || null }),
     );
-    reloadWithFlash("Review links saved. Your QR board is ready to print.");
+    reloadWithFlash("Saved. Your QR board is ready to print.");
   } catch (err) {
     fail(err);
   }
@@ -366,7 +366,7 @@ $("[data-social-links-form]")?.addEventListener("submit", async (e) => {
     await busy($("[data-save]", form), "Saving…", () =>
       api.patch(`${base}/review-links`, Object.fromEntries(new FormData(form))),
     );
-    reloadWithFlash("Social media links saved.");
+    reloadWithFlash("Google Maps and social media links saved.");
   } catch (err) {
     fail(err);
   }
