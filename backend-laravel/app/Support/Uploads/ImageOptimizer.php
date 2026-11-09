@@ -51,7 +51,8 @@ class ImageOptimizer
         }
 
         $dimensions = @getimagesizefromstring($contents);
-        if ($dimensions && ($dimensions[0] * $dimensions[1]) > self::MAX_INPUT_PIXELS) {
+        // Past the fixed cap, only when this request can be given the memory to open it.
+        if ($dimensions && ($dimensions[0] * $dimensions[1]) > self::MAX_INPUT_PIXELS && ! ImageMemory::roomFor($dimensions[0], $dimensions[1], $dimensions['mime'] ?? null)) {
             return $original;
         }
 

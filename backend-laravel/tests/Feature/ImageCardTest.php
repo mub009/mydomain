@@ -819,4 +819,34 @@ class ImageCardTest extends TestCase
         \Illuminate\Support\Facades\Cache::flush();
         $this->get($download)->assertStatus(503)->assertSee('could not be loaded');
     }
+
+    public function test_oversized_card_images_are_shrunk_with_the_actions_left_in_place(): void
+    {
+        Storage::fake('spaces');
+        $img = imagecreatetruecolor(3000, 5000);
+        imagefill($img, 0, 0, imagecolorallocate($img, 20, 120, 60));
+        ob_start();
+        imagepng($img);
+        Http::fake(['markkito.test/big/*' => Http::response((string) ob_get_clean(), 200, ['Content-Type' => 'image/png'])]);
+        unset($img);
+        $card = BusinessCard::updateOrCreate(['businessId' => $this->business->id], [
+            'imageUrl' => 'https://markkito.test/big/card.png', 'imageWidth' => 3000, 'imageHeight' => 5000,
+            'hotspots' => [$this->spot('call', ['x' => 12.5, 'y' => 80])],
+        ]);
+
+        // Listed first, changed only with --apply.
+        $this->artisan('cards:shrink-images')->expectsOutputToContain('3000x5000')->assertSuccessful();
+        $this->assertSame('https://markkito.test/big/card.png', $card->fresh()->imageUrl);
+
+        $this->artisan('cards:shrink-images --apply')->expectsOutputToContain('1 of 1 shrunk')->assertSuccessful();
+        $card->refresh();
+        $this->assertSame(1200, $card->imageWidth);
+        $this->assertSame(2000, $card->imageHeight);
+        $this->assertStringContainsString('cards/images/', $card->imageUrl);
+        $this->assertCount(1, Storage::disk('spaces')->files('cards/images'));
+        // The actions sit in percent of the image: unchanged.
+        $this->assertSame(12.5, (float) $card->hotspots[0]['x']);
+
+        $this->artisan('cards:shrink-images')->expectsOutputToContain('No card images over')->assertSuccessful();
+    }
 }

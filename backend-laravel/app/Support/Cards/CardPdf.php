@@ -5,6 +5,7 @@ namespace App\Support\Cards;
 use App\Models\Business;
 use App\Models\CardTemplate;
 use App\Support\GoldRates\BusinessCard as LogoSource;
+use App\Support\Uploads\ImageMemory;
 use chillerlan\QRCode\Common\EccLevel;
 use chillerlan\QRCode\Output\QRGdImagePNG;
 use chillerlan\QRCode\QRCode;
@@ -39,8 +40,6 @@ class CardPdf
 
     private const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 
-    // Larger pictures aren't opened at all (about 200MB in memory at 50M pixels).
-    private const MAX_IMAGE_PIXELS = 50_000_000;
 
     public static function filename(Business $business, ?CardTemplate $design = null): string
     {
@@ -384,8 +383,13 @@ class CardPdf
                     $body = null;
                 }
 
+                if ($body !== null && ! @getimagesizefromstring($body)) {
+                    Log::warning('Card PDF: downloaded file is not an image PHP can read', ['url' => $url, 'bytes' => strlen($body), 'starts' => bin2hex(substr($body, 0, 12))]);
+                    $body = null;
+                }
+
                 // Cached as base64: the cache may not keep raw bytes intact.
-                return $body !== null && @getimagesizefromstring($body) ? base64_encode($body) : null;
+                return $body !== null ? base64_encode($body) : null;
             } catch (Throwable $e) {
                 report($e);
 
@@ -394,6 +398,55 @@ class CardPdf
         });
 
         return $encoded ? base64_decode($encoded) : null;
+    }
+
+    /**
+     * Why an image can or can't be used for a card PDF, step by step: the
+     * web address, storage, and opening it. For `php artisan cards:check-pdf`.
+     *
+     * @return list<array{0: bool, 1: string}> [ok, what happened]
+     */
+    public static function checkImage(string $url): array
+    {
+        $out = [];
+        $allowed = LogoSource::allowedHost($url);
+        $out[] = [$allowed, 'Allowed host: '.($allowed ? 'yes' : 'NO — '.parse_url($url, PHP_URL_HOST).' is not the Spaces CDN, endpoint or APP_URL host')];
+        $body = null;
+        $started = microtime(true);
+        try {
+            $response = Http::timeout(15)->withOptions(['allow_redirects' => false])->get($url);
+            $ok = $response->successful();
+            $out[] = [$ok, sprintf('Web address: HTTP %d, %d bytes, %.1fs%s', $response->status(), strlen($response->body()), microtime(true) - $started,
+                $response->redirect() ? ' (redirects to '.$response->header('Location').')' : '')];
+            $body = $ok ? $response->body() : null;
+        } catch (Throwable $e) {
+            $out[] = [false, sprintf('Web address: FAILED after %.1fs — %s', microtime(true) - $started, $e->getMessage())];
+        }
+        try {
+            $stored = self::fromStorage($url);
+            $out[] = [$stored !== null, 'Spaces storage: '.($stored !== null ? strlen($stored).' bytes' : 'not found / not readable (see the log)')];
+            $body ??= $stored;
+        } catch (Throwable $e) {
+            $out[] = [false, 'Spaces storage: FAILED — '.$e->getMessage()];
+        }
+        if ($body === null) {
+            return $out;
+        }
+        $size = @getimagesizefromstring($body);
+        $out[] = [(bool) $size, 'Image: '.($size ? "{$size[0]}x{$size[1]} {$size['mime']}" : 'NOT an image PHP can read (starts '.bin2hex(substr($body, 0, 12)).')')];
+        if ($size) {
+            self::makeRoom();
+            if (! ImageMemory::roomFor($size[0], $size[1], $size['mime'])) {
+                $out[] = [false, sprintf('Memory: NOT enough to open %dx%d (%d megapixels, ~%d MB) — memory_limit is %s and this server won\'t raise it', $size[0], $size[1], $size[0] * $size[1] / 1e6, $size[0] * $size[1] * 5 / 1048576, ini_get('memory_limit'))];
+
+                return $out;
+            }
+            $out[] = [true, sprintf('Memory: room to open %d megapixels (memory_limit %s)', $size[0] * $size[1] / 1e6, ini_get('memory_limit'))];
+            $gd = @imagecreatefromstring($body);
+            $out[] = [(bool) $gd, 'GD opens it: '.($gd ? 'yes' : 'NO — GD here lacks '.$size['mime'].' support (gd_info: '.json_encode(array_filter(gd_info(), fn ($v, $k) => str_ends_with($k, 'Support'), ARRAY_FILTER_USE_BOTH)).')')];
+        }
+
+        return $out;
     }
 
     /**
@@ -435,17 +488,31 @@ class CardPdf
      */
     private static function gd(string $url, int $maxSide = 2000): ?\GdImage
     {
+        // A big picture already shrunk on an earlier download.
+        $smallKey = 'card-pdf-small:'.md5($url.'|'.$maxSide);
+        if (($small = Cache::get($smallKey)) && ($img = @imagecreatefromstring(base64_decode($small)))) {
+            imagealphablending($img, false);
+            imagesavealpha($img, true);
+
+            return $img;
+        }
         $bytes = self::fetch($url);
         if (! $bytes) {
             return null;
         }
         $size = @getimagesizefromstring($bytes);
-        if (! $size || $size[0] * $size[1] > self::MAX_IMAGE_PIXELS) {
+        if (! $size || ! ImageMemory::roomFor($size[0], $size[1], $size['mime'] ?? null)) {
+            Log::warning('Card PDF: image too big to open in the memory this server allows', [
+                'url' => $url, 'size' => $size ? "{$size[0]}x{$size[1]}" : null, 'memory_limit' => ini_get('memory_limit'),
+            ]);
+
             return null;
         }
         $img = @imagecreatefromstring($bytes);
         unset($bytes);
         if (! $img) {
+            Log::warning('Card PDF: image could not be opened (does GD support this format?)', ['url' => $url, 'type' => $size['mime'] ?? null]);
+
             return null;
         }
         $w = imagesx($img);
@@ -460,6 +527,10 @@ class CardPdf
         imagefill($small, 0, 0, imagecolorallocatealpha($small, 0, 0, 0, 127));
         imagecopyresampled($small, $img, 0, 0, 0, 0, imagesx($small), imagesy($small), $w, $h);
         unset($img);
+        // Kept, so the next download skips opening the full-size picture.
+        ob_start();
+        imagepng($small, null, 6);
+        Cache::put($smallKey, base64_encode((string) ob_get_clean()), now()->addDays(30));
 
         return $small;
     }
