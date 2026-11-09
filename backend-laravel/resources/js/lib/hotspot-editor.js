@@ -299,7 +299,8 @@ export function initHotspotEditor(editor, options) {
   function detailHtml(h) {
     const selected = h.id === state.selected;
     const shown = targetOf(h);
-    const ring = !shown ? "ring-amber-500" : selected ? "ring-brand-600 ring-[3px] z-10" : "ring-brand-500/50";
+    // A selected picture keeps its layer (front/back), so the editor stacks it as the card will.
+    const ring = !shown ? "ring-amber-500" : selected ? `ring-brand-600 ring-[3px] ${isPicture(h) ? "" : "z-10"}` : "ring-brand-500/50";
     let inner;
     if (kindOf(h) === "image") {
       const src = h.action === "logo" ? h.value || defaults.logo || "" : h.action === "custom_image" ? h.value || "" : "";
@@ -593,7 +594,29 @@ export function initHotspotEditor(editor, options) {
                     : `<div class="flex flex-wrap items-center gap-2">
                          <button type="button" class="btn-primary px-3 py-1.5 text-xs" data-logo-upload>${icon("upload", { size: 13 })} ${h.value ? "Replace image" : "Upload image"}</button>
                          ${h.value && !h.shape ? `<button type="button" class="text-[11px] font-semibold text-ink-500 hover:underline" data-fit-picture>Fit box to picture</button>` : ""}
-                       </div>`
+                       </div>
+                       ${
+                         // Zoom the picture inside the same box: the box keeps its place and size.
+                         h.value
+                           ? `<div class="space-y-1 pt-1">
+                               <span class="flex justify-between text-xs font-semibold text-ink-700">Zoom inside the box <span class="font-normal text-ink-500" data-fit-zoom-label>${h.fit ? `${zoomOf(h.fit, h.value, ...areaPx(h))}%` : "Whole picture"}</span></span>
+                               <div class="flex items-center gap-2">
+                                 <button type="button" data-zoom-step="-10" class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-gray-300 bg-white text-lg font-bold text-ink-700 hover:bg-gray-50" aria-label="Zoom out">−</button>
+                                 <input type="range" min="100" max="${ZOOM_MAX}" step="5" value="${h.fit ? zoomOf(h.fit, h.value, ...areaPx(h)) : 100}" class="min-w-0 flex-1" data-field="fitZoom" aria-label="Zoom the picture" />
+                                 <button type="button" data-zoom-step="10" class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-gray-300 bg-white text-lg font-bold text-ink-700 hover:bg-gray-50" aria-label="Zoom in">+</button>
+                               </div>
+                               ${
+                                 h.fit
+                                   ? `<div class="flex flex-wrap items-center justify-between gap-2">
+                                       <button type="button" data-adjust class="text-[11px] font-semibold ${adjustFor === h.id ? "text-brand-700" : "text-ink-600"} hover:underline">${adjustFor === h.id ? "✓ Done moving" : "Move the picture inside the box"}</button>
+                                       <button type="button" data-fit-reset class="text-[11px] font-semibold text-ink-500 hover:underline">Show whole picture</button>
+                                     </div>
+                                     ${adjustFor === h.id ? `<p class="text-[11px] text-brand-800">Drag the picture on the card to choose what shows in the box.</p>` : ""}`
+                                   : `<p class="text-[11px] text-ink-400">Zoom in to fill the box and show only part of the picture.</p>`
+                               }
+                             </div>`
+                           : ""
+                       }`
                 }
                 <p class="text-[11px] text-ink-400">JPG, PNG or WebP. A PNG with a see-through background stays see-through.</p>
               </div>`
@@ -628,6 +651,27 @@ export function initHotspotEditor(editor, options) {
             : `<p class="rounded-md bg-gray-50 px-2.5 py-2 text-[11px] ${targetOf(h) ? "text-ink-500" : "text-amber-700"}">${esc(
                 targetOf(h) || (h.action === "logo" ? "Your listing has no logo yet — add one in your listing's photos." : ""),
               )}.</p>`
+        }
+        ${
+          // Which picture sits in front where two overlap: the order the boxes
+          // are drawn in, the last on top - the same on the public card and PDF.
+          isPicture(h)
+            ? (() => {
+                const at = state.hotspots.indexOf(h);
+                const last = state.hotspots.length - 1;
+                const btn = (dir, ic, label, off) =>
+                  `<button type="button" data-layer="${dir}" ${off ? "disabled" : ""} class="flex items-center justify-center gap-1 rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-[11px] font-semibold text-ink-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40">${icon(ic, { size: 13 })} ${label}</button>`;
+                return `<div class="space-y-1.5">
+                  <span class="flex justify-between text-xs font-semibold text-ink-700">Front or back <span class="font-normal text-ink-500">${at === last ? "In front of everything" : at === 0 ? "Behind everything" : `Layer ${at + 1} of ${last + 1}`}</span></span>
+                  <div class="grid grid-cols-2 gap-1.5">
+                    ${btn("front", "chevrons-up", "Bring to front", at === last)}
+                    ${btn("back", "chevrons-down", "Send to back", at === 0)}
+                    ${btn("forward", "chevron-up", "One forward", at === last)}
+                    ${btn("backward", "chevron-down", "One back", at === 0)}
+                  </div>
+                </div>`;
+              })()
+            : ""
         }
         ${
           // The logo's size: scales its box about its centre. Works even where boxes can't be dragged (a dealer on a business's card).
@@ -776,10 +820,21 @@ export function initHotspotEditor(editor, options) {
       renderInspector();
     });
     $('[data-field="fitZoom"]', inspector)?.addEventListener("input", (e) => {
+      const first = !h.fit;
       h.fit = zoomFit(h.fit, h.value, ...areaPx(h), Number(e.target.value));
       $("[data-fit-zoom-label]", inspector).textContent = `${e.target.value}%`;
-      changed();
+      // The first zoom turns on "move inside" and "show whole picture".
+      changed({ inspector: first && !areaLocked(h) });
     });
+    $$("[data-zoom-step]", inspector).forEach((b) =>
+      b.addEventListener("click", () => {
+        const now = h.fit ? zoomOf(h.fit, h.value, ...areaPx(h)) : 100;
+        const next = clamp(now + Number(b.dataset.zoomStep), 100, ZOOM_MAX);
+        // Zooming out all the way shows the whole picture again.
+        h.fit = next <= 100 && Number(b.dataset.zoomStep) < 0 ? null : zoomFit(h.fit, h.value, ...areaPx(h), next);
+        changed({ inspector: true });
+      }),
+    );
     $("[data-fit-reset]", inspector)?.addEventListener("click", () => {
       h.fit = null;
       changed({ inspector: true });
@@ -823,6 +878,17 @@ export function initHotspotEditor(editor, options) {
       }),
     );
     $("[data-delete-spot]", inspector)?.addEventListener("click", () => removeSpot(h.id));
+    $$("[data-layer]", inspector).forEach((b) =>
+      b.addEventListener("click", () => {
+        const list = state.hotspots;
+        const from = list.indexOf(h);
+        const to = { front: list.length - 1, back: 0, forward: from + 1, backward: from - 1 }[b.dataset.layer];
+        if (to === from || to < 0 || to >= list.length) return;
+        list.splice(from, 1);
+        list.splice(to, 0, h);
+        changed({ inspector: true });
+      }),
+    );
   }
 
   function renderList() {
@@ -1654,7 +1720,7 @@ export function initHotspotEditor(editor, options) {
     (e) => {
       const el = e.target.closest("[data-spot]");
       const h = el && spotById(el.dataset.spot);
-      if (!h || !areaLocked(h) || e.button > 0) return;
+      if (!h || !(areaLocked(h) || (adjustFor === h.id && h.fit)) || e.button > 0) return;
       e.preventDefault();
       e.stopPropagation();
       if (state.selected !== h.id) select(h.id);

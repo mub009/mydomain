@@ -1,4 +1,4 @@
-import{o as s}from"./ui-BADAA2YD.js";function p(r,d,{footer:i=""}={}){const e=s(r,`<div class="space-y-3">
+import{o as s}from"./ui-D3VsD3yO.js";function p(r,d,{footer:i=""}={}){const e=s(r,`<div class="space-y-3">
       <div class="flex justify-center gap-1 text-xs font-semibold" data-frame-sizes>
         <button type="button" class="rounded-full bg-ink-900 px-3 py-1 text-white" data-size="phone">Phone</button>
         <button type="button" class="rounded-full bg-gray-100 px-3 py-1 text-ink-700" data-size="wide">Wide screen</button>

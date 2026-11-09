@@ -33,6 +33,8 @@ export const ICONS = {
   "chevron-left": "<path d=\"m15 18-6-6 6-6\"></path>",
   "chevron-right": "<path d=\"m9 18 6-6-6-6\"></path>",
   "chevron-up": "<path d=\"m18 15-6-6-6 6\"></path>",
+  "chevrons-down": "<path d=\"m7 6 5 5 5-5\"></path><path d=\"m7 13 5 5 5-5\"></path>",
+  "chevrons-up": "<path d=\"m17 11-5-5-5 5\"></path><path d=\"m17 18-5-5-5 5\"></path>",
   "clock": "<circle cx=\"12\" cy=\"12\" r=\"10\"></circle><polyline points=\"12 6 12 12 16 14\"></polyline>",
   "coins": "<circle cx=\"8\" cy=\"8\" r=\"6\"></circle><path d=\"M18.09 10.37A6 6 0 1 1 10.34 18\"></path><path d=\"M7 6h1v4\"></path><path d=\"m16.71 13.88.7.71-2.82 2.82\"></path>",
   "copy": "<rect width=\"14\" height=\"14\" x=\"8\" y=\"8\" rx=\"2\" ry=\"2\"></rect><path d=\"M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2\"></path>",
