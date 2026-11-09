@@ -43,8 +43,8 @@
       "_channels-CvUWVcU_.js"
     ]
   },
-  "_hotspot-editor-CvY7A7wW.js": {
-    "file": "assets/hotspot-editor-CvY7A7wW.js",
+  "_hotspot-editor-2GWmYuuw.js": {
+    "file": "assets/hotspot-editor-2GWmYuuw.js",
     "name": "hotspot-editor",
     "imports": [
       "_api-B_riRJ0q.js",
@@ -89,7 +89,7 @@
     ]
   },
   "resources/css/app.css": {
-    "file": "assets/app-COxZLfE_.css",
+    "file": "assets/app-4f69DmNG.css",
     "src": "resources/css/app.css",
     "isEntry": true
   },
@@ -165,7 +165,7 @@
     ]
   },
   "resources/js/pages/card-manager.js": {
-    "file": "assets/card-manager-CnXC74GY.js",
+    "file": "assets/card-manager-CtV5zIYH.js",
     "name": "card-manager",
     "src": "resources/js/pages/card-manager.js",
     "isEntry": true,
@@ -173,20 +173,20 @@
       "_api-B_riRJ0q.js",
       "_card-preview-Cd8sMS9Q.js",
       "_channels-CvUWVcU_.js",
-      "_hotspot-editor-CvY7A7wW.js",
+      "_hotspot-editor-2GWmYuuw.js",
       "_ui-BADAA2YD.js",
       "_widgets-DxMtY6cb.js",
       "__commonjsHelpers-CqkleIqs.js"
     ]
   },
   "resources/js/pages/card-template-editor.js": {
-    "file": "assets/card-template-editor-DBL-B4kU.js",
+    "file": "assets/card-template-editor-CoCfgvGk.js",
     "name": "card-template-editor",
     "src": "resources/js/pages/card-template-editor.js",
     "isEntry": true,
     "imports": [
       "_api-B_riRJ0q.js",
-      "_hotspot-editor-CvY7A7wW.js",
+      "_hotspot-editor-2GWmYuuw.js",
       "_searchable-select-DIqbFGfN.js",
       "_ui-BADAA2YD.js",
       "_widgets-DxMtY6cb.js",

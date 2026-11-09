@@ -125,7 +125,7 @@
       </div>
     @else
     {{-- The editor: the card image with its actions, and the palette to drag them from --}}
-    <div class="card p-5" data-card-editor>
+    <div class="card p-3 sm:p-5" data-card-editor>
       <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 class="flex items-center gap-1.5 font-bold text-ink-900"><x-icon name="image" :size="16" class="text-brand-600" /> Card design & actions</h3>

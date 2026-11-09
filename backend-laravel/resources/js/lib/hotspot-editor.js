@@ -319,7 +319,10 @@ export function initHotspotEditor(editor, options) {
     }
     const align = { left: "justify-start text-left", center: "justify-center text-center", right: "justify-end text-right" }[h.align || "left"];
     return `<div data-spot="${esc(h.id)}" tabindex="0" role="button" aria-label="${esc(actions[h.action].label)} — drag to move"
-        class="absolute flex ${adjustFor === h.id || (areaLocked(h) && h.value) ? "cursor-grab" : canDrag(h) ? "cursor-move" : "cursor-pointer"} touch-none items-center overflow-visible rounded ${kindOf(h) === "text" ? `${align} px-[0.15em] leading-tight text-white` : ""} ring-2 ${ring} focus:outline-none"
+        class="absolute flex ${adjustFor === h.id || (areaLocked(h) && h.value) ? "cursor-grab" : canDrag(h) ? "cursor-move" : "cursor-pointer"} ${
+          // Only a box that moves keeps the finger: elsewhere a swipe over the card scrolls the page (phones).
+          adjustFor === h.id || (areaLocked(h) && h.value) || canDrag(h) ? "touch-none" : ""
+        } items-center overflow-visible rounded ${kindOf(h) === "text" ? `${align} px-[0.15em] leading-tight text-white` : ""} ring-2 ${ring} focus:outline-none"
         style="left:${h.x}%;top:${h.y}%;width:${h.w}%;height:${h.h}%;${kindOf(h) === "text" ? esc(textStyle(h)) : ""}">
         ${inner}
         ${!shown ? `<span class="pointer-events-none absolute -top-2.5 left-1 rounded bg-amber-500 px-1 text-[9px] text-white">${h.action === "logo" ? "upload a logo" : h.action === "custom_image" ? "upload a picture" : h.action === "custom_text" ? "type your text" : "not on your listing"}</span>` : ""}
@@ -364,7 +367,7 @@ export function initHotspotEditor(editor, options) {
           .join("")
       : "";
     return `<div data-spot="${esc(h.id)}" tabindex="0" role="button" aria-label="${esc(textOf(h))} — drag to move"
-        class="absolute flex ${canMove ? "cursor-move" : "cursor-pointer"} touch-none items-center justify-center gap-1 overflow-visible rounded-lg ${drawn ? "" : "text-[11px] font-semibold"} ring-2 ${ring} ${fill} ${selected ? "z-10 ring-[3px]" : ""} focus:outline-none"
+        class="absolute flex ${canMove ? "cursor-move touch-none" : "cursor-pointer"} items-center justify-center gap-1 overflow-visible rounded-lg ${drawn ? "" : "text-[11px] font-semibold"} ring-2 ${ring} ${fill} ${selected ? "z-10 ring-[3px]" : ""} focus:outline-none"
         style="left:${h.x}%;top:${h.y}%;width:${h.w}%;height:${h.h}%;${drawn ? esc(textStyle(h)) : ""}">
         <span class="pointer-events-none flex min-w-0 items-center gap-1 rounded px-1 ${drawn ? "" : "bg-white/85 text-brand-800"}">
           ${icon(a.icon, { size: 13, className: drawn ? "h-[1.35em] w-[1.35em] shrink-0" : "shrink-0" })}<span class="truncate ${h.style === "icon" ? "sr-only" : ""}">${esc(textOf(h))}</span>
@@ -406,10 +409,11 @@ export function initHotspotEditor(editor, options) {
         ? `<textarea rows="2" maxlength="300" class="input py-1.5 text-xs" data-quick-value placeholder="${esc(fallback || "")}">${esc(h.value || "")}</textarea>`
         : `<input type="${help.type}" maxlength="300" class="input py-1.5 text-xs" data-quick-value value="${esc(h.value || "")}" placeholder="${esc(fallback || help.placeholder)}" />`;
     return `<div data-quick-box class="absolute z-20 w-60 max-w-[95%] rounded-lg border border-brand-300 bg-white p-2 text-left shadow-lg"
-        style="left:min(${h.x}%, calc(100% - 15rem));${below ? `top:calc(${h.y + h.h}% + 6px)` : `bottom:calc(${100 - h.y}% + 6px)`}">
+        style="left:max(0.25rem, min(${h.x}%, calc(100% - 15.25rem)));${below ? `top:calc(${h.y + h.h}% + 6px)` : `bottom:calc(${100 - h.y}% + 6px)`}">
         <label class="mb-1 flex items-center gap-1 text-[11px] font-bold text-ink-900">${icon(a.icon, { size: 12, className: "text-brand-600" })} ${esc(title)}</label>
         ${field}
         ${hint ? `<p class="mt-1 text-[10px] ${fallback ? "text-ink-500" : "text-amber-700"}">${esc(hint)}</p>` : ""}
+        <button type="button" class="mt-1 text-[10px] font-semibold text-brand-700 hover:underline lg:hidden" data-quick-more>More settings ↓</button>
       </div>`;
   }
 
@@ -427,6 +431,8 @@ export function initHotspotEditor(editor, options) {
       const twin = $('[data-field="value"]', inspector);
       if (twin) twin.value = field.value;
     });
+    // On a phone the settings sit below the card: take the person there.
+    $("[data-quick-more]", box)?.addEventListener("click", () => inspector.scrollIntoView({ behavior: "smooth", block: "start" }));
     // Redrawn once done, so the box's "needs details" mark updates.
     field.addEventListener("change", () => renderStage());
   }
@@ -808,6 +814,13 @@ export function initHotspotEditor(editor, options) {
           .map((h) => {
             const a = actions[h.action];
             const target = targetOf(h);
+            const help = a.value && kindOf(h) !== "image" ? VALUE_HELP[a.value] : null;
+            // Nothing to show or link to yet: fill it in right here, under its label.
+            const fillIn =
+              !target && help
+                ? `<input type="${a.value === "text" ? "text" : help.type}" maxlength="300" data-list-value="${esc(h.id)}"
+                    class="input ml-8 mt-1 w-[calc(100%-2rem)] border-amber-300 py-1.5 text-xs" placeholder="${esc(h.action === "custom_text" ? "Type your text" : help.placeholder || help.label)}" aria-label="${esc(`${textOf(h)}: ${help.label}`)}" />`
+                : "";
             return `<li>
               <button type="button" data-select-spot="${esc(h.id)}" class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs ${
                 h.id === state.selected ? "bg-brand-50 text-brand-900" : "hover:bg-gray-50"
@@ -815,9 +828,10 @@ export function initHotspotEditor(editor, options) {
                 <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-100 text-ink-700">${icon(a.icon, { size: 12 })}</span>
                 <span class="min-w-0 flex-1">
                   <span class="block truncate font-semibold">${esc(textOf(h))}</span>
-                  <span class="block truncate ${target ? "text-ink-500" : "text-amber-700"}">${esc(target || (h.action === "custom_text" ? "Type your text" : "Needs a phone/address/link"))}</span>
+                  <span class="block truncate ${target ? "text-ink-500" : "text-amber-700"}">${esc(target || (h.action === "custom_text" ? "Type your text" : help ? `Needs ${help.label.toLowerCase()} — type it below` : "Needs a phone/address/link"))}</span>
                 </span>
               </button>
+              ${fillIn}
             </li>`;
           })
           .join("")
@@ -1742,9 +1756,14 @@ export function initHotspotEditor(editor, options) {
     menu = document.createElement("div");
     menu.dataset.spotMenu = "";
     menu.setAttribute("role", "menu");
-    menu.className = "absolute z-20 max-h-72 w-48 overflow-y-auto rounded-xl bg-white p-1 text-left shadow-xl ring-1 ring-black/10";
-    // Open toward the middle so the menu stays on the image.
-    Object.assign(menu.style, x > 55 ? { right: `${100 - x}%` } : { left: `${x}%` }, y > 55 ? { bottom: `${100 - y}%` } : { top: `${y}%` });
+    menu.className = "absolute z-20 max-h-72 w-48 max-w-[calc(100%-1rem)] overflow-y-auto rounded-xl bg-white p-1 text-left shadow-xl ring-1 ring-black/10";
+    // Open toward the middle so the menu stays on the image — and never past
+    // its edge, where the card cuts it off (a narrow phone card is ~300px).
+    Object.assign(
+      menu.style,
+      x > 55 ? { right: `max(0.5rem, min(${100 - x}%, calc(100% - 12.5rem)))` } : { left: `max(0.5rem, min(${x}%, calc(100% - 12.5rem)))` },
+      y > 55 ? { bottom: `max(0.5rem, ${100 - y}%)` } : { top: `max(0.5rem, min(${y}%, calc(100% - 18.5rem)))` },
+    );
     menu.innerHTML = GROUPS.map(
       ([kind, title]) => `<p class="px-2 pb-1 pt-1.5 text-[11px] font-semibold uppercase tracking-wide text-ink-500">${esc(title)}</p>
       ${actionList
@@ -1795,6 +1814,23 @@ export function initHotspotEditor(editor, options) {
   list.addEventListener("click", (e) => {
     const b = e.target.closest("[data-select-spot]");
     if (b) select(b.dataset.selectSpot);
+  });
+  // A missing link or text typed in the list: the card shows it as you type;
+  // the list itself redraws once you leave the box, so typing keeps focus.
+  list.addEventListener("input", (e) => {
+    const field = e.target.closest("[data-list-value]");
+    const h = field && spotById(field.dataset.listValue);
+    if (!h) return;
+    h.value = field.value.trim() || null;
+    markDirty();
+    renderStage();
+    if (state.selected === h.id) {
+      const twin = $('[data-field="value"]', inspector);
+      if (twin) twin.value = field.value;
+    }
+  });
+  list.addEventListener("change", (e) => {
+    if (e.target.closest("[data-list-value]")) renderList();
   });
 
   // --- The image -------------------------------------------------------------
