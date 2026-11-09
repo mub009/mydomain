@@ -758,8 +758,15 @@ class ImageCardTest extends TestCase
         $this->get("/dashboard/businesses/{$this->business->id}?section=".urlencode('Visiting Card'))->assertOk()
             ->assertSee('data-missing-form data-via="links"', false)
             ->assertSee('name="instagramUsername"', false)
-            // A logo needs an upload: it keeps its link to Contact.
-            ->assertSee('Add in Contact', false);
+            // The logo is uploaded right here too; only opening hours link to their section.
+            ->assertSee('data-upload-field="business-logo"', false)->assertSee('name="logoUrl"', false)
+            ->assertDontSee('Add in Contact', false);
+
+        $this->business->update(['description' => null]);
+        $this->save([$this->spot('hours'), $this->spot('about')])->assertOk();
+        $this->get("/dashboard/businesses/{$this->business->id}?section=".urlencode('Visiting Card'))->assertOk()
+            ->assertSee('<textarea id="missing-about" name="description"', false)
+            ->assertSee('Add in Hours', false);
     }
 
     public function test_a_card_made_from_a_huge_photo_downloads_as_a_pdf_within_the_live_memory_limit(): void

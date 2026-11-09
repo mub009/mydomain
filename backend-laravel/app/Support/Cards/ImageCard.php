@@ -498,9 +498,15 @@ class ImageCard
 
     // The missing details that can be typed in right on the Visiting Card
     // section: [the field, the endpoint that saves it (the listing itself, or
-    // its review/social links), the input type, a placeholder]. The rest —
-    // logo, hours, address — keep their link to the section that edits them.
+    // its review/social links), the input type (or "image": an upload, or
+    // "textarea"), a placeholder]. Only opening hours — a whole week — keeps
+    // its link to the section that edits it.
     public const DETAIL_INPUTS = [
+        'logo' => ['logoUrl', 'business', 'image', 'https://…/logo.png or upload'],
+        'name' => ['name', 'business', 'text', 'Your business name'],
+        'tagline' => ['city', 'business', 'text', 'Your city'],
+        'directions' => ['addressLine1', 'business', 'text', 'Shop no., street, area'],
+        'address' => ['addressLine1', 'business', 'text', 'Shop no., street, area'],
         'call' => ['phone', 'business', 'tel', 'e.g. 98765 43210'],
         'phone_text' => ['phone', 'business', 'tel', 'e.g. 98765 43210'],
         'whatsapp' => ['whatsappNumber', 'business', 'tel', 'e.g. 98765 43210'],
@@ -508,7 +514,7 @@ class ImageCard
         'email_text' => ['email', 'business', 'email', 'you@yourshop.com'],
         'website' => ['website', 'business', 'url', 'https://…'],
         'website_text' => ['website', 'business', 'url', 'https://…'],
-        'about' => ['description', 'business', 'text', 'A short line about what you do'],
+        'about' => ['description', 'business', 'textarea', 'A short line about what you do'],
         'instagram' => ['instagramUsername', 'links', 'text', '@yourshop'],
         'facebook' => ['facebookPageUrl', 'links', 'text', 'yourshop or https://facebook.com/yourshop'],
         'youtube' => ['youtubeUrl', 'links', 'text', '@yourshop or a full YouTube link'],

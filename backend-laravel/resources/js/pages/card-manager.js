@@ -51,7 +51,8 @@ if (root && card) {
   $$("[data-missing-form]", root).forEach((form) =>
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
-      const input = $("input", form);
+      // A textbox, a textarea, or the link box of the logo upload.
+      const input = $("[data-upload-url], textarea[name], input[name]", form);
       const button = $("[data-missing-save]", form);
       const value = input.value.trim();
       if (!value) return input.focus();
@@ -68,6 +69,10 @@ if (root && card) {
         fail(err);
       }
     }),
+  );
+  // An uploaded logo is saved at once — no need to press Save.
+  $$("[data-missing-form] [data-upload-field]", root).forEach((field) =>
+    field.addEventListener("upload:done", () => field.closest("form").requestSubmit()),
   );
 
   // --- Publish, preview, link, QR -------------------------------------------
