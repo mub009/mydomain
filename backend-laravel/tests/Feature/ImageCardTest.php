@@ -9,6 +9,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 // Image cards: the business uploads its own card artwork and places
@@ -784,5 +785,38 @@ class ImageCardTest extends TestCase
         $this->assertStringStartsWith('%PDF', $pdf);
         // The photo itself, and the picture on it, both made it in.
         $this->assertGreaterThanOrEqual(2, preg_match_all('~/Subtype\s*/Image~', $pdf));
+    }
+
+    public function test_the_dashboard_pdf_is_always_the_card_shown_never_another_design(): void
+    {
+        // The card's image can't be fetched from its web address on this server.
+        Http::fake(['markkito.test/cards/*' => Http::response('', 500)]);
+        $jpeg = function (): string {
+            $img = imagecreatetruecolor(600, 1000);
+            imagefill($img, 0, 0, imagecolorallocate($img, 200, 30, 30));
+            ob_start();
+            imagejpeg($img);
+
+            return (string) ob_get_clean();
+        };
+        BusinessCard::updateOrCreate(['businessId' => $this->business->id], [
+            'imageUrl' => 'https://markkito.test/cards/images/mine.jpg', 'imageWidth' => 600, 'imageHeight' => 1000,
+            'hotspots' => [$this->spot('call')], 'isPublished' => true,
+        ]);
+        $this->withoutVite();
+        $this->post('/login', ['email' => $this->ownerEmail, 'password' => 'Password123!']);
+        $download = "/dashboard/businesses/{$this->business->id}/card.pdf";
+
+        // Read straight from storage instead: the card's own image, as one picture filling the page.
+        Storage::fake('spaces');
+        Storage::disk('spaces')->put('cards/images/mine.jpg', $jpeg());
+        $pdf = $this->get($download)->assertOk()->getContent();
+        $this->assertStringStartsWith('%PDF', $pdf);
+        $this->assertSame(1, preg_match_all('~/Subtype\s*/Image~', $pdf));
+
+        // Not in storage either: a clear error, not a PDF of some other design.
+        Storage::disk('spaces')->delete('cards/images/mine.jpg');
+        \Illuminate\Support\Facades\Cache::flush();
+        $this->get($download)->assertStatus(503)->assertSee('could not be loaded');
     }
 }

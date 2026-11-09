@@ -9,6 +9,7 @@ use App\Models\CardTemplate;
 use App\Support\BusinessAccess;
 use App\Support\BusinessFeatures;
 use App\Support\Cards\CardEngine;
+use App\Support\Cards\CardImageUnavailable;
 use App\Support\Cards\CardPdf;
 use App\Support\Cards\ImageCard;
 use App\Support\Cards\ImageColour;
@@ -140,8 +141,21 @@ class CardPageController extends Controller
     private static function pdfResponse(Business $business, bool $live, ?CardTemplate $design = null)
     {
         $disposition = request()->boolean('inline') ? 'inline' : 'attachment';
+        try {
+            $pdf = CardPdf::render($business, $live, $design);
+        } catch (CardImageUnavailable $e) {
+            // Better no file than a PDF of some other design.
+            $back = e(url()->previous() ?: '/');
 
-        return response(CardPdf::render($business, $live, $design))
+            return response('<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Card PDF</title></head>'
+                .'<body style="font-family:system-ui,sans-serif;max-width:520px;margin:15vh auto;padding:0 16px;color:#111827">'
+                .'<h1 style="font-size:20px">Couldn&rsquo;t make the PDF</h1><p>'.e($e->getMessage()).'</p>'
+                .'<p><a href="'.$back.'" style="color:#047857;font-weight:600">&larr; Back</a></p></body></html>', 503)
+                ->header('Content-Type', 'text/html; charset=UTF-8')
+                ->header('Retry-After', '60');
+        }
+
+        return response($pdf)
             ->header('Content-Type', 'application/pdf')
             ->header('Content-Disposition', $disposition.'; filename="'.CardPdf::filename($business, $design).'"')
             ->header('Cache-Control', 'private, max-age=0, no-store');

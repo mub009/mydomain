@@ -61,7 +61,7 @@ class CardPdf
             $pdf = self::renderImage($business, $source, $live);
             if ($pdf === null) {
                 Log::error('Card PDF: the card image could not be read', ['business' => $business->id, 'image' => $source['imageUrl'] ?? null]);
-                abort(503, 'Your card image could not be loaded to make the PDF just now. Please try again in a minute.');
+                throw new CardImageUnavailable;
             }
 
             return $pdf;
