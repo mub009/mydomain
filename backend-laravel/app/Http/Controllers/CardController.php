@@ -177,6 +177,10 @@ class CardController extends Controller
             'multiView' => ['sometimes', 'boolean'],
             'extraTemplateIds' => ['sometimes', 'nullable', 'array', 'max:50'],
             'extraTemplateIds.*' => ['uuid'],
+            // A picture for one of the design's free-image spots ("Missing on your listing").
+            'spotImage' => ['sometimes', 'array'],
+            'spotImage.id' => ['required_with:spotImage', 'string', 'max:40'],
+            'spotImage.url' => ['required_with:spotImage', 'url', 'max:500'],
         ]);
         if (! $data) {
             throw ApiException::badRequest('Send a templateId, backgroundImageUrl, imageUrl, hotspots, imageColour or multiView');
@@ -218,6 +222,22 @@ class CardController extends Controller
         }
         if (array_key_exists('hotspots', $data)) {
             $changes['hotspots'] = ImageCard::normalize($data['hotspots'] ?? []);
+        }
+        // Filling a free-image spot is content, not design: the whole business team can.
+        // A card still wearing a ready-made design gets its own copy of it, with the picture in.
+        if (isset($data['spotImage']) && ! array_key_exists('hotspots', $changes)) {
+            if (! CardEngine::isSafeUrl($data['spotImage']['url'])) {
+                throw ApiException::badRequest('That image address cannot be used');
+            }
+            $source = ImageCard::source($business);
+            $hotspots = $source ? ImageCard::withSpotImage($source['hotspots'], $data['spotImage']['id'], $data['spotImage']['url']) : null;
+            if ($hotspots === null) {
+                throw ApiException::badRequest('Your card has no such image spot');
+            }
+            $changes['hotspots'] = $hotspots;
+            if ($source['fromTemplate']) {
+                $changes += ['imageUrl' => $source['imageUrl'], 'imageWidth' => $source['imageWidth'], 'imageHeight' => $source['imageHeight']];
+            }
         }
         if (array_key_exists('imageColour', $data)) {
             $changes['imageColour'] = ImageColour::normalize(self::withOwnAreas($actor, $data['imageColour'], $business->card?->imageColour));

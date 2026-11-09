@@ -60,8 +60,13 @@ if (root && card) {
       button.disabled = true;
       button.textContent = "Saving…";
       try {
-        const path = form.dataset.via === "links" ? `/businesses/${biz.id}/review-links` : `/businesses/${biz.id}`;
-        await api.patch(path, { [input.name]: value });
+        if (form.dataset.via === "spot") {
+          // A free-image spot: the picture goes on the card itself.
+          await api.put(base, { spotImage: { id: form.dataset.spot, url: value } });
+        } else {
+          const path = form.dataset.via === "links" ? `/businesses/${biz.id}/review-links` : `/businesses/${biz.id}`;
+          await api.patch(path, { [input.name]: value });
+        }
         reloadWithFlash(`${$("label", form).textContent.trim()} saved — it's on your card now.`);
       } catch (err) {
         button.disabled = false;

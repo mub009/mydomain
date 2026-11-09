@@ -9,7 +9,14 @@
     @foreach ($card['missingDetails'] as $m)
       @php $input = \App\Support\Cards\ImageCard::DETAIL_INPUTS[$m['key']] ?? null; @endphp
       <li class="rounded-lg bg-white px-3 py-2 text-sm">
-        @if ($input)
+        @if ($m['key'] === 'custom_image')
+          {{-- A free-image spot in the design: its picture goes on the card itself. --}}
+          <form class="space-y-1.5" data-missing-form data-via="spot" data-spot="{{ $m['spot'] }}">
+            <label class="block text-xs font-semibold text-ink-900">{{ $m['label'] }}</label>
+            <x-upload-field name="spotUrl" purpose="card-images"placeholder="https://… or upload a picture" data-missing-upload />
+            <button class="btn-primary px-3 py-1.5 text-xs" data-missing-save>Save</button>
+          </form>
+        @elseif ($input)
           @php [$field, $via, $type, $placeholder] = $input; @endphp
           <form class="space-y-1.5" data-missing-form data-via="{{ $via }}">
             <label class="block text-xs font-semibold text-ink-900" for="missing-{{ $m['key'] }}">{{ $m['label'] }}</label>

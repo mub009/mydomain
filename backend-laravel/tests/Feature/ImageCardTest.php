@@ -97,6 +97,34 @@ class ImageCardTest extends TestCase
         $this->assertStringNotContainsString('aria-label="Instagram"', $dealerHtml);
     }
 
+    public function test_the_business_owner_uploads_a_picture_into_a_free_image_spot(): void
+    {
+        $this->withoutVite();
+        $this->imageTemplate($this->admin(), ['hotspots' => [$this->spot('call'), $this->spot('custom_image', ['label' => 'Shop photo'])]]);
+        $token = $this->postJson('/api/v1/auth/login', ['email' => $this->ownerEmail, 'password' => 'Password123!'])->json('data.accessToken');
+        $owner = ['Authorization' => "Bearer {$token}"];
+        $url = "/api/v1/businesses/{$this->business->id}/card";
+
+        // The empty free image is listed as missing, with an upload box.
+        $this->getJson($url, $owner)->assertJsonPath('data.missingDetails', [
+            ['key' => 'custom_image', 'spot' => 'h-custom_image', 'label' => 'Shop photo', 'section' => 'Visiting Card'],
+        ]);
+        $this->post('/login', ['email' => $this->ownerEmail, 'password' => 'Password123!']);
+        $this->get("/dashboard/businesses/{$this->business->id}?section=".urlencode('Visiting Card'))->assertOk()
+            ->assertSee('data-via="spot" data-spot="h-custom_image"', false)->assertSee('data-upload-field="card-images"', false);
+
+        // Only that kind of spot, and only a safe picture.
+        $this->putJson($url, ['spotImage' => ['id' => 'h-call', 'url' => 'https://cdn.example.test/p.jpg']], $owner)->assertStatus(400);
+        $this->putJson($url, ['spotImage' => ['id' => 'h-custom_image', 'url' => 'https://cdn.example.test/cards/images/shop.jpg']], $owner)->assertOk();
+
+        // The card gets its own copy of the design, with the picture in it.
+        $card = BusinessCard::where('businessId', $this->business->id)->first();
+        $this->assertSame('https://cdn.example.test/cards/images/template.jpg', $card->imageUrl);
+        $this->assertSame('https://cdn.example.test/cards/images/shop.jpg', collect($card->hotspots)->firstWhere('id', 'h-custom_image')['value']);
+        $this->getJson($url, $owner)->assertJsonPath('data.missingDetails', []);
+        $this->assertStringContainsString('cards/images/shop.jpg', $this->getJson($url, $owner)->json('data.imagePreviewHtml'));
+    }
+
     public function test_a_logo_box_shows_the_business_photo_when_it_has_no_logo(): void
     {
         $this->save([$this->spot('logo')])->assertOk();

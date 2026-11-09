@@ -533,6 +533,12 @@ class ImageCard
         $missing = [];
         foreach ($hotspots as $h) {
             $action = $h['action'] ?? null;
+            // A free image has no listing detail behind it: its picture is uploaded onto that spot.
+            if ($action === 'custom_image' && empty($h['value']) && ! empty($h['id'])) {
+                $missing['spot:'.$h['id']] = ['key' => 'custom_image', 'spot' => (string) $h['id'], 'label' => ($h['label'] ?? null) ?: 'Free image', 'section' => 'Visiting Card'];
+
+                continue;
+            }
             if (! isset(self::DETAIL_SOURCES[$action]) || ! empty($h['value']) || ! empty($defaults[$action])) {
                 continue;
             }
@@ -541,6 +547,25 @@ class ImageCard
         }
 
         return array_values($missing);
+    }
+
+    /**
+     * The card's spots with a picture put into one free-image spot — what
+     * the business team saves from "Missing on your listing" without the
+     * design editor. null = no such free-image spot.
+     */
+    public static function withSpotImage(array $hotspots, string $spotId, ?string $url): ?array
+    {
+        $found = false;
+        foreach ($hotspots as &$h) {
+            if (($h['id'] ?? null) === $spotId && ($h['action'] ?? null) === 'custom_image') {
+                $h['value'] = $url;
+                $found = true;
+            }
+        }
+        unset($h);
+
+        return $found ? $hotspots : null;
     }
 
     /** For a template, built before any business wears it: what each empty value will use. */
