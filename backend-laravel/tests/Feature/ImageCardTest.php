@@ -751,46 +751,44 @@ class ImageCardTest extends TestCase
 
     public function test_a_card_made_from_a_big_phone_photo_downloads_as_a_pdf_within_memory(): void
     {
-        // A 12-megapixel photo, as a phone takes it: the card image and a free image on it.
-        $path = public_path('test-big-card-'.uniqid().'.jpg');
+        // 12-megapixel photos, as a phone takes them, full of detail like a real
+        // photo (a plain one squeezes too small to test anything): the card
+        // image, and four different ones placed on it as free images.
         $img = imagecreatetruecolor(3000, 4000);
-        // Full of detail, like a real photo (a plain one squeezes too small to test anything).
         mt_srand(7);
         for ($y = 0; $y < 4000; $y += 4) {
             for ($x = 0; $x < 3000; $x += 4) {
                 imagefilledrectangle($img, $x, $y, $x + 3, $y + 3, mt_rand(0, 0xFFFFFF));
             }
         }
-        imagejpeg($img, $path, 90);
-        // Four more big pictures placed on it as free images, each a different photo.
-        $pics = [];
+        $jpeg = function (\GdImage $g): string {
+            ob_start();
+            imagejpeg($g, null, 90);
+
+            return (string) ob_get_clean();
+        };
+        $photos = ['card' => $jpeg($img)];
         foreach ([0, 1, 2, 3] as $i) {
-            $pics[$i] = public_path('test-big-pic-'.uniqid()."-{$i}.jpg");
-            $crop = imagecrop($img, ['x' => 0, 'y' => $i * 50, 'width' => 3000, 'height' => 3800]);
-            imagejpeg($crop, $pics[$i], 90);
+            $photos["pic{$i}"] = $jpeg(imagecrop($img, ['x' => 0, 'y' => $i * 50, 'width' => 3000, 'height' => 3800]));
         }
-        unset($img, $crop);
-        $url = '/'.basename($path);
-        $free = array_map(fn ($i) => ['id' => "pic{$i}", 'action' => 'custom_image', 'x' => 5 + $i * 20, 'y' => 10, 'w' => 18, 'h' => 20, 'value' => '/'.basename($pics[$i])], array_keys($pics));
-        try {
-            BusinessCard::updateOrCreate(['businessId' => $this->business->id], [
-                'imageUrl' => $url, 'imageWidth' => 3000, 'imageHeight' => 4000, 'isPublished' => true,
-                'hotspots' => [$this->spot('call'), ...$free],
-                'imageColour' => ['tint' => '#ff0000', 'strength' => 80, 'areas' => [['erase' => false, 'points' => [[0, 0], [60, 0], [60, 60], [0, 60]]]]],
-            ]);
-            memory_reset_peak_usage();
-            $before = memory_get_usage();
-            $pdf = $this->get('/card/spice-garden.pdf')->assertOk()->getContent();
-            $this->assertStringStartsWith("%PDF", $pdf);
-            fwrite(STDERR, "IMAGES: ".preg_match_all("~/Subtypes*/Image~", $pdf)." SIZE MB: ".round(strlen($pdf) / 1048576, 1)."
-");
-            // Well inside the 256MB the live server allows.
-            fwrite(STDERR, "PEAK MB: ".round((memory_get_peak_usage() - $before) / 1048576)."
-");
-            $this->assertLessThan(200 * 1024 * 1024, memory_get_peak_usage() - $before);
-        } finally {
-            @unlink($path);
-            array_map('unlink', $pics);
-        }
+        unset($img);
+        Http::fake(['markkito.test/big/*' => fn ($request) => Http::response($photos[basename($request->url(), '.jpg')], 200, ['Content-Type' => 'image/jpeg'])]);
+        $free = array_map(fn ($i) => ['id' => "pic{$i}", 'action' => 'custom_image', 'x' => 5 + $i * 20, 'y' => 10, 'w' => 18, 'h' => 20, 'value' => "https://markkito.test/big/pic{$i}.jpg"], [0, 1, 2, 3]);
+        BusinessCard::updateOrCreate(['businessId' => $this->business->id], [
+            'imageUrl' => 'https://markkito.test/big/card.jpg', 'imageWidth' => 3000, 'imageHeight' => 4000, 'isPublished' => true,
+            'hotspots' => [$this->spot('call'), ...$free],
+            'imageColour' => ['tint' => '#ff0000', 'strength' => 80, 'areas' => [['erase' => false, 'points' => [[0, 0], [60, 0], [60, 60], [0, 60]]]]],
+        ]);
+
+        memory_reset_peak_usage();
+        $before = memory_get_usage();
+        $pdf = $this->get('/card/spice-garden.pdf')->assertOk()->getContent();
+        $peak = memory_get_peak_usage() - $before;
+        $this->assertStringStartsWith('%PDF', $pdf);
+        // The card and all four pictures are in it.
+        $this->assertGreaterThanOrEqual(5, preg_match_all('~/Subtype\s*/Image~', $pdf));
+        fwrite(STDERR, 'PEAK MB: '.round($peak / 1048576).' PDF MB: '.round(strlen($pdf) / 1048576, 1).PHP_EOL);
+        // Well inside the 256MB the live server allows.
+        $this->assertLessThan(160 * 1024 * 1024, $peak);
     }
 }
