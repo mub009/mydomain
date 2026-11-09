@@ -13,6 +13,8 @@ use Dompdf\Dompdf;
 use Dompdf\Options;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Throwable;
 
 /**
@@ -52,11 +54,16 @@ class CardPdf
     public static function render(Business $business, bool $live, ?CardTemplate $design = null): string
     {
         self::makeRoom();
-        if ($design && ($source = ImageCard::fromTemplate($design)) && ($pdf = self::renderImage($business, $source, $live)) !== null) {
-            return $pdf;
-        }
-        // An image card prints as its own artwork; if that can't be read, the template is the fallback.
-        if (($source = ImageCard::source($business)) && ($pdf = self::renderImage($business, $source, $live)) !== null) {
+        // A card with an image prints exactly that image. If it can't be read,
+        // the download fails rather than quietly printing another design.
+        $source = $design ? ImageCard::fromTemplate($design) : ImageCard::source($business);
+        if ($source) {
+            $pdf = self::renderImage($business, $source, $live);
+            if ($pdf === null) {
+                Log::error('Card PDF: the card image could not be read', ['business' => $business->id, 'image' => $source['imageUrl'] ?? null]);
+                abort(503, 'Your card image could not be loaded to make the PDF just now. Please try again in a minute.');
+            }
+
             return $pdf;
         }
 
@@ -359,9 +366,21 @@ class CardPdf
                     $body = $path && str_starts_with($path, $public.DIRECTORY_SEPARATOR) && is_file($path) && filesize($path) <= self::MAX_IMAGE_BYTES
                         ? (string) file_get_contents($path) : null;
                 } elseif (LogoSource::allowedHost($url)) {
-                    $response = Http::timeout(10)->withOptions(['allow_redirects' => false])->get($url);
-                    $body = $response->successful() && strlen($response->body()) <= self::MAX_IMAGE_BYTES ? $response->body() : null;
+                    $body = null;
+                    try {
+                        $response = Http::timeout(15)->withOptions(['allow_redirects' => false])->get($url);
+                        if ($response->successful() && strlen($response->body()) <= self::MAX_IMAGE_BYTES) {
+                            $body = $response->body();
+                        } else {
+                            Log::warning('Card PDF: image download failed', ['url' => $url, 'status' => $response->status(), 'bytes' => strlen($response->body())]);
+                        }
+                    } catch (Throwable $e) {
+                        Log::warning('Card PDF: image download failed', ['url' => $url, 'error' => $e->getMessage()]);
+                    }
+                    // Our own uploads can be read straight from storage when the web address doesn't answer.
+                    $body ??= self::fromStorage($url);
                 } else {
+                    Log::warning('Card PDF: image not on an allowed host', ['url' => $url]);
                     $body = null;
                 }
 
@@ -375,6 +394,37 @@ class CardPdf
         });
 
         return $encoded ? base64_decode($encoded) : null;
+    }
+
+    /**
+     * One of the app's own uploads read from the Spaces disk itself (by the
+     * path under its CDN or bucket address), for when the web address fails
+     * from the server. Null when it isn't one, or can't be read either.
+     */
+    private static function fromStorage(string $url): ?string
+    {
+        $path = ltrim(rawurldecode((string) parse_url($url, PHP_URL_PATH)), '/');
+        $bucket = (string) config('filesystems.disks.spaces.bucket');
+        // A bucket address on the plain endpoint has the bucket name first in the path.
+        if ($bucket !== '' && str_starts_with($path, $bucket.'/') && ! str_starts_with((string) parse_url($url, PHP_URL_HOST), $bucket.'.')) {
+            $path = substr($path, strlen($bucket) + 1);
+        }
+        if ($path === '' || str_contains($path, '..')) {
+            return null;
+        }
+        try {
+            $disk = Storage::disk('spaces');
+            $body = $disk->exists($path) && $disk->size($path) <= self::MAX_IMAGE_BYTES ? $disk->get($path) : null;
+            if ($body === null) {
+                Log::warning('Card PDF: image not found in storage either', ['path' => $path]);
+            }
+
+            return $body;
+        } catch (Throwable $e) {
+            Log::warning('Card PDF: image could not be read from storage', ['path' => $path, 'error' => $e->getMessage()]);
+
+            return null;
+        }
     }
 
     /**
