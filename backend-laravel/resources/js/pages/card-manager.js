@@ -220,6 +220,32 @@ if (root && card) {
     paint();
   }
 
+  // --- Missing details, typed in here ---------------------------------------
+  // Saved to the listing (or its social links); the card then shows them.
+  $$("[data-missing-form]", root).forEach((form) =>
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const input = $("input", form);
+      const button = $("[data-missing-save]", form);
+      const value = input.value.trim();
+      if (!value) return input.focus();
+      // Unsaved changes in the card editor go first, so the reload keeps them.
+      if (editor?.dirty && !(await save({ reload: false }))) return;
+      fail("");
+      button.disabled = true;
+      button.textContent = "Saving…";
+      try {
+        const path = form.dataset.via === "links" ? `/businesses/${biz.id}/review-links` : `/businesses/${biz.id}`;
+        await api.patch(path, { [input.name]: value });
+        reloadWithFlash(`${$("label", form).textContent.trim()} saved — it's on your card now.`);
+      } catch (err) {
+        button.disabled = false;
+        button.textContent = "Save";
+        fail(err);
+      }
+    }),
+  );
+
   // --- Publish, preview, link, QR -------------------------------------------
   $$("[data-publish-card]", root).forEach((btn) =>
     btn.addEventListener("click", async () => {

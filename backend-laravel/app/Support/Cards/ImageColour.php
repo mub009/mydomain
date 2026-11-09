@@ -19,6 +19,20 @@ class ImageColour
 {
     public const DEFAULTS = ['tint' => null, 'strength' => 50, 'hue' => 0, 'brightness' => 100, 'saturation' => 100];
 
+    // The one-tap colours offered for a card (the dashboard's colour panel and
+    // the owner's bar on the public card): [key, label, swatch background, tint, saturation].
+    public const SWATCHES = [
+        ['original', 'Original', 'conic-gradient(#ef4444,#f59e0b,#22c55e,#3b82f6,#a855f7,#ef4444)', null, 100],
+        ['blue', 'Blue', '#2563eb', '#2563eb', 100],
+        ['green', 'Green', '#16a34a', '#16a34a', 100],
+        ['red', 'Red', '#dc2626', '#dc2626', 100],
+        ['gold', 'Gold', '#d4a017', '#d4a017', 100],
+        ['purple', 'Purple', '#7c3aed', '#7c3aed', 100],
+        ['pink', 'Pink', '#db2777', '#db2777', 100],
+        ['teal', 'Teal', '#0d9488', '#0d9488', 100],
+        ['mono', 'Black & white', 'linear-gradient(135deg,#111827 50%,#f3f4f6 50%)', null, 0],
+    ];
+
     private const HEX = '/^#[0-9a-f]{6}$/i';
 
     public static function rules(): array

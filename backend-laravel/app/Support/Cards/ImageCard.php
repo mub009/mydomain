@@ -484,6 +484,25 @@ class ImageCard
         'google_review' => ['Google review link', 'Social Media'],
     ];
 
+    // The missing details that can be typed in right on the Visiting Card
+    // section: [the field, the endpoint that saves it (the listing itself, or
+    // its review/social links), the input type, a placeholder]. The rest —
+    // logo, hours, address — keep their link to the section that edits them.
+    public const DETAIL_INPUTS = [
+        'call' => ['phone', 'business', 'tel', 'e.g. 98765 43210'],
+        'phone_text' => ['phone', 'business', 'tel', 'e.g. 98765 43210'],
+        'whatsapp' => ['whatsappNumber', 'business', 'tel', 'e.g. 98765 43210'],
+        'email' => ['email', 'business', 'email', 'you@yourshop.com'],
+        'email_text' => ['email', 'business', 'email', 'you@yourshop.com'],
+        'website' => ['website', 'business', 'url', 'https://…'],
+        'website_text' => ['website', 'business', 'url', 'https://…'],
+        'about' => ['description', 'business', 'text', 'A short line about what you do'],
+        'instagram' => ['instagramUsername', 'links', 'text', '@yourshop'],
+        'facebook' => ['facebookPageUrl', 'links', 'text', 'yourshop or https://facebook.com/yourshop'],
+        'youtube' => ['youtubeUrl', 'links', 'text', '@yourshop or a full YouTube link'],
+        'google_review' => ['googleReviewUrl', 'links', 'url', 'Google Maps share link (maps.app.goo.gl/…)'],
+    ];
+
     /**
      * The listing details the card's boxes need but the listing lacks — each
      * once, with the Manage section where it's added. A box with its own

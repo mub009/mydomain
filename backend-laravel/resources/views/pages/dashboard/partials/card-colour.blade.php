@@ -3,20 +3,7 @@
      anyone who wants them. For the whole business team, owners included.
      Driven by resources/js/pages/card-manager.js; the maths is
      App\Support\Cards\ImageColour (tint, strength, hue, brightness, saturation). --}}
-@php
-    // [key, label, swatch background, tint, saturation]
-    $swatches = [
-        ['original', 'Original', 'conic-gradient(#ef4444,#f59e0b,#22c55e,#3b82f6,#a855f7,#ef4444)', null, 100],
-        ['blue', 'Blue', '#2563eb', '#2563eb', 100],
-        ['green', 'Green', '#16a34a', '#16a34a', 100],
-        ['red', 'Red', '#dc2626', '#dc2626', 100],
-        ['gold', 'Gold', '#d4a017', '#d4a017', 100],
-        ['purple', 'Purple', '#7c3aed', '#7c3aed', 100],
-        ['pink', 'Pink', '#db2777', '#db2777', 100],
-        ['teal', 'Teal', '#0d9488', '#0d9488', 100],
-        ['mono', 'Black & white', 'linear-gradient(135deg,#111827 50%,#f3f4f6 50%)', null, 0],
-    ];
-@endphp
+@php $swatches = \App\Support\Cards\ImageColour::SWATCHES; @endphp
 <div class="rounded-xl border border-gray-200 p-4" data-colour-panel>
   <div class="flex items-center justify-between gap-2">
     <p class="flex items-center gap-1.5 text-sm font-bold text-ink-900"><x-icon name="sliders-horizontal" :size="15" class="text-brand-600" /> Card colour</p>

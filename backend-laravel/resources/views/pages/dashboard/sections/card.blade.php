@@ -113,18 +113,7 @@
           </div>
           <div>
             @if (count($card['missingDetails']))
-              <div class="rounded-xl border border-amber-200 bg-amber-50 p-4">
-                <p class="flex items-center gap-1.5 text-sm font-bold text-amber-900"><x-icon name="alert-triangle" :size="15" /> Missing on your listing</p>
-                <p class="mt-1 text-xs text-amber-800">Your card has a place for these, but your listing doesn't have them yet. Add them and they appear on your card automatically.</p>
-                <ul class="mt-3 space-y-1.5">
-                  @foreach ($card['missingDetails'] as $m)
-                    <li class="flex items-center justify-between gap-2 rounded-lg bg-white px-3 py-2 text-sm">
-                      <span class="font-semibold text-ink-900">{{ $m['label'] }}</span>
-                      <a href="{{ $base }}?section={{ urlencode($m['section']) }}" class="shrink-0 text-xs font-semibold text-brand-700 hover:underline">Add in {{ $m['section'] }} →</a>
-                    </li>
-                  @endforeach
-                </ul>
-              </div>
+              @include('pages.dashboard.partials.card-missing')
             @elseif ($card['imagePreviewHtml'])
               <div class="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
                 <p class="flex items-center gap-1.5 text-sm font-bold text-emerald-900"><x-icon name="check-circle-2" :size="15" /> Your card has everything it needs</p>
@@ -163,6 +152,9 @@
       <x-hotspot-editor subject="your card" :replaceable="false" :palette="false" :movable="$card['imageAreaTools'] ?? false" />
 
     </div>
+    @if (count($card['missingDetails']))
+      @include('pages.dashboard.partials.card-missing')
+    @endif
     @endunless
 
     {{-- Card colour, in its own section under the card. It scrolls with the

@@ -11,6 +11,7 @@ use App\Support\BusinessFeatures;
 use App\Support\Cards\CardEngine;
 use App\Support\Cards\CardPdf;
 use App\Support\Cards\ImageCard;
+use App\Support\Cards\ImageColour;
 use App\Support\WebAuth;
 
 // The public digital visiting card at /card/<slug> (the URL its QR code
@@ -46,7 +47,7 @@ class CardPageController extends Controller
         if (count($slides) > 1) {
             $details = CardEngine::details($business);
 
-            return response(view('cards.slider', [
+            return self::page($business, view('cards.slider', [
                 'b' => $details,
                 'slides' => array_map(fn ($s) => [
                     'id' => $s['id'],
@@ -55,7 +56,7 @@ class CardPageController extends Controller
                     'pdf' => $details['pdfUrl'].($s['id'] === 'main' ? '' : '?'.http_build_query(['design' => $s['id']])),
                 ], $slides),
                 'image' => ImageCard::source($business)['imageUrl'] ?? ($slides[1]['template']->imageUrl ?? null),
-            ])->render())->header('Content-Type', 'text/html; charset=UTF-8');
+            ])->render());
         }
 
         // The business's own artwork with its actions, when it has uploaded one; else its template.
@@ -63,7 +64,30 @@ class CardPageController extends Controller
         $html = ImageCard::render($business)
             ?? CardEngine::render(CardEngine::templateFor($business), CardEngine::details($business));
 
-        return response($html)->header('Content-Type', 'text/html; charset=UTF-8');
+        return self::page($business, $html);
+    }
+
+    // The card page; for someone signed in who manages the business, with the
+    // bar for changing the card's colour (cards/partials/owner-bar) — only
+    // when the card wears an image, which is what the colour changes.
+    private static function page(Business $business, string $html)
+    {
+        $user = WebAuth::user();
+        if ($user && ImageCard::source($business)
+            && BusinessAccess::canManage(['role' => $user->role, 'sub' => $user->id], $business)) {
+            $bar = view('cards.partials.owner-bar', [
+                'businessId' => $business->id,
+                'colour' => ImageColour::normalize($business->card?->imageColour),
+                'swatches' => ImageColour::SWATCHES,
+                'manageUrl' => "/dashboard/businesses/{$business->id}?section=".urlencode('Visiting Card'),
+            ])->render();
+            $html = str_contains($html, '</body>') ? preg_replace('~</body>~i', $bar.'</body>', $html, 1) : $html.$bar;
+        }
+
+        $response = response($html)->header('Content-Type', 'text/html; charset=UTF-8');
+
+        // The owner's copy carries their bar: never keep it in a shared cache.
+        return $user ? $response->header('Cache-Control', 'private, no-store') : $response;
     }
 
     // The card as a PDF, every action a working link. ?design=<id>: one of
