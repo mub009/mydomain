@@ -13,7 +13,15 @@ use GdImage;
  * resources/js/lib/card-colour.js holds the same maths for the editor.
  *
  * Stored as { tint: '#rrggbb'|null, strength: 0–100, hue: -180–180,
- * brightness: 50–150, saturation: 0–200 }; null when nothing is changed.
+ * brightness: 50–150, saturation: 0–200, areas: [...] }; null when nothing
+ * is changed.
+ *
+ * areas: where the colour goes. Empty = the whole image. Otherwise a list of
+ * outlines in percent of the image ({ erase: bool, points: [[x, y], ...] }),
+ * drawn in order: each one adds the colour inside it, or an eraser takes it
+ * away again — so a later shape wins where they overlap. The browser masks a
+ * recoloured copy of the image with them (mask()); the PDF recolours only the
+ * pixels inside them (applyGd()).
  */
 class ImageColour
 {
@@ -35,6 +43,10 @@ class ImageColour
 
     private const HEX = '/^#[0-9a-f]{6}$/i';
 
+    public const MAX_AREAS = 40;
+
+    public const MAX_AREA_POINTS = 160;
+
     public static function rules(): array
     {
         return [
@@ -44,6 +56,12 @@ class ImageColour
             'imageColour.hue' => ['nullable', 'integer', 'min:-180', 'max:180'],
             'imageColour.brightness' => ['nullable', 'integer', 'min:50', 'max:150'],
             'imageColour.saturation' => ['nullable', 'integer', 'min:0', 'max:200'],
+            'imageColour.areas' => ['nullable', 'array', 'max:'.self::MAX_AREAS],
+            'imageColour.areas.*' => ['array'],
+            'imageColour.areas.*.erase' => ['nullable', 'boolean'],
+            'imageColour.areas.*.points' => ['required', 'array', 'min:3', 'max:'.self::MAX_AREA_POINTS],
+            'imageColour.areas.*.points.*' => ['array', 'size:2'],
+            'imageColour.areas.*.points.*.*' => ['numeric'],
         ];
     }
 
@@ -64,8 +82,69 @@ class ImageColour
             'saturation' => $int('saturation', 0, 200),
         ];
         $tinted = $c['tint'] !== null && $c['strength'] > 0;
+        if (! ($tinted || $c['hue'] !== 0 || $c['brightness'] !== 100 || $c['saturation'] !== 100)) {
+            return null;
+        }
+        $c['areas'] = self::areas($raw['areas'] ?? null);
 
-        return $tinted || $c['hue'] !== 0 || $c['brightness'] !== 100 || $c['saturation'] !== 100 ? $c : null;
+        return $c;
+    }
+
+    /** Checked outlines: numbers only, inside the image, each with 3+ points; erasers before any area are dropped. */
+    public static function areas(mixed $raw): array
+    {
+        // In key order: validated request data can come back with list keys
+        // reordered, and here order is everything (outline points, x before y,
+        // and which shape is drawn last).
+        $list = function (mixed $v): array {
+            if (! is_array($v)) {
+                return [];
+            }
+            ksort($v);
+
+            return array_values($v);
+        };
+        $out = [];
+        foreach (array_slice($list($raw), 0, self::MAX_AREAS) as $area) {
+            $points = [];
+            foreach (array_slice($list($area['points'] ?? null), 0, self::MAX_AREA_POINTS) as $p) {
+                $p = $list($p);
+                if (is_numeric($p[0] ?? null) && is_numeric($p[1] ?? null)) {
+                    $points[] = [round(min(100, max(0, (float) $p[0])), 2), round(min(100, max(0, (float) $p[1])), 2)];
+                }
+            }
+            $erase = (bool) ($area['erase'] ?? false);
+            // An eraser with nothing coloured under it yet does nothing.
+            if (count($points) >= 3 && ! ($erase && ! $out)) {
+                $out[] = ['erase' => $erase, 'points' => $points];
+            }
+        }
+
+        return $out;
+    }
+
+    /** Whether the colour is limited to marked areas (else it covers the whole image). */
+    public static function partial(?array $c): bool
+    {
+        return ! empty($c['areas']);
+    }
+
+    /**
+     * The areas as an SVG image for a CSS mask over the recoloured copy of
+     * the image: opaque where the colour shows. Numbers only.
+     */
+    public static function mask(array $areas): string
+    {
+        $shapes = '';
+        foreach ($areas as $a) {
+            $pts = implode(' ', array_map(fn ($p) => ((float) $p[0]).','.((float) $p[1]), $a['points']));
+            $shapes .= '<polygon points="'.$pts.'" fill="'.($a['erase'] ? 'black' : 'white').'"/>';
+        }
+        $svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" preserveAspectRatio="none">'
+            .'<defs><mask id="m" maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100"><rect width="100" height="100" fill="black"/>'.$shapes.'</mask></defs>'
+            .'<rect width="100" height="100" fill="white" mask="url(#m)"/></svg>';
+
+        return 'data:image/svg+xml,'.rawurlencode($svg);
     }
 
     /**
@@ -130,16 +209,20 @@ class ImageColour
         return vsprintf('#%02x%02x%02x', $out);
     }
 
-    /** Recolours a truecolor GD image in place (for the PDF). */
+    /** Recolours a truecolor GD image in place (for the PDF) — only inside its areas, when it has some. */
     public static function applyGd(GdImage $img, array $c): void
     {
         $m = self::matrix($c);
         $w = imagesx($img);
         $h = imagesy($img);
+        $mask = self::partial($c) ? self::maskGd($c['areas'], $w, $h) : null;
         $seen = [];
         $clamp = fn (float $v) => (int) max(0, min(255, round($v)));
         for ($y = 0; $y < $h; $y++) {
             for ($x = 0; $x < $w; $x++) {
+                if ($mask && (imagecolorat($mask, $x, $y) & 0xFF) < 128) {
+                    continue;
+                }
                 $rgb = imagecolorat($img, $x, $y);
                 if (! isset($seen[$rgb])) {
                     $r = ($rgb >> 16) & 0xFF;
@@ -152,6 +235,25 @@ class ImageColour
                 imagesetpixel($img, $x, $y, $seen[$rgb]);
             }
         }
+    }
+
+    /** The areas drawn white (colour) and black (erased) at the image's size, in order. */
+    private static function maskGd(array $areas, int $w, int $h): GdImage
+    {
+        $mask = imagecreatetruecolor($w, $h);
+        $black = imagecolorallocate($mask, 0, 0, 0);
+        $white = imagecolorallocate($mask, 255, 255, 255);
+        imagefill($mask, 0, 0, $black);
+        foreach ($areas as $a) {
+            $flat = [];
+            foreach ($a['points'] as [$px, $py]) {
+                $flat[] = (int) round($px / 100 * ($w - 1));
+                $flat[] = (int) round($py / 100 * ($h - 1));
+            }
+            imagefilledpolygon($mask, $flat, $a['erase'] ? $black : $white);
+        }
+
+        return $mask;
     }
 
     private static function mul(array $a, array $b): array

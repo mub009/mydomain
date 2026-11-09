@@ -55,8 +55,58 @@ export function svgValues(c) {
     .join(" ")} 0 0 0 1 0`;
 }
 
+// Whether the colour is limited to marked areas (else it covers the whole image).
+export const isPartial = (c) => Array.isArray(c?.areas) && c.areas.length > 0;
+
+// The areas as an SVG image for a CSS mask: opaque where the colour shows.
+// Drawn in order, so an eraser takes the colour away from the areas before
+// it. The same as App\Support\Cards\ImageColour::mask.
+export function maskUrl(areas) {
+  const shapes = areas
+    .map((a) => `<polygon points="${a.points.map(([x, y]) => `${+x},${+y}`).join(" ")}" fill="${a.erase ? "black" : "white"}"/>`)
+    .join("");
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" preserveAspectRatio="none">` +
+    `<defs><mask id="m" maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100"><rect width="100" height="100" fill="black"/>${shapes}</mask></defs>` +
+    `<rect width="100" height="100" fill="white" mask="url(#m)"/></svg>`;
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+}
+
 // Applies the settings to an <img> on this page, through one shared SVG filter.
+// With areas, the image itself stays as it is and a recoloured copy laid over
+// it (in the image's own box: its parent) shows only inside them. Anything
+// that isn't an <img> (the editor's layer of boxes) takes the colour only
+// when it covers the whole image.
 export function applyToImage(img, c) {
+  ensureFilter(c);
+  const partial = isPartial(c) && isChanged(c);
+  const parent = img.parentElement;
+  let layer = parent?.querySelector(":scope > img[data-colour-layer]");
+  if (img.tagName === "IMG" && partial) {
+    if (!layer) {
+      layer = document.createElement("img");
+      layer.dataset.colourLayer = "";
+      layer.alt = "";
+      layer.setAttribute("aria-hidden", "true");
+      layer.draggable = false;
+      layer.style.cssText = "position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;max-width:none";
+      img.after(layer);
+      if (getComputedStyle(parent).position === "static") parent.style.position = "relative";
+    }
+    if (layer.getAttribute("src") !== img.getAttribute("src")) layer.src = img.getAttribute("src");
+    layer.hidden = img.classList.contains("hidden");
+    layer.style.filter = "url(#card-colour-live)";
+    const mask = maskUrl(c.areas);
+    layer.style.webkitMask = `${mask} 0 0/100% 100% no-repeat`;
+    layer.style.mask = `${mask} 0 0/100% 100% no-repeat`;
+    img.style.filter = "";
+    return;
+  }
+  layer?.remove();
+  img.style.filter = isChanged(c) && !partial ? "url(#card-colour-live)" : "";
+}
+
+function ensureFilter(c) {
   let svg = document.getElementById("card-colour-svg");
   if (!svg) {
     svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -69,5 +119,4 @@ export function applyToImage(img, c) {
     document.body.appendChild(svg);
   }
   svg.querySelector("feColorMatrix").setAttribute("values", svgValues(c));
-  img.style.filter = isChanged(c) ? "url(#card-colour-live)" : "";
 }

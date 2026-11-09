@@ -653,11 +653,14 @@ class ImageCard
             'ratio' => $w && $h ? $h / $w : null,
             'spots' => self::resolved($source['hotspots'] ?? [], $details, $marks),
             'fontsUrl' => self::fontsUrl($source['hotspots'] ?? []),
-            'colour' => $colour,
+            // Text and buttons take the colour only when it covers the whole card.
+            'colour' => ImageColour::partial($colour) ? null : $colour,
             'colourMatrix' => $colour ? ImageColour::svgValues($colour) : null,
+            // Colour in marked areas only: a recoloured copy of the image, masked to them.
+            'colourMask' => ImageColour::partial($colour) ? ImageColour::mask($colour['areas']) : null,
             // The drawn actions' default text and chip colours, recoloured the same way.
-            'spotInk' => $colour ? ImageColour::hex('#ffffff', $colour) : '#ffffff',
-            'spotChip' => implode(',', sscanf($colour ? ImageColour::hex('#111827', $colour) : '#111827', '#%02x%02x%02x')),
+            'spotInk' => $colour && ! ImageColour::partial($colour) ? ImageColour::hex('#ffffff', $colour) : '#ffffff',
+            'spotChip' => implode(',', sscanf($colour && ! ImageColour::partial($colour) ? ImageColour::hex('#111827', $colour) : '#111827', '#%02x%02x%02x')),
             'preview' => $preview,
             'marks' => $marks,
             // A slide inside the Multi card view slider (cards/slider.blade.php).

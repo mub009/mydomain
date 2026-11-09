@@ -429,6 +429,49 @@ class ImageCardTest extends TestCase
             ->assertOk()->assertSee('feColorMatrix', false);
     }
 
+    public function test_the_colour_can_cover_only_marked_areas_with_erased_parts(): void
+    {
+        $this->save([$this->spot('custom_text', ['value' => 'Hello', 'color' => '#808080'])])->assertOk();
+        $url = "/api/v1/businesses/{$this->business->id}/card";
+        $square = [[0, 0], [50, 0], [50, 50], [0, 50]];
+        $this->putJson($url, ['imageColour' => ['tint' => '#ff0000', 'strength' => 100, 'areas' => [
+            // An eraser before anything is coloured does nothing: dropped.
+            ['erase' => true, 'points' => [[1, 1], [2, 1], [2, 2]]],
+            ['points' => $square],
+            ['erase' => true, 'points' => [[0, 0], [10, 0], [10, 10]]],
+            // Points past the edge are pulled back inside the image.
+            ['points' => [[120, -5], [60, 60], [60, 90]]],
+        ]]], $this->auth)->assertOk()
+            ->assertJsonCount(3, 'data.imageColour.areas')
+            ->assertJsonPath('data.imageColour.areas.0.erase', false)
+            ->assertJsonPath('data.imageColour.areas.1.erase', true)
+            ->assertJsonPath('data.imageColour.areas.2.points.0', [100, 0]);
+        $this->putJson($url, ['imageColour' => ['tint' => '#ff0000', 'areas' => [['points' => [[1, 2]]]]]], $this->auth)->assertStatus(400);
+
+        // The public card: the image unfiltered, a recoloured copy masked to the areas, text left alone.
+        $this->postJson("{$url}/publish", [], $this->auth)->assertOk();
+        $html = $this->get('/card/spice-garden')->assertOk()->getContent();
+        $this->assertStringContainsString('<img class="colour-areas"', $html);
+        $this->assertStringContainsString('mask:url("data:image/svg+xml,', $html);
+        $this->assertStringNotContainsString('.card > img{filter:url(#card-colour)}', $html);
+        $this->assertStringContainsString('color:#808080', $html);
+
+        // The PDF recolours only the pixels inside the areas, less what's erased.
+        $c = \App\Support\Cards\ImageColour::normalize(['tint' => '#ff0000', 'strength' => 100, 'areas' => [['points' => $square], ['erase' => true, 'points' => [[0, 0], [20, 0], [20, 20], [0, 20]]]]]);
+        $img = imagecreatetruecolor(100, 100);
+        imagefill($img, 0, 0, imagecolorallocate($img, 128, 128, 128));
+        \App\Support\Cards\ImageColour::applyGd($img, $c);
+        $red = fn (int $x, int $y) => (imagecolorat($img, $x, $y) >> 8 & 0xFF) === 0;
+        $this->assertTrue($red(35, 35), 'inside the area');
+        $this->assertFalse($red(80, 80), 'outside it');
+        $this->assertFalse($red(5, 5), 'erased');
+        $this->assertStringStartsWith('%PDF', $this->get('/card/spice-garden.pdf')->assertOk()->getContent());
+
+        // No areas: the whole card again.
+        $this->putJson($url, ['imageColour' => ['tint' => '#ff0000', 'strength' => 100, 'areas' => []]], $this->auth)->assertOk();
+        $this->assertStringContainsString('.card > img{filter:url(#card-colour)}', $this->get('/card/spice-garden')->getContent());
+    }
+
     public function test_custom_text_is_drawn_in_its_own_font_size_and_style(): void
     {
         $this->save([

@@ -1,6 +1,7 @@
 import { api, errorMessage } from "../lib/api";
 import { cardPreviewModal } from "../lib/card-preview";
-import { applyToImage, COLOUR_DEFAULTS, isChanged } from "../lib/card-colour";
+import { applyToImage, COLOUR_DEFAULTS, isChanged, isPartial } from "../lib/card-colour";
+import { openColourAreas } from "../lib/colour-areas";
 import { downloadDataUrl, renderQrDataUrl } from "../lib/channels";
 import { initHotspotEditor } from "../lib/hotspot-editor";
 import { $, $$, pageData } from "../lib/ui";
@@ -131,7 +132,33 @@ if (root && card) {
       $("[data-stage-spots]", root),
       $("[data-colour-thumb]", panel),
     ].filter(Boolean);
-    const paint = () => targets.forEach((el) => applyToImage(el, colour));
+    let previewTimer = null;
+    let previewRequest = 0;
+    const paint = () => {
+      targets.forEach((el) => applyToImage(el, colour));
+      if (!readonlyPreview) return;
+      clearTimeout(previewTimer);
+      if (!(isPartial(colour) && isChanged(colour))) {
+        if (readonlyPreview.srcdoc !== card.previewHtml) readonlyPreview.srcdoc = card.previewHtml;
+        return;
+      }
+      // The owner's card is a sandboxed page: a colour in marked areas only is drawn into it by the server.
+      previewTimer = setTimeout(async () => {
+        const request = ++previewRequest;
+        try {
+          const res = await api.post(`${base}/preview`, {
+            imageUrl: card.imageUrl,
+            imageWidth: card.imageWidth,
+            imageHeight: card.imageHeight,
+            hotspots: card.hotspots,
+            imageColour: colour,
+          });
+          if (request === previewRequest) readonlyPreview.srcdoc = res.data.html;
+        } catch {
+          // the colour is still saved; the preview just isn't redrawn
+        }
+      }, 400);
+    };
     const statusEl = $("[data-colour-status]", panel);
     const swatches = $$("[data-swatch]", panel);
     const customInput = $("[data-colour-custom]", panel);
@@ -156,6 +183,19 @@ if (root && card) {
       customDot.classList.toggle("text-transparent", !!own);
       if (own) customInput.value = own;
       $("[data-strength-row]", panel).hidden = !colour.tint;
+      const where = $("[data-colour-where]", panel);
+      if (where) {
+        const marked = (colour.areas || []).filter((a) => !a.erase).length;
+        const erased = (colour.areas || []).length - marked;
+        $("[data-areas-summary]", where).textContent = !isChanged(colour)
+          ? "Pick a colour first, then choose where it goes."
+          : isPartial(colour)
+            ? `Only ${marked} marked ${marked === 1 ? "area" : "areas"}${erased ? `, ${erased} erased` : ""}`
+            : "The whole card";
+        $("[data-areas-clear]", where).hidden = !isPartial(colour);
+        $("[data-areas-edit] span", where).textContent = isPartial(colour) ? "Change areas" : "Colour only part";
+        $("[data-areas-edit]", where).disabled = !isChanged(colour);
+      }
       for (const key of ["strength", "brightness"]) {
         slider(key).value = colour[key];
         $(`[data-colour-label="${key}"]`, panel).textContent = `${colour[key]}%`;
@@ -197,6 +237,7 @@ if (root && card) {
         // A fresh pick starts from the plain image, keeping any brightness the person chose.
         colour = {
           ...COLOUR_DEFAULTS,
+          areas: colour.areas || [],
           brightness: colour.brightness,
           strength: colour.tint ? colour.strength : 60,
           tint,
@@ -215,6 +256,22 @@ if (root && card) {
         changed();
       });
     }
+
+    $("[data-areas-edit]", panel)?.addEventListener("click", () =>
+      openColourAreas({
+        imageUrl: card.imageUrl,
+        ratio: card.imageWidth && card.imageHeight ? card.imageWidth / card.imageHeight : 0.6,
+        colour,
+        onDone: (areas) => {
+          colour = { ...colour, areas };
+          changed();
+        },
+      }),
+    );
+    $("[data-areas-clear]", panel)?.addEventListener("click", () => {
+      colour = { ...colour, areas: [] };
+      changed();
+    });
 
     fill();
     paint();

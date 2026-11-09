@@ -131,11 +131,13 @@ class CardPdf
         $height = round($width * $sh / $sw, 2);
         $details = CardEngine::details($business);
         $pt = $width / 480; // the editor's sizes are px at a 480px-wide card
+        // Text and buttons take the colour only when it covers the whole card.
+        $textColour = ImageColour::partial($colour) ? null : $colour;
         $spots = collect(ImageCard::resolved($source['hotspots'], $details))
             // Share needs a browser; "Save contact" and the QR code point at the
             // online card, which isn't up yet when not live.
             ->reject(fn ($h) => $h['action'] === 'share' || (in_array($h['action'], ['save_contact', 'qr'], true) && ! $live))
-            ->map(function ($h) use ($width, $height, $pt, $colour) {
+            ->map(function ($h) use ($width, $height, $pt, $textColour) {
                 $text = null;
                 if ($h['kind'] === 'text') {
                     // dompdf has only its own fonts: the serif or sans one nearest the chosen font.
@@ -145,9 +147,9 @@ class CardPdf
                         round(((int) ($h['fontSize'] ?? 0) ?: ImageCard::DEFAULT_FONT_SIZE) * $pt, 2),
                         empty($h['bold']) ? 'normal' : 'bold',
                         empty($h['italic']) ? 'normal' : 'italic',
-                        $colour ? ImageColour::hex($h['color'] ?? '#ffffff', $colour) : ($h['color'] ?? '#ffffff'),
+                        $textColour ? ImageColour::hex($h['color'] ?? '#ffffff', $textColour) : ($h['color'] ?? '#ffffff'),
                         $h['align'] ?? 'left',
-                        isset($h['bg']) ? 'background:'.($colour ? ImageColour::hex($h['bg'], $colour) : $h['bg']).';' : '',
+                        isset($h['bg']) ? 'background:'.($textColour ? ImageColour::hex($h['bg'], $textColour) : $h['bg']).';' : '',
                     );
                 }
 

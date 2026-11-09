@@ -681,7 +681,7 @@ export function initHotspotEditor(editor, options) {
                 <input type="range" min="${LOGO_SCALE_MIN * 100}" max="${LOGO_SCALE_MAX * 100}" step="5" value="${Math.round(logoScale(h) * 100)}" class="w-full" data-field="logoSize" aria-label="Logo size" />
                 <span class="mt-0.5 flex justify-between text-[11px] text-ink-400"><span>Smaller</span><button type="button" class="font-semibold text-ink-500 hover:underline" data-logo-size-reset>Reset</button><span>Bigger</span></span>
               </label>
-              ${h.action !== "logo" ? "" : `<div class="space-y-1.5" data-shape-panel>
+              ${h.action !== "logo" && !(h.action === "custom_image" && !freeImageEditor) ? "" : `<div class="space-y-1.5" data-shape-panel>
                 <span class="flex justify-between text-xs font-semibold text-ink-700">Shape <span class="font-normal text-ink-500">${h.shape ? "Your own shape" : h.radius ? "Rounded" : "None"}</span></span>
                 ${
                   drawingFor === h.id
@@ -1340,6 +1340,9 @@ export function initHotspotEditor(editor, options) {
 
     const HELP = {
       draw: "Freehand: hold down and draw around the area where the picture should go.",
+      circle: "Circle: drag across the card to mark a perfectly round area.",
+      oval: "Oval: drag from one corner to the other to mark a round area of any width and height.",
+      rect: "Rectangle: drag from one corner to the other to mark a square-cornered area.",
       pen: "Pen: click to place points around the area (drag while placing to adjust). Click the first point or press Enter to close it. Backspace removes the last point.",
       edit: "Edit points: drag a point to move it, click the line to add a point, double-click a point (or select it and press Delete) to remove it.",
       move: "Move picture: drag to choose which part of the picture shows, and zoom it with the slider.",
@@ -1374,6 +1377,9 @@ export function initHotspotEditor(editor, options) {
         <div class="flex flex-wrap items-center justify-center gap-2">
           <button type="button" data-x="draw" class="${tool(mode === "draw")}">${icon("pencil", { size: 14 })} Freehand</button>
           <button type="button" data-x="pen" class="${tool(mode === "pen")}">${icon("pen-tool", { size: 14 })} Pen</button>
+          <button type="button" data-x="circle" class="${tool(mode === "circle")}"><span class="inline-block h-3.5 w-3.5 rounded-full border-2 border-current"></span> Circle</button>
+          <button type="button" data-x="oval" class="${tool(mode === "oval")}"><span class="inline-block h-3 w-4 rounded-[50%] border-2 border-current"></span> Oval</button>
+          <button type="button" data-x="rect" class="${tool(mode === "rect")}"><span class="inline-block h-3 w-3.5 rounded-sm border-2 border-current"></span> Rectangle</button>
           ${pts ? `<button type="button" data-x="edit" class="${tool(mode === "edit")}">${icon("mouse-pointer-2", { size: 14 })} Edit points</button>` : ""}
           ${draft.value ? `<button type="button" data-x="move" class="${tool(mode === "move")}">${icon("move", { size: 14 })} Move picture</button>` : ""}
           <button type="button" data-x="pan" class="${tool(mode === "pan")}">${icon("hand", { size: 14 })} Hand</button>
@@ -1481,7 +1487,7 @@ export function initHotspotEditor(editor, options) {
       const x = b.dataset.x;
       if (x === "cancel") return close();
       if (x === "upload") return pick();
-      if (["draw", "pen", "edit", "move", "pan"].includes(x)) return setMode(x);
+      if (["draw", "pen", "circle", "oval", "rect", "edit", "move", "pan"].includes(x)) return setMode(x);
       if (x === "view-in") return setView(view * 1.25);
       if (x === "view-out") return setView(view / 1.25);
       if (x === "view-fit") return setView(1);
@@ -1560,6 +1566,41 @@ export function initHotspotEditor(editor, options) {
         };
         add(e);
         track(add, () => useOutline(simplifyOutline(points)));
+        return;
+      }
+      if (mode === "circle" || mode === "oval" || mode === "rect") {
+        const line = $("[data-line]", el);
+        const start = toCanvas(e);
+        const r = canvas.getBoundingClientRect();
+        const hPerW = r.width / (r.height || 1); // card % of height that equals 1% of width on screen
+        let outline = [];
+        const shapeTo = (ev) => {
+          const end = toCanvas(ev);
+          let w = end[0] - start[0];
+          let hh = end[1] - start[1];
+          if (mode === "circle") {
+            // As wide as it is tall on screen, sized by the longer drag.
+            const size = Math.max(Math.abs(w), Math.abs(hh) / hPerW);
+            w = Math.sign(w || 1) * size;
+            hh = Math.sign(hh || 1) * size * hPerW;
+          }
+          const x0 = clamp(Math.min(start[0], start[0] + w), 0, 100);
+          const y0 = clamp(Math.min(start[1], start[1] + hh), 0, 100);
+          const x1 = clamp(Math.max(start[0], start[0] + w), 0, 100);
+          const y1 = clamp(Math.max(start[1], start[1] + hh), 0, 100);
+          outline =
+            mode === "rect"
+              ? [[x0, y0], [x1, y0], [x1, y1], [x0, y1]]
+              : around(48, (t) => [x0 + ((x1 - x0) * (1 + Math.cos(t))) / 2, y0 + ((y1 - y0) * (1 + Math.sin(t))) / 2]);
+          outline = outline.map(([x, y]) => [round(x), round(y)]);
+          line.setAttribute("points", outline.map((pt) => pt.join(",")).join(" "));
+        };
+        shapeTo(e);
+        track(shapeTo, () => {
+          useOutline(outline);
+          // A clean shape needs no point editing: straight on to placing the picture.
+          if (pts === outline && draft.value) setMode("move");
+        });
         return;
       }
       if (mode === "pen") {

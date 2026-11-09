@@ -31,7 +31,7 @@
     html,body{margin:0;padding:0}
     body{min-height:100vh;background:#111827;color:#fff;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased;overflow-x:hidden}
     {{-- The colour and the blur on separate elements: Safari can drop a filter list that mixes url() with blur(). --}}
-    .backdrop-tint{position:fixed;inset:0;{{ $colourMatrix ? 'filter:url(#card-colour)' : '' }}}
+    .backdrop-tint{position:fixed;inset:0;{{ $colourMatrix && ! $colourMask ? 'filter:url(#card-colour)' : '' }}}
     .backdrop{position:fixed;inset:-40px;background:url('{{ $image }}') center/cover;filter:blur(36px) brightness(.55);transform:scale(1.1)}
     .page{position:relative;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px 12px}
     .card{position:relative;width:100%;max-width:480px;container-type:inline-size;border-radius:18px;overflow:hidden;box-shadow:0 24px 60px -20px rgba(0,0,0,.6);background:#1f2937}
@@ -39,7 +39,11 @@
     {{-- The business's colour covers the whole card. The browser recolours only the image
          (a filter over the text and buttons draws wrong on phones, iPhones especially); their
          colours are recoloured with the same maths in ImageCard. --}}
-    {!! $colourMatrix ? '.card > img{filter:url(#card-colour)}' : '' !!}
+    {!! $colourMatrix && ! $colourMask ? '.card > img{filter:url(#card-colour)}' : '' !!}
+    {{-- Colour in marked areas only (ImageColour::mask): a recoloured copy laid over the image, cut to them. --}}
+    @if ($colourMask)
+      .card > img.colour-areas{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;filter:url(#card-colour);-webkit-mask:url("{{ $colourMask }}") 0 0/100% 100% no-repeat;mask:url("{{ $colourMask }}") 0 0/100% 100% no-repeat}
+    @endif
     .spot{position:absolute;display:flex;align-items:center;justify-content:center;gap:6px;border-radius:10px;color:{{ $spotInk }};text-decoration:none;font-weight:600;font-size:13px;-webkit-tap-highlight-color:transparent;cursor:pointer;border:0;padding:0;font-family:inherit;background:transparent}
     .spot:focus-visible{outline:3px solid #facc15;outline-offset:2px}
     .spot.invisible:active{background:rgba(255,255,255,.25)}
@@ -84,6 +88,9 @@
   <div class="page">
     <main class="card hint">
       <img src="{{ $image }}" alt="{{ $b['name'] }} visiting card" @if ($ratio) style="aspect-ratio:1/{{ round($ratio, 5) }}" @endif />
+      @if ($colourMask)
+        <img class="colour-areas" src="{{ $image }}" alt="" aria-hidden="true" />
+      @endif
       @foreach ($spots as $s)
         @php
             $box = sprintf('left:%s%%;top:%s%%;width:%s%%;height:%s%%', $s['x'], $s['y'], $s['w'], $s['h']);

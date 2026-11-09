@@ -16,7 +16,10 @@
        owner sees the colour on their card itself. --}}
   @if (! empty($card['imageUrl']) && ($thumbAlways ?? false))
     <div class="mt-3 flex justify-center rounded-lg bg-gray-100 p-2">
-      <img src="{{ $card['imageUrl'] }}" alt="Your card in this colour" class="max-h-56 w-auto rounded-md shadow-sm transition-[filter] duration-150" data-colour-thumb />
+      {{-- Its own box, so a colour limited to marked areas can be laid exactly over it. --}}
+      <span class="relative inline-block leading-none">
+        <img src="{{ $card['imageUrl'] }}" alt="Your card in this colour" class="max-h-56 w-auto rounded-md shadow-sm transition-[filter] duration-150" data-colour-thumb />
+      </span>
     </div>
   @endif
 
@@ -37,6 +40,19 @@
       <span class="w-full truncate text-center">Own colour</span>
       <input type="color" value="#2563eb" class="absolute inset-0 h-full w-full cursor-pointer opacity-0" data-colour-custom aria-label="Pick your own colour" />
     </label>
+  </div>
+
+  {{-- The whole card, or only areas marked by hand, as a square or a circle
+       (resources/js/lib/colour-areas.js), with an eraser for the parts to leave alone. --}}
+  <div class="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-gray-50 px-3 py-2.5" data-colour-where>
+    <div class="min-w-0">
+      <p class="text-xs font-semibold text-ink-700">Where the colour goes</p>
+      <p class="text-[11px] text-ink-500" data-areas-summary>The whole card</p>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      <button type="button" class="text-[11px] font-semibold text-ink-500 hover:underline" data-areas-clear hidden>Colour the whole card</button>
+      <button type="button" class="btn-secondary px-3 py-1.5 text-xs" data-areas-edit><x-icon name="pencil" :size="13" /> <span>Colour only part</span></button>
+    </div>
   </div>
 
   <details class="mt-3 rounded-lg bg-gray-50 px-3 py-2" data-colour-more>

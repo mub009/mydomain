@@ -58,7 +58,9 @@
         var colour = tint || saturation !== 100 ? {
           tint: tint, hue: 0, saturation: saturation,
           strength: current && current.tint ? current.strength : 60,
-          brightness: current ? current.brightness : 100
+          brightness: current ? current.brightness : 100,
+          // Keeps where the colour goes (areas marked in the dashboard).
+          areas: current && current.areas ? current.areas : []
         } : null;
         fetch("/session/token", { headers: { Accept: "application/json" }, credentials: "same-origin" })
           .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
