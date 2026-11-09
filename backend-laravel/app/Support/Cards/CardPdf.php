@@ -278,16 +278,29 @@ class CardPdf
         imagefill($tile, 0, 0, $clear);
         $fit = ImageCard::fit($fit);
         if ($fit) {
-            // The part of the picture that shows in the box: the box in the picture's own pixels.
-            $vw = $sw * 100 / $fit['w'];
-            $vh = $sh * 100 / $fit['h'];
-            $sx = -$fit['l'] / 100 * $vw;
-            $sy = -$fit['t'] / 100 * $vh;
+            // The picture's rectangle in the box, in pixels — past the box's edges when zoomed
+            // in, inside it with clear space around when zoomed out. Only the part inside is drawn.
+            $px = $fit['l'] / 100 * $ow;
+            $py = $fit['t'] / 100 * $oh;
+            $pw = $fit['w'] / 100 * $ow;
+            $ph = $fit['h'] / 100 * $oh;
+            $x0 = max(0, $px);
+            $y0 = max(0, $py);
+            $x1 = min($ow, $px + $pw);
+            $y1 = min($oh, $py + $ph);
+            if ($x1 - $x0 >= 1 && $y1 - $y0 >= 1) {
+                imagecopyresampled(
+                    $tile, $src,
+                    (int) round($x0), (int) round($y0),
+                    (int) round(($x0 - $px) / $pw * $sw), (int) round(($y0 - $py) / $ph * $sh),
+                    max(1, (int) round($x1 - $x0)), max(1, (int) round($y1 - $y0)),
+                    max(1, (int) round(($x1 - $x0) / $pw * $sw)), max(1, (int) round(($y1 - $y0) / $ph * $sh)),
+                );
+            }
         } else {
             // Centred, just covering.
-            [$vw, $vh, $sx, $sy] = [$cw, $ch, ($sw - $cw) / 2, ($sh - $ch) / 2];
+            imagecopyresampled($tile, $src, 0, 0, (int) round(($sw - $cw) / 2), (int) round(($sh - $ch) / 2), $ow, $oh, max(1, $cw), max(1, $ch));
         }
-        imagecopyresampled($tile, $src, 0, 0, (int) round($sx), (int) round($sy), $ow, $oh, max(1, (int) round($vw)), max(1, (int) round($vh)));
 
         // The shape, filled white on black, then everything outside it cleared.
         $mask = imagecreatetruecolor($ow, $oh);

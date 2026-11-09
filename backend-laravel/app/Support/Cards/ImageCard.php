@@ -39,6 +39,9 @@ class ImageCard
     /** A free image's picture is at most this wide/high, in percent of its area (10x). */
     public const FIT_MAX = 1000;
 
+    // A zoomed-out picture: at least this many percent of its area wide and high.
+    public const FIT_MIN = 10;
+
     /**
      * What a box can be: label, icon, kind (action / text / image), what its
      * value means (null = it takes none) and, for a detail that links
@@ -208,13 +211,13 @@ class ImageCard
             'hotspots.*.shape' => ['nullable', 'array', 'min:3', 'max:'.self::MAX_SHAPE_POINTS],
             'hotspots.*.shape.*' => ['array', 'size:2'],
             'hotspots.*.shape.*.*' => ['numeric', 'min:0', 'max:100'],
-            // Where a free image's picture sits inside its area: its rectangle in percent of the area
-            // (it always covers the area: at least 100% wide and high, edges never inside).
+            // Where a free image's picture sits inside its area: its rectangle in percent of the area.
+            // Zoomed in it covers the area (edges never inside); zoomed out it's smaller and stays within it.
             'hotspots.*.fit' => ['nullable', 'array'],
-            'hotspots.*.fit.l' => ['required_with:hotspots.*.fit', 'numeric', 'min:-'.(self::FIT_MAX - 100), 'max:0'],
-            'hotspots.*.fit.t' => ['required_with:hotspots.*.fit', 'numeric', 'min:-'.(self::FIT_MAX - 100), 'max:0'],
-            'hotspots.*.fit.w' => ['required_with:hotspots.*.fit', 'numeric', 'min:100', 'max:'.self::FIT_MAX],
-            'hotspots.*.fit.h' => ['required_with:hotspots.*.fit', 'numeric', 'min:100', 'max:'.self::FIT_MAX],
+            'hotspots.*.fit.l' => ['required_with:hotspots.*.fit', 'numeric', 'min:-'.(self::FIT_MAX - 100), 'max:'.(100 - self::FIT_MIN)],
+            'hotspots.*.fit.t' => ['required_with:hotspots.*.fit', 'numeric', 'min:-'.(self::FIT_MAX - 100), 'max:'.(100 - self::FIT_MIN)],
+            'hotspots.*.fit.w' => ['required_with:hotspots.*.fit', 'numeric', 'min:'.self::FIT_MIN, 'max:'.self::FIT_MAX],
+            'hotspots.*.fit.h' => ['required_with:hotspots.*.fit', 'numeric', 'min:'.self::FIT_MIN, 'max:'.self::FIT_MAX],
         ];
     }
 
@@ -304,12 +307,14 @@ class ImageCard
         if (! is_array($fit) || ! isset($fit['l'], $fit['t'], $fit['w'], $fit['h'])) {
             return null;
         }
-        $w = round(min(self::FIT_MAX, max(100, (float) $fit['w'])), 2);
-        $h = round(min(self::FIT_MAX, max(100, (float) $fit['h'])), 2);
+        $w = round(min(self::FIT_MAX, max(self::FIT_MIN, (float) $fit['w'])), 2);
+        $h = round(min(self::FIT_MAX, max(self::FIT_MIN, (float) $fit['h'])), 2);
+        // Bigger than the area: its edges never come inside. Smaller: it stays within the area.
+        $place = fn (float $v, float $size) => $size >= 100 ? min(0, max(100 - $size, $v)) : min(100 - $size, max(0, $v));
 
         return [
-            'l' => round(min(0, max(100 - $w, (float) $fit['l'])), 2),
-            't' => round(min(0, max(100 - $h, (float) $fit['t'])), 2),
+            'l' => round($place((float) $fit['l'], $w), 2),
+            't' => round($place((float) $fit['t'], $h), 2),
             'w' => $w,
             'h' => $h,
         ];

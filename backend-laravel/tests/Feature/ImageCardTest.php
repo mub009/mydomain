@@ -664,10 +664,13 @@ class ImageCardTest extends TestCase
         $this->save([$this->spot('custom_image', $area + ['fit' => ['l' => -10, 't' => 0, 'w' => 105, 'h' => 120]])])
             ->assertOk()->assertJsonPath('data.hotspots.0.fit', ['l' => -5, 't' => 0, 'w' => 105, 'h' => 120]);
 
-        // No position = centred and covering; smaller than the area is refused; only free images keep it.
+        // No position = centred and covering; zoomed out smaller than the area, it stays within it;
+        // only free images keep it.
         $this->save([$this->spot('custom_image', $area)])->assertOk()->assertJsonPath('data.hotspots.0.fit', null);
         $this->assertStringContainsString('<img src="https://cdn.example.test/cards/images/shop.jpg" alt="" style="object-fit:cover"', $this->get('/card/spice-garden')->getContent());
-        $this->save([$this->spot('custom_image', $area + ['fit' => ['l' => 0, 't' => 0, 'w' => 60, 'h' => 100]])])->assertStatus(400);
+        $this->save([$this->spot('custom_image', $area + ['fit' => ['l' => 50, 't' => 0, 'w' => 60, 'h' => 100]])])
+            ->assertOk()->assertJsonPath('data.hotspots.0.fit', ['l' => 40, 't' => 0, 'w' => 60, 'h' => 100]);
+        $this->save([$this->spot('custom_image', $area + ['fit' => ['l' => 0, 't' => 0, 'w' => 5, 'h' => 100]])])->assertStatus(400);
         $this->save([$this->spot('logo', $area + ['fit' => $fit])])->assertOk()->assertJsonPath('data.hotspots.0.fit', null);
     }
 
@@ -862,6 +865,31 @@ class ImageCardTest extends TestCase
         // But no text drawn on the card: the artwork shows its own icons.
         // (No text-drawing operators, BT ... ET, in the page's content streams.)
         $this->assertDoesNotMatchRegularExpression('~(^|\s)BT\s~', self::pdfDrawing($pdf));
+    }
+
+    public function test_a_free_image_can_be_zoomed_out_smaller_than_its_box(): void
+    {
+        // Zoomed out: half the box's size, in its middle. Kept inside the box if pushed past it.
+        $this->assertSame(['l' => 25.0, 't' => 25.0, 'w' => 50.0, 'h' => 50.0], \App\Support\Cards\ImageCard::fit(['l' => 25, 't' => 25, 'w' => 50, 'h' => 50]));
+        $this->assertSame(['l' => 50.0, 't' => 0.0, 'w' => 50.0, 'h' => 50.0], \App\Support\Cards\ImageCard::fit(['l' => 80, 't' => -20, 'w' => 50, 'h' => 50]));
+        // Zoomed in, as before: it covers the box.
+        $this->assertSame(['l' => -100.0, 't' => 0.0, 'w' => 200.0, 'h' => 100.0], \App\Support\Cards\ImageCard::fit(['l' => -150, 't' => 10, 'w' => 200, 'h' => 100]));
+
+        $spot = $this->spot('custom_image', ['value' => 'https://cdn.example.test/pic.jpg', 'fit' => ['l' => 25, 't' => 25, 'w' => 50, 'h' => 50]]);
+        $this->save([$spot])->assertOk()->assertJsonPath('data.hotspots.0.fit.w', 50);
+
+        // The PDF draws it small, with clear space around it in the box.
+        $shaped = new \ReflectionMethod(\App\Support\Cards\CardPdf::class, 'shapedPng');
+        $png = $shaped->invoke(null, 'https://cdn.example.test/pic.jpg', 100, 100, [[0, 0], [100, 0], [100, 100], [0, 100]], ['l' => 25, 't' => 25, 'w' => 50, 'h' => 50]);
+        $img = imagecreatefromstring(base64_decode(substr($png, strlen('data:image/png;base64,'))));
+        $alpha = fn (float $fx, float $fy) => (imagecolorat($img, (int) (imagesx($img) * $fx), (int) (imagesy($img) * $fy)) >> 24) & 0x7F;
+        $this->assertSame(127, $alpha(0.1, 0.1), 'clear around the picture');
+        $this->assertSame(0, $alpha(0.5, 0.5), 'the picture in the middle');
+        $this->assertSame(127, $alpha(0.9, 0.9), 'clear on the far side');
+
+        $this->postJson("/api/v1/businesses/{$this->business->id}/card/publish", [], $this->auth)->assertOk();
+        $this->get('/card/spice-garden.pdf')->assertOk();
+        $this->assertStringContainsString('left:25%;top:25%;width:50%;height:50%', $this->get('/card/spice-garden')->getContent());
     }
 
     /** A PDF's page drawing commands, unpacked from its content streams. */

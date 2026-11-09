@@ -109,15 +109,20 @@ const SHAPES = {
 // The public card draws it with the same CSS (ImageCard::pictureCss).
 const FIT_MAX = 1000; // percent of the area: up to 10x
 const ZOOM_MAX = 400; // the zoom slider's top, relative to just covering
+const ZOOM_MIN = 20; // its bottom: zoomed out, the picture a fifth of the size that covers the box
+const FIT_MIN = 10; // a zoomed-out picture: at least this many percent of its area (ImageCard::FIT_MIN)
 function coverRect(imgW, imgH, areaW, areaH) {
   const ia = imgW / imgH;
   const aa = areaW / areaH;
   return ia > aa ? { w: (100 * ia) / aa, h: 100 } : { w: 100, h: (100 * aa) / ia };
 }
+// Bigger than its area, the picture's edges never come inside; zoomed out
+// smaller, it stays within the area. The same as ImageCard::fit.
 function clampFit(f) {
-  const w = clamp(f.w, 100, FIT_MAX);
-  const h = clamp(f.h, 100, FIT_MAX);
-  return { l: round(clamp(f.l, 100 - w, 0)), t: round(clamp(f.t, 100 - h, 0)), w: round(w), h: round(h) };
+  const w = clamp(f.w, FIT_MIN, FIT_MAX);
+  const h = clamp(f.h, FIT_MIN, FIT_MAX);
+  const place = (v, size) => (size >= 100 ? clamp(v, 100 - size, 0) : clamp(v, 0, 100 - size));
+  return { l: round(place(f.l, w)), t: round(place(f.t, h)), w: round(w), h: round(h) };
 }
 function fitCss(h) {
   const f = h.fit;
@@ -568,7 +573,7 @@ export function initHotspotEditor(editor, options) {
                   h.value
                     ? `<label class="block pt-1">
                         <span class="mb-0.5 flex justify-between text-xs font-semibold text-ink-700">Zoom <span class="font-normal text-ink-500" data-fit-zoom-label>${zoomOf(h.fit, h.value, ...areaPx(h))}%</span></span>
-                        <input type="range" min="100" max="${ZOOM_MAX}" step="5" value="${zoomOf(h.fit, h.value, ...areaPx(h))}" class="w-full" data-field="fitZoom" aria-label="Zoom the picture" />
+                        <input type="range" min="${ZOOM_MIN}" max="${ZOOM_MAX}" step="5" value="${zoomOf(h.fit, h.value, ...areaPx(h))}" class="w-full" data-field="fitZoom" aria-label="Zoom the picture" />
                         <span class="mt-0.5 flex justify-between text-[11px] text-ink-400"><span>Fits the area</span><button type="button" class="font-semibold text-ink-500 hover:underline" data-fit-reset>Reset</button><span>Bigger</span></span>
                       </label>`
                     : ""
@@ -602,7 +607,7 @@ export function initHotspotEditor(editor, options) {
                                <span class="flex justify-between text-xs font-semibold text-ink-700">Zoom inside the box <span class="font-normal text-ink-500" data-fit-zoom-label>${h.fit ? `${zoomOf(h.fit, h.value, ...areaPx(h))}%` : "Whole picture"}</span></span>
                                <div class="flex items-center gap-2">
                                  <button type="button" data-zoom-step="-10" class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-gray-300 bg-white text-lg font-bold text-ink-700 hover:bg-gray-50" aria-label="Zoom out">−</button>
-                                 <input type="range" min="100" max="${ZOOM_MAX}" step="5" value="${h.fit ? zoomOf(h.fit, h.value, ...areaPx(h)) : 100}" class="min-w-0 flex-1" data-field="fitZoom" aria-label="Zoom the picture" />
+                                 <input type="range" min="${ZOOM_MIN}" max="${ZOOM_MAX}" step="5" value="${h.fit ? zoomOf(h.fit, h.value, ...areaPx(h)) : 100}" class="min-w-0 flex-1" data-field="fitZoom" aria-label="Zoom the picture" />
                                  <button type="button" data-zoom-step="10" class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-gray-300 bg-white text-lg font-bold text-ink-700 hover:bg-gray-50" aria-label="Zoom in">+</button>
                                </div>
                                ${
@@ -829,9 +834,9 @@ export function initHotspotEditor(editor, options) {
     $$("[data-zoom-step]", inspector).forEach((b) =>
       b.addEventListener("click", () => {
         const now = h.fit ? zoomOf(h.fit, h.value, ...areaPx(h)) : 100;
-        const next = clamp(now + Number(b.dataset.zoomStep), 100, ZOOM_MAX);
+        const next = clamp(now + Number(b.dataset.zoomStep), ZOOM_MIN, ZOOM_MAX);
         // Zooming out all the way shows the whole picture again.
-        h.fit = next <= 100 && Number(b.dataset.zoomStep) < 0 ? null : zoomFit(h.fit, h.value, ...areaPx(h), next);
+        h.fit = zoomFit(h.fit, h.value, ...areaPx(h), next);
         changed({ inspector: true });
       }),
     );
@@ -1396,7 +1401,7 @@ export function initHotspotEditor(editor, options) {
                  ${selectedPt !== null ? `<button type="button" data-x="pt-delete" class="${small}">Delete point</button>` : ""}`
               : mode === "move" && draft.value
                 ? `<label class="flex items-center gap-2">Picture zoom
-                     <input type="range" min="100" max="${ZOOM_MAX}" step="5" value="${zoom}" data-x="zoom" class="w-36" aria-label="Zoom the picture" />
+                     <input type="range" min="${ZOOM_MIN}" max="${ZOOM_MAX}" step="5" value="${zoom}" data-x="zoom" class="w-36" aria-label="Zoom the picture" />
                      <span data-zoom-label class="w-10">${zoom}%</span>
                    </label>
                    <button type="button" data-x="reset" class="${small}">Reset</button>`
