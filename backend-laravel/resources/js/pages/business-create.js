@@ -26,6 +26,26 @@ withOwner?.addEventListener("change", syncOwnerFields);
 syncOwnerFields();
 $("[data-generate-password]", form ?? document)?.addEventListener("click", () => (form.ownerPassword.value = generatePassword()));
 
+// A mobile number as the login username: the password and contact phone are
+// filled with the same number, so the business signs in with just its mobile.
+// A box the dealer has typed something else into is left as it is.
+if (form?.ownerUsername) {
+  let lastAuto = "";
+  const mobileOf = (value) => {
+    if (value.includes("@")) return null;
+    const digits = value.replace(/\D/g, "");
+    // 10 digits, optionally after +91 (as the server reads it: User::normalizePhone).
+    return /^(?:91)?([6-9]\d{9})$/.exec(digits)?.[1] ?? null;
+  };
+  form.ownerUsername.addEventListener("input", () => {
+    const mobile = mobileOf(form.ownerUsername.value.trim()) ?? "";
+    for (const field of [form.ownerPassword, form.ownerPhone]) {
+      if (field && (field.value === "" || field.value === lastAuto)) field.value = mobile;
+    }
+    lastAuto = mobile;
+  });
+}
+
 // The page link is made from the business name on the server; preview it
 // here. If the name is taken the server adds -2, -3, ... to keep it unique.
 const slugSource = form ? $("[data-slug-source]", form) : null;

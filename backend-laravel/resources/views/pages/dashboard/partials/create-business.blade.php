@@ -125,6 +125,7 @@
         <div>
           <label class="block text-[11px] font-medium text-ink-600 mb-1">Login username (email or mobile number)</label>
           <input class="input" name="ownerUsername" placeholder="owner@business.com or 9876543210" autocomplete="off" autocapitalize="none" spellcheck="false" data-owner-required />
+          <p class="mt-1 text-[11px] text-ink-400">A mobile number fills in the password and contact phone with the same number.</p>
         </div>
         <div>
           <label class="block text-[11px] font-medium text-ink-600 mb-1">Login password (min 8 chars)</label>
