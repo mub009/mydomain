@@ -354,6 +354,9 @@ export function initHotspotEditor(editor, options) {
           : "bg-gray-900/75 text-white";
     const drawn = h.style !== "invisible";
     if (drawn) ensureFont(h.font);
+    // An outline-only box too narrow for its name (most of them on a phone's
+    // ~330px card): just its icon; the name is in its tooltip and the list.
+    const iconOnly = !drawn && h.w < 25;
     const ring = missing ? "ring-amber-500" : selected ? "ring-brand-600" : "ring-brand-500/70";
     const corners = {
       nw: "-left-1.5 -top-1.5 cursor-nwse-resize",
@@ -367,12 +370,19 @@ export function initHotspotEditor(editor, options) {
           .join("")
       : "";
     return `<div data-spot="${esc(h.id)}" tabindex="0" role="button" aria-label="${esc(textOf(h))} — drag to move"
-        class="absolute flex ${canMove ? "cursor-move touch-none" : "cursor-pointer"} items-center justify-center gap-1 overflow-visible rounded-lg ${drawn ? "" : "text-[11px] font-semibold"} ring-2 ${ring} ${fill} ${selected ? "z-10 ring-[3px]" : ""} focus:outline-none"
-        style="left:${h.x}%;top:${h.y}%;width:${h.w}%;height:${h.h}%;${drawn ? esc(textStyle(h)) : ""}">
-        <span class="pointer-events-none flex min-w-0 items-center gap-1 rounded px-1 ${drawn ? "" : "bg-white/85 text-brand-800"}">
-          ${icon(a.icon, { size: 13, className: drawn ? "h-[1.35em] w-[1.35em] shrink-0" : "shrink-0" })}<span class="truncate ${h.style === "icon" ? "sr-only" : ""}">${esc(textOf(h))}</span>
+        title="${esc(textOf(h))}${missing ? " — needs details" : ""}"
+        class="absolute flex ${canMove ? "cursor-move touch-none" : "cursor-pointer"} items-center justify-center gap-1 overflow-visible rounded-lg ${drawn ? "" : "font-semibold"} ring-2 ${ring} ${fill} ${selected ? "z-10 ring-[3px]" : ""} focus:outline-none"
+        style="left:${h.x}%;top:${h.y}%;width:${h.w}%;height:${h.h}%;${drawn ? esc(textStyle(h)) : "font-size:clamp(9px, calc(11 * 100cqw / 480), 11px);"}">
+        <span class="pointer-events-none flex min-w-0 max-w-full items-center gap-1 rounded ${drawn ? "px-1" : `bg-white/85 text-brand-800 ${iconOnly ? "p-0.5" : "px-1"}`}">
+          ${icon(a.icon, { size: 13, className: drawn ? "h-[1.35em] w-[1.35em] shrink-0" : "h-[1.2em] w-[1.2em] shrink-0" })}<span class="truncate ${h.style === "icon" || iconOnly ? "sr-only" : ""}">${esc(textOf(h))}</span>
         </span>
-        ${missing ? `<span class="pointer-events-none absolute -top-2.5 left-1 rounded bg-amber-500 px-1 text-[9px] text-white">needs details</span>` : ""}
+        ${
+          missing
+            ? iconOnly
+              ? `<span class="pointer-events-none absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-white shadow" aria-hidden="true">!</span>`
+              : `<span class="pointer-events-none absolute -top-2.5 left-1 whitespace-nowrap rounded bg-amber-500 px-1 text-[9px] text-white">needs details</span>`
+            : ""
+        }
         ${handles}
       </div>`;
   }
