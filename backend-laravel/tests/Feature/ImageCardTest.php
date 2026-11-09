@@ -849,4 +849,26 @@ class ImageCardTest extends TestCase
 
         $this->artisan('cards:shrink-images')->expectsOutputToContain('No card images over')->assertSuccessful();
     }
+
+    public function test_the_pdf_links_over_the_artwork_carry_no_visible_names(): void
+    {
+        $this->save([$this->spot('call'), $this->spot('whatsapp', ['y' => 50]), $this->spot('directions', ['y' => 30])])->assertOk();
+        $this->postJson("/api/v1/businesses/{$this->business->id}/card/publish", [], $this->auth)->assertOk();
+        $pdf = $this->get('/card/spice-garden.pdf')->assertOk()->getContent();
+
+        // Still clickable: a link over each action.
+        $this->assertStringContainsString('tel:9876543210', $pdf);
+        $this->assertStringContainsString('wa.me', $pdf);
+        // But no text drawn on the card: the artwork shows its own icons.
+        // (No text-drawing operators, BT ... ET, in the page's content streams.)
+        $this->assertDoesNotMatchRegularExpression('~(^|\s)BT\s~', self::pdfDrawing($pdf));
+    }
+
+    /** A PDF's page drawing commands, unpacked from its content streams. */
+    private static function pdfDrawing(string $pdf): string
+    {
+        preg_match_all('~stream\r?\n(.*?)\r?\nendstream~s', $pdf, $m);
+
+        return "\n".implode("\n", array_map(fn ($s) => @gzuncompress($s) ?: '', $m[1]));
+    }
 }

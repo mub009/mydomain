@@ -14,7 +14,9 @@
     .page .pic{position:absolute}
     .page .pic img{width:100%;height:100%}
     .page .detail{position:absolute;overflow:hidden;line-height:1.2}
-    .page a{position:absolute;display:block;color:transparent;font-size:1pt;text-decoration:none}
+    {{-- Empty: just a clickable area over the artwork's own button. (dompdf has no
+         transparent text, so a name inside would be printed on the card.) --}}
+    .page a{position:absolute;display:block;text-decoration:none}
   </style>
 </head>
 <body>
@@ -27,7 +29,7 @@
         <div class="detail" style="{{ $s['box'] }};{{ $s['textStyle'] }}">{!! nl2br(e($s['display'])) !!}</div>
       @endif
       @if ($s['href'] && $s['href'] !== '#')
-        <a href="{{ $s['href'] }}" style="{{ $s['box'] }}">{{ $s['text'] }}</a>
+        <a href="{{ $s['href'] }}" style="{{ $s['box'] }}" title="{{ $s['text'] }}"></a>
       @endif
     @endforeach
   </div>
