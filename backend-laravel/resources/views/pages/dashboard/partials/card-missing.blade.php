@@ -13,7 +13,7 @@
           {{-- A free-image spot in the design: its picture goes on the card itself. --}}
           <form class="space-y-1.5" data-missing-form data-via="spot" data-spot="{{ $m['spot'] }}">
             <label class="block text-xs font-semibold text-ink-900">{{ $m['label'] }}</label>
-            <x-upload-field name="spotUrl" purpose="card-images"placeholder="https://… or upload a picture" data-missing-upload />
+            <x-upload-field name="spotUrl" purpose="card-images" placeholder="https://… or upload a picture" data-missing-upload />
             <button class="btn-primary px-3 py-1.5 text-xs" data-missing-save>Save</button>
           </form>
         @elseif ($input)
