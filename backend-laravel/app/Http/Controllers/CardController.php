@@ -35,6 +35,19 @@ class CardController extends Controller
 
     // Uploading the card image and placing its actions is for dealers and
     // admins; a business owner picks a ready-made design and publishes it.
+    /**
+     * Where the colour goes (its marked areas, ImageColour::areas) is set by
+     * admins only. Anyone else changing the colour keeps the areas it has.
+     */
+    private static function withOwnAreas(array $actor, mixed $colour, mixed $stored): mixed
+    {
+        if ($actor['role'] === 'ADMIN' || ! is_array($colour)) {
+            return $colour;
+        }
+
+        return [...$colour, 'areas' => is_array($stored) ? ($stored['areas'] ?? []) : []];
+    }
+
     private static function canEditDesign(array $actor): bool
     {
         return $actor['role'] !== 'BUSINESS_OWNER';
@@ -101,6 +114,8 @@ class CardController extends Controller
             'canEdit' => self::canEditDesign($actor),
             // Admins draw a free image's area (full-screen editor); dealers just place a picture and resize it.
             'imageAreaTools' => $actor['role'] === 'ADMIN',
+            // Marking where the colour goes ("Colour here" / "Eraser") is for admins.
+            'colourAreaTools' => $actor['role'] === 'ADMIN',
             // The image's recolouring — the whole business team, owners too, can change it.
             'imageColour' => ImageColour::normalize($card?->imageColour),
             'imageColourDefaults' => ImageColour::DEFAULTS,
@@ -206,7 +221,7 @@ class CardController extends Controller
             $changes['hotspots'] = ImageCard::normalize($data['hotspots'] ?? []);
         }
         if (array_key_exists('imageColour', $data)) {
-            $changes['imageColour'] = ImageColour::normalize($data['imageColour']);
+            $changes['imageColour'] = ImageColour::normalize(self::withOwnAreas($actor, $data['imageColour'], $business->card?->imageColour));
         }
         // Multi card view is about sharing, not the design: the whole business team can set it.
         if (array_key_exists('multiView', $data)) {
@@ -294,7 +309,7 @@ class CardController extends Controller
         return ApiResponse::ok(['html' => ImageCard::renderSource([
             ...$data,
             'hotspots' => ImageCard::normalize($data['hotspots'] ?? [], true),
-            'colour' => ImageColour::normalize($data['imageColour'] ?? null),
+            'colour' => ImageColour::normalize(self::withOwnAreas($request->attributes->get('auth'), $data['imageColour'] ?? null, $business->card?->imageColour)),
         ], CardEngine::details($business), true, self::canEditDesign($request->attributes->get('auth')))]);
     }
 

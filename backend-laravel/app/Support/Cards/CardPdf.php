@@ -37,6 +37,9 @@ class CardPdf
 
     private const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 
+    // Larger pictures aren't opened at all (about 200MB in memory at 50M pixels).
+    private const MAX_IMAGE_PIXELS = 50_000_000;
+
     public static function filename(Business $business, ?CardTemplate $design = null): string
     {
         return $design ? "{$business->slug}-{$design->slug}-visiting-card.pdf" : "{$business->slug}-visiting-card.pdf";
@@ -48,6 +51,7 @@ class CardPdf
      */
     public static function render(Business $business, bool $live, ?CardTemplate $design = null): string
     {
+        self::makeRoom();
         if ($design && ($source = ImageCard::fromTemplate($design)) && ($pdf = self::renderImage($business, $source, $live)) !== null) {
             return $pdf;
         }
@@ -106,7 +110,7 @@ class CardPdf
      */
     private static function renderImage(Business $business, array $source, bool $live): ?string
     {
-        $src = self::gd($source['imageUrl']);
+        $src = self::gd($source['imageUrl'], 2400);
         if (! $src) {
             return null;
         }
@@ -120,11 +124,13 @@ class CardPdf
         $dst = imagecreatetruecolor(max(1, (int) round($sw * $scale)), max(1, (int) round($sh * $scale)));
         imagefill($dst, 0, 0, imagecolorallocate($dst, 255, 255, 255));
         imagecopyresampled($dst, $src, 0, 0, 0, 0, imagesx($dst), imagesy($dst), $sw, $sh);
+        unset($src); // the full-size copy isn't needed while the PDF is drawn
         if ($colour) {
             ImageColour::applyGd($dst, $colour);
         }
         ob_start();
         imagejpeg($dst, null, 85);
+        unset($dst);
         $jpeg = 'data:image/jpeg;base64,'.base64_encode((string) ob_get_clean());
 
         $width = self::PAGE[2];
@@ -178,7 +184,7 @@ class CardPdf
     /** An image from the app's storage as a PNG data URI dompdf can draw (it can't read WebP), or null. */
     private static function png(string $url): ?string
     {
-        $img = self::gd($url);
+        $img = self::gd($url, 1200);
         if (! $img) {
             return null;
         }
@@ -371,12 +377,59 @@ class CardPdf
         return $encoded ? base64_decode($encoded) : null;
     }
 
-    private static function gd(string $url): ?\GdImage
+    /**
+     * The image, at most $maxSide pixels on its longer side: a phone photo
+     * opened at full size takes 50MB+ of memory, so it's shrunk straight away
+     * and the full-size copy let go. Null if it can't be read, or is too big
+     * to open within the memory a request has.
+     */
+    private static function gd(string $url, int $maxSide = 2000): ?\GdImage
     {
         $bytes = self::fetch($url);
-        $img = $bytes ? @imagecreatefromstring($bytes) : false;
+        if (! $bytes) {
+            return null;
+        }
+        $size = @getimagesizefromstring($bytes);
+        if (! $size || $size[0] * $size[1] > self::MAX_IMAGE_PIXELS) {
+            return null;
+        }
+        $img = @imagecreatefromstring($bytes);
+        unset($bytes);
+        if (! $img) {
+            return null;
+        }
+        $w = imagesx($img);
+        $h = imagesy($img);
+        if (max($w, $h) <= $maxSide) {
+            return $img;
+        }
+        $k = $maxSide / max($w, $h);
+        $small = imagecreatetruecolor(max(1, (int) round($w * $k)), max(1, (int) round($h * $k)));
+        imagealphablending($small, false);
+        imagesavealpha($small, true);
+        imagefill($small, 0, 0, imagecolorallocatealpha($small, 0, 0, 0, 127));
+        imagecopyresampled($small, $img, 0, 0, 0, 0, imagesx($small), imagesy($small), $w, $h);
+        unset($img);
 
-        return $img ?: null;
+        return $small;
+    }
+
+    /**
+     * Room for the images and dompdf: a card with a big photo and a few
+     * pictures on it needs more than PHP's usual 128–256MB. Only ever raised.
+     */
+    private static function makeRoom(): void
+    {
+        $limit = trim((string) ini_get('memory_limit'));
+        if ($limit === '-1') {
+            return;
+        }
+        $bytes = (int) $limit * match (strtolower(substr($limit, -1))) {
+            'g' => 1024 ** 3, 'm' => 1024 ** 2, 'k' => 1024, default => 1,
+        };
+        if ($bytes < 512 * 1024 ** 2) {
+            @ini_set('memory_limit', '512M');
+        }
     }
 
     /** Cropped to fill $w x $h (cover), darkened by $overlay, as a JPEG data URI. */

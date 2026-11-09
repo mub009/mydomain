@@ -225,6 +225,9 @@ class ImageColour
                 }
                 $rgb = imagecolorat($img, $x, $y);
                 if (! isset($seen[$rgb])) {
+                    if (count($seen) >= 100_000) {
+                        $seen = [];
+                    }
                     $r = ($rgb >> 16) & 0xFF;
                     $g = ($rgb >> 8) & 0xFF;
                     $bl = $rgb & 0xFF;

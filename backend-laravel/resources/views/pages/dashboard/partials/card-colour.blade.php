@@ -43,7 +43,9 @@
   </div>
 
   {{-- The whole card, or only areas marked by hand, as a square or a circle
-       (resources/js/lib/colour-areas.js), with an eraser for the parts to leave alone. --}}
+       (resources/js/lib/colour-areas.js), with an eraser for the parts to leave alone.
+       Marking them is for admins; everyone else's colour goes where the admin marked. --}}
+  @if (! empty($card['colourAreaTools']))
   <div class="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-gray-50 px-3 py-2.5" data-colour-where>
     <div class="min-w-0">
       <p class="text-xs font-semibold text-ink-700">Where the colour goes</p>
@@ -54,6 +56,9 @@
       <button type="button" class="btn-secondary px-3 py-1.5 text-xs" data-areas-edit><x-icon name="pencil" :size="13" /> <span>Colour only part</span></button>
     </div>
   </div>
+  @elseif (! empty($card['imageColour']['areas']))
+    <p class="mt-3 rounded-lg bg-gray-50 px-3 py-2 text-[11px] text-ink-500">The colour changes only the parts of the card your admin marked.</p>
+  @endif
 
   <details class="mt-3 rounded-lg bg-gray-50 px-3 py-2" data-colour-more>
     <summary class="cursor-pointer select-none text-xs font-semibold text-ink-700">Fine-tune</summary>

@@ -434,6 +434,15 @@ class ImageCardTest extends TestCase
         $this->save([$this->spot('custom_text', ['value' => 'Hello', 'color' => '#808080'])])->assertOk();
         $url = "/api/v1/businesses/{$this->business->id}/card";
         $square = [[0, 0], [50, 0], [50, 50], [0, 50]];
+        // Marking where the colour goes is for admins.
+        User::create([
+            'email' => 'admin-'.uniqid().'@example.com', 'passwordHash' => Hash::make('Password123!'),
+            'firstName' => 'A', 'lastName' => 'D', 'status' => 'ACTIVE', 'role' => 'ADMIN',
+        ]);
+        $adminEmail = User::where('role', 'ADMIN')->value('email');
+        $admin = ['Authorization' => 'Bearer '.$this->postJson('/api/v1/auth/login', ['email' => $adminEmail, 'password' => 'Password123!'])->json('data.accessToken')];
+        $this->putJson($url, ['imageColour' => ['tint' => '#ff0000', 'strength' => 100, 'areas' => [['points' => $square]]]], $this->auth)
+            ->assertOk()->assertJsonPath('data.imageColour.areas', []);
         $this->putJson($url, ['imageColour' => ['tint' => '#ff0000', 'strength' => 100, 'areas' => [
             // An eraser before anything is coloured does nothing: dropped.
             ['erase' => true, 'points' => [[1, 1], [2, 1], [2, 2]]],
@@ -441,12 +450,26 @@ class ImageCardTest extends TestCase
             ['erase' => true, 'points' => [[0, 0], [10, 0], [10, 10]]],
             // Points past the edge are pulled back inside the image.
             ['points' => [[120, -5], [60, 60], [60, 90]]],
-        ]]], $this->auth)->assertOk()
+        ]]], $admin)->assertOk()
             ->assertJsonCount(3, 'data.imageColour.areas')
             ->assertJsonPath('data.imageColour.areas.0.erase', false)
             ->assertJsonPath('data.imageColour.areas.1.erase', true)
             ->assertJsonPath('data.imageColour.areas.2.points.0', [100, 0]);
-        $this->putJson($url, ['imageColour' => ['tint' => '#ff0000', 'areas' => [['points' => [[1, 2]]]]]], $this->auth)->assertStatus(400);
+        $this->putJson($url, ['imageColour' => ['tint' => '#ff0000', 'areas' => [['points' => [[1, 2]]]]]], $admin)->assertStatus(400);
+        // A dealer picking another colour keeps the admin's areas, and can't change them.
+        $this->putJson($url, ['imageColour' => ['tint' => '#00ff00', 'strength' => 100, 'areas' => []]], $this->auth)
+            ->assertOk()->assertJsonPath('data.imageColour.tint', '#00ff00')->assertJsonCount(3, 'data.imageColour.areas');
+        $this->putJson($url, ['imageColour' => ['tint' => '#ff0000', 'strength' => 100, 'areas' => [['points' => $square]]]], $this->auth)
+            ->assertOk()->assertJsonCount(3, 'data.imageColour.areas');
+        // Only the admin's Visiting Card page offers marking them.
+        $this->withoutVite();
+        $section = "/dashboard/businesses/{$this->business->id}?section=".urlencode('Visiting Card');
+        $this->post('/login', ['email' => $this->dealerEmail, 'password' => 'Password123!']);
+        $this->get($section)->assertOk()->assertDontSee('data-areas-edit', false)->assertSee('your admin marked');
+        $this->post('/logout');
+        $this->post('/login', ['email' => $adminEmail, 'password' => 'Password123!']);
+        $this->get($section)->assertOk()->assertSee('data-areas-edit', false);
+        $this->post('/logout');
 
         // The public card: the image unfiltered, a recoloured copy masked to the areas, text left alone.
         $this->postJson("{$url}/publish", [], $this->auth)->assertOk();
@@ -468,7 +491,7 @@ class ImageCardTest extends TestCase
         $this->assertStringStartsWith('%PDF', $this->get('/card/spice-garden.pdf')->assertOk()->getContent());
 
         // No areas: the whole card again.
-        $this->putJson($url, ['imageColour' => ['tint' => '#ff0000', 'strength' => 100, 'areas' => []]], $this->auth)->assertOk();
+        $this->putJson($url, ['imageColour' => ['tint' => '#ff0000', 'strength' => 100, 'areas' => []]], $admin)->assertOk();
         $this->assertStringContainsString('.card > img{filter:url(#card-colour)}', $this->get('/card/spice-garden')->getContent());
     }
 
@@ -724,5 +747,50 @@ class ImageCardTest extends TestCase
             ->assertSee('name="instagramUsername"', false)
             // A logo needs an upload: it keeps its link to Contact.
             ->assertSee('Add in Contact', false);
+    }
+
+    public function test_a_card_made_from_a_big_phone_photo_downloads_as_a_pdf_within_memory(): void
+    {
+        // A 12-megapixel photo, as a phone takes it: the card image and a free image on it.
+        $path = public_path('test-big-card-'.uniqid().'.jpg');
+        $img = imagecreatetruecolor(3000, 4000);
+        // Full of detail, like a real photo (a plain one squeezes too small to test anything).
+        mt_srand(7);
+        for ($y = 0; $y < 4000; $y += 4) {
+            for ($x = 0; $x < 3000; $x += 4) {
+                imagefilledrectangle($img, $x, $y, $x + 3, $y + 3, mt_rand(0, 0xFFFFFF));
+            }
+        }
+        imagejpeg($img, $path, 90);
+        // Four more big pictures placed on it as free images, each a different photo.
+        $pics = [];
+        foreach ([0, 1, 2, 3] as $i) {
+            $pics[$i] = public_path('test-big-pic-'.uniqid()."-{$i}.jpg");
+            $crop = imagecrop($img, ['x' => 0, 'y' => $i * 50, 'width' => 3000, 'height' => 3800]);
+            imagejpeg($crop, $pics[$i], 90);
+        }
+        unset($img, $crop);
+        $url = '/'.basename($path);
+        $free = array_map(fn ($i) => ['id' => "pic{$i}", 'action' => 'custom_image', 'x' => 5 + $i * 20, 'y' => 10, 'w' => 18, 'h' => 20, 'value' => '/'.basename($pics[$i])], array_keys($pics));
+        try {
+            BusinessCard::updateOrCreate(['businessId' => $this->business->id], [
+                'imageUrl' => $url, 'imageWidth' => 3000, 'imageHeight' => 4000, 'isPublished' => true,
+                'hotspots' => [$this->spot('call'), ...$free],
+                'imageColour' => ['tint' => '#ff0000', 'strength' => 80, 'areas' => [['erase' => false, 'points' => [[0, 0], [60, 0], [60, 60], [0, 60]]]]],
+            ]);
+            memory_reset_peak_usage();
+            $before = memory_get_usage();
+            $pdf = $this->get('/card/spice-garden.pdf')->assertOk()->getContent();
+            $this->assertStringStartsWith("%PDF", $pdf);
+            fwrite(STDERR, "IMAGES: ".preg_match_all("~/Subtypes*/Image~", $pdf)." SIZE MB: ".round(strlen($pdf) / 1048576, 1)."
+");
+            // Well inside the 256MB the live server allows.
+            fwrite(STDERR, "PEAK MB: ".round((memory_get_peak_usage() - $before) / 1048576)."
+");
+            $this->assertLessThan(200 * 1024 * 1024, memory_get_peak_usage() - $before);
+        } finally {
+            @unlink($path);
+            array_map('unlink', $pics);
+        }
     }
 }
