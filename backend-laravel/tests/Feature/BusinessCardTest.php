@@ -268,13 +268,10 @@ class BusinessCardTest extends TestCase
         $admin = $this->user('ADMIN');
         $this->post('/logout');
         $this->signIn($admin);
-        // Admins (and dealers) get the editor.
+        // Admins see the same card page: no design editor or colour panel there; the link and QR sit under More details.
         $this->get("/dashboard/businesses/{$business->id}?section=".urlencode('Visiting Card'))
-            ->assertOk()->assertSee('Card design & actions', false)->assertSee('Drop the card image here')
-            // A business's card image isn't swapped from here, and actions are added by clicking the image.
-            ->assertDontSee('Replace image')->assertDontSee('Remove image')->assertDontSee('Drag onto')->assertDontSee('data-palette', false)
-            // An admin arranges the card freely (a dealer's positions are fixed).
-            ->assertSee('Drag a box to move it')->assertDontSee('positions are fixed');
+            ->assertOk()->assertSee('Your card')->assertSee('data-card-more', false)->assertSee('data-card-qr', false)
+            ->assertDontSee('Card design & actions', false)->assertDontSee('data-hotspot-editor', false)->assertDontSee('data-colour-panel', false);
         $this->get('/admin?tab='.urlencode('Card Templates'))->assertOk()->assertSee('Visiting card templates')->assertSee('Luxury Dining');
         $this->get('/admin/card-templates/new')->assertOk()->assertSee('New card template');
         $template = CardTemplate::where('name', 'Luxury Dining')->first();

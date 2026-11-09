@@ -431,11 +431,18 @@ class ImageCard
         return $text !== null && trim($text) !== '' ? $text : null;
     }
 
+    /** The business's picture for a logo box: its logo, else its own photo (gallery or cover). */
+    private static function businessImage(array $details): ?string
+    {
+        return CardEngine::safeUrl($details['logoUrl'] ?? null) ?? CardEngine::safeUrl($details['photoUrl'] ?? null);
+    }
+
     /** What a picture box shows: the business's logo, or a QR code of its card's link. */
     public static function picture(array $spot, array $details): ?string
     {
         return match ($spot['action']) {
-            'logo' => CardEngine::safeUrl($spot['value'] ?? null) ?? CardEngine::safeUrl($details['logoUrl'] ?? null),
+            // An uploaded picture, else the listing's logo, else the business's own photo.
+            'logo' => CardEngine::safeUrl($spot['value'] ?? null) ?? self::businessImage($details),
             'custom_image' => CardEngine::safeUrl($spot['value'] ?? null),
             'qr' => CardPdf::qr(($details['cardUrl'] ?? '#') !== '#' ? $details['cardUrl'] : rtrim((string) config('app.url'), '/').'/card/your-business'),
             default => null,
@@ -453,7 +460,7 @@ class ImageCard
         }
 
         return $texts + [
-            'logo' => CardEngine::safeUrl($details['logoUrl'] ?? null),
+            'logo' => self::businessImage($details),
             'call' => $details['phone'] ?? null,
             'whatsapp' => str_starts_with((string) ($details['whatsappHref'] ?? ''), 'https://wa.me/') ? '+'.substr($details['whatsappHref'], strlen('https://wa.me/')) : null,
             'email' => $details['email'] ?? null,

@@ -91,10 +91,28 @@ class ImageCardTest extends TestCase
         $this->assertStringContainsString('aria-label="Call"', $ownerHtml);
         $body = ['imageUrl' => 'https://cdn.example.test/cards/images/card.jpg', 'hotspots' => [$this->spot('call')]];
         $this->assertStringNotContainsString($outline, $this->postJson("/api/v1/businesses/{$this->business->id}/card/preview", $body, $owner)->json('data.html'));
-        // The dealer's editor preview keeps them.
+        // The dealer's preview looks the same.
         $dealerHtml = $this->getJson("/api/v1/businesses/{$this->business->id}/card", $this->auth)->json('data.imagePreviewHtml');
-        $this->assertStringContainsString($outline, $dealerHtml);
-        $this->assertStringContainsString('aria-label="Instagram"', $dealerHtml);
+        $this->assertStringNotContainsString($outline, $dealerHtml);
+        $this->assertStringNotContainsString('aria-label="Instagram"', $dealerHtml);
+    }
+
+    public function test_a_logo_box_shows_the_business_photo_when_it_has_no_logo(): void
+    {
+        $this->save([$this->spot('logo')])->assertOk();
+        $url = "/api/v1/businesses/{$this->business->id}/card";
+        // No logo and no photo: nothing to show, and the card says so.
+        $this->getJson($url, $this->auth)->assertJsonPath('data.missingDetails.0.key', 'logo');
+
+        $this->business->photos()->create(['url' => 'https://cdn.example.test/photos/shop.jpg', 'sortOrder' => 0]);
+        $this->getJson($url, $this->auth)->assertJsonPath('data.missingDetails', []);
+        $this->assertStringContainsString('https://cdn.example.test/photos/shop.jpg', $this->getJson($url, $this->auth)->json('data.imagePreviewHtml'));
+
+        // A logo still comes first.
+        $this->business->update(['logoUrl' => 'https://cdn.example.test/logos/logo.png']);
+        $html = $this->getJson($url, $this->auth)->json('data.imagePreviewHtml');
+        $this->assertStringContainsString('logos/logo.png', $html);
+        $this->assertStringNotContainsString('photos/shop.jpg', $html);
     }
 
     private function save(array $hotspots)
@@ -232,7 +250,8 @@ class ImageCardTest extends TestCase
         $this->save([$this->spot('call')])->assertOk();
         $this->post('/login', ['email' => $this->dealerEmail, 'password' => 'Password123!']);
         $page = $this->get("/dashboard/businesses/{$this->business->id}?section=".urlencode('Visiting Card'))->assertOk();
-        $page->assertSee('Card design & actions', false)->assertSee('data-colour-panel', false)->assertSee('Card colour');
+        // No colour panel on the dashboard: the colour is changed on the card page (the owner bar).
+        $page->assertDontSee('Card design & actions', false)->assertDontSee('data-colour-panel', false)->assertSee('open your card link while signed in');
         $this->putJson("/api/v1/businesses/{$this->business->id}/card", ['imageColour' => ['tint' => '#2563eb', 'strength' => 60, 'hue' => 0, 'brightness' => 100, 'saturation' => 100]], $this->auth)
             ->assertOk();
     }
@@ -244,7 +263,7 @@ class ImageCardTest extends TestCase
         $this->assertNull(BusinessCard::where('businessId', $this->business->id)->first()?->imageUrl);
         $this->post('/login', ['email' => $this->dealerEmail, 'password' => 'Password123!']);
         $this->get("/dashboard/businesses/{$this->business->id}?section=".urlencode('Visiting Card'))
-            ->assertOk()->assertSee('cards/images/template.jpg', false)->assertSee('data-colour-panel', false);
+            ->assertOk()->assertSee('cards/images/template.jpg', false)->assertDontSee('data-colour-panel', false);
     }
 
     private function admin(): array
@@ -390,8 +409,8 @@ class ImageCardTest extends TestCase
         $this->putJson($url, ['imageColour' => ['hue' => 400]], $owner)->assertStatus(400);
         $this->putJson($url, ['imageColour' => ['tint' => 'red;}']], $owner)->assertStatus(400);
         $this->getJson($url, $owner)->assertOk()->assertJsonPath('data.imageColour.strength', 60);
-        // The owner's preview comes uncoloured: the page lays the colour over it live, so it isn't applied twice.
-        $this->assertStringNotContainsString('feColorMatrix', $this->getJson($url, $owner)->json('data.imagePreviewHtml'));
+        // Every preview shows the saved colour (it is changed on the card page, not over the preview).
+        $this->assertStringContainsString('feColorMatrix', $this->getJson($url, $owner)->json('data.imagePreviewHtml'));
         $this->assertStringContainsString('feColorMatrix', $this->getJson($url, $this->auth)->json('data.imagePreviewHtml'));
 
         $this->postJson("{$url}/publish", [], $owner)->assertOk();
@@ -418,12 +437,11 @@ class ImageCardTest extends TestCase
         $this->putJson($url, ['imageColour' => ['hue' => 0, 'brightness' => 100, 'saturation' => 100]], $owner)->assertOk()->assertJsonPath('data.imageColour', null);
         $this->assertStringNotContainsString('feColorMatrix', $this->get('/card/spice-garden')->getContent());
 
-        // The owner's Visiting Card page has the one-tap colour swatches.
+        // The owner's Visiting Card page points to the card page for the colour.
         $this->withoutVite();
         $this->post('/login', ['email' => $this->ownerEmail, 'password' => 'Password123!']);
         $this->get("/dashboard/businesses/{$this->business->id}?section=".urlencode('Visiting Card'))->assertOk()
-            ->assertSee('data-colour-panel', false)->assertDontSee('data-colour-thumb', false)->assertSee('Tap a colour')->assertSee('data-swatch="gold"', false)
-            ->assertSee('Black &amp; white', false)->assertSee('Fine-tune');
+            ->assertDontSee('data-colour-panel', false)->assertSee('open your card link while signed in');
 
         // A preview shows unsaved colours.
         $this->postJson("{$url}/preview", ['imageUrl' => 'https://cdn.example.test/cards/images/card.jpg', 'imageColour' => ['saturation' => 0]], $owner)
@@ -462,15 +480,6 @@ class ImageCardTest extends TestCase
             ->assertOk()->assertJsonPath('data.imageColour.tint', '#00ff00')->assertJsonCount(3, 'data.imageColour.areas');
         $this->putJson($url, ['imageColour' => ['tint' => '#ff0000', 'strength' => 100, 'areas' => [['points' => $square]]]], $this->auth)
             ->assertOk()->assertJsonCount(3, 'data.imageColour.areas');
-        // Only the admin's Visiting Card page offers marking them.
-        $this->withoutVite();
-        $section = "/dashboard/businesses/{$this->business->id}?section=".urlencode('Visiting Card');
-        $this->post('/login', ['email' => $this->dealerEmail, 'password' => 'Password123!']);
-        $this->get($section)->assertOk()->assertDontSee('data-areas-edit', false)->assertSee('your admin marked');
-        $this->post('/logout');
-        $this->post('/login', ['email' => $adminEmail, 'password' => 'Password123!']);
-        $this->get($section)->assertOk()->assertSee('data-areas-edit', false);
-        $this->post('/logout');
 
         // The public card: the image unfiltered, a recoloured copy masked to the areas, text left alone.
         $this->postJson("{$url}/publish", [], $this->auth)->assertOk();

@@ -43,14 +43,6 @@
       "_channels-CvUWVcU_.js"
     ]
   },
-  "_hotspot-editor-DqCqGGkK.js": {
-    "file": "assets/hotspot-editor-DqCqGGkK.js",
-    "name": "hotspot-editor",
-    "imports": [
-      "_api-B_riRJ0q.js",
-      "_ui-BdSpcnW7.js"
-    ]
-  },
   "_location-input-BfE3W3ic.js": {
     "file": "assets/location-input-BfE3W3ic.js",
     "name": "location-input",
@@ -89,7 +81,7 @@
     ]
   },
   "resources/css/app.css": {
-    "file": "assets/app-uVJHBpyB.css",
+    "file": "assets/app-DH1nrE9G.css",
     "src": "resources/css/app.css",
     "isEntry": true
   },
@@ -165,30 +157,28 @@
     ]
   },
   "resources/js/pages/card-manager.js": {
-    "file": "assets/card-manager-UgDm8I3N.js",
+    "file": "assets/card-manager-Wc4R75NB.js",
     "name": "card-manager",
     "src": "resources/js/pages/card-manager.js",
     "isEntry": true,
     "imports": [
       "_api-B_riRJ0q.js",
       "_card-preview-D32f_M1W.js",
-      "_ui-BdSpcnW7.js",
       "_channels-CvUWVcU_.js",
-      "_hotspot-editor-DqCqGGkK.js",
+      "_ui-BdSpcnW7.js",
       "_widgets-BKox7ttS.js",
       "__commonjsHelpers-CqkleIqs.js"
     ]
   },
   "resources/js/pages/card-template-editor.js": {
-    "file": "assets/card-template-editor-Bgf_Ov4f.js",
+    "file": "assets/card-template-editor-C4tl4wvM.js",
     "name": "card-template-editor",
     "src": "resources/js/pages/card-template-editor.js",
     "isEntry": true,
     "imports": [
       "_api-B_riRJ0q.js",
-      "_hotspot-editor-DqCqGGkK.js",
-      "_searchable-select-DGJiky5z.js",
       "_ui-BdSpcnW7.js",
+      "_searchable-select-DGJiky5z.js",
       "_widgets-BKox7ttS.js",
       "_channels-CvUWVcU_.js",
       "__commonjsHelpers-CqkleIqs.js"

@@ -311,6 +311,10 @@ class CardEngine
             // The business's own card background, worn over any template's.
             'cardBackgroundUrl' => self::safeUrl($business->card?->backgroundImageUrl),
             'coverImageUrl' => self::safeUrl($business->coverImageUrl),
+            // The business's own picture: its first gallery photo, else its cover — what a card's
+            // logo box shows when the business has no logo.
+            'photoUrl' => self::safeUrl($business->photos()->orderBy('sortOrder')->value('url'))
+                ?? self::safeUrl($business->coverImageUrl),
             'phone' => $business->phone,
             'phoneHref' => $business->phone ? 'tel:'.preg_replace('/[^\d+]/', '', $business->phone) : null,
             'whatsappHref' => ($wa = self::digits($business->whatsappNumber ?: $business->phone)) ? "https://wa.me/{$wa}" : null,

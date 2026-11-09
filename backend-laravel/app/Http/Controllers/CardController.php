@@ -120,9 +120,8 @@ class CardController extends Controller
             'imageColour' => ImageColour::normalize($card?->imageColour),
             'imageColourDefaults' => ImageColour::DEFAULTS,
             'missingDetails' => ImageCard::missingDetails($image['hotspots'] ?? [], ImageCard::listingDefaults($details)),
-            // An owner's preview looks like the public card: no outlines over the tap areas.
-            // For an owner, the page lays the colour over it live (card-manager.js), so it's drawn without.
-            'imagePreviewHtml' => $image ? ImageCard::renderSource(self::canEditDesign($actor) ? $image : [...$image, 'colour' => null], $details, true, self::canEditDesign($actor)) : null,
+            // The preview looks like the public card, in its saved colour: no outlines over the tap areas.
+            'imagePreviewHtml' => $image ? ImageCard::renderSource($image, $details, true, false) : null,
             // Ready-made image designs from the admin, for "Start from a design".
             'imageTemplates' => $templates->filter(fn (CardTemplate $t) => (bool) $t->imageUrl)->map(fn (CardTemplate $t) => [
                 'id' => $t->id,
