@@ -190,6 +190,21 @@ class ImageCardTest extends TestCase
             ->assertSee('value="Spice Garden Kochi"', false);
     }
 
+    public function test_the_card_colour_is_picked_in_the_visiting_card_section(): void
+    {
+        $this->withoutVite();
+        $this->save([$this->spot('call')])->assertOk();
+        $this->putJson("/api/v1/businesses/{$this->business->id}/card", ['imageColour' => ['tint' => '#16a34a', 'strength' => 60]], $this->auth)->assertOk();
+        $this->post('/login', ['email' => $this->ownerEmail, 'password' => 'Password123!']);
+        $html = $this->get("/dashboard/businesses/{$this->business->id}?section=".urlencode('Visiting Card'))->assertOk()->getContent();
+        $this->assertStringContainsString('data-card-colour', $html);
+        $this->assertStringContainsString('Card colour', $html);
+        // The card's colour is the one picked.
+        $this->assertMatchesRegularExpression('~title="Green" aria-label="Green" aria-checked="true"~', $html);
+        $this->assertMatchesRegularExpression('~title="Blue" aria-label="Blue" aria-checked="false"~', $html);
+        $this->assertStringContainsString('data-colour-custom', $html);
+    }
+
     public function test_the_card_details_have_one_save_button_for_all(): void
     {
         $this->withoutVite();
@@ -356,7 +371,7 @@ class ImageCardTest extends TestCase
         $this->post('/login', ['email' => $this->dealerEmail, 'password' => 'Password123!']);
         $page = $this->get("/dashboard/businesses/{$this->business->id}?section=".urlencode('Visiting Card'))->assertOk();
         // No colour panel on the dashboard: the colour is changed on the card page (the owner bar).
-        $page->assertDontSee('Card design & actions', false)->assertDontSee('data-colour-panel', false)->assertSee('open your card link while signed in');
+        $page->assertDontSee('Card design & actions', false)->assertDontSee('data-colour-panel', false)->assertSee('from your card link while signed in')->assertSee('data-card-colour', false);
         $this->putJson("/api/v1/businesses/{$this->business->id}/card", ['imageColour' => ['tint' => '#2563eb', 'strength' => 60, 'hue' => 0, 'brightness' => 100, 'saturation' => 100]], $this->auth)
             ->assertOk();
     }
@@ -546,7 +561,7 @@ class ImageCardTest extends TestCase
         $this->withoutVite();
         $this->post('/login', ['email' => $this->ownerEmail, 'password' => 'Password123!']);
         $this->get("/dashboard/businesses/{$this->business->id}?section=".urlencode('Visiting Card'))->assertOk()
-            ->assertDontSee('data-colour-panel', false)->assertSee('open your card link while signed in');
+            ->assertDontSee('data-colour-panel', false)->assertSee('from your card link while signed in')->assertSee('data-card-colour', false);
 
         // A preview shows unsaved colours.
         $this->postJson("{$url}/preview", ['imageUrl' => 'https://cdn.example.test/cards/images/card.jpg', 'imageColour' => ['saturation' => 0]], $owner)
