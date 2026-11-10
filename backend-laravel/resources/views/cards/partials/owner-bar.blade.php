@@ -72,15 +72,13 @@
       function put(body) {
         bar.setAttribute("data-busy", "");
         status.textContent = "Saving…";
-        fetch("/session/token", { headers: { Accept: "application/json" }, credentials: "same-origin" })
-          .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
-          .then(function (t) {
-            return fetch("/api/v1/businesses/{{ $businessId }}/card", {
-              method: "PUT",
-              headers: { "Content-Type": "application/json", Accept: "application/json", Authorization: "Bearer " + t.accessToken },
-              body: JSON.stringify(body)
-            });
-          })
+        // Saved with this page's owner pass, so it works even where the browser isn't signed in here.
+        body.owner = @json($ownerToken);
+        fetch(@json(url('/api/v1/cards/'.$slug.'/owner')), {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify(body)
+        })
           .then(function (r) { if (!r.ok) throw new Error(); location.reload(); })
           .catch(function () {
             bar.removeAttribute("data-busy");

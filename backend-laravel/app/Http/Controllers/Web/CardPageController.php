@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers\Web;
 
+use App\Http\Controllers\CardController;
 use App\Http\Controllers\Controller;
 use App\Models\Business;
 use App\Models\BusinessCard;
 use App\Models\CardTemplate;
+use App\Models\User;
 use App\Support\BusinessAccess;
 use App\Support\BusinessFeatures;
 use App\Support\Cards\CardEngine;
@@ -14,6 +16,7 @@ use App\Support\Cards\CardPdf;
 use App\Support\Cards\ImageCard;
 use App\Support\Cards\ImageColour;
 use App\Support\WebAuth;
+use Illuminate\Http\Request;
 
 // The public digital visiting card at /card/<slug> (the URL its QR code
 // holds), and its "Save contact" vCard. A card is up while it is published
@@ -73,9 +76,8 @@ class CardPageController extends Controller
     // when the card wears an image, which is what the colour changes.
     private static function page(Business $business, string $html)
     {
-        $user = WebAuth::user();
-        if ($user && ImageCard::source($business)
-            && BusinessAccess::canManage(['role' => $user->role, 'sub' => $user->id], $business)) {
+        $manager = self::manager($business, request()->query('owner'));
+        if ($manager && ImageCard::source($business)) {
             // The ready-made image designs for its category, to switch the card's image right here.
             $card = $business->card;
             $current = CardEngine::templateFor($business, $card);
@@ -88,11 +90,13 @@ class CardPageController extends Controller
                     'inUse' => $t->id === $current?->id && ! $card?->imageUrl,
                 ])->values()->all();
             $bar = view('cards.partials.owner-bar', [
-                'businessId' => $business->id,
+                'slug' => $business->slug,
+                // Saves go with this pass, so they work wherever the card is opened.
+                'ownerToken' => CardEngine::ownerToken($business, $manager->id, 2),
                 'designs' => $designs,
                 'colour' => ImageColour::normalize($business->card?->imageColour),
                 'swatches' => ImageColour::SWATCHES,
-                'manageUrl' => "/dashboard/businesses/{$business->id}?section=".urlencode('Visiting Card'),
+                'manageUrl' => url("/dashboard/businesses/{$business->id}?section=".urlencode('Visiting Card')),
             ])->render();
             $html = str_contains($html, '</body>') ? preg_replace('~</body>~i', $bar.'</body>', $html, 1) : $html.$bar;
         }
@@ -100,7 +104,42 @@ class CardPageController extends Controller
         $response = response($html)->header('Content-Type', 'text/html; charset=UTF-8');
 
         // The owner's copy carries their bar: never keep it in a shared cache.
-        return $user ? $response->header('Cache-Control', 'private, no-store') : $response;
+        return $manager || WebAuth::user() ? $response->header('Cache-Control', 'private, no-store') : $response;
+    }
+
+    /**
+     * Who may change this card here: someone signed in who manages the
+     * business, or the holder of a pass from the dashboard's "Open card"
+     * (for when the browser isn't signed in on the card's address).
+     */
+    private static function manager(Business $business, mixed $token): ?User
+    {
+        $user = WebAuth::user();
+        if (! $user && ($id = CardEngine::ownerFromToken(is_string($token) ? $token : null, $business))) {
+            $user = User::find($id);
+            $user = $user && $user->status !== 'SUSPENDED' ? $user : null;
+        }
+
+        return $user && BusinessAccess::canManage(['role' => $user->role, 'sub' => $user->id], $business) ? $user : null;
+    }
+
+    /**
+     * The bar's saves: the card's colour, or another ready-made design —
+     * nothing else — through the card API, as the pass's user.
+     */
+    public function ownerUpdate(Request $request, string $slug)
+    {
+        $business = Business::with(['category', 'card'])->where('slug', $slug)->first();
+        abort_unless($business, 404);
+        $user = self::manager($business, $request->input('owner'));
+        abort_unless($user, 403);
+
+        $payload = array_intersect_key($request->all(), array_flip(['imageColour', 'templateId']));
+        abort_unless($payload, 422);
+        $sub = Request::create('/', 'PUT', [], [], [], ['CONTENT_TYPE' => 'application/json', 'HTTP_ACCEPT' => 'application/json'], json_encode($payload));
+        $sub->attributes->set('auth', ['sub' => $user->id, 'role' => $user->role]);
+
+        return app()->call([app(CardController::class), 'update'], ['request' => $sub, 'id' => $business->id]);
     }
 
     // The card as a PDF, every action a working link. ?design=<id>: one of

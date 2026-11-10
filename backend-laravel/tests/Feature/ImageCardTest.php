@@ -190,19 +190,42 @@ class ImageCardTest extends TestCase
             ->assertSee('value="Spice Garden Kochi"', false);
     }
 
-    public function test_the_card_colour_is_picked_in_the_visiting_card_section(): void
+    public function test_open_card_shows_the_colour_bar_without_being_signed_in_there(): void
     {
         $this->withoutVite();
         $this->save([$this->spot('call')])->assertOk();
-        $this->putJson("/api/v1/businesses/{$this->business->id}/card", ['imageColour' => ['tint' => '#16a34a', 'strength' => 60]], $this->auth)->assertOk();
+        $this->postJson("/api/v1/businesses/{$this->business->id}/card/publish", [], $this->auth)->assertOk();
+
+        // The dashboard's "Open card" carries the owner pass.
         $this->post('/login', ['email' => $this->ownerEmail, 'password' => 'Password123!']);
         $html = $this->get("/dashboard/businesses/{$this->business->id}?section=".urlencode('Visiting Card'))->assertOk()->getContent();
-        $this->assertStringContainsString('data-card-colour', $html);
-        $this->assertStringContainsString('Card colour', $html);
-        // The card's colour is the one picked.
-        $this->assertMatchesRegularExpression('~title="Green" aria-label="Green" aria-checked="true"~', $html);
-        $this->assertMatchesRegularExpression('~title="Blue" aria-label="Blue" aria-checked="false"~', $html);
-        $this->assertStringContainsString('data-colour-custom', $html);
+        $this->assertMatchesRegularExpression('~href="https://markkito.test/card/spice-garden\?owner=([A-Za-z0-9_.-]+)"[^>]*data-open-card~', $html);
+        preg_match('~/card/spice-garden\?owner=([A-Za-z0-9_.-]+)"~', $html, $m);
+        $pass = $m[1];
+        $this->assertStringNotContainsString('data-card-colour', $html);
+
+        // Opened in a browser that isn't signed in on the card's address: the bar still shows, never cached.
+        $this->post('/logout');
+        $page = $this->get("/card/spice-garden?owner={$pass}")->assertOk()->assertSee('id="mk-owner-bar"', false);
+        $this->assertStringContainsString('no-store', $page->headers->get('Cache-Control'));
+        preg_match('~body.owner = "([^"]+)"~', $page->getContent(), $t);
+        // Without the pass, or with a forged one: just the card.
+        $this->assertStringNotContainsString('mk-owner-bar', $this->get('/card/spice-garden')->getContent());
+        $this->assertStringNotContainsString('mk-owner-bar', $this->get('/card/spice-garden?owner='.substr($pass, 0, -2).'00')->getContent());
+
+        // The bar saves the colour with the page's pass — and only the colour or design.
+        $this->postJson('/api/v1/cards/spice-garden/owner', ['owner' => $t[1], 'imageColour' => ['tint' => '#7c3aed', 'strength' => 60]])->assertOk();
+        $this->assertSame('#7c3aed', BusinessCard::where('businessId', $this->business->id)->first()->imageColour['tint']);
+        $this->postJson('/api/v1/cards/spice-garden/owner', ['owner' => 'bad.'.str_repeat('0', 64), 'imageColour' => null])->assertStatus(403);
+        $this->postJson('/api/v1/cards/spice-garden/owner', ['owner' => $t[1], 'isPublished' => false])->assertStatus(422);
+
+        // A pass is for its own business only.
+        $other = Business::create([
+            'ownerId' => $this->business->ownerId, 'name' => 'Other', 'slug' => 'other-shop', 'categoryId' => $this->business->categoryId,
+            'status' => 'PUBLISHED', 'phone' => '98765 43210', 'addressLine1' => 'x', 'city' => 'Kochi', 'state' => 'KL', 'latitude' => 9.9, 'longitude' => 76.2,
+        ]);
+        $this->assertNull(CardEngine::ownerFromToken($pass, $other));
+        $this->assertNotNull(CardEngine::ownerFromToken($pass, $this->business));
     }
 
     public function test_the_card_details_have_one_save_button_for_all(): void
@@ -371,7 +394,7 @@ class ImageCardTest extends TestCase
         $this->post('/login', ['email' => $this->dealerEmail, 'password' => 'Password123!']);
         $page = $this->get("/dashboard/businesses/{$this->business->id}?section=".urlencode('Visiting Card'))->assertOk();
         // No colour panel on the dashboard: the colour is changed on the card page (the owner bar).
-        $page->assertDontSee('Card design & actions', false)->assertDontSee('data-colour-panel', false)->assertSee('from your card link while signed in')->assertSee('data-card-colour', false);
+        $page->assertDontSee('Card design & actions', false)->assertDontSee('data-colour-panel', false)->assertSee('press Open card');
         $this->putJson("/api/v1/businesses/{$this->business->id}/card", ['imageColour' => ['tint' => '#2563eb', 'strength' => 60, 'hue' => 0, 'brightness' => 100, 'saturation' => 100]], $this->auth)
             ->assertOk();
     }
@@ -561,7 +584,7 @@ class ImageCardTest extends TestCase
         $this->withoutVite();
         $this->post('/login', ['email' => $this->ownerEmail, 'password' => 'Password123!']);
         $this->get("/dashboard/businesses/{$this->business->id}?section=".urlencode('Visiting Card'))->assertOk()
-            ->assertDontSee('data-colour-panel', false)->assertSee('from your card link while signed in')->assertSee('data-card-colour', false);
+            ->assertDontSee('data-colour-panel', false)->assertSee('press Open card')->assertSee('?owner=', false);
 
         // A preview shows unsaved colours.
         $this->postJson("{$url}/preview", ['imageUrl' => 'https://cdn.example.test/cards/images/card.jpg', 'imageColour' => ['saturation' => 0]], $owner)
@@ -854,7 +877,7 @@ class ImageCardTest extends TestCase
         $this->post('/login', ['email' => $this->ownerEmail, 'password' => 'Password123!']);
         $page = $this->get('/card/spice-garden')->assertOk()
             ->assertSee('id="mk-owner-bar"', false)
-            ->assertSee("/api/v1/businesses/{$this->business->id}/card", false)
+            ->assertSee("api\\/v1\\/cards\\/spice-garden\\/owner", false)
             ->assertSee('?section=Visiting+Card', false);
         $this->assertStringContainsString('no-store', $page->headers->get('Cache-Control'));
         $this->assertMatchesRegularExpression('~title="Green" aria-label="Green" aria-checked="true"~', $page->getContent());

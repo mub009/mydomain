@@ -150,6 +150,8 @@ class CardController extends Controller
             'publishedAt' => $card?->publishedAt,
             'viewCount' => $card?->viewCount ?? 0,
             'publicUrl' => CardEngine::cardUrl($business->slug),
+            // "Open card" for the team: the card with its colour and design bar (CardEngine::ownerUrl).
+            'ownerUrl' => CardEngine::ownerUrl($business, $actor['sub']),
             'plan' => $business->subscriptionPlan ?? 'FREE',
             'details' => $details,
             'templates' => $templates->map(fn (CardTemplate $t) => [
