@@ -21,9 +21,7 @@ if (root && card) {
     if (err) errorBox?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
 
-  // --- The card as it looks (read-only; its colour is changed on the card page) ---
-  const readonlyPreview = $("[data-card-readonly-preview]", root);
-  if (readonlyPreview && card.previewHtml) readonlyPreview.srcdoc = card.previewHtml; // a property, never innerHTML
+  // The card's colour (changed on the card page itself), for the preview pop-up.
   const colour = card.imageColour || null;
 
   // --- Ready-made designs ----------------------------------------------------
