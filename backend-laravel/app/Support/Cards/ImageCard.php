@@ -750,7 +750,7 @@ class ImageCard
         }
         $w = $source['imageWidth'] ?? null;
         $h = $source['imageHeight'] ?? null;
-        $colour = ImageColour::normalize($source['colour'] ?? null);
+        $colour = ImageColour::visible(ImageColour::normalize($source['colour'] ?? null));
 
         return view('cards.image', [
             'b' => $details,
