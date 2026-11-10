@@ -165,6 +165,18 @@ class ImageCardTest extends TestCase
             ->assertSee('data-state="KL" data-city="Kochi"', false);
     }
 
+    public function test_the_card_details_have_one_save_button_for_all(): void
+    {
+        $this->withoutVite();
+        $this->save([$this->spot('call'), $this->spot('tagline', ['y' => 40]), $this->spot('email', ['y' => 80]), $this->spot('instagram', ['y' => 90])])->assertOk();
+        $this->post('/login', ['email' => $this->ownerEmail, 'password' => 'Password123!']);
+        $html = $this->get("/dashboard/businesses/{$this->business->id}?section=".urlencode('Visiting Card'))->assertOk()->getContent();
+        $this->assertSame(1, substr_count($html, 'data-card-details-form'));
+        $this->assertSame(1, substr_count($html, 'data-card-details-save'));
+        $this->assertSame(4, substr_count($html, 'data-detail '));
+        $this->assertStringNotContainsString('data-missing-save', $html);
+    }
+
     public function test_a_logo_box_shows_the_business_photo_when_it_has_no_logo(): void
     {
         $this->save([$this->spot('logo')])->assertOk();
