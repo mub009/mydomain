@@ -204,6 +204,30 @@ class CardEngine
         return self::safeUrl($url) !== null;
     }
 
+    /**
+     * The business on Google Maps — its own listing, not a bare pin. With a
+     * Google Place ID (set in Reviews & QR) Maps opens that exact place;
+     * otherwise it searches the business's name and address. Only with
+     * neither an address nor a name does it fall back to the coordinates.
+     */
+    public static function mapsUrl(Business $business, ?string $address): ?string
+    {
+        $base = 'https://www.google.com/maps/search/?api=1&query=';
+        $hasCoords = $business->latitude !== null && $business->longitude !== null;
+        $text = collect([trim((string) $business->name), $address])->filter()->implode(', ');
+        $query = $address ? $text : ($hasCoords ? "{$business->latitude},{$business->longitude}" : $text);
+        if ($query === '') {
+            return null;
+        }
+        $url = $base.rawurlencode($query);
+        if ($placeId = trim((string) $business->googlePlaceId)) {
+            // Maps needs a query alongside the Place ID; the name reads best if it ever shows.
+            $url = $base.rawurlencode($text ?: $query).'&query_place_id='.rawurlencode($placeId);
+        }
+
+        return $url;
+    }
+
     public static function cardUrl(string $slug): string
     {
         return rtrim((string) config('app.url'), '/')."/card/{$slug}";
@@ -321,9 +345,7 @@ class CardEngine
             'email' => $business->email,
             'website' => self::safeUrl($business->website),
             'address' => $address ?: null,
-            'mapsHref' => $business->latitude !== null && $business->longitude !== null
-                ? "https://www.google.com/maps/search/?api=1&query={$business->latitude},{$business->longitude}"
-                : ($address ? 'https://www.google.com/maps/search/?api=1&query='.rawurlencode($address) : null),
+            'mapsHref' => self::mapsUrl($business, $address ?: null),
             // Google's "write a review" page for the business (set in Reviews & QR).
             'googleReviewHref' => self::safeUrl(ReviewChannels::google($business)),
             'hours' => $business->relationLoaded('hours') && $business->hours->isNotEmpty() ? (Helpers::summariseHours($business->hours) ?: null) : null,

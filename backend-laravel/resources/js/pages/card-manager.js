@@ -46,39 +46,71 @@ if (root && card) {
     useTemplate(card.templateId, "Your card is back to the original design.", e.currentTarget),
   );
 
-  // --- Missing details, typed in here ---------------------------------------
-  // Saved to the listing (or its social links); the card then shows them.
-  $$("[data-missing-form]", root).forEach((form) =>
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      // A textbox, a textarea, or the link box of the logo upload.
-      const input = $("[data-upload-url], textarea[name], input[name]", form);
-      const button = $("[data-missing-save]", form);
-      const value = input.value.trim();
-      if (!value) return input.focus();
-      fail("");
-      button.disabled = true;
-      button.textContent = "Saving…";
-      try {
-        if (form.dataset.via === "spot") {
-          // A free-image spot: the picture goes on the card itself.
-          await api.put(base, { spotImage: { id: form.dataset.spot, url: value } });
-        } else {
-          const path = form.dataset.via === "links" ? `/businesses/${biz.id}/review-links` : `/businesses/${biz.id}`;
-          await api.patch(path, { [input.name]: value });
-        }
-        reloadWithFlash(`${form.dataset.label} saved — it's on your card now.`);
-      } catch (err) {
-        button.disabled = false;
-        button.textContent = "Save";
-        fail(err);
+  // --- Card details, all saved with one Save button ---------------------------
+  // Only what was changed is sent: listing fields in one request, social
+  // links in another, and each free-image spot's picture on the card itself.
+  const detailsForm = $("[data-card-details-form]", root);
+  const detailsStatus = detailsForm && $("[data-card-details-status]", detailsForm);
+  detailsForm?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const button = $("[data-card-details-save]", detailsForm);
+    const business = {};
+    const links = {};
+    const spots = [];
+    const changed = [];
+
+    $$("[data-detail]", detailsForm).forEach((row) => {
+      const { via, label } = row.dataset;
+      if (row.hasAttribute("data-category-city")) {
+        // Category, state and city go together when any of them changed.
+        const category = $("select[name=categoryId]", row).value;
+        const state = $("[name=state]", row)?.value.trim() ?? "";
+        const city = $("[name=city]", row)?.value.trim() ?? "";
+        const { initialCategory, initialState, initialCity } = row.dataset;
+        if (category === initialCategory && state === initialState && city === initialCity) return;
+        if (category) business.categoryId = category;
+        if (state && city) Object.assign(business, { state, city });
+        changed.push(label);
+        return;
       }
-    }),
-  );
-  // An uploaded logo is saved at once — no need to press Save.
-  $$("[data-missing-form] [data-upload-field]", root).forEach((field) =>
-    field.addEventListener("upload:done", () => field.closest("form").requestSubmit()),
-  );
+      const el = $("[data-upload-url], textarea[name], input[name]", row);
+      if (!el) return;
+      const value = el.value.trim();
+      // Unchanged or left empty: nothing to save.
+      if (!value || value === el.defaultValue.trim()) return;
+      if (via === "spot") spots.push({ id: row.dataset.spot, url: value });
+      else (via === "links" ? links : business)[el.name] = value;
+      changed.push(label);
+    });
+
+    if (!changed.length) {
+      if (detailsStatus) detailsStatus.textContent = "Nothing changed.";
+      return;
+    }
+    fail("");
+    if (detailsStatus) detailsStatus.textContent = "";
+    button.disabled = true;
+    const text = $("span", button);
+    text.textContent = "Saving…";
+    try {
+      if (Object.keys(business).length) await api.patch(`/businesses/${biz.id}`, business);
+      if (Object.keys(links).length) await api.patch(`/businesses/${biz.id}/review-links`, links);
+      for (const spot of spots) await api.put(base, { spotImage: spot });
+      reloadWithFlash(`Saved ${changed.join(", ")} — it's on your card now.`);
+    } catch (err) {
+      button.disabled = false;
+      text.textContent = "Save";
+      fail(err);
+    }
+  });
+  // An uploaded picture waits for Save like everything else.
+  if (detailsForm) {
+    $$("[data-upload-field]", detailsForm).forEach((field) =>
+      field.addEventListener("upload:done", () => {
+        if (detailsStatus) detailsStatus.textContent = "Picture uploaded — press Save to put it on your card.";
+      }),
+    );
+  }
 
   // --- Publish, preview, link, QR -------------------------------------------
   $$("[data-publish-card]", root).forEach((btn) =>

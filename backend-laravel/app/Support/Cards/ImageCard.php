@@ -504,7 +504,8 @@ class ImageCard
     public const DETAIL_INPUTS = [
         'logo' => ['logoUrl', 'business', 'image', 'https://…/logo.png or upload'],
         'name' => ['name', 'business', 'text', 'Your business name'],
-        'tagline' => ['city', 'business', 'text', 'Your city'],
+        // Picked from drop-downs: the category, and the state and city (area).
+        'tagline' => ['categoryId', 'business', 'category-city', 'Select category'],
         'directions' => ['addressLine1', 'business', 'text', 'Shop no., street, area'],
         'address' => ['addressLine1', 'business', 'text', 'Shop no., street, area'],
         'call' => ['phone', 'business', 'tel', 'e.g. 98765 43210'],
@@ -574,7 +575,8 @@ class ImageCard
                 continue;
             }
             [$label, $section] = self::DETAIL_SOURCES[$action];
-            $field = self::DETAIL_INPUTS[$action][0] ?? null;
+            // Category & city is picked from drop-downs; its value is the text the card shows.
+            $field = (self::DETAIL_INPUTS[$action][2] ?? null) === 'category-city' ? null : (self::DETAIL_INPUTS[$action][0] ?? null);
             $value = $field ? $business->getAttribute($field) : ($defaults[$action] ?? null);
             $out[$label] ??= [
                 'key' => $action, 'label' => $label, 'section' => $section,

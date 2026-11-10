@@ -6,6 +6,7 @@ use App\Models\Business;
 use App\Models\BusinessCard;
 use App\Models\Category;
 use App\Models\User;
+use App\Support\Cards\CardEngine;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
@@ -60,6 +61,25 @@ class ImageCardTest extends TestCase
     private function spot(string $action, array $extra = []): array
     {
         return ['id' => 'h-'.$action, 'action' => $action, 'x' => 10, 'y' => 70, 'w' => 30, 'h' => 8, ...$extra];
+    }
+
+    public function test_the_location_link_opens_the_business_on_google_maps(): void
+    {
+        $this->business->refresh();
+        // Name and address, so Maps shows the business — not a bare pin at its coordinates.
+        $this->assertSame(
+            'https://www.google.com/maps/search/?api=1&query=Spice%20Garden%2C%201%20Main%20St%2C%20Kochi%2C%20KL',
+            CardEngine::mapsUrl($this->business, '1 Main St, Kochi, KL'),
+        );
+        // With a Google Place ID, that exact place.
+        $this->business->googlePlaceId = 'ChIJabc123';
+        $this->assertSame(
+            'https://www.google.com/maps/search/?api=1&query=Spice%20Garden%2C%201%20Main%20St%2C%20Kochi%2C%20KL&query_place_id=ChIJabc123',
+            CardEngine::mapsUrl($this->business, '1 Main St, Kochi, KL'),
+        );
+        // No address: the coordinates.
+        $this->business->googlePlaceId = null;
+        $this->assertSame('https://www.google.com/maps/search/?api=1&query=9.9%2C76.2', CardEngine::mapsUrl($this->business, null));
     }
 
     public function test_business_owners_see_their_card_but_cannot_edit_its_design(): void
@@ -129,6 +149,32 @@ class ImageCardTest extends TestCase
         // Still listed, to change the picture.
         $this->get("/dashboard/businesses/{$this->business->id}?section=".urlencode('Visiting Card'))->assertOk()
             ->assertSee('data-spot="h-custom_image"', false)->assertSee('value="https://cdn.example.test/cards/images/shop.jpg"', false);
+    }
+
+    public function test_the_category_and_city_detail_is_picked_from_drop_downs(): void
+    {
+        $this->withoutVite();
+        Category::create(['name' => 'Bakeries', 'slug' => 'bakeries']);
+        $this->imageTemplate($this->admin(), ['hotspots' => [$this->spot('call'), $this->spot('tagline', ['y' => 80])]]);
+        $this->post('/login', ['email' => $this->ownerEmail, 'password' => 'Password123!']);
+        $this->get("/dashboard/businesses/{$this->business->id}?section=".urlencode('Visiting Card'))->assertOk()
+            ->assertSee('Category &amp; city', false)->assertSee('Restaurants · Kochi')
+            ->assertSee('<select id="card-detail-tagline" name="categoryId"', false)
+            ->assertSee('Bakeries')
+            ->assertSee('name="state"', false)->assertSee('name="city"', false)
+            ->assertSee('data-state="KL" data-city="Kochi"', false);
+    }
+
+    public function test_the_card_details_have_one_save_button_for_all(): void
+    {
+        $this->withoutVite();
+        $this->save([$this->spot('call'), $this->spot('tagline', ['y' => 40]), $this->spot('email', ['y' => 80]), $this->spot('instagram', ['y' => 90])])->assertOk();
+        $this->post('/login', ['email' => $this->ownerEmail, 'password' => 'Password123!']);
+        $html = $this->get("/dashboard/businesses/{$this->business->id}?section=".urlencode('Visiting Card'))->assertOk()->getContent();
+        $this->assertSame(1, substr_count($html, 'data-card-details-form'));
+        $this->assertSame(1, substr_count($html, 'data-card-details-save'));
+        $this->assertSame(4, substr_count($html, 'data-detail '));
+        $this->assertStringNotContainsString('data-missing-save', $html);
     }
 
     public function test_a_logo_box_shows_the_business_photo_when_it_has_no_logo(): void
@@ -346,7 +392,7 @@ class ImageCardTest extends TestCase
         $this->get('/card/spice-garden')->assertOk()
             ->assertSee('cards/images/template.jpg', false)
             ->assertSee('href="tel:9876543210"', false)
-            ->assertSee('query=9.9,76.2', false);
+            ->assertSee('query=Spice%20Garden%2C%201%20Main%20St', false);
 
         // The admin's later edits reach the card.
         $this->patchJson("/api/v1/admin/card-templates/{$id}", ['hotspots' => [$this->spot('email')]], $admin)->assertOk();
@@ -599,7 +645,7 @@ class ImageCardTest extends TestCase
         $html = $this->get('/card/spice-garden')->assertOk()->getContent();
         $this->assertMatchesRegularExpression('#<div class="spot detail"[^>]*text-align:center[^>]*><span>Spice Garden</span>#', $html);
         // Linked details: the address opens directions, the phone calls, the email writes.
-        $this->assertMatchesRegularExpression('#<a class="spot detail"[^>]*href="https://www.google.com/maps/search/\?api=1&amp;query=9.9,76.2"[^>]*><span>1 Main St, Kochi, KL</span>#', $html);
+        $this->assertMatchesRegularExpression('#<a class="spot detail"[^>]*href="https://www.google.com/maps/search/\?api=1&amp;query=Spice%20Garden%2C%201%20Main%20St%2C%20Kochi%2C%20KL"[^>]*><span>1 Main St, Kochi, KL</span>#', $html);
         $this->assertMatchesRegularExpression('#href="tel:9876543210"[^>]*><span>98765 43210</span>#', $html);
         $this->assertMatchesRegularExpression('#href="mailto:orders@spice.test"[^>]*><span>orders@spice.test</span>#', $html);
         $this->assertStringContainsString("<span>Kerala meals\nand seafood</span>", $html);
@@ -729,7 +775,7 @@ class ImageCardTest extends TestCase
         $html = $this->get('/card/spice-garden')->getContent();
         $this->assertStringNotContainsString('writereview', $html);
         $this->assertStringContainsString('<span>Location</span>', $html);
-        $this->assertStringContainsString('query=9.9,76.2', $html);
+        $this->assertStringContainsString('query=Spice%20Garden%2C%201%20Main%20St', $html);
         $this->getJson("/api/v1/businesses/{$this->business->id}/card", $this->auth)
             ->assertJsonFragment(['label' => 'Google review link', 'section' => 'Social Media']);
 
@@ -783,6 +829,32 @@ class ImageCardTest extends TestCase
         ]);
         $this->post('/login', ['email' => $stranger->email, 'password' => 'Password123!']);
         $this->assertStringNotContainsString('mk-owner-bar', $this->get('/card/spice-garden')->assertOk()->getContent());
+    }
+
+    public function test_the_owner_changes_the_card_design_from_the_public_card_link(): void
+    {
+        $admin = $this->admin();
+        $first = $this->imageTemplate($admin);
+        $second = $this->postJson('/api/v1/admin/card-templates', [
+            'name' => 'Blue Image Card', 'layout' => 'classic', 'categoryId' => $this->business->categoryId,
+            'imageUrl' => 'https://cdn.example.test/cards/images/blue.jpg', 'imageWidth' => 600, 'imageHeight' => 1000,
+            'hotspots' => [$this->spot('call')],
+        ], $admin)->assertCreated()->json('data.id');
+        $this->postJson("/api/v1/businesses/{$this->business->id}/card/publish", [], $this->auth)->assertOk();
+
+        // The owner's bar lists the category's designs, the one in use marked.
+        $this->post('/login', ['email' => $this->ownerEmail, 'password' => 'Password123!']);
+        $html = $this->get('/card/spice-garden')->assertOk()->getContent();
+        $this->assertStringContainsString('aria-label="Card design"', $html);
+        $this->assertMatchesRegularExpression('~aria-checked="true" data-design="'.$first.'"~', $html);
+        $this->assertMatchesRegularExpression('~aria-checked="false" data-design="'.$second.'"~', $html);
+        $this->assertStringContainsString('cards/images/blue.jpg', $html);
+
+        // Picking one (what the bar sends) puts it on the card.
+        $token = $this->postJson('/api/v1/auth/login', ['email' => $this->ownerEmail, 'password' => 'Password123!'])->json('data.accessToken');
+        $this->putJson("/api/v1/businesses/{$this->business->id}/card", ['templateId' => $second], ['Authorization' => "Bearer {$token}"])->assertOk();
+        $html = $this->get('/card/spice-garden')->assertOk()->getContent();
+        $this->assertMatchesRegularExpression('~aria-checked="true" data-design="'.$second.'"~', $html);
     }
 
     public function test_missing_card_details_get_a_textbox_on_the_visiting_card_section(): void
