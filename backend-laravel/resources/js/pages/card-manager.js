@@ -24,6 +24,40 @@ if (root && card) {
   // The card's colour (changed on the card page itself), for the preview pop-up.
   const colour = card.imageColour || null;
 
+  // --- Card colour, picked in the dashboard (same as the bar on the card link) ---
+  const colourBox = $("[data-card-colour]", root);
+  if (colourBox) {
+    const status = $("[data-colour-status]", colourBox);
+    const saveColour = async (tint, saturation) => {
+      colourBox.classList.add("pointer-events-none", "opacity-60");
+      status.textContent = "Saving…";
+      const next =
+        tint || saturation !== 100
+          ? {
+              tint,
+              hue: 0,
+              saturation,
+              strength: colour?.tint ? colour.strength : 60,
+              brightness: colour ? colour.brightness : 100,
+              // Keeps where the colour goes (areas marked by the admin).
+              areas: colour?.areas ?? [],
+            }
+          : null;
+      try {
+        await api.put(base, { imageColour: next });
+        reloadWithFlash("Card colour changed.");
+      } catch (err) {
+        colourBox.classList.remove("pointer-events-none", "opacity-60");
+        status.textContent = "";
+        fail(err);
+      }
+    };
+    $$("[data-colour-tint]", colourBox).forEach((b) =>
+      b.addEventListener("click", () => saveColour(b.dataset.colourTint || null, Number(b.dataset.colourSaturation))),
+    );
+    $("[data-colour-custom]", colourBox).addEventListener("change", (e) => saveColour(e.target.value, 100));
+  }
+
   // --- Ready-made designs ----------------------------------------------------
   // Picking one drops the card's own image copy, so the design's image shows.
   async function useTemplate(id, message, button) {

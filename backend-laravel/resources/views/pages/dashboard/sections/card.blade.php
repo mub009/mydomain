@@ -28,7 +28,7 @@
           Your card's buttons and details come from your listing —
           <a href="{{ $base }}?section=Contact" class="font-semibold text-brand-700 hover:underline">edit them in Contact</a>.
           @if ($hasImage)
-            To change the card's colour or design, open your card link while signed in — a bar shows at the bottom, only for you.
+            Pick its colour below. You can also change the colour or design from your card link while signed in — a bar shows at the bottom, only for you.
           @endif
         </p>
         @unless ($card['listingLive'])
@@ -47,6 +47,31 @@
           <button type="button" class="btn-secondary px-4 py-2 text-sm" data-preview-card><x-icon name="eye" :size="15" /> Preview</button>
           <a href="{{ $base }}/card.pdf" class="btn-secondary px-4 py-2 text-sm"><x-icon name="download" :size="15" /> Download PDF</a>
         </div>
+        @if ($hasImage)
+          {{-- The card's colour, picked right here (the same choices as the bar on the card link). --}}
+          @php
+              $c = $card['imageColour'] ?? null;
+              $swatches = \App\Support\Cards\ImageColour::SWATCHES;
+              $on = ! $c ? 'original' : (! ($c['tint'] ?? null) ? (($c['saturation'] ?? 100) === 0 ? 'mono' : 'original')
+                  : (collect($swatches)->first(fn ($s) => $s[3] && strcasecmp($s[3], $c['tint']) === 0)[0] ?? 'custom'));
+          @endphp
+          <div class="rounded-lg border border-gray-200 p-3" data-card-colour>
+            <p class="mb-2 flex items-center gap-1.5 text-sm font-semibold text-ink-900"><x-icon name="palette" :size="15" class="text-brand-600" /> Card colour</p>
+            <div class="flex flex-wrap items-center gap-2" role="radiogroup" aria-label="Card colour">
+              @foreach ($swatches as [$key, $label, $bg, $tint, $sat])
+                <button type="button" role="radio" title="{{ $label }}" aria-label="{{ $label }}" aria-checked="{{ $on === $key ? 'true' : 'false' }}"
+                        @class(['h-9 w-9 rounded-full border-2 border-white shadow ring-2 transition', 'ring-brand-600' => $on === $key, 'ring-transparent hover:ring-gray-300' => $on !== $key])
+                        style="background: {{ $bg }}" data-colour-tint="{{ $tint ?? '' }}" data-colour-saturation="{{ $sat }}"></button>
+              @endforeach
+              <label title="Your own colour" @class(['relative flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border-2 text-lg text-ink-500 ring-2', 'border-white ring-brand-600' => $on === 'custom', 'border-dashed border-gray-400 ring-transparent' => $on !== 'custom'])
+                     @if ($on === 'custom') style="background: {{ $c['tint'] }}" @endif>
+                @unless ($on === 'custom')+@endunless
+                <input type="color" class="absolute inset-0 h-full w-full cursor-pointer opacity-0" value="{{ $on === 'custom' ? $c['tint'] : '#2563eb' }}" aria-label="Pick your own colour" data-colour-custom />
+              </label>
+            </div>
+            <p class="mt-1.5 text-xs text-ink-500" data-colour-status>Tap a colour — your card changes straight away.</p>
+          </div>
+        @endif
         @if ($card['viewCount'] > 0)
           <p class="text-xs text-ink-500">Opened {{ number_format($card['viewCount']) }} {{ $card['viewCount'] === 1 ? 'time' : 'times' }}.</p>
         @endif
