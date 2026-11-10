@@ -76,8 +76,20 @@ class CardPageController extends Controller
         $user = WebAuth::user();
         if ($user && ImageCard::source($business)
             && BusinessAccess::canManage(['role' => $user->role, 'sub' => $user->id], $business)) {
+            // The ready-made image designs for its category, to switch the card's image right here.
+            $card = $business->card;
+            $current = CardEngine::templateFor($business, $card);
+            $designs = CardEngine::templatesFor($business->categoryId)
+                ->filter(fn (CardTemplate $t) => (bool) $t->imageUrl)
+                ->map(fn (CardTemplate $t) => [
+                    'id' => $t->id,
+                    'name' => $t->name,
+                    'imageUrl' => $t->imageUrl,
+                    'inUse' => $t->id === $current?->id && ! $card?->imageUrl,
+                ])->values()->all();
             $bar = view('cards.partials.owner-bar', [
                 'businessId' => $business->id,
+                'designs' => $designs,
                 'colour' => ImageColour::normalize($business->card?->imageColour),
                 'swatches' => ImageColour::SWATCHES,
                 'manageUrl' => "/dashboard/businesses/{$business->id}?section=".urlencode('Visiting Card'),

@@ -819,6 +819,32 @@ class ImageCardTest extends TestCase
         $this->assertStringNotContainsString('mk-owner-bar', $this->get('/card/spice-garden')->assertOk()->getContent());
     }
 
+    public function test_the_owner_changes_the_card_design_from_the_public_card_link(): void
+    {
+        $admin = $this->admin();
+        $first = $this->imageTemplate($admin);
+        $second = $this->postJson('/api/v1/admin/card-templates', [
+            'name' => 'Blue Image Card', 'layout' => 'classic', 'categoryId' => $this->business->categoryId,
+            'imageUrl' => 'https://cdn.example.test/cards/images/blue.jpg', 'imageWidth' => 600, 'imageHeight' => 1000,
+            'hotspots' => [$this->spot('call')],
+        ], $admin)->assertCreated()->json('data.id');
+        $this->postJson("/api/v1/businesses/{$this->business->id}/card/publish", [], $this->auth)->assertOk();
+
+        // The owner's bar lists the category's designs, the one in use marked.
+        $this->post('/login', ['email' => $this->ownerEmail, 'password' => 'Password123!']);
+        $html = $this->get('/card/spice-garden')->assertOk()->getContent();
+        $this->assertStringContainsString('aria-label="Card design"', $html);
+        $this->assertMatchesRegularExpression('~aria-checked="true" data-design="'.$first.'"~', $html);
+        $this->assertMatchesRegularExpression('~aria-checked="false" data-design="'.$second.'"~', $html);
+        $this->assertStringContainsString('cards/images/blue.jpg', $html);
+
+        // Picking one (what the bar sends) puts it on the card.
+        $token = $this->postJson('/api/v1/auth/login', ['email' => $this->ownerEmail, 'password' => 'Password123!'])->json('data.accessToken');
+        $this->putJson("/api/v1/businesses/{$this->business->id}/card", ['templateId' => $second], ['Authorization' => "Bearer {$token}"])->assertOk();
+        $html = $this->get('/card/spice-garden')->assertOk()->getContent();
+        $this->assertMatchesRegularExpression('~aria-checked="true" data-design="'.$second.'"~', $html);
+    }
+
     public function test_missing_card_details_get_a_textbox_on_the_visiting_card_section(): void
     {
         $this->save([$this->spot('instagram'), $this->spot('logo'), $this->spot('whatsapp')])->assertOk();

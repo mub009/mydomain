@@ -28,7 +28,7 @@
           Your card's buttons and details come from your listing —
           <a href="{{ $base }}?section=Contact" class="font-semibold text-brand-700 hover:underline">edit them in Contact</a>.
           @if ($hasImage)
-            To change the card's colour, open your card link while signed in — a colour bar shows at the bottom, only for you.
+            To change the card's colour or design, open your card link while signed in — a bar shows at the bottom, only for you.
           @endif
         </p>
         @unless ($card['listingLive'])
