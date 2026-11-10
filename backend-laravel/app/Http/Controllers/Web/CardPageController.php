@@ -94,6 +94,7 @@ class CardPageController extends Controller
                 // Saves go with this pass, so they work wherever the card is opened.
                 'ownerToken' => CardEngine::ownerToken($business, $manager->id, 2),
                 'designs' => $designs,
+                'isAdmin' => $manager->role === 'ADMIN',
                 'colour' => ImageColour::normalize($business->card?->imageColour),
                 'swatches' => ImageColour::SWATCHES,
                 'manageUrl' => url("/dashboard/businesses/{$business->id}?section=".urlencode('Visiting Card')),

@@ -47,6 +47,10 @@
   <div class="top">
     <span><b>Your card</b> <span class="note" data-status>Only you see this bar</span></span>
     <span class="links">
+      @if ($isAdmin ?? false)
+        {{-- Admins: mark where the business team's colour may go (opens the editor in Manage → Visiting Card). --}}
+        <a class="edit" href="{{ $manageUrl.'&areas=1#colour-areas' }}" style="color:#7c3aed">Colour areas →</a>
+      @endif
       <a class="edit" href="{{ $manageUrl }}">Edit card →</a>
       <button type="button" class="x" data-close aria-label="Hide this bar">×</button>
     </span>
