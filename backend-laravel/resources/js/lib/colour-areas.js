@@ -2,7 +2,10 @@
 // card image the colour should change. Each area is drawn freehand, with the
 // pen (point by point, like a pen tool), as a square/rectangle, a circle or an
 // oval; the eraser draws the same shapes to take the colour away again — on
-// its own it starts from the whole card ("colour everywhere except here"). Areas apply in order, so a later one wins where
+// its own it starts from the whole card ("colour everywhere except here").
+// "Edit points" reshapes what's drawn, like a direct-selection tool: drag a
+// point or the whole shape, click an edge to add a point, double-click a
+// point to remove it, Delete removes the shape. Areas apply in order, so a later one wins where
 // they overlap. Nothing marked = the colour covers the whole card.
 //
 // Stored with the colour as areas: [{ erase, points: [[x, y], ...] }] in
@@ -44,7 +47,8 @@ const tooSmall = (pts) => {
 export function openColourAreas({ imageUrl, ratio, colour, onDone }) {
   let areas = (colour.areas || []).map((a) => ({ erase: !!a.erase, points: a.points.map((p) => [...p]) }));
   let erase = false;
-  let shape = "free"; // free | pen | rect | circle | oval
+  let shape = "free"; // free | pen | rect | circle | oval | edit
+  let selected = null; // Edit points: the index of the shape being reshaped
   let pen = []; // the pen's points so far, until the shape is closed
   let problem = "";
 
@@ -97,7 +101,9 @@ export function openColourAreas({ imageUrl, ratio, colour, onDone }) {
         <div class="min-w-0 flex-1">
           <p class="font-bold">Where the colour goes</p>
           <p class="text-xs text-white/70">${
-            shape === "pen"
+            shape === "edit"
+              ? "Edit points: click a shape, then drag its points (or the shape itself). Click an edge to add a point, double-click a point to remove it."
+              : shape === "pen"
               ? "Pen: click point by point around the part. Click the first point (or double-click, or press Enter) to close it."
               : erase
                 ? "Eraser: draw over the parts that should keep their own colour."
@@ -120,7 +126,14 @@ export function openColourAreas({ imageUrl, ratio, colour, onDone }) {
         ${btn('data-shape="rect"', shape === "rect", `<span class="inline-block h-3 w-3 rounded-[2px] border-2 border-current"></span> Square`)}
         ${btn('data-shape="circle"', shape === "circle", `<span class="inline-block h-3.5 w-3.5 rounded-full border-2 border-current"></span> Round`)}
         ${btn('data-shape="oval"', shape === "oval", `<span class="inline-block h-3 w-4 rounded-[50%] border-2 border-current"></span> Oval`)}
+        ${btn('data-shape="edit"', shape === "edit", `${icon("mouse-pointer-2", { size: 14 })} Edit points`, areas.length ? "" : "disabled")}
       </div>
+      ${
+        shape === "edit"
+          ? `<span class="mx-1 h-6 w-px bg-white/20"></span>
+             ${btn('data-x="edit-delete"', false, `${icon("trash-2", { size: 14 })} Delete shape`, selected !== null ? "" : "disabled")}`
+          : ""
+      }
       ${
         // Shown as soon as the pen is picked (greyed until used), so the card never jumps while drawing.
         shape === "pen"
@@ -145,10 +158,12 @@ export function openColourAreas({ imageUrl, ratio, colour, onDone }) {
     lines.innerHTML =
       areas
         .map(
-          (a) =>
-            `<polygon points="${a.points.map((p) => p.join(",")).join(" ")}" fill="${a.erase ? "rgba(239,68,68,.15)" : "none"}" stroke="${
-              a.erase ? "#f87171" : "#fff"
-            }" stroke-width="1.5" stroke-dasharray="5 4" vector-effect="non-scaling-stroke" />`,
+          (a, i) =>
+            `<polygon points="${a.points.map((p) => p.join(",")).join(" ")}" fill="${
+              i === selected ? "rgba(250,204,21,.12)" : a.erase ? "rgba(239,68,68,.15)" : "none"
+            }" stroke="${i === selected ? "#facc15" : a.erase ? "#f87171" : "#fff"}" stroke-width="${i === selected ? 2 : 1.5}" ${
+              i === selected ? "" : 'stroke-dasharray="5 4"'
+            } vector-effect="non-scaling-stroke" />`,
         )
         .join("") +
       `<polygon data-draft points="" fill="${erase ? "rgba(239,68,68,.2)" : "rgba(255,255,255,.2)"}" stroke="${erase ? "#f87171" : "#38bdf8"}" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round" />` +
@@ -158,6 +173,17 @@ export function openColourAreas({ imageUrl, ratio, colour, onDone }) {
         : "");
     // The pen's points as dots of a fixed size (the SVG is stretched, so they are drawn as HTML).
     canvas.querySelectorAll("[data-pen-dot]").forEach((d) => d.remove());
+    // Edit points: the selected shape's points as square handles.
+    if (shape === "edit" && selected !== null && areas[selected]) {
+      areas[selected].points.forEach(([x, y]) => {
+        const d = document.createElement("span");
+        d.dataset.penDot = "";
+        d.className = "pointer-events-none absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 border-2 border-gray-900 bg-yellow-300";
+        d.style.left = `${x}%`;
+        d.style.top = `${y}%`;
+        canvas.appendChild(d);
+      });
+    }
     pen.forEach(([x, y], i) => {
       const d = document.createElement("span");
       d.dataset.penDot = "";
@@ -204,6 +230,7 @@ export function openColourAreas({ imageUrl, ratio, colour, onDone }) {
     if (b.dataset.shape) {
       shape = b.dataset.shape;
       pen = [];
+      if (shape !== "edit") selected = null;
     }
     const x = b.dataset.x;
     if (x === "cancel") return close();
@@ -219,8 +246,13 @@ export function openColourAreas({ imageUrl, ratio, colour, onDone }) {
     if (x === "pen-close") return closePen();
     if (x === "pen-back") pen.pop();
     if (x === "pen-cancel") pen = [];
+    if (x === "edit-delete" && selected !== null) {
+      areas.splice(selected, 1);
+      selected = null;
+    }
     if (x === "undo") areas.pop();
     if (x === "clear") areas = [];
+    if (selected !== null && !areas[selected]) selected = null;
     render();
   });
 
@@ -241,9 +273,102 @@ export function openColourAreas({ imageUrl, ratio, colour, onDone }) {
     if (pen.length > 3) pen.pop();
     closePen();
   });
+  // Edit points helpers: distances in screen pixels.
+  const px = (a, b, r) => Math.hypot(((a[0] - b[0]) * r.width) / 100, ((a[1] - b[1]) * r.height) / 100);
+  const inside = (p, pts) => {
+    let ins = false;
+    for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+      const [xi, yi] = pts[i];
+      const [xj, yj] = pts[j];
+      if (yi > p[1] !== yj > p[1] && p[0] < ((xj - xi) * (p[1] - yi)) / (yj - yi) + xi) ins = !ins;
+    }
+    return ins;
+  };
+  // The nearest point on the edge a→b to p, and how far it is in pixels.
+  const onEdge = (p, a, b, r) => {
+    const ax = (a[0] * r.width) / 100, ay = (a[1] * r.height) / 100;
+    const bx = (b[0] * r.width) / 100, by = (b[1] * r.height) / 100;
+    const qx = (p[0] * r.width) / 100, qy = (p[1] * r.height) / 100;
+    const len = (bx - ax) ** 2 + (by - ay) ** 2 || 1;
+    const t = clamp(((qx - ax) * (bx - ax) + (qy - ay) * (by - ay)) / len, 0, 1);
+    return { at: [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t], dist: Math.hypot(qx - (ax + (bx - ax) * t), qy - (ay + (by - ay) * t)) };
+  };
+  function startDrag(e, onMove) {
+    canvas.setPointerCapture(e.pointerId);
+    const move = (ev) => {
+      onMove(at(ev));
+      paint();
+    };
+    const up = () => {
+      canvas.removeEventListener("pointermove", move);
+      canvas.removeEventListener("pointerup", up);
+      canvas.removeEventListener("pointercancel", up);
+      areas[selected] && (areas[selected].points = areas[selected].points.map(([x, y]) => [r2(x), r2(y)]));
+      render();
+    };
+    canvas.addEventListener("pointermove", move);
+    canvas.addEventListener("pointerup", up);
+    canvas.addEventListener("pointercancel", up);
+  }
+  function editDown(e) {
+    const p = at(e);
+    const r = canvas.getBoundingClientRect();
+    const sel = selected !== null ? areas[selected] : null;
+    if (sel) {
+      // A point of the selected shape: drag it.
+      const i = sel.points.findIndex((q) => px(q, p, r) < 10);
+      if (i >= 0) {
+        return startDrag(e, (q) => {
+          sel.points[i] = q;
+        });
+      }
+      // Its edge: a new point there, dragged at once.
+      for (let k = 0; k < sel.points.length; k++) {
+        const hit = onEdge(p, sel.points[k], sel.points[(k + 1) % sel.points.length], r);
+        if (hit.dist < 7 && sel.points.length < MAX_POINTS) {
+          sel.points.splice(k + 1, 0, hit.at);
+          render();
+          return startDrag(e, (q) => {
+            sel.points[k + 1] = q;
+          });
+        }
+      }
+    }
+    // A shape under the pointer (the top one first): select it and drag it whole.
+    for (let k = areas.length - 1; k >= 0; k--) {
+      if (inside(p, areas[k].points)) {
+        selected = k;
+        render();
+        const from = p;
+        const orig = areas[k].points.map((q) => [...q]);
+        const xs = orig.map((q) => q[0]);
+        const ys = orig.map((q) => q[1]);
+        return startDrag(e, (q) => {
+          // Moved as one, never past the card's edges.
+          const dx = clamp(q[0] - from[0], -Math.min(...xs), 100 - Math.max(...xs));
+          const dy = clamp(q[1] - from[1], -Math.min(...ys), 100 - Math.max(...ys));
+          areas[k].points = orig.map(([x, y]) => [x + dx, y + dy]);
+        });
+      }
+    }
+    selected = null;
+    render();
+  }
+  canvas.addEventListener("dblclick", (e) => {
+    if (shape !== "edit" || selected === null) return;
+    const sel = areas[selected];
+    const r = canvas.getBoundingClientRect();
+    const i = sel.points.findIndex((q) => px(q, at(e), r) < 10);
+    if (i >= 0 && sel.points.length > 3) {
+      sel.points.splice(i, 1);
+      render();
+    }
+  });
+
   canvas.addEventListener("pointerdown", (e) => {
     if (e.button > 0) return;
     e.preventDefault();
+    if (shape === "edit") return editDown(e);
     if (shape === "pen") {
       const p = at(e);
       const r = canvas.getBoundingClientRect();
@@ -298,6 +423,12 @@ export function openColourAreas({ imageUrl, ratio, colour, onDone }) {
   });
 
   function onKey(e) {
+    if (shape === "edit" && selected !== null && (e.key === "Delete" || e.key === "Backspace")) {
+      e.preventDefault();
+      areas.splice(selected, 1);
+      selected = null;
+      return render();
+    }
     // While drawing with the pen: Enter closes the shape, Backspace removes the last point, Escape drops it.
     if (pen.length) {
       if (e.key === "Enter") {
@@ -322,6 +453,7 @@ export function openColourAreas({ imageUrl, ratio, colour, onDone }) {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && areas.length) {
       e.preventDefault();
       areas.pop();
+      if (selected !== null && !areas[selected]) selected = null;
       render();
     }
   }
