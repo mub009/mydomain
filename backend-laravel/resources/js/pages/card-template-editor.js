@@ -62,7 +62,7 @@ $("[data-areas-edit]", areasBox).addEventListener("click", () => {
     imageUrl: img.imageUrl,
     ratio: img.imageWidth && img.imageHeight ? img.imageWidth / img.imageHeight : 0.6,
     // A sample colour shows where it goes while marking.
-    colour: { tint: "#2563eb", strength: 60, hue: 0, brightness: 100, saturation: 100, areas: colourAreas },
+    colour: { tint: "#db2777", strength: 70, hue: 0, brightness: 100, saturation: 100, areas: colourAreas },
     onDone: (areas) => {
       colourAreas = areas;
       areasDirty = true;
