@@ -101,29 +101,11 @@
       </details>
     </div>
 
-    {{-- The card as it looks, and what the listing still needs for it. --}}
-    <div class="card p-5">
-      <div class="mb-4">
-        <h3 class="flex items-center gap-1.5 font-bold text-ink-900"><x-icon name="image" :size="16" class="text-brand-600" /> Your card</h3>
-        <p class="mt-0.5 text-sm text-ink-500">Your card shows your listing's details and picture. To change the design, pick a ready-made design below.</p>
-      </div>
-      <div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div class="min-w-0">
-          @if ($card['imagePreviewHtml'])
-            <div class="mx-auto w-full max-w-[360px] overflow-hidden rounded-xl border border-gray-200 bg-gray-50">
-              <iframe sandbox="" title="Your card" class="block h-[600px] w-full border-0" data-card-readonly-preview></iframe>
-            </div>
-          @else
-            <p class="rounded-md bg-gray-50 px-3 py-6 text-center text-sm text-ink-500">Your card design isn't set up yet. Pick a ready-made design below.</p>
-          @endif
-        </div>
-        <div>
-          @if (count($card['cardDetails'] ?? []))
-            @include('pages.dashboard.partials.card-missing')
-          @endif
-        </div>
-      </div>
-    </div>
+    {{-- What the card shows from the listing, to update right here. The card
+         itself is seen with "Preview" or "Open card" above. --}}
+    @if (count($card['cardDetails'] ?? []))
+      @include('pages.dashboard.partials.card-missing')
+    @endif
 
     {{-- Ready-made image designs made by the admin for this category --}}
     @if (count($card['imageTemplates']))
