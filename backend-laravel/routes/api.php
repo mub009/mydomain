@@ -116,6 +116,10 @@ Route::prefix('classifieds')->group(function () {
 Route::post('/ai/business-description', [AiController::class, 'businessDescription'])
     ->middleware(['auth.jwt', 'role:BUSINESS_OWNER,DEALER,ADMIN', 'throttle:30,60']);
 
+// The colour/design bar on the open card (/card/<slug>): saves with the card's owner pass.
+Route::post('/cards/{slug}/owner', [\App\Http\Controllers\Web\CardPageController::class, 'ownerUpdate'])
+    ->where('slug', '[A-Za-z0-9_-]+')->middleware('throttle:30,1');
+
 // The visiting-card designs offered for a category (the "Add a business" picker).
 Route::get('/card-templates', [CardController::class, 'templates'])
     ->middleware(['auth.jwt', 'role:BUSINESS_OWNER,DEALER,ADMIN']);

@@ -228,6 +228,48 @@ class CardEngine
         return $url;
     }
 
+    /**
+     * The card link for someone who manages the business ("Open card" in
+     * the dashboard): it carries a signed, short-lived pass, so the card
+     * shows its colour and design bar even where the browser isn't signed
+     * in on the card's own address. Shared links never carry it.
+     */
+    public static function ownerUrl(Business $business, string $userId, int $hours = 12): string
+    {
+        return self::cardUrl($business->slug).'?owner='.self::ownerToken($business, $userId, $hours);
+    }
+
+    public static function ownerToken(Business $business, string $userId, int $hours = 12): string
+    {
+        $expires = time() + $hours * 3600;
+        $payload = rtrim(strtr(base64_encode("{$userId}.{$expires}"), '+/', '-_'), '=');
+
+        return $payload.'.'.self::ownerSignature($business, $userId, $expires);
+    }
+
+    /** The user id a pass is for, if it is genuine, unexpired and for this business; else null. */
+    public static function ownerFromToken(?string $token, Business $business): ?string
+    {
+        if (! is_string($token) || ! preg_match('/^([A-Za-z0-9_-]+)\.([a-f0-9]{64})$/', $token, $m)) {
+            return null;
+        }
+        $decoded = base64_decode(strtr($m[1], '-_', '+/'), true);
+        if ($decoded === false || ! preg_match('/^([A-Za-z0-9-]+)\.(\d+)$/', $decoded, $p)) {
+            return null;
+        }
+        [, $userId, $expires] = $p;
+        if ((int) $expires < time() || ! hash_equals(self::ownerSignature($business, $userId, (int) $expires), $m[2])) {
+            return null;
+        }
+
+        return $userId;
+    }
+
+    private static function ownerSignature(Business $business, string $userId, int $expires): string
+    {
+        return hash_hmac('sha256', "card-owner|{$business->id}|{$userId}|{$expires}", (string) config('app.key'));
+    }
+
     public static function cardUrl(string $slug): string
     {
         return rtrim((string) config('app.url'), '/')."/card/{$slug}";
