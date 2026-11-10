@@ -398,6 +398,17 @@ if (places) {
       $$("[data-place]", list).forEach((button) =>
         button.addEventListener("click", async () => {
           const place = found[Number(button.dataset.place)];
+          // On the Visiting Card's details: fill the field; the form's one Save saves it.
+          if (places.hasAttribute("data-places-fill")) {
+            const row = places.parentElement;
+            $("[data-place-id]", row).value = place.id;
+            const reviewUrl = $("[data-review-url]", row);
+            // A pasted link would win over the Place ID, so it is cleared.
+            reviewUrl.value = "";
+            reviewUrl.dataset.cleared = "1";
+            list.innerHTML = `<li class="flex items-center gap-1.5 rounded-lg border border-brand-500 bg-brand-50 px-3 py-2 text-xs"><span class="text-brand-600">${icon("check", 14)}</span><span><b>${esc(place.name)}</b> selected — press Save.</span></li>`;
+            return;
+          }
           try {
             await busy(button, "Saving…", () => api.patch(`${base}/review-links`, { googlePlaceId: place.id, googleReviewUrl: null }));
             reloadWithFlash(`Connected to ${place.name} on Google. Customers now go straight to its review box.`);

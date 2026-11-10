@@ -71,14 +71,20 @@ if (root && card) {
         changed.push(label);
         return;
       }
-      const el = $("[data-upload-url], textarea[name], input[name]", row);
-      if (!el) return;
-      const value = el.value.trim();
-      // Unchanged or left empty: nothing to save.
-      if (!value || value === el.defaultValue.trim()) return;
-      if (via === "spot") spots.push({ id: row.dataset.spot, url: value });
-      else (via === "links" ? links : business)[el.name] = value;
-      changed.push(label);
+      // Every field of the row (e.g. Google review: the Place ID picked on Google Maps, and the link).
+      let rowChanged = false;
+      $$("textarea[name], input[name]", row).forEach((el) => {
+        const value = el.value.trim();
+        // A hidden field's defaultValue follows its value, so it keeps its first value in data-initial.
+        const initial = (el.dataset.initial ?? el.defaultValue).trim();
+        if (value === initial) return;
+        // Left empty: nothing to save — unless it was cleared on purpose (a picked Google place replaces the link).
+        if (!value && !(el.dataset.cleared && initial)) return;
+        if (via === "spot") spots.push({ id: row.dataset.spot, url: value });
+        else (via === "links" ? links : business)[el.name] = value || null;
+        rowChanged = true;
+      });
+      if (rowChanged) changed.push(label);
     });
 
     if (!changed.length) {
