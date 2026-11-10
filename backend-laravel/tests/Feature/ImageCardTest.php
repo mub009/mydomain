@@ -294,6 +294,38 @@ class ImageCardTest extends TestCase
         $this->assertStringContainsString('class="colour-areas"', $this->get('/card/spice-garden')->getContent());
     }
 
+    public function test_only_admins_mark_the_colour_areas_in_the_visiting_card_section(): void
+    {
+        $this->withoutVite();
+        $this->save([$this->spot('call')])->assertOk();
+        $url = "/dashboard/businesses/{$this->business->id}?section=".urlencode('Visiting Card');
+
+        // The business team and the dealer: no area tools.
+        $this->post('/login', ['email' => $this->ownerEmail, 'password' => 'Password123!']);
+        $this->get($url)->assertOk()->assertDontSee('data-colour-areas', false);
+        $this->post('/logout');
+        $this->post('/login', ['email' => $this->dealerEmail, 'password' => 'Password123!']);
+        $this->get($url)->assertOk()->assertDontSee('data-colour-areas', false);
+        $this->post('/logout');
+
+        // The admin: "Mark areas".
+        $admin = User::create([
+            'email' => 'admin-'.uniqid().'@example.com', 'passwordHash' => Hash::make('Password123!'),
+            'firstName' => 'A', 'lastName' => 'D', 'status' => 'ACTIVE', 'role' => 'ADMIN',
+        ]);
+        $this->post('/login', ['email' => $admin->email, 'password' => 'Password123!']);
+        $this->get($url)->assertOk()->assertSee('data-colour-areas', false)->assertSee('Mark areas')->assertSee('Nothing marked');
+
+        // Areas saved with no colour picked yet are kept (what the editor sends), and shown.
+        $token = $this->postJson('/api/v1/auth/login', ['email' => $admin->email, 'password' => 'Password123!'])->json('data.accessToken');
+        $this->putJson("/api/v1/businesses/{$this->business->id}/card", ['imageColour' => ['areas' => [['points' => [[0, 0], [50, 0], [50, 50]]]]]], ['Authorization' => "Bearer {$token}"])
+            ->assertOk()->assertJsonCount(1, 'data.imageColour.areas');
+        $this->get($url)->assertOk()->assertSee('1 area marked')->assertSee('Change areas')->assertSee('Clear areas');
+        // No colour yet: the card looks as it was.
+        $this->postJson("/api/v1/businesses/{$this->business->id}/card/publish", [], $this->auth)->assertOk();
+        $this->assertStringNotContainsString('feColorMatrix', $this->get('/card/spice-garden')->getContent());
+    }
+
     public function test_the_card_details_have_one_save_button_for_all(): void
     {
         $this->withoutVite();

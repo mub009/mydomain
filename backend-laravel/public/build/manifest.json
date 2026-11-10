@@ -81,7 +81,7 @@
     ]
   },
   "resources/css/app.css": {
-    "file": "assets/app-DwSuyBEc.css",
+    "file": "assets/app-BPDzC62D.css",
     "src": "resources/css/app.css",
     "isEntry": true
   },
@@ -157,15 +157,15 @@
     ]
   },
   "resources/js/pages/card-manager.js": {
-    "file": "assets/card-manager-va1-pQvt.js",
+    "file": "assets/card-manager-Dzzg9pVA.js",
     "name": "card-manager",
     "src": "resources/js/pages/card-manager.js",
     "isEntry": true,
     "imports": [
       "_api-B_riRJ0q.js",
       "_card-preview-D32f_M1W.js",
-      "_channels-CvUWVcU_.js",
       "_ui-BdSpcnW7.js",
+      "_channels-CvUWVcU_.js",
       "_widgets-BKox7ttS.js",
       "__commonjsHelpers-CqkleIqs.js"
     ]
