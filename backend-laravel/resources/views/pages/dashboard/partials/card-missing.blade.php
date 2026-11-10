@@ -46,6 +46,25 @@
               <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <x-state-city :state="$biz['state'] ?? ''" :city="$biz['city'] ?? ''" :required="false" />
               </div>
+            @elseif ($m['key'] === 'google_review')
+              {{-- Google Maps: find the business on Google (its Place ID is saved with Save), or paste its Maps share link. --}}
+              @php $mapsQuery = trim(($biz['name'] ?? '').' '.($biz['city'] ?? '')); @endphp
+              @if (\App\Support\GooglePlaces::configured())
+                <div class="rounded-lg border border-amber-200 bg-amber-50/60 p-2.5" data-places-search data-places-fill>
+                  <p class="flex items-center gap-1.5 text-xs font-bold text-ink-900"><x-icon name="map-pin" :size="13" class="text-amber-600" /> Find your business on Google Maps</p>
+                  <div class="mt-1.5 flex gap-2">
+                    <input class="input min-w-0 flex-1 py-1.5 text-sm" data-places-query value="{{ $mapsQuery }}" aria-label="Business name and city" />
+                    <button type="button" class="btn-primary shrink-0 px-3 py-1.5 text-xs" data-places-go><x-icon name="search" :size="13" /> <span>Search</span></button>
+                  </div>
+                  <ul class="mt-2 space-y-1.5" data-places-results></ul>
+                </div>
+              @endif
+              <input type="hidden" name="googlePlaceId" value="{{ $biz['googlePlaceId'] ?? '' }}" data-initial="{{ $biz['googlePlaceId'] ?? '' }}" data-place-id />
+              <input id="{{ $id }}" type="url" name="{{ $field }}" value="{{ $m['value'] }}" placeholder="{{ $placeholder }}" class="input w-full py-1.5 text-sm" data-review-url />
+              <p class="text-[11px] text-ink-500">
+                Or open <a href="{{ 'https://www.google.com/maps/search/?api=1&query='.rawurlencode($mapsQuery) }}" target="_blank" rel="noopener" class="font-semibold text-brand-700 hover:underline">your business on Google Maps <x-icon name="external-link" :size="11" class="-mt-0.5 inline" /></a>,
+                tap <b>Share</b>, copy the link and paste it here.
+              </p>
             @elseif ($type === 'textarea')
               <textarea id="{{ $id }}" name="{{ $field }}" rows="2" placeholder="{{ $placeholder }}" class="input w-full py-1.5 text-sm">{{ $m['value'] }}</textarea>
             @else

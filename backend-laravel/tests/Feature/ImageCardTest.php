@@ -165,6 +165,31 @@ class ImageCardTest extends TestCase
             ->assertSee('data-state="KL" data-city="Kochi"', false);
     }
 
+    public function test_the_google_review_detail_has_google_maps_options(): void
+    {
+        $this->withoutVite();
+        $this->business->update(['googlePlaceId' => 'ChIJsaved123']);
+        $this->save([$this->spot('call'), $this->spot('google_review', ['y' => 80])])->assertOk();
+        $this->post('/login', ['email' => $this->ownerEmail, 'password' => 'Password123!']);
+        $url = "/dashboard/businesses/{$this->business->id}?section=".urlencode('Visiting Card');
+
+        // Without Google search set up: a link to the business on Google Maps, to copy its share link.
+        config(['services.google_places.key' => null]);
+        $this->get($url)->assertOk()
+            ->assertSee('Google review link')
+            ->assertSee('https://www.google.com/maps/search/?api=1&amp;query=Spice%20Garden%20Kochi', false)
+            ->assertSee('name="googlePlaceId" value="ChIJsaved123" data-initial="ChIJsaved123"', false)
+            ->assertSee('name="googleReviewUrl"', false)
+            ->assertDontSee('data-places-search', false);
+
+        // With it: "Find your business on Google Maps", filled in for Save.
+        config(['services.google_places.key' => 'test-key']);
+        $this->get($url)->assertOk()
+            ->assertSee('Find your business on Google Maps')
+            ->assertSee('data-places-search data-places-fill', false)
+            ->assertSee('value="Spice Garden Kochi"', false);
+    }
+
     public function test_the_card_details_have_one_save_button_for_all(): void
     {
         $this->withoutVite();
