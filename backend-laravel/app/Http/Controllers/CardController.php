@@ -185,6 +185,14 @@ class CardController extends Controller
             'spotImage' => ['sometimes', 'array'],
             'spotImage.id' => ['required_with:spotImage', 'string', 'max:40'],
             'spotImage.url' => ['required_with:spotImage', 'url', 'max:500'],
+            // A picture box moved and zoomed (from the open card): its id and where the picture sits.
+            'spotFit' => ['sometimes', 'array'],
+            'spotFit.id' => ['required_with:spotFit', 'string', 'max:40'],
+            'spotFit.fit' => ['nullable', 'array'],
+            'spotFit.fit.l' => ['required_with:spotFit.fit', 'numeric', 'min:-'.(ImageCard::FIT_MAX - 100), 'max:'.(100 - ImageCard::FIT_MIN)],
+            'spotFit.fit.t' => ['required_with:spotFit.fit', 'numeric', 'min:-'.(ImageCard::FIT_MAX - 100), 'max:'.(100 - ImageCard::FIT_MIN)],
+            'spotFit.fit.w' => ['required_with:spotFit.fit', 'numeric', 'min:'.ImageCard::FIT_MIN, 'max:'.ImageCard::FIT_MAX],
+            'spotFit.fit.h' => ['required_with:spotFit.fit', 'numeric', 'min:'.ImageCard::FIT_MIN, 'max:'.ImageCard::FIT_MAX],
         ]);
         if (! $data) {
             throw ApiException::badRequest('Send a templateId, backgroundImageUrl, imageUrl, hotspots, imageColour or multiView');
@@ -237,6 +245,18 @@ class CardController extends Controller
             $hotspots = $source ? ImageCard::withSpotImage($source['hotspots'], $data['spotImage']['id'], $data['spotImage']['url']) : null;
             if ($hotspots === null) {
                 throw ApiException::badRequest('Your card has no such image spot');
+            }
+            $changes['hotspots'] = $hotspots;
+            if ($source['fromTemplate']) {
+                $changes += ['imageUrl' => $source['imageUrl'], 'imageWidth' => $source['imageWidth'], 'imageHeight' => $source['imageHeight']];
+            }
+        }
+        // Arranging a picture (move and zoom) is content too: the whole business team can.
+        if (isset($data['spotFit']) && ! array_key_exists('hotspots', $changes)) {
+            $source = ImageCard::source($business);
+            $hotspots = $source ? ImageCard::withSpotFit($source['hotspots'], $data['spotFit']['id'], $data['spotFit']['fit'] ?? null) : null;
+            if ($hotspots === null) {
+                throw ApiException::badRequest('Your card has no such picture');
             }
             $changes['hotspots'] = $hotspots;
             if ($source['fromTemplate']) {
