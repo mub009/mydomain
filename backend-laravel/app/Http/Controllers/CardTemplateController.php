@@ -9,6 +9,7 @@ use App\Support\ApiResponse;
 use App\Support\Cards\BackgroundGenerator;
 use App\Support\Cards\CardEngine;
 use App\Support\Cards\ImageCard;
+use App\Support\Cards\ImageColour;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -48,6 +49,13 @@ class CardTemplateController extends Controller
             'imageWidth' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:20000'],
             'imageHeight' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:20000'],
             ...ImageCard::rules(),
+            // Where a business's colour may go on this design's image (ImageColour::areas).
+            'colourAreas' => ['sometimes', 'nullable', 'array', 'max:'.ImageColour::MAX_AREAS],
+            'colourAreas.*' => ['array'],
+            'colourAreas.*.erase' => ['nullable', 'boolean'],
+            'colourAreas.*.points' => ['required', 'array', 'min:3', 'max:'.ImageColour::MAX_AREA_POINTS],
+            'colourAreas.*.points.*' => ['array', 'size:2'],
+            'colourAreas.*.points.*.*' => ['numeric'],
         ];
     }
 
@@ -58,8 +66,13 @@ class CardTemplateController extends Controller
         if (array_key_exists('hotspots', $data)) {
             $data['hotspots'] = ImageCard::normalize($data['hotspots'] ?? []);
         }
+        if (array_key_exists('colourAreas', $data)) {
+            $data['colourAreas'] = ImageColour::areas($data['colourAreas'] ?? null) ?: null;
+        }
+        // No image, nothing to mark: its areas go with it.
         if (array_key_exists('imageUrl', $data) && $data['imageUrl'] === null) {
             $data['imageWidth'] = $data['imageHeight'] = null;
+            $data['colourAreas'] = null;
         }
 
         return $data;

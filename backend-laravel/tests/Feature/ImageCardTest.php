@@ -7,6 +7,7 @@ use App\Models\BusinessCard;
 use App\Models\Category;
 use App\Models\User;
 use App\Support\Cards\CardEngine;
+use App\Support\Cards\ImageCard;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
@@ -344,6 +345,40 @@ class ImageCardTest extends TestCase
         $this->assertStringContainsString('data-colour-areas', $html);
         $this->assertStringContainsString('no picture design yet', $html);
         $this->assertMatchesRegularExpression('~data-areas-edit\s+disabled~', $html);
+    }
+
+    public function test_colour_areas_marked_on_a_design_apply_to_every_card_wearing_it(): void
+    {
+        $admin = $this->admin();
+        $id = $this->imageTemplate($admin);
+        $top = [[0, 0], [100, 0], [100, 40], [0, 40]];
+
+        // Marked in the template editor, saved and checked with the template.
+        $this->patchJson("/api/v1/admin/card-templates/{$id}", ['colourAreas' => [['points' => $top], ['erase' => true, 'points' => [[120, 0], [5, 5], [5, 10]]]]], $admin)
+            ->assertOk()->assertJsonCount(2, 'data.colourAreas')->assertJsonPath('data.colourAreas.1.points.0', [100, 0]);
+        $this->getJson("/api/v1/admin/card-templates/{$id}", $admin)->assertJsonCount(2, 'data.colourAreas');
+
+        // The business wears it and picks a colour from the open card: only the design's areas change.
+        $this->postJson("/api/v1/businesses/{$this->business->id}/card/publish", [], $this->auth)->assertOk();
+        $this->post('/login', ['email' => $this->ownerEmail, 'password' => 'Password123!']);
+        preg_match('~body.owner = "([^"]+)"~', $this->get('/card/spice-garden')->getContent(), $t);
+        $this->postJson('/api/v1/cards/spice-garden/owner', ['owner' => $t[1], 'imageColour' => ['tint' => '#2563eb', 'strength' => 60]])->assertOk();
+        $this->assertSame([], BusinessCard::where('businessId', $this->business->id)->first()->imageColour['areas']);
+        $html = $this->get('/card/spice-garden')->getContent();
+        $this->assertStringContainsString('class="colour-areas"', $html);
+        $this->assertSame(2, count(ImageCard::source($this->business->fresh())['colour']['areas']));
+        // The dashboard says the design's areas are used.
+        $this->get("/dashboard/businesses/{$this->business->id}?section=".urlencode('Visiting Card'))->assertOk();
+        $this->getJson("/api/v1/businesses/{$this->business->id}/card", $this->auth)->assertJsonPath('data.designColourAreas', 2);
+
+        // A card's own areas win over the design's.
+        $this->putJson("/api/v1/businesses/{$this->business->id}/card", ['imageColour' => ['tint' => '#2563eb', 'strength' => 60, 'areas' => [['points' => [[0, 50], [50, 50], [50, 100]]]]]], $admin)->assertOk();
+        $this->assertEquals([[0, 50], [50, 50], [50, 100]], ImageCard::source($this->business->fresh())['colour']['areas'][0]['points']);
+
+        // Removing the design's image removes its areas too.
+        $this->patchJson("/api/v1/admin/card-templates/{$id}", ['imageUrl' => null], $admin)->assertOk()->assertJsonPath('data.colourAreas', []);
+        // Only admins edit templates.
+        $this->patchJson("/api/v1/admin/card-templates/{$id}", ['colourAreas' => []], $this->auth)->assertStatus(403);
     }
 
     public function test_the_card_details_have_one_save_button_for_all(): void

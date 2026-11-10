@@ -29,6 +29,13 @@
       "__commonjsHelpers-CqkleIqs.js"
     ]
   },
+  "_colour-areas-RNL_-VMO.js": {
+    "file": "assets/colour-areas-RNL_-VMO.js",
+    "name": "colour-areas",
+    "imports": [
+      "_ui-BdSpcnW7.js"
+    ]
+  },
   "_commission-charts-CadtPEUw.js": {
     "file": "assets/commission-charts-CadtPEUw.js",
     "name": "commission-charts",
@@ -157,26 +164,28 @@
     ]
   },
   "resources/js/pages/card-manager.js": {
-    "file": "assets/card-manager-DpvdbTKl.js",
+    "file": "assets/card-manager-DdBY7JTK.js",
     "name": "card-manager",
     "src": "resources/js/pages/card-manager.js",
     "isEntry": true,
     "imports": [
       "_api-B_riRJ0q.js",
       "_card-preview-D32f_M1W.js",
-      "_ui-BdSpcnW7.js",
+      "_colour-areas-RNL_-VMO.js",
       "_channels-CvUWVcU_.js",
+      "_ui-BdSpcnW7.js",
       "_widgets-BKox7ttS.js",
       "__commonjsHelpers-CqkleIqs.js"
     ]
   },
   "resources/js/pages/card-template-editor.js": {
-    "file": "assets/card-template-editor-C4tl4wvM.js",
+    "file": "assets/card-template-editor-1OZ7Yef_.js",
     "name": "card-template-editor",
     "src": "resources/js/pages/card-template-editor.js",
     "isEntry": true,
     "imports": [
       "_api-B_riRJ0q.js",
+      "_colour-areas-RNL_-VMO.js",
       "_ui-BdSpcnW7.js",
       "_searchable-select-DGJiky5z.js",
       "_widgets-BKox7ttS.js",

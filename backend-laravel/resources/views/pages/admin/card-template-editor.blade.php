@@ -36,6 +36,17 @@
           </p>
         </div>
         <x-hotspot-editor subject="the card" />
+
+        {{-- Where a business's colour may go on this design: every card wearing it
+             recolours only there (resources/js/lib/colour-areas.js). Saved with the template. --}}
+        <div class="mt-4 rounded-lg border border-violet-200 bg-violet-50/60 p-3" data-template-areas>
+          <p class="flex items-center gap-1.5 text-sm font-semibold text-ink-900"><x-icon name="palette" :size="15" class="text-violet-600" /> Colour areas</p>
+          <p class="mt-0.5 text-xs text-ink-600" data-areas-status></p>
+          <div class="mt-2 flex flex-wrap gap-2">
+            <button type="button" class="btn-primary px-3 py-1.5 text-xs" data-areas-edit><x-icon name="pencil" :size="13" /> <span>Mark areas</span></button>
+            <button type="button" class="btn-secondary px-3 py-1.5 text-xs !text-red-700" data-areas-clear hidden><x-icon name="trash-2" :size="13" /> Clear areas</button>
+          </div>
+        </div>
       </div>
 
       <form class="card space-y-5 p-5" data-template-form>
@@ -97,6 +108,7 @@
           'imageWidth' => $template['imageWidth'] ?? null,
           'imageHeight' => $template['imageHeight'] ?? null,
           'hotspots' => $template['hotspots'] ?? [],
+          'colourAreas' => $template['colourAreas'] ?? [],
           'actions' => $options['actions'],
           'fonts' => $options['fonts'],
           'actionDefaults' => $options['actionDefaults'],

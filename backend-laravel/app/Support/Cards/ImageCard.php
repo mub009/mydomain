@@ -101,15 +101,28 @@ class ImageCard
     public static function source(Business $business, ?BusinessCard $card = null): ?array
     {
         $card ??= $business->card;
+        $template = CardEngine::templateFor($business, $card);
         if ($card?->imageUrl) {
             $source = self::pack($card->imageUrl, $card->imageWidth, $card->imageHeight, $card->hotspots, false);
         } else {
-            $template = CardEngine::templateFor($business, $card);
             $source = $template ? self::fromTemplate($template) : null;
         }
 
-        // The business's recolouring applies to whichever image it wears.
-        return $source ? [...$source, 'colour' => ImageColour::normalize($card?->imageColour)] : null;
+        // The business's recolouring applies to whichever image it wears — only in
+        // the card's own marked areas, or else the ones marked on its design.
+        return $source ? [...$source, 'colour' => self::colourFor($card, $template)] : null;
+    }
+
+    /** The card's colour, limited to its own marked areas or else to its design's. */
+    public static function colourFor(?BusinessCard $card, ?CardTemplate $template): ?array
+    {
+        $colour = ImageColour::normalize($card?->imageColour);
+        $designAreas = ImageColour::areas($template?->colourAreas ?? null);
+        if ($colour && ! $colour['areas'] && $designAreas) {
+            $colour['areas'] = $designAreas;
+        }
+
+        return $colour;
     }
 
     /**

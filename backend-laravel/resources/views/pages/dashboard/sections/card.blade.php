@@ -59,7 +59,9 @@
               @if (! $hasImage)
                 This card has no picture design yet — pick a ready-made design below first, then mark where its colour may change.
               @elseif ($areaCount)
-                {{ $areaCount }} {{ $areaCount === 1 ? 'area' : 'areas' }} marked — the business team's colour changes only there.
+                {{ $areaCount }} {{ $areaCount === 1 ? 'area' : 'areas' }} marked on this card — the business team's colour changes only there.
+              @elseif ($designAreas = $card['designColourAreas'] ?? 0)
+                Using the {{ $designAreas }} {{ $designAreas === 1 ? 'area' : 'areas' }} marked on its design — the business team's colour changes only there. Mark areas here only to differ for this card.
               @else
                 Nothing marked — the business team's colour changes the whole card. Mark the parts it may change.
               @endif
