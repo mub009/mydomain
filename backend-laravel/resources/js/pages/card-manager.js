@@ -53,6 +53,11 @@ if (root && card) {
           saveAreas(areas, areas.length ? "Colour areas saved — the team's colour changes only there." : "Colour areas cleared — the colour covers the whole card."),
       }),
     );
+    // From the open card's "Colour areas →" (admins): straight into the editor.
+    if (new URLSearchParams(location.search).get("areas") === "1" && card.imageUrl) {
+      areasBox.scrollIntoView({ block: "center" });
+      $("[data-areas-edit]", areasBox).click();
+    }
     $("[data-areas-clear]", areasBox)?.addEventListener("click", () =>
       saveAreas([], "Colour areas cleared — the colour covers the whole card."),
     );

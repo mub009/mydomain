@@ -314,7 +314,7 @@ class ImageCardTest extends TestCase
             'firstName' => 'A', 'lastName' => 'D', 'status' => 'ACTIVE', 'role' => 'ADMIN',
         ]);
         $this->post('/login', ['email' => $admin->email, 'password' => 'Password123!']);
-        $this->get($url)->assertOk()->assertSee('data-colour-areas', false)->assertSee('Mark areas')->assertSee('Nothing marked');
+        $this->get($url)->assertOk()->assertSee('data-colour-areas', false)->assertSee('id="colour-areas"', false)->assertSee('Mark areas')->assertSee('Nothing marked');
 
         // Areas saved with no colour picked yet are kept (what the editor sends), and shown.
         $token = $this->postJson('/api/v1/auth/login', ['email' => $admin->email, 'password' => 'Password123!'])->json('data.accessToken');
@@ -324,6 +324,26 @@ class ImageCardTest extends TestCase
         // No colour yet: the card looks as it was.
         $this->postJson("/api/v1/businesses/{$this->business->id}/card/publish", [], $this->auth)->assertOk();
         $this->assertStringNotContainsString('feColorMatrix', $this->get('/card/spice-garden')->getContent());
+
+        // On the open card, the admin's bar links straight to the area editor; the business team's doesn't.
+        $this->get('/card/spice-garden')->assertOk()->assertSee('Colour areas →')->assertSee('section=Visiting+Card&amp;areas=1#colour-areas', false);
+        $this->post('/logout');
+        $this->post('/login', ['email' => $this->ownerEmail, 'password' => 'Password123!']);
+        $this->get('/card/spice-garden')->assertOk()->assertSee('id="mk-owner-bar"', false)->assertDontSee('Colour areas →');
+    }
+
+    public function test_the_admin_sees_colour_areas_even_before_the_card_has_a_picture_design(): void
+    {
+        $this->withoutVite();
+        $admin = User::create([
+            'email' => 'admin-'.uniqid().'@example.com', 'passwordHash' => Hash::make('Password123!'),
+            'firstName' => 'A', 'lastName' => 'D', 'status' => 'ACTIVE', 'role' => 'ADMIN',
+        ]);
+        $this->post('/login', ['email' => $admin->email, 'password' => 'Password123!']);
+        $html = $this->get("/dashboard/businesses/{$this->business->id}?section=".urlencode('Visiting Card'))->assertOk()->getContent();
+        $this->assertStringContainsString('data-colour-areas', $html);
+        $this->assertStringContainsString('no picture design yet', $html);
+        $this->assertMatchesRegularExpression('~data-areas-edit\s+disabled~', $html);
     }
 
     public function test_the_card_details_have_one_save_button_for_all(): void
