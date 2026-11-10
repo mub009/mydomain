@@ -51,21 +51,30 @@ if (root && card) {
   $$("[data-missing-form]", root).forEach((form) =>
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
-      // A textbox, a textarea, or the link box of the logo upload.
-      const input = $("[data-upload-url], textarea[name], input[name]", form);
       const button = $("[data-missing-save]", form);
-      const value = input.value.trim();
-      if (!value) return input.focus();
+      let payload;
+      if ($("[data-multi-fields]", form)) {
+        // Several drop-downs (category, state, city): every named field is saved.
+        if (!form.reportValidity()) return;
+        payload = {};
+        $$("select[name], input[name]", form).forEach((el) => (payload[el.name] = el.value.trim()));
+      } else {
+        // A textbox, a textarea, or the link box of the logo upload.
+        const input = $("[data-upload-url], textarea[name], input[name]", form);
+        const value = input.value.trim();
+        if (!value) return input.focus();
+        payload = { [input.name]: value };
+      }
       fail("");
       button.disabled = true;
       button.textContent = "Saving…";
       try {
         if (form.dataset.via === "spot") {
           // A free-image spot: the picture goes on the card itself.
-          await api.put(base, { spotImage: { id: form.dataset.spot, url: value } });
+          await api.put(base, { spotImage: { id: form.dataset.spot, url: Object.values(payload)[0] } });
         } else {
           const path = form.dataset.via === "links" ? `/businesses/${biz.id}/review-links` : `/businesses/${biz.id}`;
-          await api.patch(path, { [input.name]: value });
+          await api.patch(path, payload);
         }
         reloadWithFlash(`${form.dataset.label} saved — it's on your card now.`);
       } catch (err) {

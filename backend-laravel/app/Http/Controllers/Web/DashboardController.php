@@ -264,6 +264,8 @@ class DashboardController extends Controller
                 break;
             case 'Visiting Card':
                 $data['card'] = InternalApi::tryCall([CardController::class, 'show'], [], ['id' => $id], true)['data'] ?? null;
+                // For the card's "Category & city" detail, picked from a drop-down.
+                $data['categories'] = InternalApi::tryCall([CategoryController::class, 'index'])['data'] ?? [];
                 break;
             case 'Gold Rate':
                 $data['goldRate'] = self::goldPosters($id);

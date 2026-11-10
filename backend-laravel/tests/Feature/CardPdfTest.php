@@ -76,7 +76,7 @@ class CardPdfTest extends TestCase
         foreach ([
             'tel:9876543210',
             'https://wa.me/919123456789',
-            'https://www.google.com/maps/search/?api=1&query=9.9,76.2',
+            'https://www.google.com/maps/search/?api=1&query=Spice%20Garden%2C%201%20Main%20St%2C%20Kochi%2C%20KL',
             'mailto:hi@spice.test',
             'https://spice.test',
             'https://instagram.com/spicegarden',

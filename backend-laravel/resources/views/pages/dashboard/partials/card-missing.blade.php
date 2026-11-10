@@ -35,6 +35,20 @@
               @endif
               <x-upload-field :name="$field" :purpose="$via === 'spot' ? 'card-images' : 'business-logo'" :remove-background="$via !== 'spot'" :value="$m['value'] ?? ''" :placeholder="$placeholder" />
               <button class="btn-primary px-3 py-1.5 text-xs" data-missing-save>Save</button>
+            @elseif ($type === 'category-city')
+              {{-- Category, state and city (area) from drop-downs — the same lists as Contact. --}}
+              @if ($m['value'])<span class="block text-xs text-ink-500">{{ $m['value'] }}</span>@endif
+              <input type="hidden" data-multi-fields />
+              <select id="{{ $id }}" name="categoryId" required class="input w-full py-1.5 text-sm" data-search-select data-search-placeholder="Search category…">
+                <option value="">{{ $placeholder }}</option>
+                @foreach ($categories ?? [] as $c)
+                  <option value="{{ $c['id'] }}" @selected(($biz['category']['id'] ?? null) === $c['id'])>{{ $c['name'] }}</option>
+                @endforeach
+              </select>
+              <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <x-state-city :state="$biz['state'] ?? ''" :city="$biz['city'] ?? ''" />
+              </div>
+              <button class="btn-primary px-3 py-1.5 text-xs" data-missing-save>Save</button>
             @elseif ($type === 'textarea')
               <textarea id="{{ $id }}" name="{{ $field }}" rows="2" required placeholder="{{ $placeholder }}" class="input w-full py-1.5 text-sm">{{ $m['value'] }}</textarea>
               <button class="btn-primary px-3 py-1.5 text-xs" data-missing-save>Save</button>
