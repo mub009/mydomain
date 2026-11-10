@@ -1,7 +1,8 @@
 // "Where the colour goes": a full-screen editor for marking the parts of the
-// card image the colour should change. Each area is drawn freehand, as a
-// square/rectangle, a circle or an oval; the eraser draws the same shapes to
-// take the colour away again. Areas apply in order, so a later one wins where
+// card image the colour should change. Each area is drawn freehand, with the
+// pen (point by point, like a pen tool), as a square/rectangle, a circle or an
+// oval; the eraser draws the same shapes to take the colour away again — on
+// its own it starts from the whole card ("colour everywhere except here"). Areas apply in order, so a later one wins where
 // they overlap. Nothing marked = the colour covers the whole card.
 //
 // Stored with the colour as areas: [{ erase, points: [[x, y], ...] }] in
@@ -43,7 +44,8 @@ const tooSmall = (pts) => {
 export function openColourAreas({ imageUrl, ratio, colour, onDone }) {
   let areas = (colour.areas || []).map((a) => ({ erase: !!a.erase, points: a.points.map((p) => [...p]) }));
   let erase = false;
-  let shape = "free"; // free | rect | circle | oval
+  let shape = "free"; // free | pen | rect | circle | oval
+  let pen = []; // the pen's points so far, until the shape is closed
   let problem = "";
 
   const el = document.createElement("div");
@@ -95,9 +97,11 @@ export function openColourAreas({ imageUrl, ratio, colour, onDone }) {
         <div class="min-w-0 flex-1">
           <p class="font-bold">Where the colour goes</p>
           <p class="text-xs text-white/70">${
-            erase
-              ? "Eraser: draw over the parts that should keep their own colour."
-              : "Draw around the parts the colour should change. Nothing marked = the whole card."
+            shape === "pen"
+              ? "Pen: click point by point around the part. Click the first point (or double-click, or press Enter) to close it."
+              : erase
+                ? "Eraser: draw over the parts that should keep their own colour."
+                : "Draw around the parts the colour should change. Nothing marked = the whole card."
           }</p>
           ${problem ? `<p class="mt-0.5 text-xs font-semibold text-red-300">${esc(problem)}</p>` : ""}
         </div>
@@ -112,10 +116,20 @@ export function openColourAreas({ imageUrl, ratio, colour, onDone }) {
       <span class="mx-1 h-6 w-px bg-white/20"></span>
       <div class="flex flex-wrap gap-1.5" role="group" aria-label="Shape">
         ${btn('data-shape="free"', shape === "free", `${icon("pencil", { size: 14 })} Freehand`)}
+        ${btn('data-shape="pen"', shape === "pen", `${icon("pen-tool", { size: 14 })} Pen`)}
         ${btn('data-shape="rect"', shape === "rect", `<span class="inline-block h-3 w-3 rounded-[2px] border-2 border-current"></span> Square`)}
         ${btn('data-shape="circle"', shape === "circle", `<span class="inline-block h-3.5 w-3.5 rounded-full border-2 border-current"></span> Round`)}
         ${btn('data-shape="oval"', shape === "oval", `<span class="inline-block h-3 w-4 rounded-[50%] border-2 border-current"></span> Oval`)}
       </div>
+      ${
+        // Shown as soon as the pen is picked (greyed until used), so the card never jumps while drawing.
+        shape === "pen"
+          ? `<span class="mx-1 h-6 w-px bg-white/20"></span>
+             ${btn('data-x="pen-close"', false, `${icon("check", { size: 14 })} Close shape`, pen.length >= 3 ? "" : "disabled")}
+             ${btn('data-x="pen-back"', false, "Remove last point", pen.length ? "" : "disabled")}
+             ${btn('data-x="pen-cancel"', false, `${icon("x", { size: 14 })} Cancel shape`, pen.length ? "" : "disabled")}`
+          : ""
+      }
       <span class="mx-1 h-6 w-px bg-white/20"></span>
       ${btn('data-x="undo"', false, "Undo", areas.length ? "" : "disabled")}
       ${btn('data-x="clear"', false, "Clear all", areas.length ? "" : "disabled")}
@@ -137,7 +151,28 @@ export function openColourAreas({ imageUrl, ratio, colour, onDone }) {
             }" stroke-width="1.5" stroke-dasharray="5 4" vector-effect="non-scaling-stroke" />`,
         )
         .join("") +
-      `<polygon data-draft points="" fill="${erase ? "rgba(239,68,68,.2)" : "rgba(255,255,255,.2)"}" stroke="${erase ? "#f87171" : "#38bdf8"}" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round" />`;
+      `<polygon data-draft points="" fill="${erase ? "rgba(239,68,68,.2)" : "rgba(255,255,255,.2)"}" stroke="${erase ? "#f87171" : "#38bdf8"}" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round" />` +
+      (pen.length
+        ? `<polyline points="${pen.map((p) => p.join(",")).join(" ")}" fill="none" stroke="${erase ? "#f87171" : "#38bdf8"}" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round" />` +
+          `<polyline data-pen-next points="" fill="none" stroke="${erase ? "#f87171" : "#38bdf8"}" stroke-width="1.5" stroke-dasharray="4 3" vector-effect="non-scaling-stroke" />`
+        : "");
+    // The pen's points as dots of a fixed size (the SVG is stretched, so they are drawn as HTML).
+    canvas.querySelectorAll("[data-pen-dot]").forEach((d) => d.remove());
+    pen.forEach(([x, y], i) => {
+      const d = document.createElement("span");
+      d.dataset.penDot = "";
+      d.className = `pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white ${i === 0 ? "h-3.5 w-3.5 bg-sky-400" : "h-2.5 w-2.5 bg-sky-500"}`;
+      d.style.left = `${x}%`;
+      d.style.top = `${y}%`;
+      canvas.appendChild(d);
+    });
+  }
+
+  function closePen() {
+    if (pen.length < 3) return;
+    const pts = pen;
+    pen = [];
+    add(pts);
   }
 
   function add(points) {
@@ -149,9 +184,13 @@ export function openColourAreas({ imageUrl, ratio, colour, onDone }) {
       problem = `Up to ${MAX_AREAS} shapes. Undo or clear some first.`;
       return render();
     }
+    // Erasing with nothing marked yet: the colour starts from the whole card, minus this.
     if (erase && !areas.some((a) => !a.erase)) {
-      problem = "Mark where the colour goes first — the eraser takes colour away from it.";
-      return render();
+      if (areas.length + 2 > MAX_AREAS) {
+        problem = `Up to ${MAX_AREAS} shapes. Undo or clear some first.`;
+        return render();
+      }
+      areas.push({ erase: false, points: [[0, 0], [100, 0], [100, 100], [0, 100]] });
     }
     problem = "";
     areas.push({ erase, points: points.map(([x, y]) => [r2(x), r2(y)]) });
@@ -162,15 +201,24 @@ export function openColourAreas({ imageUrl, ratio, colour, onDone }) {
     const b = e.target.closest("[data-x], [data-shape]");
     if (!b) return;
     problem = "";
-    if (b.dataset.shape) shape = b.dataset.shape;
+    if (b.dataset.shape) {
+      shape = b.dataset.shape;
+      pen = [];
+    }
     const x = b.dataset.x;
     if (x === "cancel") return close();
     if (x === "done") {
+      // A pen shape still open is kept, as if closed.
+      if (pen.length >= 3) closePen();
+      pen = [];
       close();
       return onDone(areas);
     }
     if (x === "paint") erase = false;
     if (x === "erase") erase = true;
+    if (x === "pen-close") return closePen();
+    if (x === "pen-back") pen.pop();
+    if (x === "pen-cancel") pen = [];
     if (x === "undo") areas.pop();
     if (x === "clear") areas = [];
     render();
@@ -180,9 +228,34 @@ export function openColourAreas({ imageUrl, ratio, colour, onDone }) {
     const r = canvas.getBoundingClientRect();
     return [clamp(((ev.clientX - r.left) / r.width) * 100, 0, 100), clamp(((ev.clientY - r.top) / r.height) * 100, 0, 100)];
   };
+  // The pen: each click adds a point; clicking the first point closes the shape.
+  canvas.addEventListener("pointermove", (e) => {
+    if (shape !== "pen" || !pen.length) return;
+    const next = lines.querySelector("[data-pen-next]");
+    next?.setAttribute("points", [pen[pen.length - 1], at(e)].map((p) => p.join(",")).join(" "));
+  });
+  canvas.addEventListener("dblclick", (e) => {
+    if (shape !== "pen") return;
+    e.preventDefault();
+    // The double-click's second click added a point at the same spot: drop it.
+    if (pen.length > 3) pen.pop();
+    closePen();
+  });
   canvas.addEventListener("pointerdown", (e) => {
     if (e.button > 0) return;
     e.preventDefault();
+    if (shape === "pen") {
+      const p = at(e);
+      const r = canvas.getBoundingClientRect();
+      const first = pen[0];
+      // Within ~12px of the first point: close the shape.
+      if (first && pen.length >= 3 && Math.hypot(((p[0] - first[0]) * r.width) / 100, ((p[1] - first[1]) * r.height) / 100) < 12) {
+        return closePen();
+      }
+      problem = "";
+      pen.push(p);
+      return render();
+    }
     canvas.setPointerCapture(e.pointerId);
     const draft = lines.querySelector("[data-draft]");
     const start = at(e);
@@ -225,6 +298,23 @@ export function openColourAreas({ imageUrl, ratio, colour, onDone }) {
   });
 
   function onKey(e) {
+    // While drawing with the pen: Enter closes the shape, Backspace removes the last point, Escape drops it.
+    if (pen.length) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        return closePen();
+      }
+      if (e.key === "Backspace") {
+        e.preventDefault();
+        pen.pop();
+        return render();
+      }
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        pen = [];
+        return render();
+      }
+    }
     if (e.key === "Escape") {
       e.stopPropagation();
       close();
