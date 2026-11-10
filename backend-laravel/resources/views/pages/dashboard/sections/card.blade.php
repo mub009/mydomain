@@ -47,6 +47,29 @@
           <button type="button" class="btn-secondary px-4 py-2 text-sm" data-preview-card><x-icon name="eye" :size="15" /> Preview</button>
           <a href="{{ $base }}/card.pdf" class="btn-secondary px-4 py-2 text-sm"><x-icon name="download" :size="15" /> Download PDF</a>
         </div>
+        @if (($card['colourAreaTools'] ?? false) && $hasImage)
+          {{-- Admins only: where the business team's colour may go (ImageColour areas). --}}
+          @php $areaCount = count($card['imageColour']['areas'] ?? []); @endphp
+          <div class="rounded-lg border border-violet-200 bg-violet-50/60 p-3" data-colour-areas>
+            <p class="flex items-center gap-1.5 text-sm font-semibold text-ink-900">
+              <x-icon name="palette" :size="15" class="text-violet-600" /> Colour areas
+              <span class="badge bg-violet-100 text-violet-700">Admin</span>
+            </p>
+            <p class="mt-0.5 text-xs text-ink-600">
+              @if ($areaCount)
+                {{ $areaCount }} {{ $areaCount === 1 ? 'area' : 'areas' }} marked — the business team's colour changes only there.
+              @else
+                Nothing marked — the business team's colour changes the whole card. Mark the parts it may change.
+              @endif
+            </p>
+            <div class="mt-2 flex flex-wrap gap-2">
+              <button type="button" class="btn-primary px-3 py-1.5 text-xs" data-areas-edit><x-icon name="pencil" :size="13" /> {{ $areaCount ? 'Change areas' : 'Mark areas' }}</button>
+              @if ($areaCount)
+                <button type="button" class="btn-secondary px-3 py-1.5 text-xs !text-red-700" data-areas-clear><x-icon name="trash-2" :size="13" /> Clear areas</button>
+              @endif
+            </div>
+          </div>
+        @endif
         @if ($card['viewCount'] > 0)
           <p class="text-xs text-ink-500">Opened {{ number_format($card['viewCount']) }} {{ $card['viewCount'] === 1 ? 'time' : 'times' }}.</p>
         @endif

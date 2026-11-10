@@ -1,5 +1,7 @@
 import { api, errorMessage } from "../lib/api";
 import { cardPreviewModal } from "../lib/card-preview";
+import { COLOUR_DEFAULTS } from "../lib/card-colour";
+import { openColourAreas } from "../lib/colour-areas";
 import { downloadDataUrl, renderQrDataUrl } from "../lib/channels";
 import { $, $$, pageData } from "../lib/ui";
 import { reloadWithFlash, showError } from "../lib/widgets";
@@ -23,6 +25,38 @@ if (root && card) {
 
   // The card's colour (changed on the card page itself), for the preview pop-up.
   const colour = card.imageColour || null;
+
+  // --- Colour areas (admins): where the business team's colour may go --------
+  const areasBox = $("[data-colour-areas]", root);
+  if (areasBox) {
+    const saveAreas = async (areas, message) => {
+      fail("");
+      try {
+        // The colour stays as it is; only where it goes changes. No colour yet: just the areas.
+        await api.put(base, { imageColour: { ...(colour || {}), areas } });
+        reloadWithFlash(message);
+      } catch (err) {
+        fail(err);
+      }
+    };
+    $("[data-areas-edit]", areasBox).addEventListener("click", () =>
+      openColourAreas({
+        imageUrl: card.imageUrl,
+        ratio: card.imageWidth && card.imageHeight ? card.imageWidth / card.imageHeight : 0.6,
+        // The card's colour shows where it goes while marking; with none picked yet, a blue.
+        colour: {
+          ...COLOUR_DEFAULTS,
+          ...(colour?.tint ? colour : { tint: "#2563eb", strength: 60 }),
+          areas: colour?.areas || [],
+        },
+        onDone: (areas) =>
+          saveAreas(areas, areas.length ? "Colour areas saved — the team's colour changes only there." : "Colour areas cleared — the colour covers the whole card."),
+      }),
+    );
+    $("[data-areas-clear]", areasBox)?.addEventListener("click", () =>
+      saveAreas([], "Colour areas cleared — the colour covers the whole card."),
+    );
+  }
 
   // --- Ready-made designs ----------------------------------------------------
   // Picking one drops the card's own image copy, so the design's image shows.
