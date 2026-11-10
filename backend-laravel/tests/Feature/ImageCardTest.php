@@ -228,6 +228,38 @@ class ImageCardTest extends TestCase
         $this->assertNotNull(CardEngine::ownerFromToken($pass, $this->business));
     }
 
+    public function test_pictures_are_moved_and_zoomed_from_the_open_card(): void
+    {
+        $this->withoutVite();
+        $this->business->update(['logoUrl' => 'https://cdn.example.test/logos/logo.png']);
+        $this->save([$this->spot('call'), $this->spot('logo', ['y' => 10, 'w' => 40, 'h' => 20])])->assertOk();
+        $this->postJson("/api/v1/businesses/{$this->business->id}/card/publish", [], $this->auth)->assertOk();
+
+        // The open card marks the logo box to arrange, and the bar offers it.
+        $this->post('/login', ['email' => $this->ownerEmail, 'password' => 'Password123!']);
+        $html = $this->get('/card/spice-garden')->assertOk()->getContent();
+        $this->assertStringContainsString('data-arrange="h-logo" data-arrange-label="Logo"', $html);
+        $this->assertStringContainsString('Arrange pictures', $html);
+        $this->assertStringContainsString('aria-label="Zoom in"', $html);
+        preg_match('~body.owner = "([^"]+)"~', $html, $t);
+
+        // Saved with the bar's pass: zoomed in and moved, drawn so on the card.
+        $fit = ['l' => -20, 't' => -10, 'w' => 150, 'h' => 150];
+        $this->postJson('/api/v1/cards/spice-garden/owner', ['owner' => $t[1], 'spotFit' => ['id' => 'h-logo', 'fit' => $fit]])->assertOk();
+        $logo = collect(BusinessCard::where('businessId', $this->business->id)->first()->hotspots)->firstWhere('id', 'h-logo');
+        $this->assertEquals($fit, $logo['fit']);
+        $this->assertStringContainsString('left:-20%;top:-10%;width:150%;height:150%', $this->get('/card/spice-garden')->getContent());
+
+        // Kept inside the rules: never past its edges, and only picture boxes.
+        $this->postJson('/api/v1/cards/spice-garden/owner', ['owner' => $t[1], 'spotFit' => ['id' => 'h-logo', 'fit' => ['l' => -90, 't' => 0, 'w' => 150, 'h' => 150]]])->assertOk();
+        $this->assertEquals(-50, collect(BusinessCard::where('businessId', $this->business->id)->first()->hotspots)->firstWhere('id', 'h-logo')['fit']['l']);
+        $this->postJson('/api/v1/cards/spice-garden/owner', ['owner' => $t[1], 'spotFit' => ['id' => 'h-call', 'fit' => $fit]])->assertStatus(400);
+
+        // Reset: back as it was.
+        $this->postJson('/api/v1/cards/spice-garden/owner', ['owner' => $t[1], 'spotFit' => ['id' => 'h-logo', 'fit' => null]])->assertOk();
+        $this->assertNull(collect(BusinessCard::where('businessId', $this->business->id)->first()->hotspots)->firstWhere('id', 'h-logo')['fit'] ?? null);
+    }
+
     public function test_the_card_details_have_one_save_button_for_all(): void
     {
         $this->withoutVite();
@@ -749,7 +781,7 @@ class ImageCardTest extends TestCase
         $this->save([$this->spot('logo', $logo + ['radius' => 50])])->assertOk()->assertJsonPath('data.hotspots.0.radius', 50);
         $this->postJson("/api/v1/businesses/{$this->business->id}/card/publish", [], $this->auth)->assertOk();
         $html = $this->get('/card/spice-garden')->getContent();
-        $this->assertStringContainsString('height:8%;border-radius:50%">', $html);
+        $this->assertStringContainsString('height:8%;border-radius:50%"', $html);
         $this->assertStringContainsString('style="object-fit:cover;border-radius:50%"', $html);
 
         // Square again: no rounding drawn; more than round is refused; only a logo keeps it.
@@ -772,7 +804,7 @@ class ImageCardTest extends TestCase
             ->assertJsonPath('data.hotspots.0.value', 'https://cdn.example.test/cards/images/offer.png')
             ->assertJsonPath('data.hotspots.0.w', 90);
         $html = $this->get('/card/spice-garden')->getContent();
-        $this->assertStringContainsString('width:90%;height:12%;border-radius:0">', $html);
+        $this->assertStringContainsString('width:90%;height:12%;border-radius:0"', $html);
         $this->assertStringContainsString('<img src="https://cdn.example.test/cards/images/offer.png" alt=""', $html);
 
         // It can be rounded like the logo, and must be a picture address.
@@ -817,13 +849,14 @@ class ImageCardTest extends TestCase
             ->assertOk()->assertJsonPath('data.hotspots.0.fit', ['l' => -5, 't' => 0, 'w' => 105, 'h' => 120]);
 
         // No position = centred and covering; zoomed out smaller than the area, it stays within it;
-        // only free images keep it.
+        // free images and the logo keep it (the logo is arranged from the open card), nothing else.
         $this->save([$this->spot('custom_image', $area)])->assertOk()->assertJsonPath('data.hotspots.0.fit', null);
         $this->assertStringContainsString('<img src="https://cdn.example.test/cards/images/shop.jpg" alt="" style="object-fit:cover"', $this->get('/card/spice-garden')->getContent());
         $this->save([$this->spot('custom_image', $area + ['fit' => ['l' => 50, 't' => 0, 'w' => 60, 'h' => 100]])])
             ->assertOk()->assertJsonPath('data.hotspots.0.fit', ['l' => 40, 't' => 0, 'w' => 60, 'h' => 100]);
         $this->save([$this->spot('custom_image', $area + ['fit' => ['l' => 0, 't' => 0, 'w' => 5, 'h' => 100]])])->assertStatus(400);
-        $this->save([$this->spot('logo', $area + ['fit' => $fit])])->assertOk()->assertJsonPath('data.hotspots.0.fit', null);
+        $this->save([$this->spot('logo', $area + ['fit' => $fit])])->assertOk()->assertJsonPath('data.hotspots.0.fit', $fit);
+        $this->save([$this->spot('qr', $area + ['fit' => $fit])])->assertOk()->assertJsonPath('data.hotspots.0.fit', null);
     }
 
     public function test_review_us_on_google_and_location_actions(): void

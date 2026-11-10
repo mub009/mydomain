@@ -30,6 +30,18 @@
     #mk-owner-bar .ds[aria-checked="true"]{border-color:#059669;box-shadow:0 0 0 2px #a7f3d0}
     #mk-owner-bar .ds[aria-checked="true"]::after{content:"✓";position:absolute;top:2px;right:2px;width:16px;height:16px;border-radius:999px;background:#059669;color:#fff;font-size:10px;line-height:16px;text-align:center}
     #mk-owner-bar[data-busy] .row{opacity:.5;pointer-events:none}
+    #mk-owner-bar .pk{flex:0 0 auto;display:flex;align-items:center;gap:6px;border:1px solid #d1d5db;background:#fff;border-radius:999px;padding:5px 10px 5px 5px;font:600 12px system-ui,sans-serif;color:#111827;cursor:pointer}
+    #mk-owner-bar .pk img{width:26px;height:26px;border-radius:999px;object-fit:cover;background:#f3f4f6}
+    #mk-owner-bar .arr{display:none}
+    #mk-owner-bar[data-arranging] .arr{display:block}
+    #mk-owner-bar[data-arranging] .main{display:none}
+    #mk-owner-bar .arr p{margin:0 0 8px;font-size:12px;color:#4b5563}
+    #mk-owner-bar .tools{display:flex;flex-wrap:wrap;gap:6px}
+    #mk-owner-bar .tools button{border:1px solid #d1d5db;background:#fff;border-radius:10px;min-width:40px;height:38px;padding:0 12px;font:600 14px system-ui,sans-serif;color:#111827;cursor:pointer}
+    #mk-owner-bar .tools button.go{background:#059669;border-color:#059669;color:#fff}
+    #mk-owner-bar .tools button.big{font-size:20px;line-height:1}
+    #mk-owner-bar[data-busy] .tools{opacity:.5;pointer-events:none}
+    .spot.pic[data-arranging]{outline:2px dashed #059669;outline-offset:2px;cursor:move;touch-action:none;z-index:5}
     @media print{#mk-owner-bar{display:none}}
   </style>
   <div class="top">
@@ -39,6 +51,7 @@
       <button type="button" class="x" data-close aria-label="Hide this bar">×</button>
     </span>
   </div>
+  <div class="main">
   <p class="lbl">Colour</p>
   <div class="row" role="radiogroup" aria-label="Card colour">
     @foreach ($swatches as [$key, $label, $bg, $tint, $sat])
@@ -62,6 +75,22 @@
       @endforeach
     </div>
   @endif
+  {{-- Pictures on the card (logo, free images): move and zoom each one. Filled in by the script. --}}
+  <div data-pictures hidden>
+    <p class="lbl">Arrange pictures</p>
+    <div class="row" data-picture-list></div>
+  </div>
+  </div>
+  <div class="arr">
+    <p><b data-arrange-name>Picture</b> — drag it to move, − / + to zoom.</p>
+    <div class="tools">
+      <button type="button" class="big" data-zoom="-1" aria-label="Zoom out">−</button>
+      <button type="button" class="big" data-zoom="1" aria-label="Zoom in">+</button>
+      <button type="button" data-arrange-reset>Reset</button>
+      <button type="button" data-arrange-cancel>Cancel</button>
+      <button type="button" class="go" data-arrange-save>Save</button>
+    </div>
+  </div>
   <script>
     (function () {
       var bar = document.getElementById("mk-owner-bar");
@@ -108,6 +137,103 @@
           put({ templateId: b.dataset.design });
         });
       });
+
+      // --- Arrange a picture: drag to move, − / + to zoom (saved as the box's "fit") ---
+      var boxes = Array.prototype.slice.call(document.querySelectorAll(".spot.pic[data-arrange]"));
+      if (!boxes.length) return;
+      var list = bar.querySelector("[data-picture-list]");
+      bar.querySelector("[data-pictures]").hidden = false;
+      boxes.forEach(function (box) {
+        var chip = document.createElement("button");
+        chip.type = "button";
+        chip.className = "pk";
+        var thumb = document.createElement("img");
+        thumb.src = box.querySelector("img").src;
+        thumb.alt = "";
+        chip.appendChild(thumb);
+        chip.appendChild(document.createTextNode(box.dataset.arrangeLabel));
+        chip.addEventListener("click", function () { start(box); });
+        list.appendChild(chip);
+      });
+
+      var box = null, img = null, fit = null, saved = "", drag = null;
+      var MIN = {{ \App\Support\Cards\ImageCard::FIT_MIN }}, MAX = {{ \App\Support\Cards\ImageCard::FIT_MAX }};
+
+      // Where the picture sits now, in percent of its box: its own fit, or how it is shown (cover / contain).
+      function fitNow() {
+        var st = img.style;
+        if (st.position === "absolute" && st.width.slice(-1) === "%") {
+          return { l: parseFloat(st.left), t: parseFloat(st.top), w: parseFloat(st.width), h: parseFloat(st.height) };
+        }
+        var bw = box.clientWidth, bh = box.clientHeight, iw = img.naturalWidth || bw, ih = img.naturalHeight || bh;
+        var cover = getComputedStyle(img).objectFit === "cover";
+        var k = cover ? Math.max(bw / iw, bh / ih) : Math.min(bw / iw, bh / ih);
+        var w = iw * k / bw * 100, h = ih * k / bh * 100;
+        return { l: (100 - w) / 2, t: (100 - h) / 2, w: w, h: h };
+      }
+      // As the server keeps it: bigger than the box, its edges never come inside; smaller, it stays within.
+      function place(v, size) { return size >= 100 ? Math.min(0, Math.max(100 - size, v)) : Math.min(100 - size, Math.max(0, v)); }
+      function show() {
+        fit.l = place(fit.l, fit.w);
+        fit.t = place(fit.t, fit.h);
+        img.style.cssText = "position:absolute;left:" + fit.l + "%;top:" + fit.t + "%;width:" + fit.w + "%;height:" + fit.h + "%;max-width:none;object-fit:cover";
+      }
+      function start(b) {
+        box = b;
+        img = box.querySelector("img");
+        saved = img.getAttribute("style") || "";
+        fit = fitNow();
+        box.setAttribute("data-arranging", "");
+        bar.setAttribute("data-arranging", "");
+        bar.querySelector("[data-arrange-name]").textContent = box.dataset.arrangeLabel;
+        show();
+      }
+      function stop() {
+        box.removeAttribute("data-arranging");
+        bar.removeAttribute("data-arranging");
+        box = img = fit = null;
+      }
+      function zoom(dir) {
+        var f = dir > 0 ? 1.15 : 1 / 1.15;
+        var w = fit.w * f, h = fit.h * f;
+        if (Math.min(w, h) < MIN || Math.max(w, h) > MAX) return;
+        var cx = fit.l + fit.w / 2, cy = fit.t + fit.h / 2;
+        fit = { l: cx - w / 2, t: cy - h / 2, w: w, h: h };
+        show();
+      }
+      bar.querySelectorAll("[data-zoom]").forEach(function (b) {
+        b.addEventListener("click", function () { zoom(Number(b.dataset.zoom)); });
+      });
+      bar.querySelector("[data-arrange-cancel]").addEventListener("click", function () {
+        img.setAttribute("style", saved);
+        stop();
+      });
+      bar.querySelector("[data-arrange-reset]").addEventListener("click", function () {
+        put({ spotFit: { id: box.dataset.arrange, fit: null } });
+      });
+      bar.querySelector("[data-arrange-save]").addEventListener("click", function () {
+        var r = function (v) { return Math.round(v * 100) / 100; };
+        put({ spotFit: { id: box.dataset.arrange, fit: { l: r(fit.l), t: r(fit.t), w: r(fit.w), h: r(fit.h) } } });
+      });
+      document.addEventListener("pointerdown", function (e) {
+        if (!box || !box.contains(e.target)) return;
+        e.preventDefault();
+        drag = { x: e.clientX, y: e.clientY, l: fit.l, t: fit.t };
+        box.setPointerCapture && box.setPointerCapture(e.pointerId);
+      });
+      document.addEventListener("pointermove", function (e) {
+        if (!drag) return;
+        fit.l = drag.l + (e.clientX - drag.x) / box.clientWidth * 100;
+        fit.t = drag.t + (e.clientY - drag.y) / box.clientHeight * 100;
+        show();
+      });
+      document.addEventListener("pointerup", function () { drag = null; });
+      // The mouse wheel zooms too.
+      document.addEventListener("wheel", function (e) {
+        if (!box || !box.contains(e.target)) return;
+        e.preventDefault();
+        zoom(e.deltaY < 0 ? 1 : -1);
+      }, { passive: false });
     })();
   </script>
 </div>

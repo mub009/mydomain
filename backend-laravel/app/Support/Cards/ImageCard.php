@@ -259,7 +259,8 @@ class ImageCard
                 'radius' => in_array($h['action'], ['logo', 'custom_image'], true) && ! empty($h['radius']) ? (int) min(50, max(0, (int) $h['radius'])) : null,
                 // A picture cut to a shape drawn in the editor (a preset or by hand).
                 'shape' => in_array($h['action'], ['logo', 'custom_image'], true) ? self::shape($h['shape'] ?? null) : null,
-                'fit' => $h['action'] === 'custom_image' ? self::fit($h['fit'] ?? null) : null,
+                // Where the picture sits in its box (moved and zoomed): a free image or the logo.
+                'fit' => in_array($h['action'], ['logo', 'custom_image'], true) ? self::fit($h['fit'] ?? null) : null,
             ];
             if ($lenient) {
                 if (! self::valueIsValid($spot)) {
@@ -332,7 +333,7 @@ class ImageCard
         $shape = ! empty($s['shape']) ? self::clipPath($s['shape']) : null;
         $radius = (int) ($s['radius'] ?? 0);
         $box = $shape ? 'border-radius:0;clip-path:'.$shape : ($radius ? "border-radius:{$radius}%" : (($s['action'] ?? '') === 'custom_image' ? 'border-radius:0' : ''));
-        $f = ($s['action'] ?? '') === 'custom_image' ? self::fit($s['fit'] ?? null) : null;
+        $f = in_array($s['action'] ?? '', ['logo', 'custom_image'], true) ? self::fit($s['fit'] ?? null) : null;
         if ($f) {
             $img = sprintf('position:absolute;left:%s%%;top:%s%%;width:%s%%;height:%s%%;max-width:none;object-fit:cover', $f['l'], $f['t'], $f['w'], $f['h']);
         } elseif (($s['action'] ?? '') === 'custom_image' && $shape) {
@@ -602,6 +603,25 @@ class ImageCard
         foreach ($hotspots as &$h) {
             if (($h['id'] ?? null) === $spotId && ($h['action'] ?? null) === 'custom_image') {
                 $h['value'] = $url;
+                $found = true;
+            }
+        }
+        unset($h);
+
+        return $found ? $hotspots : null;
+    }
+
+    /**
+     * The card's spots with one picture box (logo or free image) moved and
+     * zoomed — what the business team arranges from the open card. null =
+     * no such picture box; a null fit puts the picture back as it was.
+     */
+    public static function withSpotFit(array $hotspots, string $spotId, ?array $fit): ?array
+    {
+        $found = false;
+        foreach ($hotspots as &$h) {
+            if (($h['id'] ?? null) === $spotId && in_array($h['action'] ?? null, ['logo', 'custom_image'], true)) {
+                $h['fit'] = self::fit($fit);
                 $found = true;
             }
         }

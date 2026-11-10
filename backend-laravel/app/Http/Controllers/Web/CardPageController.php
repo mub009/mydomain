@@ -124,8 +124,8 @@ class CardPageController extends Controller
     }
 
     /**
-     * The bar's saves: the card's colour, or another ready-made design —
-     * nothing else — through the card API, as the pass's user.
+     * The bar's saves: the card's colour, another ready-made design, or a
+     * picture moved and zoomed — nothing else — through the card API, as the pass's user.
      */
     public function ownerUpdate(Request $request, string $slug)
     {
@@ -134,7 +134,7 @@ class CardPageController extends Controller
         $user = self::manager($business, $request->input('owner'));
         abort_unless($user, 403);
 
-        $payload = array_intersect_key($request->all(), array_flip(['imageColour', 'templateId']));
+        $payload = array_intersect_key($request->all(), array_flip(['imageColour', 'templateId', 'spotFit']));
         abort_unless($payload, 422);
         $sub = Request::create('/', 'PUT', [], [], [], ['CONTENT_TYPE' => 'application/json', 'HTTP_ACCEPT' => 'application/json'], json_encode($payload));
         $sub->attributes->set('auth', ['sub' => $user->id, 'role' => $user->role]);
