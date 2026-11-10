@@ -1,4 +1,5 @@
 import { api, errorMessage } from "../lib/api";
+import { openColourAreas } from "../lib/colour-areas";
 import { initHotspotEditor } from "../lib/hotspot-editor";
 import { initSearchableSelects } from "../lib/searchable-select";
 import { $, pageData } from "../lib/ui";
@@ -30,11 +31,51 @@ const imageEditor = initHotspotEditor($("[data-hotspot-editor]"), {
   imageWidth: templateData.imageWidth,
   imageHeight: templateData.imageHeight,
   hotspots: templateData.hotspots,
-  onChange: () => schedulePreview(),
+  onChange: () => {
+    schedulePreview();
+    if (areasBox) showAreas();
+  },
   onError: fail,
   fullScreen: true, // the whole editor as a Photoshop-like workspace
   onSave: () => $("[data-save]")?.click(),
 });
+
+// --- Colour areas: where a business's colour may go on this design -----------
+let colourAreas = templateData.colourAreas || [];
+let areasDirty = false;
+const areasBox = $("[data-template-areas]");
+function showAreas() {
+  const hasImage = !!imageEditor.payload().imageUrl;
+  const n = colourAreas.length;
+  $("[data-areas-status]", areasBox).textContent = !hasImage
+    ? "Upload the card image first, then mark the parts a business's colour may change."
+    : n
+      ? `${n} ${n === 1 ? "area" : "areas"} marked — every card using this design changes colour only there.${areasDirty ? " Save to keep it." : ""}`
+      : `Nothing marked — a business's colour changes the whole card.${areasDirty ? " Save to keep it." : ""}`;
+  $("[data-areas-edit]", areasBox).disabled = !hasImage;
+  $("[data-areas-edit] span", areasBox).textContent = n ? "Change areas" : "Mark areas";
+  $("[data-areas-clear]", areasBox).hidden = !n;
+}
+$("[data-areas-edit]", areasBox).addEventListener("click", () => {
+  const img = imageEditor.payload();
+  openColourAreas({
+    imageUrl: img.imageUrl,
+    ratio: img.imageWidth && img.imageHeight ? img.imageWidth / img.imageHeight : 0.6,
+    // A sample colour shows where it goes while marking.
+    colour: { tint: "#2563eb", strength: 60, hue: 0, brightness: 100, saturation: 100, areas: colourAreas },
+    onDone: (areas) => {
+      colourAreas = areas;
+      areasDirty = true;
+      showAreas();
+    },
+  });
+});
+$("[data-areas-clear]", areasBox).addEventListener("click", () => {
+  colourAreas = [];
+  areasDirty = true;
+  showAreas();
+});
+showAreas();
 
 function values() {
   const f = new FormData(form);
@@ -90,9 +131,10 @@ form.addEventListener("submit", async (e) => {
   const button = $("[data-save]", form);
   button.disabled = true;
   try {
-    const body = { ...values(), ...imageEditor.payload() };
+    const body = { ...values(), ...imageEditor.payload(), colourAreas };
     const { data } = id ? await api.patch(`/admin/card-templates/${id}`, body) : await api.post("/admin/card-templates", body);
     imageEditor.markClean();
+    areasDirty = false;
     reloadWithFlash(id ? "Template saved." : "Template created.", `/admin/card-templates/${data.id}`);
   } catch (err) {
     button.disabled = false;
@@ -101,7 +143,7 @@ form.addEventListener("submit", async (e) => {
 });
 
 window.addEventListener("beforeunload", (e) => {
-  if (imageEditor.dirty) {
+  if (imageEditor.dirty || areasDirty) {
     e.preventDefault();
     e.returnValue = "";
   }

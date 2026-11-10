@@ -121,6 +121,8 @@ class CardController extends Controller
             // The image's recolouring — the whole business team, owners too, can change it.
             'imageColour' => ImageColour::normalize($card?->imageColour),
             'imageColourDefaults' => ImageColour::DEFAULTS,
+            // The areas marked on its design (template editor), used when the card has none of its own.
+            'designColourAreas' => count(ImageColour::areas($current?->colourAreas ?? null)),
             'missingDetails' => ImageCard::missingDetails($image['hotspots'] ?? [], ImageCard::listingDefaults($details)),
             // Every listing detail the card shows, with its current value, to update from the card section.
             'cardDetails' => ImageCard::cardDetails($image['hotspots'] ?? [], ImageCard::listingDefaults($details), $business),
