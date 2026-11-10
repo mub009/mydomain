@@ -123,7 +123,8 @@
           brightness: current ? current.brightness : 100,
           // Keeps where the colour goes (areas marked in the dashboard).
           areas: current && current.areas ? current.areas : []
-        } : null;
+          // "Original": no colour, but the marked areas stay for the next colour.
+        } : (current && current.areas && current.areas.length ? { areas: current.areas } : null);
         put({ imageColour: colour });
       }
 

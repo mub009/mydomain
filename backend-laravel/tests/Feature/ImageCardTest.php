@@ -260,6 +260,40 @@ class ImageCardTest extends TestCase
         $this->assertNull(collect(BusinessCard::where('businessId', $this->business->id)->first()->hotspots)->firstWhere('id', 'h-logo')['fit'] ?? null);
     }
 
+    public function test_the_business_team_colours_only_the_areas_the_admin_marked(): void
+    {
+        $this->save([$this->spot('call')])->assertOk();
+        $this->postJson("/api/v1/businesses/{$this->business->id}/card/publish", [], $this->auth)->assertOk();
+        $square = [[0, 0], [50, 0], [50, 50], [0, 50]];
+        // The admin marks where the colour may go.
+        $this->putJson("/api/v1/businesses/{$this->business->id}/card", ['imageColour' => ['tint' => '#16a34a', 'strength' => 60, 'areas' => [['points' => $square]]]], $this->admin())->assertOk();
+        $areas = fn () => BusinessCard::where('businessId', $this->business->id)->first()->imageColour['areas'] ?? null;
+
+        // The business team, from the open card's bar.
+        $this->post('/login', ['email' => $this->ownerEmail, 'password' => 'Password123!']);
+        preg_match('~body.owner = "([^"]+)"~', $this->get('/card/spice-garden')->getContent(), $t);
+        $pick = fn ($colour) => $this->postJson('/api/v1/cards/spice-garden/owner', ['owner' => $t[1], 'imageColour' => $colour])->assertOk();
+
+        // A colour: only inside the marked area — even if other areas are sent.
+        $pick(['tint' => '#2563eb', 'strength' => 60, 'areas' => [['points' => [[0, 0], [100, 0], [100, 100]]]]]);
+        $this->assertSame([['erase' => false, 'points' => $square]], $areas());
+        $html = $this->get('/card/spice-garden')->getContent();
+        $this->assertStringContainsString('class="colour-areas"', $html);
+
+        // "Original": the card shows no colour, but the marked area is kept…
+        $pick(null);
+        $this->assertSame([['erase' => false, 'points' => $square]], $areas());
+        $html = $this->get('/card/spice-garden')->getContent();
+        $this->assertStringNotContainsString('class="colour-areas"', $html);
+        $this->assertStringNotContainsString('feColorMatrix', $html);
+        $this->assertMatchesRegularExpression('~title="Original" aria-label="Original" aria-checked="true"~', $html);
+
+        // …so the next colour still goes only there, never over the whole card.
+        $pick(['tint' => '#dc2626', 'strength' => 60]);
+        $this->assertSame([['erase' => false, 'points' => $square]], $areas());
+        $this->assertStringContainsString('class="colour-areas"', $this->get('/card/spice-garden')->getContent());
+    }
+
     public function test_the_card_details_have_one_save_button_for_all(): void
     {
         $this->withoutVite();

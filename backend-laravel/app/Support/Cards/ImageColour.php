@@ -65,7 +65,12 @@ class ImageColour
         ];
     }
 
-    /** Checked settings, or null when they leave the image as it is. */
+    /**
+     * Checked settings, or null when they leave the image as it is and mark
+     * no areas. Marked areas (where the colour may go, set by an admin) are
+     * kept even with no colour picked ("Original"), so the business team's
+     * next colour still goes only there.
+     */
     public static function normalize(mixed $raw): ?array
     {
         if (! is_array($raw)) {
@@ -81,13 +86,22 @@ class ImageColour
             'brightness' => $int('brightness', 50, 150),
             'saturation' => $int('saturation', 0, 200),
         ];
-        $tinted = $c['tint'] !== null && $c['strength'] > 0;
-        if (! ($tinted || $c['hue'] !== 0 || $c['brightness'] !== 100 || $c['saturation'] !== 100)) {
-            return null;
-        }
         $c['areas'] = self::areas($raw['areas'] ?? null);
 
-        return $c;
+        return self::changes($c) || $c['areas'] ? $c : null;
+    }
+
+    /** Whether the settings change the image at all (a colour, hue, brightness or saturation). */
+    public static function changes(?array $c): bool
+    {
+        return $c !== null && (($c['tint'] !== null && $c['strength'] > 0)
+            || $c['hue'] !== 0 || $c['brightness'] !== 100 || $c['saturation'] !== 100);
+    }
+
+    /** The settings to draw: null when they leave the image as it is (marked areas but no colour). */
+    public static function visible(?array $c): ?array
+    {
+        return self::changes($c) ? $c : null;
     }
 
     /** Checked outlines: numbers only, inside the image, each with 3+ points; erasers before any area are dropped. */

@@ -125,7 +125,7 @@ class CardPdf
         $sw = imagesx($src);
         $sh = imagesy($src);
         // Recolouring goes pixel by pixel, so a recoloured image is kept smaller.
-        $colour = ImageColour::normalize($source['colour'] ?? null);
+        $colour = ImageColour::visible(ImageColour::normalize($source['colour'] ?? null));
         $scale = min(1, ($colour ? 1000 : 1600) / $sw);
         $dst = imagecreatetruecolor(max(1, (int) round($sw * $scale)), max(1, (int) round($sh * $scale)));
         imagefill($dst, 0, 0, imagecolorallocate($dst, 255, 255, 255));

@@ -41,11 +41,13 @@ class CardController extends Controller
      */
     private static function withOwnAreas(array $actor, mixed $colour, mixed $stored): mixed
     {
-        if ($actor['role'] === 'ADMIN' || ! is_array($colour)) {
+        if ($actor['role'] === 'ADMIN') {
             return $colour;
         }
+        // "Original" (no colour) keeps the marked areas too, for the next colour picked.
+        $areas = is_array($stored) ? ($stored['areas'] ?? []) : [];
 
-        return [...$colour, 'areas' => is_array($stored) ? ($stored['areas'] ?? []) : []];
+        return is_array($colour) ? [...$colour, 'areas' => $areas] : ($areas ? ['areas' => $areas] : null);
     }
 
     private static function canEditDesign(array $actor): bool
