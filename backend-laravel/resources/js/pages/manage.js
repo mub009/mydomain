@@ -379,7 +379,18 @@ if (places) {
   const query = $("[data-places-query]", places);
   const list = $("[data-places-results]", places);
   const note = (text) => (list.innerHTML = `<li class="text-xs text-ink-500">${esc(text)}</li>`);
+  const mapsUrl = () => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query.value.trim())}`;
+  // Google Maps itself, for when the search here can't be used: find the business there and copy its Share link.
+  const mapsHelp = (lead) =>
+    (list.innerHTML = `<li class="rounded-lg border border-amber-200 bg-white px-3 py-2 text-xs text-ink-700">${esc(lead)}
+      <a href="${esc(mapsUrl())}" target="_blank" rel="noopener" class="font-semibold text-brand-700 hover:underline">Open Google Maps</a>,
+      find your business, tap <b>Share</b>, copy the link and paste it in the box below.</li>`);
   const search = async () => {
+    // No Google Places key on this server: Search opens Google Maps for what's typed.
+    if (places.dataset.placesApi === "0") {
+      window.open(mapsUrl(), "_blank", "noopener");
+      return mapsHelp("Google Maps opened in a new tab.");
+    }
     showError(errorBox, "");
     go.disabled = true;
     note("Searching Google…");
@@ -418,8 +429,8 @@ if (places) {
         }),
       );
     } catch (err) {
-      list.innerHTML = "";
-      fail(err);
+      // Shown right here (the page's error box is out of sight up top), with Google Maps to fall back on.
+      mapsHelp(errorMessage(err));
     } finally {
       go.disabled = false;
     }

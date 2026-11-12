@@ -182,13 +182,15 @@ class ImageCardTest extends TestCase
             ->assertSee('https://www.google.com/maps/search/?api=1&amp;query=Spice%20Garden%20Kochi', false)
             ->assertSee('name="googlePlaceId" value="ChIJsaved123" data-initial="ChIJsaved123"', false)
             ->assertSee('name="googleReviewUrl"', false)
-            ->assertDontSee('data-places-search', false);
+            // The search is still offered: it opens Google Maps for the name typed.
+            ->assertSee('Find your business on Google Maps')
+            ->assertSee('data-places-search data-places-fill data-places-api="0"', false);
 
         // With it: "Find your business on Google Maps", filled in for Save.
         config(['services.google_places.key' => 'test-key']);
         $this->get($url)->assertOk()
             ->assertSee('Find your business on Google Maps')
-            ->assertSee('data-places-search data-places-fill', false)
+            ->assertSee('data-places-search data-places-fill data-places-api="1"', false)
             ->assertSee('value="Spice Garden Kochi"', false);
     }
 

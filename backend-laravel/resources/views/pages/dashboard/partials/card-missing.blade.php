@@ -54,8 +54,9 @@
             @elseif ($m['key'] === 'google_review')
               {{-- Google Maps: find the business on Google (its Place ID is saved with Save), or paste its Maps share link. --}}
               @php $mapsQuery = trim(($biz['name'] ?? '').' '.($biz['city'] ?? '')); @endphp
-              @if (\App\Support\GooglePlaces::configured())
-                <div class="rounded-lg border border-amber-200 bg-amber-50/60 p-2.5" data-places-search data-places-fill>
+              {{-- Always offered: with a Google Places key it searches here; without one, Search opens Google Maps for the name typed. --}}
+              @php $placesApi = \App\Support\GooglePlaces::configured(); @endphp
+                <div class="rounded-lg border border-amber-200 bg-amber-50/60 p-2.5" data-places-search data-places-fill data-places-api="{{ $placesApi ? '1' : '0' }}">
                   <p class="flex items-center gap-1.5 text-xs font-bold text-ink-900"><x-icon name="map-pin" :size="13" class="text-amber-600" /> Find your business on Google Maps</p>
                   <div class="mt-1.5 flex gap-2">
                     <input class="input min-w-0 flex-1 py-1.5 text-sm" data-places-query value="{{ $mapsQuery }}" aria-label="Business name and city" />
@@ -63,7 +64,6 @@
                   </div>
                   <ul class="mt-2 space-y-1.5" data-places-results></ul>
                 </div>
-              @endif
               <input type="hidden" name="googlePlaceId" value="{{ $biz['googlePlaceId'] ?? '' }}" data-initial="{{ $biz['googlePlaceId'] ?? '' }}" data-place-id />
               <input id="{{ $id }}" type="url" name="{{ $field }}" value="{{ $m['value'] }}" placeholder="{{ $placeholder }}" class="input w-full py-1.5 text-sm" data-review-url />
               <p class="text-[11px] text-ink-500">
