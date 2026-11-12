@@ -186,6 +186,10 @@ class CardController extends Controller
             'extraTemplateIds' => ['sometimes', 'nullable', 'array', 'max:50'],
             'extraTemplateIds.*' => ['uuid'],
             // A picture for one of the design's free-image spots ("Missing on your listing").
+            // The words in one custom text box (Card details): the business team can change them.
+            'spotText' => ['sometimes', 'array'],
+            'spotText.id' => ['required_with:spotText', 'string', 'max:40'],
+            'spotText.text' => ['required_with:spotText', 'string', 'max:500'],
             'spotImage' => ['sometimes', 'array'],
             'spotImage.id' => ['required_with:spotImage', 'string', 'max:40'],
             'spotImage.url' => ['required_with:spotImage', 'url', 'max:500'],
@@ -280,6 +284,18 @@ class CardController extends Controller
                     }
                 }
                 unset($h);
+            }
+            $changes['hotspots'] = $hotspots;
+            if ($source['fromTemplate']) {
+                $changes += ['imageUrl' => $source['imageUrl'], 'imageWidth' => $source['imageWidth'], 'imageHeight' => $source['imageHeight']];
+            }
+        }
+        // A custom text box's words: content, not the design — the whole business team can.
+        if (isset($data['spotText']) && ! array_key_exists('hotspots', $changes)) {
+            $source = ImageCard::source($business);
+            $hotspots = $source ? ImageCard::withSpotText($source['hotspots'], $data['spotText']['id'], trim($data['spotText']['text'])) : null;
+            if ($hotspots === null) {
+                throw ApiException::badRequest('Your card has no such text');
             }
             $changes['hotspots'] = $hotspots;
             if ($source['fromTemplate']) {
