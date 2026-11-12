@@ -189,6 +189,9 @@ class CardController extends Controller
             'spotImage' => ['sometimes', 'array'],
             'spotImage.id' => ['required_with:spotImage', 'string', 'max:40'],
             'spotImage.url' => ['required_with:spotImage', 'url', 'max:500'],
+            // The picture's own size, when known: it then starts filling its whole box ("full size").
+            'spotImage.width' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:20000'],
+            'spotImage.height' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:20000'],
             // A picture box moved and zoomed (from the open card): its id and where the picture sits.
             'spotFit' => ['sometimes', 'array'],
             'spotFit.id' => ['required_with:spotFit', 'string', 'max:40'],
@@ -249,6 +252,15 @@ class CardController extends Controller
             $hotspots = $source ? ImageCard::withSpotImage($source['hotspots'], $data['spotImage']['id'], $data['spotImage']['url']) : null;
             if ($hotspots === null) {
                 throw ApiException::badRequest('Your card has no such image spot');
+            }
+            // Full size: a new picture whose size is known fills its whole box, in its own proportions.
+            if (! empty($data['spotImage']['width']) && ! empty($data['spotImage']['height'])) {
+                foreach ($hotspots as &$h) {
+                    if (($h['id'] ?? null) === $data['spotImage']['id']) {
+                        $h['fit'] = ImageCard::coverFit($h, $source['imageWidth'], $source['imageHeight'], $data['spotImage']['width'], $data['spotImage']['height']) ?? ($h['fit'] ?? null);
+                    }
+                }
+                unset($h);
             }
             $changes['hotspots'] = $hotspots;
             if ($source['fromTemplate']) {

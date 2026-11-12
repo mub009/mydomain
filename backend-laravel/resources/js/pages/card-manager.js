@@ -87,6 +87,14 @@ if (root && card) {
   // Only what was changed is sent: listing fields in one request, social
   // links in another, and each free-image spot's picture on the card itself.
   const detailsForm = $("[data-card-details-form]", root);
+  // A picture's own width and height, read by loading it; {} when it can't be loaded.
+  const pictureSize = (url) =>
+    new Promise((done) => {
+      const img = new Image();
+      img.onload = () => done(img.naturalWidth && img.naturalHeight ? { width: img.naturalWidth, height: img.naturalHeight } : {});
+      img.onerror = () => done({});
+      img.src = url;
+    });
   const detailsStatus = detailsForm && $("[data-card-details-status]", detailsForm);
   detailsForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -138,7 +146,8 @@ if (root && card) {
     try {
       if (Object.keys(business).length) await api.patch(`/businesses/${biz.id}`, business);
       if (Object.keys(links).length) await api.patch(`/businesses/${biz.id}/review-links`, links);
-      for (const spot of spots) await api.put(base, { spotImage: spot });
+      // A free image's picture goes with its size, so it starts filling its whole box ("full size").
+      for (const spot of spots) await api.put(base, { spotImage: { ...spot, ...(await pictureSize(spot.url)) } });
       reloadWithFlash(`Saved ${changed.join(", ")} — it's on your card now.`);
     } catch (err) {
       button.disabled = false;
