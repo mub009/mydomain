@@ -240,7 +240,7 @@ class ImageCardTest extends TestCase
         // The open card marks the logo box to arrange, and the bar offers it.
         $this->post('/login', ['email' => $this->ownerEmail, 'password' => 'Password123!']);
         $html = $this->get('/card/spice-garden')->assertOk()->getContent();
-        $this->assertStringContainsString('data-arrange="h-logo" data-arrange-kind="logo" data-arrange-label="Logo"', $html);
+        $this->assertStringContainsString('data-arrange="h-logo" data-arrange-kind="logo" data-arrange-shape="" data-arrange-size="100" data-arrange-label="Logo"', $html);
         $this->assertStringContainsString('Arrange pictures', $html);
         $this->assertStringContainsString('aria-label="Zoom in"', $html);
         preg_match('~body.owner = "([^"]+)"~', $html, $t);
@@ -486,9 +486,19 @@ class ImageCardTest extends TestCase
         $this->assertEquals([100, 50], $shapeOf()['shape'][0]);
         $this->assertEquals([50, 100], $shapeOf()['shape'][16]);
 
+        // Its size: at 50% the oval is half as big, centred, and the size is remembered for the bar.
+        $this->postJson('/api/v1/cards/spice-garden/owner', ['owner' => $t[1], 'spotShape' => ['id' => 'h-custom_image', 'shape' => 'round', 'size' => 50]])->assertOk();
+        $this->assertEquals([61.1, 50], $shapeOf()['shape'][0]);
+        $this->assertEquals([50, 75], $shapeOf()['shape'][16]);
+        $this->assertSame(['round', 50], [$shapeOf()['shapePreset'], $shapeOf()['shapeSize']]);
+        $this->assertStringContainsString('data-arrange-shape="round" data-arrange-size="50"', $this->get('/card/spice-garden')->getContent());
+        $this->assertStringContainsString('data-shape-size="-10"', $this->get('/card/spice-garden')->getContent());
+        $this->postJson('/api/v1/cards/spice-garden/owner', ['owner' => $t[1], 'spotShape' => ['id' => 'h-custom_image', 'shape' => 'round', 'size' => 5]])->assertStatus(400);
+
         // Normal: no shape at all.
         $pick('normal')->assertOk();
         $this->assertNull($shapeOf()['shape']);
+        $this->assertSame([null, null], [$shapeOf()['shapePreset'], $shapeOf()['shapeSize']]);
 
         // Only free images, and only the ready shapes.
         $pick('round', 'h-logo')->assertStatus(400);

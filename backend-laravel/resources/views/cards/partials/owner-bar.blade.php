@@ -46,6 +46,9 @@
     #mk-owner-bar .shapes .lbl{margin:0 4px 0 2px}
     #mk-owner-bar .shapes button{display:flex;align-items:center;gap:6px;font-size:13px}
     #mk-owner-bar .shapes i{display:inline-block;width:14px;height:14px;border:2px solid currentColor;box-sizing:border-box}
+    #mk-owner-bar .shapes button[aria-pressed="true"]{border-color:#059669;background:#ecfdf5;color:#047857}
+    #mk-owner-bar .sizes{margin-top:8px;align-items:center}
+    #mk-owner-bar .sizes output{min-width:48px;text-align:center;font:600 14px system-ui,sans-serif}
     .spot.pic[data-arranging]{outline:2px dashed #059669;outline-offset:2px;cursor:move;touch-action:none;z-index:5}
     @media print{#mk-owner-bar{display:none}}
   </style>
@@ -105,10 +108,17 @@
     {{-- Free images only: cut the picture to a ready shape. --}}
     <div class="tools shapes" data-arrange-shapes hidden>
       <span class="lbl">Shape</span>
-      <button type="button" data-shape-preset="normal"><i style="border-style:dashed"></i>Normal</button>
-      <button type="button" data-shape-preset="square"><i></i>Square</button>
-      <button type="button" data-shape-preset="round"><i style="border-radius:50%"></i>Round</button>
-      <button type="button" data-shape-preset="oval"><i style="width:18px;border-radius:50%"></i>Oval</button>
+      <button type="button" data-shape-preset="normal" aria-pressed="false"><i style="border-style:dashed"></i>Normal</button>
+      <button type="button" data-shape-preset="square" aria-pressed="false"><i></i>Square</button>
+      <button type="button" data-shape-preset="round" aria-pressed="false"><i style="border-radius:50%"></i>Round</button>
+      <button type="button" data-shape-preset="oval" aria-pressed="false"><i style="width:18px;border-radius:50%"></i>Oval</button>
+    </div>
+    {{-- The shape's size inside its box: smaller or bigger, seen at once, kept with Save. --}}
+    <div class="tools sizes" data-arrange-sizes hidden>
+      <span class="lbl">Shape size</span>
+      <button type="button" class="big" data-shape-size="-10" aria-label="Smaller shape">−</button>
+      <output data-shape-size-value>100%</output>
+      <button type="button" class="big" data-shape-size="10" aria-label="Bigger shape">+</button>
     </div>
   </div>
   <script>
@@ -209,6 +219,11 @@
         bar.querySelector("[data-arrange-name]").textContent = box.dataset.arrangeLabel;
         bar.querySelector("[data-arrange-change]").hidden = box.dataset.arrangeKind !== "custom_image";
         bar.querySelector("[data-arrange-shapes]").hidden = box.dataset.arrangeKind !== "custom_image";
+        shape = box.dataset.arrangeShape || "normal";
+        size = Number(box.dataset.arrangeSize) || 100;
+        shapeDirty = false;
+        savedClip = box.style.clipPath;
+        showShape(false);
         show();
       }
       function stop() {
@@ -229,6 +244,7 @@
       });
       bar.querySelector("[data-arrange-cancel]").addEventListener("click", function () {
         img.setAttribute("style", saved);
+        box.style.clipPath = savedClip;
         stop();
       });
       bar.querySelector("[data-arrange-reset]").addEventListener("click", function () {
@@ -255,7 +271,49 @@
             status.style.color = "#b91c1c";
           });
       });
-      // A ready shape: the picture's current position is saved first, then the shape.
+      // A ready shape and its size: seen at once on the card, kept with Save.
+      var shape = "normal", size = 100, shapeDirty = false, savedClip = "";
+      var MIN_SIZE = {{ \App\Support\Cards\ImageCard::SHAPE_MIN_SIZE }};
+      // As the server draws it (ImageCard::presetShape): the biggest square / circle that fit the box, or an oval filling it, scaled by size.
+      function shapePoints() {
+        var k = size / 100, bw = box.clientWidth, bh = box.clientHeight;
+        var sx = (bw && bh ? Math.min(1, bh / bw) : 1) * k, sy = (bw && bh ? Math.min(1, bw / bh) : 1) * k;
+        var ring = function (rx, ry) {
+          var pts = [];
+          for (var i = 0; i < 64; i++) pts.push([50 + rx * Math.cos(2 * Math.PI * i / 64), 50 + ry * Math.sin(2 * Math.PI * i / 64)]);
+          return pts;
+        };
+        if (shape === "square") return [[50 - 50 * sx, 50 - 50 * sy], [50 + 50 * sx, 50 - 50 * sy], [50 + 50 * sx, 50 + 50 * sy], [50 - 50 * sx, 50 + 50 * sy]];
+        if (shape === "round") return ring(50 * sx, 50 * sy);
+        if (shape === "oval") return ring(50 * k, 50 * k);
+        return null;
+      }
+      function showShape(draw) {
+        bar.querySelectorAll("[data-shape-preset]").forEach(function (b) {
+          b.setAttribute("aria-pressed", b.dataset.shapePreset === shape ? "true" : "false");
+        });
+        bar.querySelector("[data-arrange-sizes]").hidden = box.dataset.arrangeKind !== "custom_image" || shape === "normal";
+        bar.querySelector("[data-shape-size-value]").textContent = size + "%";
+        if (!draw) return;
+        var pts = shapePoints();
+        box.style.clipPath = pts ? "polygon(" + pts.map(function (p) { return (Math.round(p[0] * 10) / 10) + "% " + (Math.round(p[1] * 10) / 10) + "%"; }).join(",") + ")" : "none";
+      }
+      bar.querySelectorAll("[data-shape-preset]").forEach(function (b) {
+        b.addEventListener("click", function () {
+          if (!box) return;
+          shape = b.dataset.shapePreset;
+          shapeDirty = true;
+          showShape(true);
+        });
+      });
+      bar.querySelectorAll("[data-shape-size]").forEach(function (b) {
+        b.addEventListener("click", function () {
+          if (!box || shape === "normal") return;
+          size = Math.min(100, Math.max(MIN_SIZE, size + Number(b.dataset.shapeSize)));
+          shapeDirty = true;
+          showShape(true);
+        });
+      });
       function send(body) {
         body.owner = @json($ownerToken);
         return fetch(@json(url('/api/v1/cards/'.$slug.'/owner')), {
@@ -264,26 +322,22 @@
           body: JSON.stringify(body)
         }).then(function (r) { if (!r.ok) throw new Error(); });
       }
-      bar.querySelectorAll("[data-shape-preset]").forEach(function (b) {
-        b.addEventListener("click", function () {
-          if (!box) return;
-          var id = box.dataset.arrange;
-          var r = function (v) { return Math.round(v * 100) / 100; };
-          bar.setAttribute("data-busy", "");
-          status.textContent = "Saving…";
-          send({ spotFit: { id: id, fit: { l: r(fit.l), t: r(fit.t), w: r(fit.w), h: r(fit.h) } } })
-            .then(function () { return send({ spotShape: { id: id, shape: b.dataset.shapePreset } }); })
-            .then(function () { location.reload(); })
-            .catch(function () {
-              bar.removeAttribute("data-busy");
-              status.textContent = "Couldn't save — try again";
-              status.style.color = "#b91c1c";
-            });
-        });
-      });
       bar.querySelector("[data-arrange-save]").addEventListener("click", function () {
         var r = function (v) { return Math.round(v * 100) / 100; };
-        put({ spotFit: { id: box.dataset.arrange, fit: { l: r(fit.l), t: r(fit.t), w: r(fit.w), h: r(fit.h) } } });
+        var id = box.dataset.arrange;
+        var spotFit = { id: id, fit: { l: r(fit.l), t: r(fit.t), w: r(fit.w), h: r(fit.h) } };
+        if (!shapeDirty) return put({ spotFit: spotFit });
+        // Position first, then the shape and its size.
+        bar.setAttribute("data-busy", "");
+        status.textContent = "Saving…";
+        send({ spotFit: spotFit })
+          .then(function () { return send({ spotShape: { id: id, shape: shape, size: size } }); })
+          .then(function () { location.reload(); })
+          .catch(function () {
+            bar.removeAttribute("data-busy");
+            status.textContent = "Couldn't save — try again";
+            status.style.color = "#b91c1c";
+          });
       });
       document.addEventListener("pointerdown", function (e) {
         if (!box || !box.contains(e.target)) return;

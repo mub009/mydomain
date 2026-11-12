@@ -222,6 +222,8 @@ class ImageCard
             'hotspots.*.radius' => ['nullable', 'integer', 'min:0', 'max:50'],
             // A picture cut to a shape: [x, y] points in percent of its box.
             'hotspots.*.shape' => ['nullable', 'array', 'min:3', 'max:'.self::MAX_SHAPE_POINTS],
+            'hotspots.*.shapePreset' => ['nullable', 'in:square,round,oval'],
+            'hotspots.*.shapeSize' => ['nullable', 'integer', 'min:'.self::SHAPE_MIN_SIZE, 'max:100'],
             'hotspots.*.shape.*' => ['array', 'size:2'],
             'hotspots.*.shape.*.*' => ['numeric', 'min:0', 'max:100'],
             // Where a free image's picture sits inside its area: its rectangle in percent of the area.
@@ -272,6 +274,9 @@ class ImageCard
                 'radius' => in_array($h['action'], ['logo', 'custom_image'], true) && ! empty($h['radius']) ? (int) min(50, max(0, (int) $h['radius'])) : null,
                 // A picture cut to a shape drawn in the editor (a preset or by hand).
                 'shape' => in_array($h['action'], ['logo', 'custom_image'], true) ? self::shape($h['shape'] ?? null) : null,
+                // A free image's ready shape (open card) and its size in percent of the box, to adjust it later.
+                'shapePreset' => $h['action'] === 'custom_image' && in_array($h['shapePreset'] ?? null, ['square', 'round', 'oval'], true) ? $h['shapePreset'] : null,
+                'shapeSize' => $h['action'] === 'custom_image' && isset($h['shapeSize']) && is_numeric($h['shapeSize']) ? (int) min(100, max(self::SHAPE_MIN_SIZE, (int) $h['shapeSize'])) : null,
                 // Where the picture sits in its box (moved and zoomed): a free image or the logo.
                 'fit' => in_array($h['action'], ['logo', 'custom_image'], true) ? self::fit($h['fit'] ?? null) : null,
             ];
@@ -374,8 +379,10 @@ class ImageCard
         return $layout($card->hotspots) == $layout($template->hotspots);
     }
 
-    // The ready shapes a free image can be cut to from the open card.
+    // The ready shapes a free image can be cut to from the open card, and how small one can be (percent of its box).
     public const SHAPE_PRESETS = ['normal', 'square', 'round', 'oval'];
+
+    public const SHAPE_MIN_SIZE = 20;
 
     /**
      * A ready shape as outline points in percent of the box: "square" and
@@ -383,12 +390,14 @@ class ImageCard
      * (so they need the box's real proportions: its w/h in percent of the
      * card image, $cardW × $cardH px); "oval" fills the box; "normal" = none.
      */
-    public static function presetShape(string $preset, array $spot, ?int $cardW, ?int $cardH): ?array
+    public static function presetShape(string $preset, array $spot, ?int $cardW, ?int $cardH, int $size = 100): ?array
     {
+        // Smaller than the box: scaled about its centre.
+        $k = min(100, max(self::SHAPE_MIN_SIZE, $size)) / 100;
         $boxW = (float) ($spot['w'] ?? 0) * (int) $cardW;
         $boxH = (float) ($spot['h'] ?? 0) * (int) $cardH;
         // Unknown proportions: treat the box as square.
-        [$sx, $sy] = $boxW > 0 && $boxH > 0 ? [min(1, $boxH / $boxW), min(1, $boxW / $boxH)] : [1, 1];
+        [$sx, $sy] = $boxW > 0 && $boxH > 0 ? [min(1, $boxH / $boxW) * $k, min(1, $boxW / $boxH) * $k] : [$k, $k];
         $ring = fn (float $rx, float $ry) => array_map(
             fn ($i) => [50 + $rx * cos(2 * M_PI * $i / 64), 50 + $ry * sin(2 * M_PI * $i / 64)],
             range(0, 63),
@@ -397,18 +406,20 @@ class ImageCard
         return self::shape(match ($preset) {
             'square' => [[50 - 50 * $sx, 50 - 50 * $sy], [50 + 50 * $sx, 50 - 50 * $sy], [50 + 50 * $sx, 50 + 50 * $sy], [50 - 50 * $sx, 50 + 50 * $sy]],
             'round' => $ring(50 * $sx, 50 * $sy),
-            'oval' => $ring(50, 50),
+            'oval' => $ring(50 * $k, 50 * $k),
             default => null,
         });
     }
 
     /** The card's spots with one free image cut to a ready shape (rounded corners dropped); null = no such box. */
-    public static function withSpotShape(array $hotspots, string $spotId, string $preset, ?int $cardW, ?int $cardH): ?array
+    public static function withSpotShape(array $hotspots, string $spotId, string $preset, ?int $cardW, ?int $cardH, int $size = 100): ?array
     {
         $found = false;
         foreach ($hotspots as &$h) {
             if (($h['id'] ?? null) === $spotId && ($h['action'] ?? null) === 'custom_image') {
-                $h['shape'] = self::presetShape($preset, $h, $cardW, $cardH);
+                $h['shape'] = self::presetShape($preset, $h, $cardW, $cardH, $size);
+                $h['shapePreset'] = $preset === 'normal' ? null : $preset;
+                $h['shapeSize'] = $preset === 'normal' ? null : min(100, max(self::SHAPE_MIN_SIZE, $size));
                 $h['radius'] = null;
                 $found = true;
             }

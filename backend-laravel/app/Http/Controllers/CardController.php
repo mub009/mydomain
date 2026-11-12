@@ -196,6 +196,8 @@ class CardController extends Controller
             'spotShape' => ['sometimes', 'array'],
             'spotShape.id' => ['required_with:spotShape', 'string', 'max:40'],
             'spotShape.shape' => ['required_with:spotShape', 'in:'.implode(',', ImageCard::SHAPE_PRESETS)],
+            // How big the shape is inside its box, in percent (100 = as big as fits).
+            'spotShape.size' => ['sometimes', 'integer', 'min:'.ImageCard::SHAPE_MIN_SIZE, 'max:100'],
             // A picture box moved and zoomed (from the open card): its id and where the picture sits.
             'spotFit' => ['sometimes', 'array'],
             'spotFit.id' => ['required_with:spotFit', 'string', 'max:40'],
@@ -285,7 +287,7 @@ class CardController extends Controller
         // Its shape too: content, not the design — the whole business team can.
         if (isset($data['spotShape']) && ! array_key_exists('hotspots', $changes)) {
             $source = ImageCard::source($business);
-            $hotspots = $source ? ImageCard::withSpotShape($source['hotspots'], $data['spotShape']['id'], $data['spotShape']['shape'], $source['imageWidth'], $source['imageHeight']) : null;
+            $hotspots = $source ? ImageCard::withSpotShape($source['hotspots'], $data['spotShape']['id'], $data['spotShape']['shape'], $source['imageWidth'], $source['imageHeight'], (int) ($data['spotShape']['size'] ?? 100)) : null;
             if ($hotspots === null) {
                 throw ApiException::badRequest('Your card has no such picture');
             }
