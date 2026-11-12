@@ -48,6 +48,21 @@
           </div>
         </div>
 
+        {{-- The colours businesses may recolour this design in, chosen by the admin (none = the standard swatches). --}}
+        <div class="mt-4 rounded-lg border border-emerald-200 bg-emerald-50/60 p-3" data-template-choices>
+          <p class="flex items-center gap-1.5 text-sm font-semibold text-ink-900"><x-icon name="palette" :size="15" class="text-emerald-600" /> Colours businesses can pick</p>
+          <p class="mt-0.5 text-xs text-ink-600" data-choices-status></p>
+          <div class="mt-2 flex flex-wrap items-center gap-2" data-choices-list></div>
+          <div class="mt-2 flex flex-wrap items-center gap-2">
+            <label class="relative flex h-9 cursor-pointer items-center gap-2 rounded-lg border border-gray-300 bg-white pl-1 pr-3 text-xs font-semibold text-ink-700">
+              <span class="h-7 w-7 rounded-md border border-gray-200" data-choice-preview style="background:#2563eb"></span>
+              <span data-choice-hex>#2563eb</span>
+              <input type="color" value="#2563eb" class="absolute inset-0 h-full w-full cursor-pointer opacity-0" aria-label="Colour to add" data-choice-input />
+            </label>
+            <button type="button" class="btn-primary px-3 py-1.5 text-xs" data-choice-add><x-icon name="plus" :size="13" /> Add this colour</button>
+          </div>
+        </div>
+
         {{-- Colour versions: the same design in other colours, each a swatch and its own image
              (a "sub-master" of this master design). On the open card the business picks one and
              wears that image; the boxes stay the master's. Saved with the template. --}}
@@ -56,8 +71,12 @@
           <p class="mt-0.5 text-xs text-ink-600" data-variants-status></p>
           <ul class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3" data-variants-list></ul>
           <div class="mt-3 rounded-lg border border-sky-200 bg-white p-2.5" data-variant-add>
-            <p class="mb-2 text-xs font-semibold text-ink-700">Add a colour version: pick its colour, then upload the design in that colour.</p>
-            <div class="flex flex-wrap items-center gap-2" role="radiogroup" aria-label="Colour" data-variant-grid></div>
+            <p class="mb-2 text-xs font-semibold text-ink-700">Add a colour version: choose its colour, then upload the design in that colour.</p>
+            <label class="relative inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg border border-gray-300 bg-white pl-1 pr-3 text-xs font-semibold text-ink-700">
+              <span class="h-7 w-7 rounded-md border border-gray-200" data-variant-preview style="background:#dc2626"></span>
+              <span data-variant-hex>#dc2626</span>
+              <input type="color" value="#dc2626" class="absolute inset-0 h-full w-full cursor-pointer opacity-0" aria-label="Colour of this version" data-variant-custom />
+            </label>
             <div class="mt-2 flex flex-wrap items-center gap-2">
               <button type="button" class="btn-primary px-3 py-1.5 text-xs" data-variant-upload><x-icon name="upload" :size="13" /> <span>Upload image for this colour</span></button>
               <input type="file" accept="image/png,image/jpeg,image/webp" class="hidden" data-variant-file />
@@ -127,6 +146,7 @@
           'hotspots' => $template['hotspots'] ?? [],
           'colourAreas' => $template['colourAreas'] ?? [],
           'colourVariants' => $template['colourVariants'] ?? [],
+          'colourChoices' => $template['colourChoices'] ?? [],
           'actions' => $options['actions'],
           'fonts' => $options['fonts'],
           'actionDefaults' => $options['actionDefaults'],

@@ -81,11 +81,13 @@
       <button type="button" role="radio" class="sw" title="{{ $label }}" aria-label="{{ $label }}" aria-checked="{{ $on === $key ? 'true' : 'false' }}"
               style="background: {{ $bg }}" data-tint="{{ $tint ?? '' }}" data-saturation="{{ $sat }}"></button>
     @endforeach
+    @if ($ownColour ?? true)
     <label role="radio" class="sw own" title="Your own colour" aria-checked="{{ $on === 'custom' ? 'true' : 'false' }}"
            @if ($on === 'custom') style="background: {{ $c['tint'] }};border-style:solid;border-color:#fff" @endif>
       @unless ($on === 'custom')+@endunless
       <input type="color" value="{{ $on === 'custom' ? $c['tint'] : '#2563eb' }}" aria-label="Pick your own colour" data-custom />
     </label>
+    @endif
   </div>
   @endif
   @if (count($designs ?? []) > 1)
