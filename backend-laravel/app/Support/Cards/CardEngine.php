@@ -190,7 +190,6 @@ class CardEngine
             'hotspots' => $template->hotspots ?? [],
             'colourAreas' => $template->colourAreas ?? [],
             'colourVariants' => ImageCard::colourVariants($template->colourVariants),
-            'colourChoices' => ImageCard::colourChoices($template->colourChoices),
             'design' => self::normalizeDesign($template->design),
             'isDefault' => $template->isDefault,
             'isActive' => $template->isActive,

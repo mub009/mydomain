@@ -20,7 +20,7 @@ class CardTemplate extends Model
     protected $table = 'card_templates';
 
     protected $fillable = [
-        'categoryId', 'isCommon', 'name', 'slug', 'layout', 'backgroundImageUrl', 'imageUrl', 'imageWidth', 'imageHeight', 'hotspots', 'colourAreas', 'colourVariants', 'colourChoices', 'design',
+        'categoryId', 'isCommon', 'name', 'slug', 'layout', 'backgroundImageUrl', 'imageUrl', 'imageWidth', 'imageHeight', 'hotspots', 'colourAreas', 'colourVariants', 'design',
         'isDefault', 'isActive', 'isPremium', 'sortOrder',
     ];
 
@@ -31,7 +31,6 @@ class CardTemplate extends Model
             'hotspots' => 'array',
             'colourAreas' => 'array',
             'colourVariants' => 'array',
-            'colourChoices' => 'array',
             'imageWidth' => 'integer',
             'imageHeight' => 'integer',
             'isCommon' => 'boolean',
