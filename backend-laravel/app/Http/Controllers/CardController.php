@@ -268,7 +268,8 @@ class CardController extends Controller
             $changes['imageHeight'] = $data['imageUrl'] !== null ? ($data['imageHeight'] ?? null) : null;
         }
         if (array_key_exists('hotspots', $data)) {
-            $changes['hotspots'] = ImageCard::normalize($data['hotspots'] ?? []);
+            // Saved from the design editor: the dealer's own layout, kept exactly as made (never merged with the design).
+            $changes['hotspots'] = array_map(fn ($h) => [...$h, 'own' => ['layout']], ImageCard::normalize($data['hotspots'] ?? []));
         }
         // Filling a free-image spot is content, not design: the whole business team can.
         // A card still wearing a ready-made design gets its own copy of it, with the picture in.

@@ -103,7 +103,10 @@ class ImageCard
         $card ??= $business->card;
         $template = CardEngine::templateFor($business, $card);
         if ($card?->imageUrl) {
-            $source = self::pack($card->imageUrl, $card->imageWidth, $card->imageHeight, $card->hotspots, false);
+            // A copy of a design made only to hold the card's own content follows the
+            // design as the admin keeps it: its current boxes, with the card's content on top.
+            $hotspots = $template && self::derived($card, $template) ? self::merged($card->hotspots ?? [], $template->hotspots ?? []) : $card->hotspots;
+            $source = self::pack($card->imageUrl, $card->imageWidth, $card->imageHeight, $hotspots, false);
         } else {
             $source = $template ? self::fromTemplate($template) : null;
         }
@@ -225,6 +228,8 @@ class ImageCard
             'hotspots.*.shapePreset' => ['nullable', 'in:square,round,oval'],
             'hotspots.*.shapeSize' => ['nullable', 'integer', 'min:'.self::SHAPE_MIN_SIZE, 'max:100'],
             'hotspots.*.shapeCorners' => ['nullable', 'integer', 'min:0', 'max:50'],
+            'hotspots.*.own' => ['nullable', 'array'],
+            'hotspots.*.own.*' => ['string', 'in:'.implode(',', self::OWN_FIELDS)],
             'hotspots.*.shape.*' => ['array', 'size:2'],
             'hotspots.*.shape.*.*' => ['numeric', 'min:0', 'max:100'],
             // Where a free image's picture sits inside its area: its rectangle in percent of the area.
@@ -278,6 +283,8 @@ class ImageCard
                 // A free image's ready shape (open card) and its size in percent of the box, to adjust it later.
                 'shapePreset' => $h['action'] === 'custom_image' && in_array($h['shapePreset'] ?? null, ['square', 'round', 'oval'], true) ? $h['shapePreset'] : null,
                 'shapeSize' => $h['action'] === 'custom_image' && isset($h['shapeSize']) && is_numeric($h['shapeSize']) ? (int) min(100, max(self::SHAPE_MIN_SIZE, (int) $h['shapeSize'])) : null,
+                // Which of these the card set itself, kept over the design's later changes (merged).
+                'own' => is_array($h['own'] ?? null) ? (array_values(array_intersect($h['own'], self::OWN_FIELDS)) ?: null) : null,
                 // A square's rounded corners, in percent of its side (0 = sharp, 50 = round).
                 'shapeCorners' => $h['action'] === 'custom_image' && ($h['shapePreset'] ?? null) === 'square' && isset($h['shapeCorners']) && is_numeric($h['shapeCorners']) ? (int) min(50, max(0, (int) $h['shapeCorners'])) : null,
                 // Where the picture sits in its box (moved and zoomed): a free image or the logo.
@@ -331,6 +338,7 @@ class ImageCard
             if (($h['id'] ?? null) === $spotId && in_array($h['action'] ?? null, ['logo', 'custom_image'], true)) {
                 $h['x'] = round(min(100 - (float) ($h['w'] ?? 0), max(0, $x)), 2);
                 $h['y'] = round(min(100 - (float) ($h['h'] ?? 0), max(0, $y)), 2);
+                $h = self::own($h, ['x', 'y']);
                 $found = true;
             }
         }
@@ -346,6 +354,7 @@ class ImageCard
         foreach ($hotspots as &$h) {
             if (($h['id'] ?? null) === $spotId && ($h['action'] ?? null) === 'custom_text') {
                 $h['value'] = $text;
+                $h = self::own($h, ['value']);
                 $found = true;
             }
         }
@@ -391,6 +400,7 @@ class ImageCard
             $pick ??= array_key_first($pool[$action]);
             $h['value'] = $pool[$action][$pick]['value'];
             $h['fit'] = null;
+            $h = self::own($h, ['value', 'fit']);
             unset($pool[$action][$pick]);
             $filled++;
         }
@@ -412,9 +422,76 @@ class ImageCard
         if ($card->imageUrl !== $template->imageUrl) {
             return false;
         }
+        if (self::derived($card, $template)) {
+            return true;
+        }
         $layout = fn ($spots) => collect($spots ?? [])->map(fn ($h) => [$h['id'] ?? null, $h['action'] ?? null, (float) ($h['x'] ?? 0), (float) ($h['y'] ?? 0), (float) ($h['w'] ?? 0), (float) ($h['h'] ?? 0)])->sortBy(0)->values()->all();
 
         return $layout($card->hotspots) == $layout($template->hotspots);
+    }
+
+    // What a card puts in a design's box of its own — kept over the design's
+    // current boxes (merged) — and the mark that says so on each box ("own").
+    // "layout": the whole box is a dealer's own (saved from the design editor) — such a copy is never merged.
+    public const OWN_FIELDS = ['value', 'fit', 'shape', 'shapePreset', 'shapeSize', 'shapeCorners', 'radius', 'x', 'y', 'layout'];
+
+    /** A box marked as holding the card's own $fields. */
+    private static function own(array $h, array $fields): array
+    {
+        $h['own'] = array_values(array_unique([...($h['own'] ?? []), ...$fields]));
+
+        return $h;
+    }
+
+    /**
+     * Whether a card's own copy only holds its content over a design — the
+     * same image, and either marked boxes or no boxes the design lacks —
+     * rather than a layout a dealer rearranged in the editor (left as made).
+     */
+    public static function derived(BusinessCard $card, CardTemplate $template): bool
+    {
+        if (! $card->imageUrl || ! $template->imageUrl || $card->imageUrl !== $template->imageUrl) {
+            return false;
+        }
+        $spots = collect($card->hotspots ?? []);
+        if ($spots->contains(fn ($h) => in_array('layout', $h['own'] ?? [], true))) {
+            return false;
+        }
+        if ($spots->contains(fn ($h) => ! empty($h['own']))) {
+            return true;
+        }
+        $designIds = collect($template->hotspots ?? [])->pluck('id')->filter()->all();
+
+        return $spots->every(fn ($h) => isset($h['id']) && in_array($h['id'], $designIds, true));
+    }
+
+    /**
+     * The design's current boxes with the card's own content laid over them,
+     * box by box (the same id): what the card marked as its own, or — for a
+     * copy made before boxes were marked — whatever differs from the design.
+     * Boxes the admin added since appear; boxes they removed go.
+     */
+    public static function merged(array $card, array $design): array
+    {
+        $mine = collect($card)->filter(fn ($h) => isset($h['id']))->keyBy('id');
+        // Marked copies say exactly what's theirs; an unmarked box there is the design's.
+        $marked = $mine->contains(fn ($h) => ! empty($h['own']));
+
+        return array_map(function (array $d) use ($mine, $marked) {
+            $c = $mine->get($d['id'] ?? '');
+            if (! $c) {
+                return $d;
+            }
+            $fields = $c['own'] ?? ($marked ? [] : array_values(array_filter(self::OWN_FIELDS, fn ($f) => ($c[$f] ?? null) != ($d[$f] ?? null))));
+            foreach ($fields as $f) {
+                $d[$f] = $c[$f] ?? null;
+            }
+            if ($fields) {
+                $d['own'] = $fields;
+            }
+
+            return $d;
+        }, $design);
     }
 
     // The ready shapes a free image can be cut to from the open card, and how small one can be (percent of its box).
@@ -481,6 +558,7 @@ class ImageCard
                 $h['shapeSize'] = $preset === 'normal' ? null : min(100, max(self::SHAPE_MIN_SIZE, $size));
                 $h['shapeCorners'] = $preset === 'square' ? min(50, max(0, $corners)) : null;
                 $h['radius'] = null;
+                $h = self::own($h, ['shape', 'shapePreset', 'shapeSize', 'shapeCorners', 'radius']);
                 $found = true;
             }
         }
@@ -827,6 +905,7 @@ class ImageCard
                     $h['fit'] = null;
                 }
                 $h['value'] = $url;
+                $h = self::own($h, ['value', 'fit']);
                 $found = true;
             }
         }
@@ -846,6 +925,7 @@ class ImageCard
         foreach ($hotspots as &$h) {
             if (($h['id'] ?? null) === $spotId && in_array($h['action'] ?? null, ['logo', 'custom_image'], true)) {
                 $h['fit'] = self::fit($fit);
+                $h = self::own($h, ['fit']);
                 $found = true;
             }
         }

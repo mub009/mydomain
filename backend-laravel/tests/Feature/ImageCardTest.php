@@ -550,7 +550,7 @@ class ImageCardTest extends TestCase
         $this->putJson($url, ['spotImage' => ['id' => 'a-photo', 'url' => 'https://cdn.example.test/cards/images/shop.jpg']], $this->auth)->assertOk();
         $this->putJson($url, ['spotShape' => ['id' => 'a-photo', 'shape' => 'round']], $this->auth)->assertOk();
         $card = BusinessCard::where('businessId', $this->business->id)->first();
-        $card->update(['hotspots' => collect($card->hotspots)->map(fn ($h) => $h['id'] === 'a-link' ? [...$h, 'value' => '@spiceshop'] : $h)->all()]);
+        $card->update(['hotspots' => collect($card->hotspots)->map(fn ($h) => $h['id'] === 'a-link' ? [...$h, 'value' => '@spiceshop', 'own' => ['value']] : $h)->all()]);
         // Still the first design as made: ticked.
         $this->getJson($url, $this->auth)->assertJsonPath('data.imageTemplates.0.inUse', true);
 
@@ -627,6 +627,54 @@ class ImageCardTest extends TestCase
         $move('h-logo', 0, 0)->assertOk();
         $this->assertEquals([0, 0], [$spot('h-logo')['x'], $spot('h-logo')['y']]);
         $move('h-call', 10, 10)->assertStatus(400);
+    }
+
+    public function test_boxes_the_admin_adds_to_a_design_later_reach_cards_with_their_own_content(): void
+    {
+        $admin = $this->admin();
+        $design = [
+            $this->spot('call'),
+            ['id' => 'photo', 'action' => 'custom_image', 'label' => 'Shop photo', 'x' => 10, 'y' => 30, 'w' => 80, 'h' => 20],
+            ['id' => 'slogan', 'action' => 'custom_text', 'value' => 'Since 1998', 'x' => 10, 'y' => 60, 'w' => 80, 'h' => 5],
+        ];
+        $id = $this->postJson('/api/v1/admin/card-templates', [
+            'name' => 'Design', 'layout' => 'classic', 'categoryId' => $this->business->categoryId, 'isDefault' => true,
+            'imageUrl' => 'https://cdn.example.test/cards/images/design.jpg', 'imageWidth' => 600, 'imageHeight' => 1000, 'hotspots' => $design,
+        ], $admin)->assertCreated()->json('data.id');
+        $url = "/api/v1/businesses/{$this->business->id}/card";
+
+        // The card gets its own copy: a picture, cut round, its box moved.
+        $this->putJson($url, ['spotImage' => ['id' => 'photo', 'url' => 'https://cdn.example.test/cards/images/shop.jpg']], $this->auth)->assertOk();
+        $this->putJson($url, ['spotShape' => ['id' => 'photo', 'shape' => 'round']], $this->auth)->assertOk();
+        $this->putJson($url, ['spotPlace' => ['id' => 'photo', 'x' => 15, 'y' => 35]], $this->auth)->assertOk();
+        $this->assertNotNull(BusinessCard::where('businessId', $this->business->id)->value('imageUrl'));
+
+        // Later the admin adds a WhatsApp box and changes the slogan.
+        $this->patchJson("/api/v1/admin/card-templates/{$id}", ['hotspots' => [
+            ...array_map(fn ($h) => $h['id'] === 'slogan' ? [...$h, 'value' => 'Est. 1998'] : $h, $design),
+            ['id' => 'wa', 'action' => 'whatsapp', 'x' => 50, 'y' => 85, 'w' => 40, 'h' => 8, 'style' => 'button'],
+        ]], $admin)->assertOk();
+
+        // The card has the new box and the design's new slogan — and keeps its own picture, shape and place.
+        $spots = collect(ImageCard::source($this->business->fresh())['hotspots'])->keyBy('id');
+        $this->assertTrue($spots->has('wa'));
+        $this->assertSame('Est. 1998', $spots['slogan']['value']);
+        $this->assertSame('https://cdn.example.test/cards/images/shop.jpg', $spots['photo']['value']);
+        $this->assertSame('round', $spots['photo']['shapePreset']);
+        $this->assertEquals([15, 35], [$spots['photo']['x'], $spots['photo']['y']]);
+        $this->postJson("{$url}/publish", [], $this->auth)->assertOk();
+        $this->assertStringContainsString('aria-label="WhatsApp"', $this->get('/card/spice-garden')->getContent());
+        // Still the design in use.
+        $this->getJson($url, $this->auth)->assertJsonPath('data.imageTemplates.0.inUse', true);
+
+        // A box the admin removes goes from the card too.
+        $this->patchJson("/api/v1/admin/card-templates/{$id}", ['hotspots' => [$design[0], $design[1]]], $admin)->assertOk();
+        $this->assertFalse(collect(ImageCard::source($this->business->fresh())['hotspots'])->contains('id', 'slogan'));
+
+        // A layout a dealer saved in the design editor stays exactly as they made it.
+        $this->putJson($url, ['imageUrl' => 'https://cdn.example.test/cards/images/design.jpg', 'imageWidth' => 600, 'imageHeight' => 1000, 'hotspots' => [$this->spot('email')]], $this->auth)->assertOk();
+        $this->patchJson("/api/v1/admin/card-templates/{$id}", ['hotspots' => [...$design, ['id' => 'wa', 'action' => 'whatsapp', 'x' => 50, 'y' => 85, 'w' => 40, 'h' => 8]]], $admin)->assertOk();
+        $this->assertSame(['h-email'], collect(ImageCard::source($this->business->fresh())['hotspots'])->pluck('id')->all());
     }
 
     public function test_the_card_details_have_one_save_button_for_all(): void
