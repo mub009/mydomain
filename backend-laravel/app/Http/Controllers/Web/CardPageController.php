@@ -159,11 +159,15 @@ class CardPageController extends Controller
         abort_unless($spotId !== '' && strlen($spotId) <= 40 && $request->hasFile('file'), 422);
         $auth = ['sub' => $user->id, 'role' => $user->role];
 
+        // The picture's own size, to fit it to the box below.
+        $size = @getimagesize($request->file('file')->getRealPath()) ?: [0, 0];
         $upload = Request::create('/', 'POST', ['purpose' => 'card-images'], [], ['file' => $request->file('file')], ['HTTP_ACCEPT' => 'application/json']);
         $upload->attributes->set('auth', $auth);
         $url = app()->call([app(UploadController::class), 'image'], ['request' => $upload])->getData(true)['data']['url'];
 
-        $save = Request::create('/', 'PUT', [], [], [], ['CONTENT_TYPE' => 'application/json', 'HTTP_ACCEPT' => 'application/json'], json_encode(['spotImage' => ['id' => $spotId, 'url' => $url]]));
+        // The picture's size goes with it, so it starts filling its whole box ("full size").
+        $picture = ['id' => $spotId, 'url' => $url] + ($size[0] && $size[1] ? ['width' => (int) $size[0], 'height' => (int) $size[1]] : []);
+        $save = Request::create('/', 'PUT', [], [], [], ['CONTENT_TYPE' => 'application/json', 'HTTP_ACCEPT' => 'application/json'], json_encode(['spotImage' => $picture]));
         $save->attributes->set('auth', $auth);
 
         return app()->call([app(CardController::class), 'update'], ['request' => $save, 'id' => $business->id]);

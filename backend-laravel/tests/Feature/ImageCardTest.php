@@ -404,8 +404,10 @@ class ImageCardTest extends TestCase
         $spot = collect(BusinessCard::where('businessId', $this->business->id)->first()->hotspots)->firstWhere('id', 'h-custom_image');
         $this->assertStringContainsString('/cards/images/', $spot['value']);
         $this->assertStringNotContainsString('old.jpg', $spot['value']);
-        $this->assertNull($spot['fit'] ?? null);
+        // Full size: the 400×300 picture fills its 180×80 px box — full width, taller than the box, centred.
+        $this->assertEquals(['l' => 0, 't' => -34.38, 'w' => 100, 'h' => 168.75], $spot['fit']);
         Storage::disk('spaces')->assertExists('cards/images/'.basename($spot['value']));
+        $this->get('/card/spice-garden')->assertSee('left:0%;top:-34.38%;width:100%;height:168.75%', false);
 
         // Then zoomed in, as the bar's Save sends it.
         $this->postJson('/api/v1/cards/spice-garden/owner', ['owner' => $t[1], 'spotFit' => ['id' => 'h-custom_image', 'fit' => ['l' => -25, 't' => -25, 'w' => 150, 'h' => 150]]])->assertOk();
@@ -416,6 +418,26 @@ class ImageCardTest extends TestCase
         $this->post('/api/v1/cards/spice-garden/owner/picture', ['owner' => $t[1], 'spotId' => 'h-call', 'file' => $again], ['Accept' => 'application/json'])->assertStatus(400);
         $this->post('/logout');
         $this->post('/api/v1/cards/spice-garden/owner/picture', ['owner' => 'bad.'.str_repeat('0', 64), 'spotId' => 'h-custom_image', 'file' => $again], ['Accept' => 'application/json'])->assertStatus(403);
+    }
+
+    public function test_an_uploaded_free_image_starts_filling_its_whole_box(): void
+    {
+        // A wide picture in a tall box: full height, wider than the box, centred.
+        $this->assertEquals(['l' => -50, 't' => 0, 'w' => 200, 'h' => 100], ImageCard::coverFit(['w' => 50, 'h' => 50], 100, 100, 400, 200));
+        // A tall picture in a wide box: full width, taller than the box, centred.
+        $this->assertEquals(['l' => 0, 't' => -150, 'w' => 100, 'h' => 400], ImageCard::coverFit(['w' => 50, 'h' => 25], 100, 100, 100, 200));
+        // Same shape: exactly the box. Unknown sizes: nothing.
+        $this->assertEquals(['l' => 0, 't' => 0, 'w' => 100, 'h' => 100], ImageCard::coverFit(['w' => 40, 'h' => 20], 1000, 1000, 200, 100));
+        $this->assertNull(ImageCard::coverFit(['w' => 40, 'h' => 20], null, null, 200, 100));
+
+        // From the dashboard (Card details): the picture's size goes with it, and it fills the box too.
+        $this->save([$this->spot('call'), $this->spot('custom_image', ['w' => 50, 'h' => 30])])->assertOk();
+        $this->putJson("/api/v1/businesses/{$this->business->id}/card", ['spotImage' => ['id' => 'h-custom_image', 'url' => 'https://cdn.example.test/cards/images/p.jpg', 'width' => 300, 'height' => 300]], $this->auth)->assertOk();
+        // The box is 300×300 px (50% of 600, 30% of 1000): a square picture fills it exactly.
+        $this->assertEquals(['l' => 0, 't' => 0, 'w' => 100, 'h' => 100], collect(BusinessCard::where('businessId', $this->business->id)->first()->hotspots)->firstWhere('id', 'h-custom_image')['fit']);
+        // Without a size, it starts centred as before.
+        $this->putJson("/api/v1/businesses/{$this->business->id}/card", ['spotImage' => ['id' => 'h-custom_image', 'url' => 'https://cdn.example.test/cards/images/q.jpg']], $this->auth)->assertOk();
+        $this->assertNull(collect(BusinessCard::where('businessId', $this->business->id)->first()->hotspots)->firstWhere('id', 'h-custom_image')['fit'] ?? null);
     }
 
     public function test_the_card_details_have_one_save_button_for_all(): void

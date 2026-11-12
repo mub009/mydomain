@@ -312,6 +312,25 @@ class ImageCard
     }
 
     /**
+     * A picture fitted to fill its whole box ("full size"): kept in its own
+     * proportions, centred, and just big enough that no edge shows — what a
+     * newly uploaded picture starts as. $spot's w/h are its box in percent of
+     * the card image ($cardW × $cardH px); null when a size is unknown.
+     */
+    public static function coverFit(array $spot, ?int $cardW, ?int $cardH, int $picW, int $picH): ?array
+    {
+        $boxW = (float) ($spot['w'] ?? 0) * (int) $cardW;
+        $boxH = (float) ($spot['h'] ?? 0) * (int) $cardH;
+        if ($boxW <= 0 || $boxH <= 0 || $picW <= 0 || $picH <= 0) {
+            return null;
+        }
+        $over = ($picW / $picH) / ($boxW / $boxH); // >1: wider than the box
+        [$w, $h] = $over >= 1 ? [100 * $over, 100.0] : [100.0, 100 / $over];
+
+        return self::fit(['l' => (100 - $w) / 2, 't' => (100 - $h) / 2, 'w' => $w, 'h' => $h]);
+    }
+
+    /**
      * Where a free image's picture sits inside its area: its rectangle
      * ['l', 't', 'w', 'h'] in percent of the area, always covering it.
      * null = centred, just covering (object-fit: cover).
