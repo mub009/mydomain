@@ -162,7 +162,8 @@
       function save(tint, saturation) {
         var colour = tint || saturation !== 100 ? {
           tint: tint, hue: 0, saturation: saturation,
-          strength: current && current.tint ? current.strength : 60,
+          // Full strength: the picked colour replaces the design's own (its shading kept), not a mix of the two.
+          strength: 100,
           brightness: current ? current.brightness : 100,
           // Keeps where the colour goes (areas marked in the dashboard).
           areas: current && current.areas ? current.areas : []
