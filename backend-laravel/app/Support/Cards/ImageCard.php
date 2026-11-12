@@ -319,6 +319,21 @@ class ImageCard
         return count($out) >= 3 ? $out : null;
     }
 
+    /** The card's spots with the words of one custom text box changed; null = no such box. */
+    public static function withSpotText(array $hotspots, string $spotId, string $text): ?array
+    {
+        $found = false;
+        foreach ($hotspots as &$h) {
+            if (($h['id'] ?? null) === $spotId && ($h['action'] ?? null) === 'custom_text') {
+                $h['value'] = $text;
+                $found = true;
+            }
+        }
+        unset($h);
+
+        return $found ? $hotspots : null;
+    }
+
     /**
      * A new design's boxes with what was put on the old design carried over:
      * each empty box of the new design takes the value (an uploaded picture,
@@ -743,6 +758,15 @@ class ImageCard
             if ($action === 'custom_image' && ! empty($h['id'])) {
                 $out['spot:'.$h['id']] = [
                     'key' => 'custom_image', 'spot' => (string) $h['id'], 'label' => ($h['label'] ?? null) ?: 'Free image',
+                    'section' => 'Visiting Card', 'value' => ($h['value'] ?? null) ?: null, 'missing' => empty($h['value']),
+                ];
+
+                continue;
+            }
+            // The design's own words (a slogan, an offer…): the business team can change them here too.
+            if ($action === 'custom_text' && ! empty($h['id'])) {
+                $out['spot:'.$h['id']] = [
+                    'key' => 'custom_text', 'spot' => (string) $h['id'], 'label' => ($h['label'] ?? null) ?: 'Custom text',
                     'section' => 'Visiting Card', 'value' => ($h['value'] ?? null) ?: null, 'missing' => empty($h['value']),
                 ];
 

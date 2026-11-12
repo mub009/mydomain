@@ -577,6 +577,33 @@ class ImageCardTest extends TestCase
         $this->putJson($url, ['templateId' => $first], $this->auth)->assertOk()->assertJsonPath('data.imageUrl', null);
     }
 
+    public function test_the_business_sees_and_changes_custom_text_in_card_details(): void
+    {
+        $this->withoutVite();
+        $this->imageTemplate($this->admin(), ['hotspots' => [$this->spot('call'), $this->spot('custom_text', ['y' => 80, 'label' => 'Slogan', 'value' => 'Since 1998'])]]);
+        $this->postJson("/api/v1/businesses/{$this->business->id}/card/publish", [], $this->auth)->assertOk();
+
+        // The business owner's Card details list the design's text, ready to change.
+        $this->post('/login', ['email' => $this->ownerEmail, 'password' => 'Password123!']);
+        $url = "/dashboard/businesses/{$this->business->id}?section=".urlencode('Visiting Card');
+        $this->get($url)->assertOk()
+            ->assertSee('Slogan')
+            ->assertSee('data-via="spot-text"  data-spot="h-custom_text"', false)
+            ->assertSee('<textarea id="card-detail-h-custom_text" name="spotText"', false)
+            ->assertSee('Since 1998');
+
+        // Saved by the team (what the one Save sends): the card shows the new words.
+        $token = $this->postJson('/api/v1/auth/login', ['email' => $this->ownerEmail, 'password' => 'Password123!'])->json('data.accessToken');
+        $owner = ['Authorization' => "Bearer {$token}"];
+        $this->putJson("/api/v1/businesses/{$this->business->id}/card", ['spotText' => ['id' => 'h-custom_text', 'text' => '  Open 24 hours  ']], $owner)->assertOk();
+        $this->assertSame('Open 24 hours', collect(BusinessCard::where('businessId', $this->business->id)->first()->hotspots)->firstWhere('id', 'h-custom_text')['value']);
+        $this->assertStringContainsString('<span>Open 24 hours</span>', $this->get('/card/spice-garden')->getContent());
+        $this->get($url)->assertSee('Open 24 hours');
+
+        // Only a custom text box takes words this way.
+        $this->putJson("/api/v1/businesses/{$this->business->id}/card", ['spotText' => ['id' => 'h-call', 'text' => 'x']], $owner)->assertStatus(400);
+    }
+
     public function test_the_card_details_have_one_save_button_for_all(): void
     {
         $this->withoutVite();

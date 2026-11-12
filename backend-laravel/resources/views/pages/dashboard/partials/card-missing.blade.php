@@ -17,13 +17,18 @@
   <ul class="mt-3 space-y-2">
     @foreach ($card['cardDetails'] as $m)
       @php
-          $input = $m['key'] === 'custom_image' ? ['spotUrl', 'spot', 'image', 'https://… or upload a picture'] : (\App\Support\Cards\ImageCard::DETAIL_INPUTS[$m['key']] ?? null);
+          $input = match ($m['key']) {
+              'custom_image' => ['spotUrl', 'spot', 'image', 'https://… or upload a picture'],
+              // The design's own words, changed for this card.
+              'custom_text' => ['spotText', 'spot-text', 'textarea', 'Your text'],
+              default => \App\Support\Cards\ImageCard::DETAIL_INPUTS[$m['key']] ?? null,
+          };
           $id = 'card-detail-'.($m['spot'] ?? $m['key']);
       @endphp
       <li @class(['rounded-lg bg-white px-3 py-2 text-sm', 'ring-1 ring-amber-300' => $m['missing']])>
         @if ($input)
           @php [$field, $via, $type, $placeholder] = $input; @endphp
-          <div class="space-y-1.5" data-detail data-label="{{ $m['label'] }}" data-via="{{ $via }}" @if ($via === 'spot') data-spot="{{ $m['spot'] }}" @endif
+          <div class="space-y-1.5" data-detail data-label="{{ $m['label'] }}" data-via="{{ $via }}" @if (in_array($via, ['spot', 'spot-text'], true)) data-spot="{{ $m['spot'] }}" @endif
                @if ($type === 'category-city') data-category-city data-initial-category="{{ $biz['category']['id'] ?? '' }}" data-initial-state="{{ $biz['state'] ?? '' }}" data-initial-city="{{ $biz['city'] ?? '' }}" @endif>
             <label class="flex items-center gap-1.5 text-xs font-semibold text-ink-900" for="{{ $id }}">
               {{ $m['label'] }}
@@ -86,7 +91,7 @@
       </li>
     @endforeach
   </ul>
-  @if (collect($card['cardDetails'])->contains(fn ($m) => $m['key'] === 'custom_image' || isset(\App\Support\Cards\ImageCard::DETAIL_INPUTS[$m['key']])))
+  @if (collect($card['cardDetails'])->contains(fn ($m) => in_array($m['key'], ['custom_image', 'custom_text'], true) || isset(\App\Support\Cards\ImageCard::DETAIL_INPUTS[$m['key']])))
     <div class="mt-3 flex items-center gap-3">
       <button class="btn-primary px-5 py-2 text-sm" data-card-details-save><x-icon name="check" :size="15" /> <span>Save</span></button>
       <p class="text-xs text-ink-500" data-card-details-status></p>

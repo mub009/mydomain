@@ -102,6 +102,7 @@ if (root && card) {
     const business = {};
     const links = {};
     const spots = [];
+    const texts = [];
     const changed = [];
 
     $$("[data-detail]", detailsForm).forEach((row) => {
@@ -128,6 +129,7 @@ if (root && card) {
         // Left empty: nothing to save — unless it was cleared on purpose (a picked Google place replaces the link).
         if (!value && !(el.dataset.cleared && initial)) return;
         if (via === "spot") spots.push({ id: row.dataset.spot, url: value });
+        else if (via === "spot-text") texts.push({ id: row.dataset.spot, text: value });
         else (via === "links" ? links : business)[el.name] = value || null;
         rowChanged = true;
       });
@@ -148,6 +150,7 @@ if (root && card) {
       if (Object.keys(links).length) await api.patch(`/businesses/${biz.id}/review-links`, links);
       // A free image's picture goes with its size, so it starts filling its whole box ("full size").
       for (const spot of spots) await api.put(base, { spotImage: { ...spot, ...(await pictureSize(spot.url)) } });
+      for (const text of texts) await api.put(base, { spotText: text });
       reloadWithFlash(`Saved ${changed.join(", ")} — it's on your card now.`);
     } catch (err) {
       button.disabled = false;
