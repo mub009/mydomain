@@ -106,11 +106,18 @@ function showVariants() {
     .map(
       (v, i) => `<li class="overflow-hidden rounded-lg border border-gray-200 bg-white">
         <img src="${esc(v.imageUrl)}" alt="" class="aspect-[3/5] w-full object-cover object-top" />
-        <div class="flex items-center gap-2 border-t border-gray-100 p-2">
-          <span class="h-5 w-5 shrink-0 rounded-full border border-white shadow ring-1 ring-gray-300" style="background:${esc(v.colour)}"></span>
-          <span class="min-w-0 flex-1 truncate font-mono text-[11px] text-ink-600">${esc(v.colour)}</span>
-          <button type="button" class="text-[11px] font-semibold text-brand-700 hover:underline" data-variant-replace="${i}">Change image</button>
-          <button type="button" class="text-[11px] font-semibold text-red-700 hover:underline" data-variant-remove="${i}" aria-label="Remove ${esc(v.colour)}">Remove</button>
+        <div class="space-y-1.5 border-t border-gray-100 p-2">
+          <div class="flex items-center gap-2">
+            <label class="relative h-6 w-6 shrink-0 cursor-pointer rounded-full border border-white shadow ring-1 ring-gray-300" style="background:${esc(v.colour)}" title="Change this colour">
+              <input type="color" value="${esc(v.colour)}" class="absolute inset-0 h-full w-full cursor-pointer opacity-0" aria-label="Colour of ${esc(v.colour)}" data-variant-edit="${i}" />
+            </label>
+            <span class="font-mono text-[11px] text-ink-600">${esc(v.colour)}</span>
+            <span class="text-[10px] text-ink-400">(tap to change)</span>
+          </div>
+          <div class="flex items-center justify-between gap-2">
+            <button type="button" class="text-[11px] font-semibold text-brand-700 hover:underline" data-variant-replace="${i}">Change image</button>
+            <button type="button" class="text-[11px] font-semibold text-red-700 hover:underline" data-variant-remove="${i}" aria-label="Remove ${esc(v.colour)}">Delete</button>
+          </div>
         </div>
       </li>`,
     )
@@ -137,6 +144,18 @@ variantsBox.addEventListener("input", (e) => {
     pickedColour = e.target.value;
     showVariants();
   }
+  // A version's colour edited in place (its image stays).
+  if (e.target.matches("[data-variant-edit]")) {
+    const v = variants[Number(e.target.dataset.variantEdit)];
+    if (v) {
+      v.colour = e.target.value;
+      variantsDirty = true;
+      const row = e.target.closest("li");
+      e.target.parentElement.style.background = v.colour;
+      row.querySelector(".font-mono").textContent = v.colour;
+      $("[data-variants-status]", variantsBox).textContent = `${variants.length} colour ${variants.length === 1 ? "version" : "versions"} — businesses pick one on their open card. Save to keep them.`;
+    }
+  }
 });
 variantFile.addEventListener("change", async () => {
   const file = variantFile.files?.[0];
@@ -157,43 +176,6 @@ variantFile.addEventListener("change", async () => {
   }
 });
 showVariants();
-
-// --- Colours businesses can pick: chosen by the admin for this design ---
-let choices = [...(templateData.colourChoices || [])];
-let choicesDirty = false;
-const choicesBox = $("[data-template-choices]");
-const choiceInput = $("[data-choice-input]", choicesBox);
-function showChoices() {
-  const n = choices.length;
-  $("[data-choices-status]", choicesBox).textContent = n
-    ? `Businesses can pick ${n === 1 ? "this colour" : `these ${n} colours`} (or Original) — no others.${choicesDirty ? " Save to keep it." : ""}`
-    : `None chosen — businesses see the standard colours and can pick their own.${choicesDirty ? " Save to keep it." : ""}`;
-  $("[data-choices-list]", choicesBox).innerHTML = choices
-    .map(
-      (c, i) => `<span class="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-white py-1 pl-1 pr-2 text-[11px] font-mono text-ink-700">
-        <span class="h-5 w-5 rounded-full border border-white shadow ring-1 ring-gray-300" style="background:${esc(c)}"></span>${esc(c)}
-        <button type="button" class="ml-0.5 text-red-700 hover:underline" data-choice-remove="${i}" aria-label="Remove ${esc(c)}">×</button></span>`,
-    )
-    .join("");
-  $("[data-choice-add]", choicesBox).disabled = choices.length >= 16;
-}
-choiceInput.addEventListener("input", () => {
-  $("[data-choice-preview]", choicesBox).style.background = choiceInput.value;
-  $("[data-choice-hex]", choicesBox).textContent = choiceInput.value;
-});
-choicesBox.addEventListener("click", (e) => {
-  if (e.target.closest("[data-choice-add]") && !choices.includes(choiceInput.value.toLowerCase())) {
-    choices.push(choiceInput.value.toLowerCase());
-    choicesDirty = true;
-  }
-  const remove = e.target.closest("[data-choice-remove]");
-  if (remove) {
-    choices.splice(Number(remove.dataset.choiceRemove), 1);
-    choicesDirty = true;
-  }
-  showChoices();
-});
-showChoices();
 
 function values() {
   const f = new FormData(form);
@@ -249,12 +231,11 @@ form.addEventListener("submit", async (e) => {
   const button = $("[data-save]", form);
   button.disabled = true;
   try {
-    const body = { ...values(), ...imageEditor.payload(), colourAreas, colourVariants: variants, colourChoices: choices };
+    const body = { ...values(), ...imageEditor.payload(), colourAreas, colourVariants: variants };
     const { data } = id ? await api.patch(`/admin/card-templates/${id}`, body) : await api.post("/admin/card-templates", body);
     imageEditor.markClean();
     areasDirty = false;
     variantsDirty = false;
-    choicesDirty = false;
     reloadWithFlash(id ? "Template saved." : "Template created.", `/admin/card-templates/${data.id}`);
   } catch (err) {
     button.disabled = false;
@@ -263,7 +244,7 @@ form.addEventListener("submit", async (e) => {
 });
 
 window.addEventListener("beforeunload", (e) => {
-  if (imageEditor.dirty || areasDirty || variantsDirty || choicesDirty) {
+  if (imageEditor.dirty || areasDirty || variantsDirty) {
     e.preventDefault();
     e.returnValue = "";
   }

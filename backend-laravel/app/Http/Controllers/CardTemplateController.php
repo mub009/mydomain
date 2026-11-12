@@ -63,9 +63,6 @@ class CardTemplateController extends Controller
             'colourVariants.*.imageUrl' => ['required', 'url', 'max:500', 'regex:#^https?://[^\s"\'()<>\\\\]+$#i'],
             'colourVariants.*.imageWidth' => ['nullable', 'integer', 'min:1', 'max:20000'],
             'colourVariants.*.imageHeight' => ['nullable', 'integer', 'min:1', 'max:20000'],
-            // The colours businesses may recolour this design in (none = the standard swatches).
-            'colourChoices' => ['sometimes', 'nullable', 'array', 'max:'.ImageCard::MAX_COLOUR_CHOICES],
-            'colourChoices.*' => ['string', 'regex:/^#[0-9a-fA-F]{6}$/'],
         ];
     }
 
@@ -78,9 +75,6 @@ class CardTemplateController extends Controller
         }
         if (array_key_exists('colourAreas', $data)) {
             $data['colourAreas'] = ImageColour::areas($data['colourAreas'] ?? null) ?: null;
-        }
-        if (array_key_exists('colourChoices', $data)) {
-            $data['colourChoices'] = ImageCard::colourChoices($data['colourChoices'] ?? null) ?: null;
         }
         if (array_key_exists('colourVariants', $data)) {
             $data['colourVariants'] = ImageCard::colourVariants($data['colourVariants'] ?? null) ?: null;

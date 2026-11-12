@@ -772,39 +772,33 @@ class ImageCardTest extends TestCase
         $this->patchJson("/api/v1/admin/card-templates/{$master['id']}", ['imageUrl' => null], $admin)->assertOk()->assertJsonPath('data.colourVariants', []);
     }
 
-    public function test_the_admin_chooses_which_colours_a_business_can_pick(): void
+    public function test_the_admin_adds_edits_and_deletes_colour_versions(): void
     {
         $admin = $this->admin();
         $id = $this->imageTemplate($admin);
-        $this->postJson("/api/v1/businesses/{$this->business->id}/card/publish", [], $this->auth)->assertOk();
-        $this->post('/login', ['email' => $this->ownerEmail, 'password' => 'Password123!']);
+        $url = "/api/v1/admin/card-templates/{$id}";
+        // Several added.
+        $v = $this->patchJson($url, ['colourVariants' => [
+            ['colour' => '#dc2626', 'imageUrl' => 'https://cdn.example.test/cards/images/red.jpg'],
+            ['colour' => '#2563eb', 'imageUrl' => 'https://cdn.example.test/cards/images/blue.jpg'],
+            ['colour' => '#16a34a', 'imageUrl' => 'https://cdn.example.test/cards/images/green.jpg'],
+        ]], $admin)->assertOk()->assertJsonCount(3, 'data.colourVariants')->json('data.colourVariants');
 
-        // None chosen: the standard colours and a free picker.
-        $html = $this->get('/card/spice-garden')->getContent();
-        $this->assertStringContainsString('aria-label="Green"', $html);
-        $this->assertStringContainsString('aria-label="Pick your own colour"', $html);
+        // Edited (a colour and an image) and one deleted — ids kept, so cards wearing them keep them.
+        $this->business->card()->updateOrCreate([], ['templateId' => $id, 'colourVariantId' => $v[0]['id']]);
+        $this->patchJson($url, ['colourVariants' => [
+            [...$v[0], 'colour' => '#b91c1c'],
+            [...$v[2], 'imageUrl' => 'https://cdn.example.test/cards/images/green-2.jpg'],
+        ]], $admin)->assertOk()
+            ->assertJsonCount(2, 'data.colourVariants')
+            ->assertJsonPath('data.colourVariants.0.id', $v[0]['id'])
+            ->assertJsonPath('data.colourVariants.0.colour', '#b91c1c')
+            ->assertJsonPath('data.colourVariants.1.imageUrl', 'https://cdn.example.test/cards/images/green-2.jpg');
+        $this->assertSame('https://cdn.example.test/cards/images/red.jpg', ImageCard::source($this->business->fresh())['imageUrl']);
 
-        // The admin chooses the colours (any, each once).
-        $this->patchJson("/api/v1/admin/card-templates/{$id}", ['colourChoices' => ['#7C3AED', '#0f766e', '#7c3aed']], $admin)
-            ->assertOk()->assertJsonPath('data.colourChoices', ['#7c3aed', '#0f766e']);
-        $this->patchJson("/api/v1/admin/card-templates/{$id}", ['colourChoices' => ['purple']], $admin)->assertStatus(400);
-
-        // The open card offers Original and those — nothing else, no free picker.
-        $html = $this->get('/card/spice-garden')->getContent();
-        $this->assertStringContainsString('aria-label="Original"', $html);
-        $this->assertStringContainsString('aria-label="#7c3aed"', $html);
-        $this->assertStringContainsString('aria-label="#0f766e"', $html);
-        $this->assertStringNotContainsString('aria-label="Green"', $html);
-        $this->assertStringNotContainsString('aria-label="Pick your own colour"', $html);
-        preg_match('~body.owner = "([^"]+)"~', $html, $t);
-        $pick = fn (?array $colour) => $this->postJson('/api/v1/cards/spice-garden/owner', ['owner' => $t[1], 'imageColour' => $colour]);
-
-        // Only those can be picked (and Original); the picked one shows as chosen.
-        $pick(['tint' => '#0F766E', 'strength' => 100])->assertOk();
-        $this->assertMatchesRegularExpression('~title="\#0f766e" aria-label="\#0f766e" aria-checked="true"~', $this->get('/card/spice-garden')->getContent());
-        $pick(['tint' => '#dc2626', 'strength' => 100])->assertStatus(400);
-        $pick(['tint' => null, 'saturation' => 0])->assertStatus(400);
-        $pick(null)->assertOk(); // Original
+        // All deleted: the card goes back to the master image.
+        $this->patchJson($url, ['colourVariants' => []], $admin)->assertOk()->assertJsonPath('data.colourVariants', []);
+        $this->assertSame('https://cdn.example.test/cards/images/template.jpg', ImageCard::source($this->business->fresh())['imageUrl']);
     }
 
     public function test_the_card_details_have_one_save_button_for_all(): void

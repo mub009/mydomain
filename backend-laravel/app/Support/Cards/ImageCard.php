@@ -158,22 +158,6 @@ class ImageCard
         return array_values($out);
     }
 
-    // How many colours an admin can offer for a design.
-    public const MAX_COLOUR_CHOICES = 16;
-
-    /** The colours an admin offers for a design (#rrggbb, each once, in order); [] = the standard swatches. */
-    public static function colourChoices(mixed $raw): array
-    {
-        $out = [];
-        foreach (is_array($raw) ? $raw : [] as $c) {
-            if (is_string($c) && preg_match(self::HEX, $c) && ! in_array(strtolower($c), $out, true)) {
-                $out[] = strtolower($c);
-            }
-        }
-
-        return array_slice($out, 0, self::MAX_COLOUR_CHOICES);
-    }
-
     /** The colour version a card picked, if its design still has it. */
     public static function variantFor(?BusinessCard $card, ?CardTemplate $template): ?array
     {
