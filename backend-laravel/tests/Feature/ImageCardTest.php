@@ -440,6 +440,24 @@ class ImageCardTest extends TestCase
         $this->assertNull(collect(BusinessCard::where('businessId', $this->business->id)->first()->hotspots)->firstWhere('id', 'h-custom_image')['fit'] ?? null);
     }
 
+    public function test_free_images_auto_fit_their_box_and_logos_stay_whole(): void
+    {
+        $this->business->update(['logoUrl' => 'https://cdn.example.test/logos/logo.png']);
+        $this->save([
+            $this->spot('logo', ['y' => 5]),
+            $this->spot('custom_image', ['y' => 40, 'value' => 'https://cdn.example.test/cards/images/old-photo.jpg']),
+        ])->assertOk();
+        $this->postJson("/api/v1/businesses/{$this->business->id}/card/publish", [], $this->auth)->assertOk();
+        $html = $this->get('/card/spice-garden')->assertOk()->getContent();
+        // A free image never arranged fills its whole box…
+        $this->assertStringContainsString('<img src="https://cdn.example.test/cards/images/old-photo.jpg" alt="" style="object-fit:cover"', $html);
+        // …while the logo is shown whole, never cropped.
+        $this->assertMatchesRegularExpression('~<img src="https://cdn.example.test/logos/logo.png" alt="[^"]*" />~', $html);
+        // The bar's "Auto fit" puts an arranged picture back to filling its box.
+        $this->post('/login', ['email' => $this->ownerEmail, 'password' => 'Password123!']);
+        $this->get('/card/spice-garden')->assertSee('data-arrange-reset>Auto fit</button>', false);
+    }
+
     public function test_the_card_details_have_one_save_button_for_all(): void
     {
         $this->withoutVite();

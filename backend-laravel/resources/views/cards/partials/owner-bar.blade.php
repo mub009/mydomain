@@ -90,7 +90,7 @@
     <div class="tools">
       <button type="button" class="big" data-zoom="-1" aria-label="Zoom out">−</button>
       <button type="button" class="big" data-zoom="1" aria-label="Zoom in">+</button>
-      <button type="button" data-arrange-reset>Reset</button>
+      <button type="button" data-arrange-reset>Auto fit</button>
       {{-- Free images only: put a different picture in the box. --}}
       <button type="button" data-arrange-change hidden>Change picture</button>
       <input type="file" accept="image/png,image/jpeg,image/gif,image/webp" data-arrange-file hidden />
