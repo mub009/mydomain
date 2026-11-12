@@ -192,6 +192,10 @@ class CardController extends Controller
             // The picture's own size, when known: it then starts filling its whole box ("full size").
             'spotImage.width' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:20000'],
             'spotImage.height' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:20000'],
+            // A free image cut to a ready shape (from the open card): normal, square, round or oval.
+            'spotShape' => ['sometimes', 'array'],
+            'spotShape.id' => ['required_with:spotShape', 'string', 'max:40'],
+            'spotShape.shape' => ['required_with:spotShape', 'in:'.implode(',', ImageCard::SHAPE_PRESETS)],
             // A picture box moved and zoomed (from the open card): its id and where the picture sits.
             'spotFit' => ['sometimes', 'array'],
             'spotFit.id' => ['required_with:spotFit', 'string', 'max:40'],
@@ -261,6 +265,18 @@ class CardController extends Controller
                     }
                 }
                 unset($h);
+            }
+            $changes['hotspots'] = $hotspots;
+            if ($source['fromTemplate']) {
+                $changes += ['imageUrl' => $source['imageUrl'], 'imageWidth' => $source['imageWidth'], 'imageHeight' => $source['imageHeight']];
+            }
+        }
+        // Its shape too: content, not the design — the whole business team can.
+        if (isset($data['spotShape']) && ! array_key_exists('hotspots', $changes)) {
+            $source = ImageCard::source($business);
+            $hotspots = $source ? ImageCard::withSpotShape($source['hotspots'], $data['spotShape']['id'], $data['spotShape']['shape'], $source['imageWidth'], $source['imageHeight']) : null;
+            if ($hotspots === null) {
+                throw ApiException::badRequest('Your card has no such picture');
             }
             $changes['hotspots'] = $hotspots;
             if ($source['fromTemplate']) {
