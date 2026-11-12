@@ -88,7 +88,7 @@ class CardPageController extends Controller
                     'id' => $t->id,
                     'name' => $t->name,
                     'imageUrl' => $t->imageUrl,
-                    'inUse' => $t->id === $current?->id && ! $card?->imageUrl,
+                    'inUse' => $t->id === $current?->id && ImageCard::wears($card, $t),
                 ])->values()->all();
             $bar = view('cards.partials.owner-bar', [
                 'slug' => $business->slug,
