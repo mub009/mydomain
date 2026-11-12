@@ -120,6 +120,13 @@
       <output data-shape-size-value>100%</output>
       <button type="button" class="big" data-shape-size="10" aria-label="Bigger shape">+</button>
     </div>
+    {{-- Square only: round its 4 corners, from sharp to fully round. --}}
+    <div class="tools sizes" data-arrange-corners-row hidden>
+      <span class="lbl">Corners</span>
+      <button type="button" class="big" data-shape-corners="-5" aria-label="Sharper corners">−</button>
+      <output data-shape-corners-value>0%</output>
+      <button type="button" class="big" data-shape-corners="5" aria-label="Rounder corners">+</button>
+    </div>
   </div>
   <script>
     (function () {
@@ -221,6 +228,7 @@
         bar.querySelector("[data-arrange-shapes]").hidden = box.dataset.arrangeKind !== "custom_image";
         shape = box.dataset.arrangeShape || "normal";
         size = Number(box.dataset.arrangeSize) || 100;
+        corners = Number(box.dataset.arrangeCorners) || 0;
         shapeDirty = false;
         savedClip = box.style.clipPath;
         showShape(false);
@@ -272,7 +280,7 @@
           });
       });
       // A ready shape and its size: seen at once on the card, kept with Save.
-      var shape = "normal", size = 100, shapeDirty = false, savedClip = "";
+      var shape = "normal", size = 100, corners = 0, shapeDirty = false, savedClip = "";
       var MIN_SIZE = {{ \App\Support\Cards\ImageCard::SHAPE_MIN_SIZE }};
       // As the server draws it (ImageCard::presetShape): the biggest square / circle that fit the box, or an oval filling it, scaled by size.
       function shapePoints() {
@@ -283,7 +291,20 @@
           for (var i = 0; i < 64; i++) pts.push([50 + rx * Math.cos(2 * Math.PI * i / 64), 50 + ry * Math.sin(2 * Math.PI * i / 64)]);
           return pts;
         };
-        if (shape === "square") return [[50 - 50 * sx, 50 - 50 * sy], [50 + 50 * sx, 50 - 50 * sy], [50 + 50 * sx, 50 + 50 * sy], [50 - 50 * sx, 50 + 50 * sy]];
+        if (shape === "square") {
+          var hx = 50 * sx, hy = 50 * sy, c = corners / 100;
+          if (c <= 0) return [[50 - hx, 50 - hy], [50 + hx, 50 - hy], [50 + hx, 50 + hy], [50 - hx, 50 + hy]];
+          // Each corner a quarter circle (as ImageCard::presetShape draws it).
+          var rx = 2 * hx * c, ry = 2 * hy * c, out = [];
+          [[1, -1, -90], [1, 1, 0], [-1, 1, 90], [-1, -1, 180]].forEach(function (q) {
+            var cx = 50 + q[0] * (hx - rx), cy = 50 + q[1] * (hy - ry);
+            for (var i = 0; i <= 8; i++) {
+              var a = (q[2] + 90 * i / 8) * Math.PI / 180;
+              out.push([cx + rx * Math.cos(a), cy + ry * Math.sin(a)]);
+            }
+          });
+          return out;
+        }
         if (shape === "round") return ring(50 * sx, 50 * sy);
         if (shape === "oval") return ring(50 * k, 50 * k);
         return null;
@@ -294,6 +315,8 @@
         });
         bar.querySelector("[data-arrange-sizes]").hidden = box.dataset.arrangeKind !== "custom_image" || shape === "normal";
         bar.querySelector("[data-shape-size-value]").textContent = size + "%";
+        bar.querySelector("[data-arrange-corners-row]").hidden = box.dataset.arrangeKind !== "custom_image" || shape !== "square";
+        bar.querySelector("[data-shape-corners-value]").textContent = corners + "%";
         if (!draw) return;
         var pts = shapePoints();
         box.style.clipPath = pts ? "polygon(" + pts.map(function (p) { return (Math.round(p[0] * 10) / 10) + "% " + (Math.round(p[1] * 10) / 10) + "%"; }).join(",") + ")" : "none";
@@ -302,6 +325,14 @@
         b.addEventListener("click", function () {
           if (!box) return;
           shape = b.dataset.shapePreset;
+          shapeDirty = true;
+          showShape(true);
+        });
+      });
+      bar.querySelectorAll("[data-shape-corners]").forEach(function (b) {
+        b.addEventListener("click", function () {
+          if (!box || shape !== "square") return;
+          corners = Math.min(50, Math.max(0, corners + Number(b.dataset.shapeCorners)));
           shapeDirty = true;
           showShape(true);
         });
@@ -331,7 +362,7 @@
         bar.setAttribute("data-busy", "");
         status.textContent = "Saving…";
         send({ spotFit: spotFit })
-          .then(function () { return send({ spotShape: { id: id, shape: shape, size: size } }); })
+          .then(function () { return send({ spotShape: { id: id, shape: shape, size: size, corners: shape === "square" ? corners : 0 } }); })
           .then(function () { location.reload(); })
           .catch(function () {
             bar.removeAttribute("data-busy");
