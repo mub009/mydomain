@@ -311,6 +311,50 @@ class ImageCard
         return count($out) >= 3 ? $out : null;
     }
 
+    // The ready shapes a free image can be cut to from the open card.
+    public const SHAPE_PRESETS = ['normal', 'square', 'round', 'oval'];
+
+    /**
+     * A ready shape as outline points in percent of the box: "square" and
+     * "round" are the biggest square / circle that fit the box, centred
+     * (so they need the box's real proportions: its w/h in percent of the
+     * card image, $cardW × $cardH px); "oval" fills the box; "normal" = none.
+     */
+    public static function presetShape(string $preset, array $spot, ?int $cardW, ?int $cardH): ?array
+    {
+        $boxW = (float) ($spot['w'] ?? 0) * (int) $cardW;
+        $boxH = (float) ($spot['h'] ?? 0) * (int) $cardH;
+        // Unknown proportions: treat the box as square.
+        [$sx, $sy] = $boxW > 0 && $boxH > 0 ? [min(1, $boxH / $boxW), min(1, $boxW / $boxH)] : [1, 1];
+        $ring = fn (float $rx, float $ry) => array_map(
+            fn ($i) => [50 + $rx * cos(2 * M_PI * $i / 64), 50 + $ry * sin(2 * M_PI * $i / 64)],
+            range(0, 63),
+        );
+
+        return self::shape(match ($preset) {
+            'square' => [[50 - 50 * $sx, 50 - 50 * $sy], [50 + 50 * $sx, 50 - 50 * $sy], [50 + 50 * $sx, 50 + 50 * $sy], [50 - 50 * $sx, 50 + 50 * $sy]],
+            'round' => $ring(50 * $sx, 50 * $sy),
+            'oval' => $ring(50, 50),
+            default => null,
+        });
+    }
+
+    /** The card's spots with one free image cut to a ready shape (rounded corners dropped); null = no such box. */
+    public static function withSpotShape(array $hotspots, string $spotId, string $preset, ?int $cardW, ?int $cardH): ?array
+    {
+        $found = false;
+        foreach ($hotspots as &$h) {
+            if (($h['id'] ?? null) === $spotId && ($h['action'] ?? null) === 'custom_image') {
+                $h['shape'] = self::presetShape($preset, $h, $cardW, $cardH);
+                $h['radius'] = null;
+                $found = true;
+            }
+        }
+        unset($h);
+
+        return $found ? $hotspots : null;
+    }
+
     /**
      * A picture fitted to fill its whole box ("full size"): kept in its own
      * proportions, centred, and just big enough that no edge shows — what a

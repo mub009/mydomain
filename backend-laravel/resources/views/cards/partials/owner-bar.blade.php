@@ -41,6 +41,11 @@
     #mk-owner-bar .tools button.go{background:#059669;border-color:#059669;color:#fff}
     #mk-owner-bar .tools button.big{font-size:20px;line-height:1}
     #mk-owner-bar[data-busy] .tools{opacity:.5;pointer-events:none}
+    #mk-owner-bar [hidden]{display:none !important}
+    #mk-owner-bar .shapes{margin-top:8px;align-items:center}
+    #mk-owner-bar .shapes .lbl{margin:0 4px 0 2px}
+    #mk-owner-bar .shapes button{display:flex;align-items:center;gap:6px;font-size:13px}
+    #mk-owner-bar .shapes i{display:inline-block;width:14px;height:14px;border:2px solid currentColor;box-sizing:border-box}
     .spot.pic[data-arranging]{outline:2px dashed #059669;outline-offset:2px;cursor:move;touch-action:none;z-index:5}
     @media print{#mk-owner-bar{display:none}}
   </style>
@@ -96,6 +101,14 @@
       <input type="file" accept="image/png,image/jpeg,image/gif,image/webp" data-arrange-file hidden />
       <button type="button" data-arrange-cancel>Cancel</button>
       <button type="button" class="go" data-arrange-save>Save</button>
+    </div>
+    {{-- Free images only: cut the picture to a ready shape. --}}
+    <div class="tools shapes" data-arrange-shapes hidden>
+      <span class="lbl">Shape</span>
+      <button type="button" data-shape-preset="normal"><i style="border-style:dashed"></i>Normal</button>
+      <button type="button" data-shape-preset="square"><i></i>Square</button>
+      <button type="button" data-shape-preset="round"><i style="border-radius:50%"></i>Round</button>
+      <button type="button" data-shape-preset="oval"><i style="width:18px;border-radius:50%"></i>Oval</button>
     </div>
   </div>
   <script>
@@ -195,6 +208,7 @@
         bar.setAttribute("data-arranging", "");
         bar.querySelector("[data-arrange-name]").textContent = box.dataset.arrangeLabel;
         bar.querySelector("[data-arrange-change]").hidden = box.dataset.arrangeKind !== "custom_image";
+        bar.querySelector("[data-arrange-shapes]").hidden = box.dataset.arrangeKind !== "custom_image";
         show();
       }
       function stop() {
@@ -240,6 +254,32 @@
             status.textContent = "Couldn't upload that picture — try another";
             status.style.color = "#b91c1c";
           });
+      });
+      // A ready shape: the picture's current position is saved first, then the shape.
+      function send(body) {
+        body.owner = @json($ownerToken);
+        return fetch(@json(url('/api/v1/cards/'.$slug.'/owner')), {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify(body)
+        }).then(function (r) { if (!r.ok) throw new Error(); });
+      }
+      bar.querySelectorAll("[data-shape-preset]").forEach(function (b) {
+        b.addEventListener("click", function () {
+          if (!box) return;
+          var id = box.dataset.arrange;
+          var r = function (v) { return Math.round(v * 100) / 100; };
+          bar.setAttribute("data-busy", "");
+          status.textContent = "Saving…";
+          send({ spotFit: { id: id, fit: { l: r(fit.l), t: r(fit.t), w: r(fit.w), h: r(fit.h) } } })
+            .then(function () { return send({ spotShape: { id: id, shape: b.dataset.shapePreset } }); })
+            .then(function () { location.reload(); })
+            .catch(function () {
+              bar.removeAttribute("data-busy");
+              status.textContent = "Couldn't save — try again";
+              status.style.color = "#b91c1c";
+            });
+        });
       });
       bar.querySelector("[data-arrange-save]").addEventListener("click", function () {
         var r = function (v) { return Math.round(v * 100) / 100; };

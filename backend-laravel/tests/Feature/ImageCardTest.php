@@ -458,6 +458,43 @@ class ImageCardTest extends TestCase
         $this->get('/card/spice-garden')->assertSee('data-arrange-reset>Auto fit</button>', false);
     }
 
+    public function test_the_dealer_shapes_a_free_image_from_the_open_card(): void
+    {
+        // A 180×80 px box (30% × 8% of the 600×1000 card).
+        $this->save([$this->spot('logo', ['y' => 5]), $this->spot('custom_image', ['y' => 40, 'radius' => 20, 'value' => 'https://cdn.example.test/cards/images/p.jpg'])])->assertOk();
+        $this->postJson("/api/v1/businesses/{$this->business->id}/card/publish", [], $this->auth)->assertOk();
+        $this->post('/login', ['email' => $this->dealerEmail, 'password' => 'Password123!']);
+        $html = $this->get('/card/spice-garden')->getContent();
+        $this->assertStringContainsString('data-shape-preset="round"', $html);
+        preg_match('~body.owner = "([^"]+)"~', $html, $t);
+        $shapeOf = fn () => collect(BusinessCard::where('businessId', $this->business->id)->first()->hotspots)->firstWhere('id', 'h-custom_image');
+        $pick = fn ($shape, $id = 'h-custom_image') => $this->postJson('/api/v1/cards/spice-garden/owner', ['owner' => $t[1], 'spotShape' => ['id' => $id, 'shape' => $shape]]);
+
+        // Square: the biggest square that fits the wide box, centred — its rounded corners dropped.
+        $pick('square')->assertOk();
+        $this->assertEquals([[27.8, 0], [72.2, 0], [72.2, 100], [27.8, 100]], $shapeOf()['shape']);
+        $this->assertNull($shapeOf()['radius']);
+        $this->assertStringContainsString('clip-path:polygon(27.8% 0%,72.2% 0%,72.2% 100%,27.8% 100%)', $this->get('/card/spice-garden')->getContent());
+
+        // Round: a circle as tall as the box; Oval: fills the box.
+        $pick('round')->assertOk();
+        $round = $shapeOf()['shape'];
+        $this->assertCount(64, $round);
+        $this->assertEquals([72.2, 50], $round[0]);
+        $this->assertEquals([50, 100], $round[16]);
+        $pick('oval')->assertOk();
+        $this->assertEquals([100, 50], $shapeOf()['shape'][0]);
+        $this->assertEquals([50, 100], $shapeOf()['shape'][16]);
+
+        // Normal: no shape at all.
+        $pick('normal')->assertOk();
+        $this->assertNull($shapeOf()['shape']);
+
+        // Only free images, and only the ready shapes.
+        $pick('round', 'h-logo')->assertStatus(400);
+        $pick('star')->assertStatus(400);
+    }
+
     public function test_the_card_details_have_one_save_button_for_all(): void
     {
         $this->withoutVite();
