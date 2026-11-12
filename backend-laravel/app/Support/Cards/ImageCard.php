@@ -319,6 +319,26 @@ class ImageCard
         return count($out) >= 3 ? $out : null;
     }
 
+    /**
+     * The card's spots with one picture box (logo or free image) moved to
+     * another place on the card — its top-left corner at $x, $y percent,
+     * kept wholly on the card; null = no such picture box.
+     */
+    public static function withSpotPlace(array $hotspots, string $spotId, float $x, float $y): ?array
+    {
+        $found = false;
+        foreach ($hotspots as &$h) {
+            if (($h['id'] ?? null) === $spotId && in_array($h['action'] ?? null, ['logo', 'custom_image'], true)) {
+                $h['x'] = round(min(100 - (float) ($h['w'] ?? 0), max(0, $x)), 2);
+                $h['y'] = round(min(100 - (float) ($h['h'] ?? 0), max(0, $y)), 2);
+                $found = true;
+            }
+        }
+        unset($h);
+
+        return $found ? $hotspots : null;
+    }
+
     /** The card's spots with the words of one custom text box changed; null = no such box. */
     public static function withSpotText(array $hotspots, string $spotId, string $text): ?array
     {

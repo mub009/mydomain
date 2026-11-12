@@ -46,7 +46,7 @@
     #mk-owner-bar .shapes .lbl{margin:0 4px 0 2px}
     #mk-owner-bar .shapes button{display:flex;align-items:center;gap:6px;font-size:13px}
     #mk-owner-bar .shapes i{display:inline-block;width:14px;height:14px;border:2px solid currentColor;box-sizing:border-box}
-    #mk-owner-bar .shapes button[aria-pressed="true"]{border-color:#059669;background:#ecfdf5;color:#047857}
+    #mk-owner-bar .tools button[aria-pressed="true"]{border-color:#059669;background:#ecfdf5;color:#047857}
     #mk-owner-bar .sizes{margin-top:8px;align-items:center}
     #mk-owner-bar .sizes output{min-width:48px;text-align:center;font:600 14px system-ui,sans-serif}
     .spot.pic[data-arranging]{outline:2px dashed #059669;outline-offset:2px;cursor:move;touch-action:none;z-index:5}
@@ -94,7 +94,7 @@
   </div>
   </div>
   <div class="arr">
-    <p><b data-arrange-name>Picture</b> — drag it to move, − / + to zoom in or out.</p>
+    <p><b data-arrange-name>Picture</b> — drag to move, − / + to zoom in or out. Pick “Whole box” to move it anywhere on the card.</p>
     <div class="tools">
       <button type="button" class="big" data-zoom="-1" aria-label="Zoom out">−</button>
       <button type="button" class="big" data-zoom="1" aria-label="Zoom in">+</button>
@@ -104,6 +104,12 @@
       <input type="file" accept="image/png,image/jpeg,image/gif,image/webp" data-arrange-file hidden />
       <button type="button" data-arrange-cancel>Cancel</button>
       <button type="button" class="go" data-arrange-save>Save</button>
+    </div>
+    {{-- What a drag moves: the picture inside its box, or the whole box anywhere on the card. --}}
+    <div class="tools sizes" data-drag-modes>
+      <span class="lbl">Drag</span>
+      <button type="button" data-drag-mode="picture" aria-pressed="true">Picture</button>
+      <button type="button" data-drag-mode="box" aria-pressed="false">Whole box</button>
     </div>
     {{-- Free images only: cut the picture to a ready shape. --}}
     <div class="tools shapes" data-arrange-shapes hidden>
@@ -226,6 +232,11 @@
         bar.querySelector("[data-arrange-name]").textContent = box.dataset.arrangeLabel;
         bar.querySelector("[data-arrange-change]").hidden = box.dataset.arrangeKind !== "custom_image";
         bar.querySelector("[data-arrange-shapes]").hidden = box.dataset.arrangeKind !== "custom_image";
+        dragMode = "picture";
+        boxPlace = { x: parseFloat(box.style.left) || 0, y: parseFloat(box.style.top) || 0 };
+        savedPlace = { left: box.style.left, top: box.style.top };
+        placeDirty = false;
+        showDragMode();
         shape = box.dataset.arrangeShape || "normal";
         size = Number(box.dataset.arrangeSize) || 100;
         corners = Number(box.dataset.arrangeCorners) || 0;
@@ -253,6 +264,8 @@
       bar.querySelector("[data-arrange-cancel]").addEventListener("click", function () {
         img.setAttribute("style", saved);
         box.style.clipPath = savedClip;
+        box.style.left = savedPlace.left;
+        box.style.top = savedPlace.top;
         stop();
       });
       bar.querySelector("[data-arrange-reset]").addEventListener("click", function () {
@@ -281,6 +294,19 @@
       });
       // A ready shape and its size: seen at once on the card, kept with Save.
       var shape = "normal", size = 100, corners = 0, shapeDirty = false, savedClip = "";
+      // "Whole box": the box's own place on the card (its top-left corner, in percent of the card).
+      var dragMode = "picture", boxPlace = { x: 0, y: 0 }, savedPlace = null, placeDirty = false;
+      function showDragMode() {
+        bar.querySelectorAll("[data-drag-mode]").forEach(function (b) {
+          b.setAttribute("aria-pressed", b.dataset.dragMode === dragMode ? "true" : "false");
+        });
+      }
+      bar.querySelectorAll("[data-drag-mode]").forEach(function (b) {
+        b.addEventListener("click", function () {
+          dragMode = b.dataset.dragMode;
+          showDragMode();
+        });
+      });
       var MIN_SIZE = {{ \App\Support\Cards\ImageCard::SHAPE_MIN_SIZE }};
       // As the server draws it (ImageCard::presetShape): the biggest square / circle that fit the box, or an oval filling it, scaled by size.
       function shapePoints() {
@@ -357,12 +383,13 @@
         var r = function (v) { return Math.round(v * 100) / 100; };
         var id = box.dataset.arrange;
         var spotFit = { id: id, fit: { l: r(fit.l), t: r(fit.t), w: r(fit.w), h: r(fit.h) } };
-        if (!shapeDirty) return put({ spotFit: spotFit });
-        // Position first, then the shape and its size.
+        if (!shapeDirty && !placeDirty) return put({ spotFit: spotFit });
+        // The picture's position first, then the box's place, then the shape and its size.
         bar.setAttribute("data-busy", "");
         status.textContent = "Saving…";
         send({ spotFit: spotFit })
-          .then(function () { return send({ spotShape: { id: id, shape: shape, size: size, corners: shape === "square" ? corners : 0 } }); })
+          .then(function () { return placeDirty ? send({ spotPlace: { id: id, x: r(boxPlace.x), y: r(boxPlace.y) } }) : null; })
+          .then(function () { return shapeDirty ? send({ spotShape: { id: id, shape: shape, size: size, corners: shape === "square" ? corners : 0 } }) : null; })
           .then(function () { location.reload(); })
           .catch(function () {
             bar.removeAttribute("data-busy");
@@ -373,11 +400,22 @@
       document.addEventListener("pointerdown", function (e) {
         if (!box || !box.contains(e.target)) return;
         e.preventDefault();
-        drag = { x: e.clientX, y: e.clientY, l: fit.l, t: fit.t };
+        drag = { x: e.clientX, y: e.clientY, l: fit.l, t: fit.t, px: boxPlace.x, py: boxPlace.y };
         box.setPointerCapture && box.setPointerCapture(e.pointerId);
       });
       document.addEventListener("pointermove", function (e) {
         if (!drag) return;
+        if (dragMode === "box") {
+          // The whole box, anywhere on the card, never past its edges.
+          var card = box.parentElement.getBoundingClientRect();
+          var w = parseFloat(box.style.width) || 0, h = parseFloat(box.style.height) || 0;
+          boxPlace.x = Math.min(100 - w, Math.max(0, drag.px + (e.clientX - drag.x) / card.width * 100));
+          boxPlace.y = Math.min(100 - h, Math.max(0, drag.py + (e.clientY - drag.y) / card.height * 100));
+          box.style.left = boxPlace.x + "%";
+          box.style.top = boxPlace.y + "%";
+          placeDirty = true;
+          return;
+        }
         fit.l = drag.l + (e.clientX - drag.x) / box.clientWidth * 100;
         fit.t = drag.t + (e.clientY - drag.y) / box.clientHeight * 100;
         show();
