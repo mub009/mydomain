@@ -86,11 +86,14 @@
   </div>
   </div>
   <div class="arr">
-    <p><b data-arrange-name>Picture</b> — drag it to move, − / + to zoom.</p>
+    <p><b data-arrange-name>Picture</b> — drag it to move, − / + to zoom in or out.</p>
     <div class="tools">
       <button type="button" class="big" data-zoom="-1" aria-label="Zoom out">−</button>
       <button type="button" class="big" data-zoom="1" aria-label="Zoom in">+</button>
       <button type="button" data-arrange-reset>Reset</button>
+      {{-- Free images only: put a different picture in the box. --}}
+      <button type="button" data-arrange-change hidden>Change picture</button>
+      <input type="file" accept="image/png,image/jpeg,image/gif,image/webp" data-arrange-file hidden />
       <button type="button" data-arrange-cancel>Cancel</button>
       <button type="button" class="go" data-arrange-save>Save</button>
     </div>
@@ -191,6 +194,7 @@
         box.setAttribute("data-arranging", "");
         bar.setAttribute("data-arranging", "");
         bar.querySelector("[data-arrange-name]").textContent = box.dataset.arrangeLabel;
+        bar.querySelector("[data-arrange-change]").hidden = box.dataset.arrangeKind !== "custom_image";
         show();
       }
       function stop() {
@@ -215,6 +219,27 @@
       });
       bar.querySelector("[data-arrange-reset]").addEventListener("click", function () {
         put({ spotFit: { id: box.dataset.arrange, fit: null } });
+      });
+      // "Change picture": upload a new one into this free-image box, with the page's pass.
+      var fileInput = bar.querySelector("[data-arrange-file]");
+      bar.querySelector("[data-arrange-change]").addEventListener("click", function () { fileInput.click(); });
+      fileInput.addEventListener("change", function () {
+        var file = fileInput.files && fileInput.files[0];
+        if (!file || !box) return;
+        var form = new FormData();
+        form.append("owner", @json($ownerToken));
+        form.append("spotId", box.dataset.arrange);
+        form.append("file", file);
+        bar.setAttribute("data-busy", "");
+        status.textContent = "Uploading…";
+        fetch(@json(url('/api/v1/cards/'.$slug.'/owner/picture')), { method: "POST", headers: { Accept: "application/json" }, body: form })
+          .then(function (r) { if (!r.ok) throw new Error(); location.reload(); })
+          .catch(function () {
+            bar.removeAttribute("data-busy");
+            fileInput.value = "";
+            status.textContent = "Couldn't upload that picture — try another";
+            status.style.color = "#b91c1c";
+          });
       });
       bar.querySelector("[data-arrange-save]").addEventListener("click", function () {
         var r = function (v) { return Math.round(v * 100) / 100; };

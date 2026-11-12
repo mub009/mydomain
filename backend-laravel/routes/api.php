@@ -119,6 +119,9 @@ Route::post('/ai/business-description', [AiController::class, 'businessDescripti
 // The colour/design bar on the open card (/card/<slug>): saves with the card's owner pass.
 Route::post('/cards/{slug}/owner', [\App\Http\Controllers\Web\CardPageController::class, 'ownerUpdate'])
     ->where('slug', '[A-Za-z0-9_-]+')->middleware('throttle:30,1');
+// …and its "Change picture" for a free-image box (a file upload, same pass).
+Route::post('/cards/{slug}/owner/picture', [\App\Http\Controllers\Web\CardPageController::class, 'ownerPicture'])
+    ->where('slug', '[A-Za-z0-9_-]+')->middleware('throttle:12,1');
 
 // The visiting-card designs offered for a category (the "Add a business" picker).
 Route::get('/card-templates', [CardController::class, 'templates'])
