@@ -55,7 +55,8 @@ class BusinessFeatures
     ];
 
     // Manage-page sections a visiting-card-only business doesn't see.
-    public const CARD_ONLY_HIDDEN = ['Hours', 'Services', 'Photos', 'Reviews & QR', 'SEO'];
+    // Social Media too: the card's own links (Instagram, Facebook, YouTube, Google review) are set in its Card details.
+    public const CARD_ONLY_HIDDEN = ['Hours', 'Services', 'Photos', 'Reviews & QR', 'Social Media', 'SEO'];
 
     /** Has the digital visiting card but no website. */
     public static function cardOnly(Business|array $business): bool
@@ -124,8 +125,8 @@ class BusinessFeatures
         // A business taken for its visiting card alone (no website) is kept
         // to what the card needs: these listing extras are left off its menu.
         if (in_array($section, self::CARD_ONLY_HIDDEN, true) && self::cardOnly($business)
-            // One Review and AI Google Review work from the review links and QR, so they keep it.
-            && ! ($section === 'Reviews & QR' && (self::has($business, self::ONE_REVIEW) || self::has($business, self::AI_REVIEW)))) {
+            // One Review and AI Google Review work from the review and social links and QR, so they keep those.
+            && ! (in_array($section, ['Reviews & QR', 'Social Media'], true) && (self::has($business, self::ONE_REVIEW) || self::has($business, self::AI_REVIEW)))) {
             return false;
         }
         foreach (self::SECTIONS as $feature => $sections) {

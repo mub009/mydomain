@@ -105,7 +105,13 @@ class FeaturePlansTest extends TestCase
             $this->assertFalse(BusinessFeatures::allowsSection($cardOnly, $section), $section);
         }
         $this->assertTrue(BusinessFeatures::allowsSection($cardOnly, 'Contact'));
-        $this->assertTrue(BusinessFeatures::allowsSection($cardOnly, 'Social Media'));
+        // Its links are set in the card's own details, so Social Media is left off its menu…
+        $this->assertFalse(BusinessFeatures::allowsSection($cardOnly, 'Social Media'));
+        // …unless One Review or AI Google Review, which use them, come with it.
+        $this->assertTrue(BusinessFeatures::allowsSection(['features' => ['VISITING_CARD', 'ONE_REVIEW']], 'Social Media'));
+        $this->assertTrue(BusinessFeatures::allowsSection(['features' => ['VISITING_CARD', 'AI_REVIEW']], 'Social Media'));
+        // With a website it stays.
+        $this->assertTrue(BusinessFeatures::allowsSection(['features' => ['VISITING_CARD', 'WEBSITE']], 'Social Media'));
         $this->assertTrue(BusinessFeatures::allowsSection($cardOnly, 'Visiting Card'));
 
         // One Review and AI Google Review need Reviews & QR, so it stays for them.
