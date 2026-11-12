@@ -93,12 +93,12 @@ class CardPageController extends Controller
             $bar = view('cards.partials.owner-bar', [
                 'slug' => $business->slug,
                 // Saves go with this pass, so they work wherever the card is opened.
-                'ownerToken' => CardEngine::ownerToken($business, $manager->id, 2),
+                'ownerToken' => CardEngine::ownerToken($business, $manager->id, 12),
                 'designs' => $designs,
                 'isAdmin' => $manager->role === 'ADMIN',
                 'colour' => ImageColour::normalize($business->card?->imageColour),
                 'swatches' => ImageColour::SWATCHES,
-                'manageUrl' => url("/dashboard/businesses/{$business->id}?section=".urlencode('Visiting Card')),
+                'manageUrl' => "/dashboard/businesses/{$business->id}?section=".urlencode('Visiting Card'),
             ])->render();
             $html = str_contains($html, '</body>') ? preg_replace('~</body>~i', $bar.'</body>', $html, 1) : $html.$bar;
         }

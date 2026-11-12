@@ -684,8 +684,21 @@ class ImageCardTest extends TestCase
         $this->save([$this->spot('call')])->assertOk();
         $this->postJson("/api/v1/businesses/{$this->business->id}/card/publish", [], $this->auth)->assertOk();
         $this->post('/login', ['email' => $this->ownerEmail, 'password' => 'Password123!']);
-        // The bar sends the picked colour at full strength (not mixed with the design's own).
-        $this->assertStringContainsString('strength: 100,', $this->get('/card/spice-garden')->getContent());
+        // The bar sends the picked colour at full strength (not mixed with the design's own)…
+        $html = $this->get('/card/spice-garden')->getContent();
+        $this->assertStringContainsString('strength: 100,', $html);
+        // …to a same-site address (never http:// from an https page behind a proxy)…
+        $this->assertStringContainsString('fetch("\\/api\\/v1\\/cards\\/spice-garden\\/owner"', $html);
+        $this->assertStringNotContainsString('http:\\/\\/localhost\\/api', $html);
+        // …with a pass good for 12 hours, and a clear message when it has run out.
+        preg_match('~body.owner = "([^"]+)"~', $html, $t);
+        $this->travel(11)->hours();
+        $this->postJson('/api/v1/cards/spice-garden/owner', ['owner' => $t[1], 'imageColour' => ['tint' => '#dc2626', 'strength' => 100]])->assertOk();
+        $this->travel(13)->hours();
+        $this->post('/logout');
+        $this->postJson('/api/v1/cards/spice-garden/owner', ['owner' => $t[1], 'imageColour' => ['tint' => '#2563eb', 'strength' => 100]])->assertStatus(403);
+        $this->assertStringContainsString('Your editing time ran out', $html);
+        $this->travelBack();
 
         $red = \App\Support\Cards\ImageColour::normalize(['tint' => '#dc2626', 'strength' => 100]);
         // White and black text and buttons stay readable…

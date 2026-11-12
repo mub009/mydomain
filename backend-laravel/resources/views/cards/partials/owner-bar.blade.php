@@ -141,22 +141,32 @@
       var current = @json($c);
       bar.querySelector("[data-close]").addEventListener("click", function () { bar.remove(); });
 
+      // Why a save was refused, in words: an expired editing pass says how to get a new one.
+      function failed(r) {
+        if (r.status === 403) return Promise.reject(new Error("Your editing time ran out — open the card again from your dashboard (Open card)."));
+        return r.json().then(
+          function (j) { throw new Error((j && j.error && j.error.message) || "Couldn't save — try again"); },
+          function () { throw new Error("Couldn't save — try again"); }
+        );
+      }
+      function showFailure(err, fallback) {
+        bar.removeAttribute("data-busy");
+        status.textContent = err && err.message && err.message !== "Failed to fetch" ? err.message : fallback;
+        status.style.color = "#b91c1c";
+      }
+
       function put(body) {
         bar.setAttribute("data-busy", "");
         status.textContent = "Saving…";
         // Saved with this page's owner pass, so it works even where the browser isn't signed in here.
         body.owner = @json($ownerToken);
-        fetch(@json(url('/api/v1/cards/'.$slug.'/owner')), {
+        fetch(@json('/api/v1/cards/'.$slug.'/owner'), {
           method: "POST",
           headers: { "Content-Type": "application/json", Accept: "application/json" },
           body: JSON.stringify(body)
         })
-          .then(function (r) { if (!r.ok) throw new Error(); location.reload(); })
-          .catch(function () {
-            bar.removeAttribute("data-busy");
-            status.textContent = "Couldn't save — try again";
-            status.style.color = "#b91c1c";
-          });
+          .then(function (r) { return r.ok ? location.reload() : failed(r); })
+          .catch(function (err) { showFailure(err, "Couldn't save — check your connection and try again"); });
       }
 
       function save(tint, saturation) {
@@ -284,13 +294,11 @@
         form.append("file", file);
         bar.setAttribute("data-busy", "");
         status.textContent = "Uploading…";
-        fetch(@json(url('/api/v1/cards/'.$slug.'/owner/picture')), { method: "POST", headers: { Accept: "application/json" }, body: form })
-          .then(function (r) { if (!r.ok) throw new Error(); location.reload(); })
-          .catch(function () {
-            bar.removeAttribute("data-busy");
+        fetch(@json('/api/v1/cards/'.$slug.'/owner/picture'), { method: "POST", headers: { Accept: "application/json" }, body: form })
+          .then(function (r) { return r.ok ? location.reload() : failed(r); })
+          .catch(function (err) {
             fileInput.value = "";
-            status.textContent = "Couldn't upload that picture — try another";
-            status.style.color = "#b91c1c";
+            showFailure(err, "Couldn't upload that picture — try another");
           });
       });
       // A ready shape and its size: seen at once on the card, kept with Save.
@@ -374,11 +382,11 @@
       });
       function send(body) {
         body.owner = @json($ownerToken);
-        return fetch(@json(url('/api/v1/cards/'.$slug.'/owner')), {
+        return fetch(@json('/api/v1/cards/'.$slug.'/owner'), {
           method: "POST",
           headers: { "Content-Type": "application/json", Accept: "application/json" },
           body: JSON.stringify(body)
-        }).then(function (r) { if (!r.ok) throw new Error(); });
+        }).then(function (r) { return r.ok ? null : failed(r); });
       }
       bar.querySelector("[data-arrange-save]").addEventListener("click", function () {
         var r = function (v) { return Math.round(v * 100) / 100; };
@@ -392,11 +400,7 @@
           .then(function () { return placeDirty ? send({ spotPlace: { id: id, x: r(boxPlace.x), y: r(boxPlace.y) } }) : null; })
           .then(function () { return shapeDirty ? send({ spotShape: { id: id, shape: shape, size: size, corners: shape === "square" ? corners : 0 } }) : null; })
           .then(function () { location.reload(); })
-          .catch(function () {
-            bar.removeAttribute("data-busy");
-            status.textContent = "Couldn't save — try again";
-            status.style.color = "#b91c1c";
-          });
+          .catch(function (err) { showFailure(err, "Couldn't save — try again"); });
       });
       document.addEventListener("pointerdown", function (e) {
         if (!box || !box.contains(e.target)) return;
