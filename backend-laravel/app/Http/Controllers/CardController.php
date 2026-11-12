@@ -121,6 +121,9 @@ class CardController extends Controller
             // The image's recolouring — the whole business team, owners too, can change it.
             'imageColour' => ImageColour::normalize($card?->imageColour),
             'imageColourDefaults' => ImageColour::DEFAULTS,
+            // The design's colour versions (admin-made images) and the one the card wears.
+            'colourVariants' => ImageCard::colourVariants($current?->colourVariants),
+            'colourVariantId' => ImageCard::variantFor($card, $current)['id'] ?? null,
             // The areas marked on its design (template editor), used when the card has none of its own.
             'designColourAreas' => count(ImageColour::areas($current?->colourAreas ?? null)),
             'missingDetails' => ImageCard::missingDetails($image['hotspots'] ?? [], ImageCard::listingDefaults($details)),
@@ -183,6 +186,8 @@ class CardController extends Controller
             ...ImageCard::rules(),
             ...ImageColour::rules(),
             'multiView' => ['sometimes', 'boolean'],
+            // A colour version of the design (its id; null = the master image) — the whole team can pick one.
+            'colourVariant' => ['sometimes', 'nullable', 'string', 'max:40'],
             'extraTemplateIds' => ['sometimes', 'nullable', 'array', 'max:50'],
             'extraTemplateIds.*' => ['uuid'],
             // A picture for one of the design's free-image spots ("Missing on your listing").
@@ -236,6 +241,11 @@ class CardController extends Controller
                 throw ApiException::forbidden('This is a premium design. Upgrade your plan to use it.');
             }
             $changes['templateId'] = $template->id;
+            // The colour picked stays if the new design has a version in the same colour; else its master image.
+            if ($business->card?->colourVariantId && ! array_key_exists('colourVariant', $data)) {
+                $was = ImageCard::variantFor($business->card, CardEngine::templateFor($business, $business->card));
+                $changes['colourVariantId'] = $was ? (collect(ImageCard::colourVariants($template->colourVariants))->firstWhere('colour', $was['colour'])['id'] ?? null) : null;
+            }
             // Picking a design drops the card's own image copy, so the design's
             // image (if it has one) shows — unless an image is sent with it.
             if (! array_key_exists('imageUrl', $data)) {
@@ -293,7 +303,7 @@ class CardController extends Controller
             }
             $changes['hotspots'] = $hotspots;
             if ($source['fromTemplate']) {
-                $changes += ['imageUrl' => $source['imageUrl'], 'imageWidth' => $source['imageWidth'], 'imageHeight' => $source['imageHeight']];
+                $changes += ImageCard::masterImage($source);
             }
         }
         // Moving a picture's box on the card, from the open card: the whole business team can.
@@ -305,7 +315,7 @@ class CardController extends Controller
             }
             $changes['hotspots'] = $hotspots;
             if ($source['fromTemplate']) {
-                $changes += ['imageUrl' => $source['imageUrl'], 'imageWidth' => $source['imageWidth'], 'imageHeight' => $source['imageHeight']];
+                $changes += ImageCard::masterImage($source);
             }
         }
         // A custom text box's words: content, not the design — the whole business team can.
@@ -317,7 +327,7 @@ class CardController extends Controller
             }
             $changes['hotspots'] = $hotspots;
             if ($source['fromTemplate']) {
-                $changes += ['imageUrl' => $source['imageUrl'], 'imageWidth' => $source['imageWidth'], 'imageHeight' => $source['imageHeight']];
+                $changes += ImageCard::masterImage($source);
             }
         }
         // Its shape too: content, not the design — the whole business team can.
@@ -329,7 +339,7 @@ class CardController extends Controller
             }
             $changes['hotspots'] = $hotspots;
             if ($source['fromTemplate']) {
-                $changes += ['imageUrl' => $source['imageUrl'], 'imageWidth' => $source['imageWidth'], 'imageHeight' => $source['imageHeight']];
+                $changes += ImageCard::masterImage($source);
             }
         }
         // Arranging a picture (move and zoom) is content too: the whole business team can.
@@ -341,11 +351,24 @@ class CardController extends Controller
             }
             $changes['hotspots'] = $hotspots;
             if ($source['fromTemplate']) {
-                $changes += ['imageUrl' => $source['imageUrl'], 'imageWidth' => $source['imageWidth'], 'imageHeight' => $source['imageHeight']];
+                $changes += ImageCard::masterImage($source);
             }
         }
         if (array_key_exists('imageColour', $data)) {
             $changes['imageColour'] = ImageColour::normalize(self::withOwnAreas($actor, $data['imageColour'], $business->card?->imageColour));
+            // Recoloured by hand: back to the master image underneath.
+            if (! array_key_exists('colourVariant', $data)) {
+                $changes['colourVariantId'] = null;
+            }
+        }
+        // A colour version: one of the design's own, by id (null = the master image). It is shown as made,
+        // so any recolouring is set aside — its marked areas are kept for later.
+        if (array_key_exists('colourVariant', $data)) {
+            $design = isset($changes['templateId']) ? CardTemplate::find($changes['templateId']) : CardEngine::templateFor($business, $business->card);
+            if ($data['colourVariant'] !== null && ! collect(ImageCard::colourVariants($design?->colourVariants))->contains('id', $data['colourVariant'])) {
+                throw ApiException::badRequest('That colour is not offered for this design');
+            }
+            $changes['colourVariantId'] = $data['colourVariant'];
         }
         // Multi card view is about sharing, not the design: the whole business team can set it.
         if (array_key_exists('multiView', $data)) {
