@@ -29,8 +29,8 @@
       "__commonjsHelpers-CqkleIqs.js"
     ]
   },
-  "_colour-areas-BtQhCvKs.js": {
-    "file": "assets/colour-areas-BtQhCvKs.js",
+  "_colour-areas-7GRW3NDR.js": {
+    "file": "assets/colour-areas-7GRW3NDR.js",
     "name": "colour-areas",
     "imports": [
       "_ui-BdSpcnW7.js"
@@ -164,14 +164,14 @@
     ]
   },
   "resources/js/pages/card-manager.js": {
-    "file": "assets/card-manager-COO67Qve.js",
+    "file": "assets/card-manager-4NFqJmsI.js",
     "name": "card-manager",
     "src": "resources/js/pages/card-manager.js",
     "isEntry": true,
     "imports": [
       "_api-B_riRJ0q.js",
       "_card-preview-D32f_M1W.js",
-      "_colour-areas-BtQhCvKs.js",
+      "_colour-areas-7GRW3NDR.js",
       "_channels-CvUWVcU_.js",
       "_ui-BdSpcnW7.js",
       "_widgets-BKox7ttS.js",
@@ -179,13 +179,13 @@
     ]
   },
   "resources/js/pages/card-template-editor.js": {
-    "file": "assets/card-template-editor-ZasUtvx6.js",
+    "file": "assets/card-template-editor-BVBM6dnd.js",
     "name": "card-template-editor",
     "src": "resources/js/pages/card-template-editor.js",
     "isEntry": true,
     "imports": [
       "_api-B_riRJ0q.js",
-      "_colour-areas-BtQhCvKs.js",
+      "_colour-areas-7GRW3NDR.js",
       "_ui-BdSpcnW7.js",
       "_searchable-select-DGJiky5z.js",
       "_widgets-BKox7ttS.js",

@@ -1,8 +1,7 @@
 // "Where the colour goes": a full-screen editor for marking the parts of the
 // card image the colour should change. Each area is drawn freehand, with the
 // pen (point by point, like a pen tool), as a square/rectangle, a circle or an
-// oval; the eraser draws the same shapes to take the colour away again — on
-// its own it starts from the whole card ("colour everywhere except here").
+// oval. (Areas erased with an older eraser are still drawn and kept.)
 // "Edit points" reshapes what's drawn, like a direct-selection tool: drag a
 // point or the whole shape, click an edge to add a point, double-click a
 // point to remove it, Delete removes the shape. Areas apply in order, so a later one wins where
@@ -105,9 +104,7 @@ export function openColourAreas({ imageUrl, ratio, colour, onDone }) {
               ? "Edit points: click a shape, then drag its points (or the shape itself). Click an edge to add a point, double-click a point to remove it."
               : shape === "pen"
               ? "Pen: click point by point around the part. Click the first point (or double-click, or press Enter) to close it."
-              : erase
-                ? "Eraser: draw over the parts that should keep their own colour."
-                : "Draw around the parts the colour should change. Nothing marked = the whole card."
+              : "Draw around the parts the colour should change. Nothing marked = the whole card."
           }</p>
           ${problem ? `<p class="mt-0.5 text-xs font-semibold text-red-300">${esc(problem)}</p>` : ""}
         </div>
@@ -115,11 +112,6 @@ export function openColourAreas({ imageUrl, ratio, colour, onDone }) {
         <button type="button" data-x="done" class="rounded-lg bg-brand-600 px-5 py-2 text-sm font-semibold text-white hover:bg-brand-700">Done</button>
       </div>`;
     tools.innerHTML = `
-      <div class="flex gap-1.5" role="group" aria-label="Colour or erase">
-        ${btn('data-x="paint"', !erase, `${icon("paintbrush", { size: 14 })} Colour here`)}
-        ${btn('data-x="erase"', erase, `${icon("eraser", { size: 14 })} Eraser`)}
-      </div>
-      <span class="mx-1 h-6 w-px bg-white/20"></span>
       <div class="flex flex-wrap gap-1.5" role="group" aria-label="Shape">
         ${btn('data-shape="free"', shape === "free", `${icon("pencil", { size: 14 })} Freehand`)}
         ${btn('data-shape="pen"', shape === "pen", `${icon("pen-tool", { size: 14 })} Pen`)}
@@ -146,7 +138,7 @@ export function openColourAreas({ imageUrl, ratio, colour, onDone }) {
       <span class="mx-1 h-6 w-px bg-white/20"></span>
       ${btn('data-x="undo"', false, "Undo", areas.length ? "" : "disabled")}
       ${btn('data-x="clear"', false, "Clear all", areas.length ? "" : "disabled")}
-      <span class="text-white/60">${areas.length ? `${areas.filter((a) => !a.erase).length} marked, ${areas.filter((a) => a.erase).length} erased` : "Nothing marked yet"}</span>`;
+      <span class="text-white/60">${areas.length ? `${areas.length} marked` : "Nothing marked yet"}</span>`;
     paint();
   }
 
@@ -242,7 +234,6 @@ export function openColourAreas({ imageUrl, ratio, colour, onDone }) {
       return onDone(areas);
     }
     if (x === "paint") erase = false;
-    if (x === "erase") erase = true;
     if (x === "pen-close") return closePen();
     if (x === "pen-back") pen.pop();
     if (x === "pen-cancel") pen = [];
