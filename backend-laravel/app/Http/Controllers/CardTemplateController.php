@@ -56,6 +56,13 @@ class CardTemplateController extends Controller
             'colourAreas.*.points' => ['required', 'array', 'min:3', 'max:'.ImageColour::MAX_AREA_POINTS],
             'colourAreas.*.points.*' => ['array', 'size:2'],
             'colourAreas.*.points.*.*' => ['numeric'],
+            // Colour versions: the same design in other colours, each a swatch and its own image.
+            'colourVariants' => ['sometimes', 'nullable', 'array', 'max:'.ImageCard::MAX_COLOUR_VARIANTS],
+            'colourVariants.*.id' => ['nullable', 'string', 'max:40', 'regex:/^[A-Za-z0-9_-]+$/'],
+            'colourVariants.*.colour' => ['required', 'string', 'regex:/^#[0-9a-fA-F]{6}$/'],
+            'colourVariants.*.imageUrl' => ['required', 'url', 'max:500', 'regex:#^https?://[^\s"\'()<>\\\\]+$#i'],
+            'colourVariants.*.imageWidth' => ['nullable', 'integer', 'min:1', 'max:20000'],
+            'colourVariants.*.imageHeight' => ['nullable', 'integer', 'min:1', 'max:20000'],
         ];
     }
 
@@ -69,10 +76,14 @@ class CardTemplateController extends Controller
         if (array_key_exists('colourAreas', $data)) {
             $data['colourAreas'] = ImageColour::areas($data['colourAreas'] ?? null) ?: null;
         }
-        // No image, nothing to mark: its areas go with it.
+        if (array_key_exists('colourVariants', $data)) {
+            $data['colourVariants'] = ImageCard::colourVariants($data['colourVariants'] ?? null) ?: null;
+        }
+        // No image, nothing to mark or recolour: its areas and colour versions go with it.
         if (array_key_exists('imageUrl', $data) && $data['imageUrl'] === null) {
             $data['imageWidth'] = $data['imageHeight'] = null;
             $data['colourAreas'] = null;
+            $data['colourVariants'] = null;
         }
 
         return $data;

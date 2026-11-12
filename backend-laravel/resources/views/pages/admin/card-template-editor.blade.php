@@ -47,6 +47,23 @@
             <button type="button" class="btn-secondary px-3 py-1.5 text-xs !text-red-700" data-areas-clear hidden><x-icon name="trash-2" :size="13" /> Clear areas</button>
           </div>
         </div>
+
+        {{-- Colour versions: the same design in other colours, each a swatch and its own image
+             (a "sub-master" of this master design). On the open card the business picks one and
+             wears that image; the boxes stay the master's. Saved with the template. --}}
+        <div class="mt-4 rounded-lg border border-sky-200 bg-sky-50/60 p-3" data-template-variants>
+          <p class="flex items-center gap-1.5 text-sm font-semibold text-ink-900"><x-icon name="palette" :size="15" class="text-sky-600" /> Colour versions</p>
+          <p class="mt-0.5 text-xs text-ink-600" data-variants-status></p>
+          <ul class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3" data-variants-list></ul>
+          <div class="mt-3 rounded-lg border border-sky-200 bg-white p-2.5" data-variant-add>
+            <p class="mb-2 text-xs font-semibold text-ink-700">Add a colour version: pick its colour, then upload the design in that colour.</p>
+            <div class="flex flex-wrap items-center gap-2" role="radiogroup" aria-label="Colour" data-variant-grid></div>
+            <div class="mt-2 flex flex-wrap items-center gap-2">
+              <button type="button" class="btn-primary px-3 py-1.5 text-xs" data-variant-upload><x-icon name="upload" :size="13" /> <span>Upload image for this colour</span></button>
+              <input type="file" accept="image/png,image/jpeg,image/webp" class="hidden" data-variant-file />
+            </div>
+          </div>
+        </div>
       </div>
 
       <form class="card space-y-5 p-5" data-template-form>
@@ -109,6 +126,7 @@
           'imageHeight' => $template['imageHeight'] ?? null,
           'hotspots' => $template['hotspots'] ?? [],
           'colourAreas' => $template['colourAreas'] ?? [],
+          'colourVariants' => $template['colourVariants'] ?? [],
           'actions' => $options['actions'],
           'fonts' => $options['fonts'],
           'actionDefaults' => $options['actionDefaults'],

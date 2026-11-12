@@ -65,6 +65,17 @@
   </div>
   <div class="main">
   <p class="lbl">Colour</p>
+  @if (count($variants ?? []))
+    {{-- The design's own colour versions (images the admin made): picking one shows that image. --}}
+    <div class="row" role="radiogroup" aria-label="Card colour">
+      <button type="button" role="radio" class="sw" title="Original" aria-label="Original" aria-checked="{{ $variantId ? 'false' : 'true' }}"
+              style="background: conic-gradient(#ef4444,#f59e0b,#22c55e,#3b82f6,#a855f7,#ef4444)" data-variant=""></button>
+      @foreach ($variants as $v)
+        <button type="button" role="radio" class="sw" title="{{ $v['colour'] }}" aria-label="Colour {{ $v['colour'] }}" aria-checked="{{ $variantId === $v['id'] ? 'true' : 'false' }}"
+                style="background: {{ $v['colour'] }}" data-variant="{{ $v['id'] }}"></button>
+      @endforeach
+    </div>
+  @else
   <div class="row" role="radiogroup" aria-label="Card colour">
     @foreach ($swatches as [$key, $label, $bg, $tint, $sat])
       <button type="button" role="radio" class="sw" title="{{ $label }}" aria-label="{{ $label }}" aria-checked="{{ $on === $key ? 'true' : 'false' }}"
@@ -76,6 +87,7 @@
       <input type="color" value="{{ $on === 'custom' ? $c['tint'] : '#2563eb' }}" aria-label="Pick your own colour" data-custom />
     </label>
   </div>
+  @endif
   @if (count($designs ?? []) > 1)
     {{-- The card's image: another ready-made design (as "Use this design" in the dashboard). --}}
     <p class="lbl">Design</p>
@@ -183,9 +195,17 @@
       }
 
       bar.querySelectorAll("button.sw").forEach(function (b) {
-        b.addEventListener("click", function () { save(b.dataset.tint || null, Number(b.dataset.saturation)); });
+        b.addEventListener("click", function () {
+          // A colour version of the design (its own image), or else the colour laid over the image.
+          if (b.hasAttribute("data-variant")) {
+            if (b.getAttribute("aria-checked") === "true") return;
+            return put({ colourVariant: b.dataset.variant || null });
+          }
+          save(b.dataset.tint || null, Number(b.dataset.saturation));
+        });
       });
-      bar.querySelector("[data-custom]").addEventListener("change", function (e) { save(e.target.value, 100); });
+      var custom = bar.querySelector("[data-custom]");
+      if (custom) custom.addEventListener("change", function (e) { save(e.target.value, 100); });
       bar.querySelectorAll("[data-design]").forEach(function (b) {
         b.addEventListener("click", function () {
           if (b.getAttribute("aria-checked") === "true") return;

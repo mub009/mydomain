@@ -189,6 +189,7 @@ class CardEngine
             'imageHeight' => $template->imageHeight,
             'hotspots' => $template->hotspots ?? [],
             'colourAreas' => $template->colourAreas ?? [],
+            'colourVariants' => ImageCard::colourVariants($template->colourVariants),
             'design' => self::normalizeDesign($template->design),
             'isDefault' => $template->isDefault,
             'isActive' => $template->isActive,

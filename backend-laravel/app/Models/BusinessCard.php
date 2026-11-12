@@ -25,7 +25,7 @@ class BusinessCard extends Model
     // imageColour: the business's recolouring of that image (ImageColour).
     // multiView + extraTemplateIds: the public link shows other ready-made
     // designs after the card, as a slider (ImageCard::slides()).
-    protected $fillable = ['businessId', 'templateId', 'backgroundImageUrl', 'imageUrl', 'imageWidth', 'imageHeight', 'hotspots', 'imageColour', 'isPublished', 'multiView', 'extraTemplateIds', 'publishedAt', 'viewCount'];
+    protected $fillable = ['businessId', 'templateId', 'backgroundImageUrl', 'imageUrl', 'imageWidth', 'imageHeight', 'hotspots', 'imageColour', 'colourVariantId', 'isPublished', 'multiView', 'extraTemplateIds', 'publishedAt', 'viewCount'];
 
     protected function casts(): array
     {

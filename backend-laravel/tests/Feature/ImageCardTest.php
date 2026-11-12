@@ -710,6 +710,68 @@ class ImageCardTest extends TestCase
         $this->assertGreaterThan($g * 2, $r);
     }
 
+    public function test_a_design_s_colour_versions_are_picked_on_the_open_card(): void
+    {
+        $admin = $this->admin();
+        $make = fn (string $name, array $variants) => $this->postJson('/api/v1/admin/card-templates', [
+            'name' => $name, 'layout' => 'classic', 'categoryId' => $this->business->categoryId, 'isDefault' => $name === 'Master',
+            'imageUrl' => 'https://cdn.example.test/cards/images/'.strtolower($name).'.jpg', 'imageWidth' => 600, 'imageHeight' => 1000,
+            'hotspots' => [$this->spot('call'), ['id' => 'photo', 'action' => 'custom_image', 'x' => 10, 'y' => 30, 'w' => 80, 'h' => 20]],
+            'colourVariants' => $variants,
+        ], $admin)->assertCreated();
+        // The admin adds colour versions, each a swatch and its own image; a bad one is refused.
+        $master = $make('Master', [
+            ['colour' => '#DC2626', 'imageUrl' => 'https://cdn.example.test/cards/images/master-red.jpg', 'imageWidth' => 600, 'imageHeight' => 1000],
+            ['colour' => '#2563eb', 'imageUrl' => 'https://cdn.example.test/cards/images/master-blue.jpg'],
+        ])->assertJsonCount(2, 'data.colourVariants')->assertJsonPath('data.colourVariants.0.colour', '#dc2626')->json('data');
+        $this->postJson('/api/v1/admin/card-templates', ['name' => 'X', 'layout' => 'classic', 'imageUrl' => 'https://cdn.example.test/x.jpg', 'colourVariants' => [['colour' => 'red', 'imageUrl' => 'https://cdn.example.test/r.jpg']]], $admin)->assertStatus(400);
+        [$red, $blue] = [$master['colourVariants'][0]['id'], $master['colourVariants'][1]['id']];
+        $other = $make('Other', [['colour' => '#dc2626', 'imageUrl' => 'https://cdn.example.test/cards/images/other-red.jpg']])->json('data');
+        $this->postJson("/api/v1/businesses/{$this->business->id}/card/publish", [], $this->auth)->assertOk();
+
+        // The open card offers them instead of recolouring.
+        $this->post('/login', ['email' => $this->ownerEmail, 'password' => 'Password123!']);
+        $html = $this->get('/card/spice-garden')->getContent();
+        $this->assertStringContainsString('data-variant="'.$red.'"', $html);
+        $this->assertStringNotContainsString('aria-label="Pick your own colour"', $html);
+        preg_match('~body.owner = "([^"]+)"~', $html, $t);
+        $send = fn (array $body) => $this->postJson('/api/v1/cards/spice-garden/owner', ['owner' => $t[1], ...$body]);
+
+        // Picking red: the card wears the red image, as made — no recolouring.
+        $send(['colourVariant' => $red])->assertOk();
+        $html = $this->get('/card/spice-garden')->getContent();
+        $this->assertStringContainsString('cards/images/master-red.jpg', $html);
+        $this->assertStringNotContainsString('feColorMatrix', $html);
+        $this->assertMatchesRegularExpression('~aria-checked="true"\s+style="background: #dc2626" data-variant="'.$red.'"~', $html);
+        $this->getJson("/api/v1/businesses/{$this->business->id}/card", $this->auth)->assertJsonPath('data.colourVariantId', $red);
+
+        // Changing the card's own content keeps the master as its copy, and the red version on show.
+        $send(['spotPlace' => ['id' => 'photo', 'x' => 5, 'y' => 40]])->assertOk();
+        $this->assertSame('https://cdn.example.test/cards/images/master.jpg', BusinessCard::where('businessId', $this->business->id)->value('imageUrl'));
+        $this->assertStringContainsString('cards/images/master-red.jpg', $this->get('/card/spice-garden')->getContent());
+
+        // Another design with a red version: switching keeps red.
+        $send(['templateId' => $other['id']])->assertOk();
+        $this->assertStringContainsString('cards/images/other-red.jpg', $this->get('/card/spice-garden')->getContent());
+        $send(['templateId' => $master['id']])->assertOk();
+        $this->assertStringContainsString('cards/images/master-red.jpg', $this->get('/card/spice-garden')->getContent());
+
+        // Only the design's own versions; "Original" (null) goes back to the master image.
+        $send(['colourVariant' => 'nope'])->assertStatus(400);
+        $send(['colourVariant' => $blue])->assertOk();
+        $this->assertStringContainsString('cards/images/master-blue.jpg', $this->get('/card/spice-garden')->getContent());
+        $send(['colourVariant' => null])->assertOk();
+        $this->assertStringNotContainsString('master-blue.jpg', $this->get('/card/spice-garden')->getContent());
+
+        // Recolouring by hand sets a picked version aside.
+        $send(['colourVariant' => $red])->assertOk();
+        $send(['imageColour' => ['tint' => '#16a34a', 'strength' => 100]])->assertOk();
+        $this->assertNull(BusinessCard::where('businessId', $this->business->id)->value('colourVariantId'));
+
+        // Removing the master image removes its versions too.
+        $this->patchJson("/api/v1/admin/card-templates/{$master['id']}", ['imageUrl' => null], $admin)->assertOk()->assertJsonPath('data.colourVariants', []);
+    }
+
     public function test_the_card_details_have_one_save_button_for_all(): void
     {
         $this->withoutVite();

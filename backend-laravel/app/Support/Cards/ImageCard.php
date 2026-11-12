@@ -111,9 +111,67 @@ class ImageCard
             $source = $template ? self::fromTemplate($template) : null;
         }
 
+        if (! $source) {
+            return null;
+        }
+        // The master image, kept for when the card makes its own copy of the design.
+        $source['master'] = ['imageUrl' => $source['imageUrl'], 'imageWidth' => $source['imageWidth'], 'imageHeight' => $source['imageHeight']];
+        // A colour version picked from the design's own (admin-made images): that image, as made — no recolouring.
+        // Any card on the design's master picture can wear it (its boxes, even rearranged, sit on the same picture).
+        $variant = $template && (! $card?->imageUrl || $card->imageUrl === $template->imageUrl) ? self::variantFor($card, $template) : null;
+        if ($variant) {
+            return [...$source, 'imageUrl' => $variant['imageUrl'], 'imageWidth' => $variant['imageWidth'] ?? $source['imageWidth'],
+                'imageHeight' => $variant['imageHeight'] ?? $source['imageHeight'], 'colour' => null, 'variant' => $variant['id']];
+        }
+
         // The business's recolouring applies to whichever image it wears — only in
         // the card's own marked areas, or else the ones marked on its design.
-        return $source ? [...$source, 'colour' => self::colourFor($card, $template)] : null;
+        return [...$source, 'colour' => self::colourFor($card, $template), 'variant' => null];
+    }
+
+    // How many colour versions a design can have.
+    public const MAX_COLOUR_VARIANTS = 12;
+
+    /**
+     * A design's colour versions as stored: each its id, swatch colour
+     * (#rrggbb) and image (with its size), the bad ones dropped.
+     *
+     * @return list<array{id: string, colour: string, imageUrl: string, imageWidth: ?int, imageHeight: ?int}>
+     */
+    public static function colourVariants(mixed $raw): array
+    {
+        $out = [];
+        foreach (array_slice(is_array($raw) ? array_values($raw) : [], 0, self::MAX_COLOUR_VARIANTS) as $v) {
+            $colour = is_string($v['colour'] ?? null) && preg_match(self::HEX, $v['colour']) ? strtolower($v['colour']) : null;
+            $url = CardEngine::safeUrl($v['imageUrl'] ?? null);
+            if (! $colour || ! $url) {
+                continue;
+            }
+            $id = is_string($v['id'] ?? null) && preg_match('/^[A-Za-z0-9_-]{1,40}$/', $v['id']) ? $v['id'] : 'v'.substr(md5($colour.$url), 0, 10);
+            if (isset($out[$id])) {
+                continue;
+            }
+            $size = fn ($n) => isset($v[$n]) && is_numeric($v[$n]) && $v[$n] >= 1 ? (int) min(20000, $v[$n]) : null;
+            $out[$id] = ['id' => $id, 'colour' => $colour, 'imageUrl' => $url, 'imageWidth' => $size('imageWidth'), 'imageHeight' => $size('imageHeight')];
+        }
+
+        return array_values($out);
+    }
+
+    /** The colour version a card picked, if its design still has it. */
+    public static function variantFor(?BusinessCard $card, ?CardTemplate $template): ?array
+    {
+        if (! $card?->colourVariantId || ! $template) {
+            return null;
+        }
+
+        return collect(self::colourVariants($template->colourVariants))->firstWhere('id', $card->colourVariantId);
+    }
+
+    /** The master image of a source, for the card's own copy of its design. */
+    public static function masterImage(array $source): array
+    {
+        return $source['master'] ?? ['imageUrl' => $source['imageUrl'], 'imageWidth' => $source['imageWidth'], 'imageHeight' => $source['imageHeight']];
     }
 
     /** The card's colour, limited to its own marked areas or else to its design's. */
