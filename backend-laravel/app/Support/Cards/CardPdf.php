@@ -172,8 +172,9 @@ class CardPdf
                     'display' => $h['display'],
                     'textStyle' => $text,
                     'src' => $h['kind'] === 'image' ? (in_array($h['action'], ['logo', 'custom_image'], true)
-                        ? (! empty($h['shape']) || ! empty($h['fit'])
-                            ? self::shapedPng($h['src'], $h['w'] * $width / 100, $h['h'] * $height / 100, $h['shape'] ?: [[0, 0], [100, 0], [100, 100], [0, 100]], $h['fit'] ?? null)
+                        // A free image always fills its box (auto fit), as on the card; a logo only when shaped or moved.
+                        ? ($h['action'] === 'custom_image' || ! empty($h['shape']) || ! empty($h['fit'])
+                            ? self::shapedPng($h['src'], $h['w'] * $width / 100, $h['h'] * $height / 100, ($h['shape'] ?? null) ?: [[0, 0], [100, 0], [100, 100], [0, 100]], $h['fit'] ?? null)
                             : (! empty($h['radius']) ? self::roundedPng($h['src'], $h['w'] * $width / 100, $h['h'] * $height / 100, (int) $h['radius']) : self::png($h['src'])))
                         : $h['src']) : null,
                     'box' => sprintf('left:%spt;top:%spt;width:%spt;height:%spt', round($h['x'] * $width / 100, 2), round($h['y'] * $height / 100, 2), round($h['w'] * $width / 100, 2), round($h['h'] * $height / 100, 2)),

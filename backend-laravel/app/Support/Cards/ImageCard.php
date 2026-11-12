@@ -368,7 +368,8 @@ class ImageCard
         $f = in_array($s['action'] ?? '', ['logo', 'custom_image'], true) ? self::fit($s['fit'] ?? null) : null;
         if ($f) {
             $img = sprintf('position:absolute;left:%s%%;top:%s%%;width:%s%%;height:%s%%;max-width:none;object-fit:cover', $f['l'], $f['t'], $f['w'], $f['h']);
-        } elseif (($s['action'] ?? '') === 'custom_image' && $shape) {
+        } elseif (($s['action'] ?? '') === 'custom_image') {
+            // A free image with no position of its own fills its whole box (auto fit), centred.
             $img = 'object-fit:cover';
         } else {
             $img = $shape ? 'object-fit:cover' : ($radius ? "object-fit:cover;border-radius:{$radius}%" : null);
