@@ -240,7 +240,7 @@ class ImageCardTest extends TestCase
         // The open card marks the logo box to arrange, and the bar offers it.
         $this->post('/login', ['email' => $this->ownerEmail, 'password' => 'Password123!']);
         $html = $this->get('/card/spice-garden')->assertOk()->getContent();
-        $this->assertStringContainsString('data-arrange="h-logo" data-arrange-kind="logo" data-arrange-shape="" data-arrange-size="100" data-arrange-label="Logo"', $html);
+        $this->assertStringContainsString('data-arrange="h-logo" data-arrange-kind="logo" data-arrange-shape="" data-arrange-size="100" data-arrange-corners="0" data-arrange-label="Logo"', $html);
         $this->assertStringContainsString('Arrange pictures', $html);
         $this->assertStringContainsString('aria-label="Zoom in"', $html);
         preg_match('~body.owner = "([^"]+)"~', $html, $t);
@@ -494,6 +494,24 @@ class ImageCardTest extends TestCase
         $this->assertStringContainsString('data-arrange-shape="round" data-arrange-size="50"', $this->get('/card/spice-garden')->getContent());
         $this->assertStringContainsString('data-shape-size="-10"', $this->get('/card/spice-garden')->getContent());
         $this->postJson('/api/v1/cards/spice-garden/owner', ['owner' => $t[1], 'spotShape' => ['id' => 'h-custom_image', 'shape' => 'round', 'size' => 5]])->assertStatus(400);
+
+        // A square's 4 corners rounded: 25% of its side, each corner a quarter circle; remembered for the bar.
+        $this->postJson('/api/v1/cards/spice-garden/owner', ['owner' => $t[1], 'spotShape' => ['id' => 'h-custom_image', 'shape' => 'square', 'corners' => 25]])->assertOk();
+        $square = $shapeOf()['shape'];
+        $this->assertCount(36, $square);
+        // The square spans 27.8%–72.2% across; its top edge starts after the rounded corner.
+        $this->assertEquals([61.1, 0], $square[0]);
+        $this->assertEquals([72.2, 25], $square[8]);
+        $this->assertSame(25, $shapeOf()['shapeCorners']);
+        $this->assertStringContainsString('data-arrange-corners="25"', $this->get('/card/spice-garden')->getContent());
+        $this->assertStringContainsString('data-shape-corners="5"', $this->get('/card/spice-garden')->getContent());
+        // Sharp: 4 points again; too round is refused.
+        $this->postJson('/api/v1/cards/spice-garden/owner', ['owner' => $t[1], 'spotShape' => ['id' => 'h-custom_image', 'shape' => 'square', 'corners' => 0]])->assertOk();
+        $this->assertCount(4, $shapeOf()['shape']);
+        $this->postJson('/api/v1/cards/spice-garden/owner', ['owner' => $t[1], 'spotShape' => ['id' => 'h-custom_image', 'shape' => 'square', 'corners' => 60]])->assertStatus(400);
+        // Corners belong to squares only.
+        $this->postJson('/api/v1/cards/spice-garden/owner', ['owner' => $t[1], 'spotShape' => ['id' => 'h-custom_image', 'shape' => 'round', 'corners' => 25]])->assertOk();
+        $this->assertNull($shapeOf()['shapeCorners']);
 
         // Normal: no shape at all.
         $pick('normal')->assertOk();
