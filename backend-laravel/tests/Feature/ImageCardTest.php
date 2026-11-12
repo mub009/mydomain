@@ -495,6 +495,60 @@ class ImageCardTest extends TestCase
         $pick('star')->assertStatus(400);
     }
 
+    public function test_changing_the_design_carries_the_old_designs_pictures_and_values_over(): void
+    {
+        $admin = $this->admin();
+        $template = fn (string $name, array $spots, string $img) => $this->postJson('/api/v1/admin/card-templates', [
+            'name' => $name, 'layout' => 'classic', 'categoryId' => $this->business->categoryId,
+            'imageUrl' => "https://cdn.example.test/cards/images/{$img}.jpg", 'imageWidth' => 600, 'imageHeight' => 1000, 'hotspots' => $spots,
+        ], $admin)->assertCreated()->json('data.id');
+        $first = $template('First', [
+            $this->spot('call'),
+            ['id' => 'a-photo', 'action' => 'custom_image', 'label' => 'Shop photo', 'x' => 10, 'y' => 30, 'w' => 80, 'h' => 20],
+            ['id' => 'a-link', 'action' => 'instagram', 'label' => 'Insta', 'x' => 10, 'y' => 60, 'w' => 40, 'h' => 6],
+        ], 'first');
+        $second = $template('Second', [
+            $this->spot('whatsapp'),
+            // Differently placed boxes of the same kinds, matched by name and kind.
+            ['id' => 'b-photo', 'action' => 'custom_image', 'label' => 'Shop photo', 'x' => 20, 'y' => 10, 'w' => 60, 'h' => 30],
+            ['id' => 'b-link', 'action' => 'instagram', 'label' => 'Insta', 'x' => 10, 'y' => 80, 'w' => 40, 'h' => 6],
+            // A box the new design fills itself keeps its own.
+            ['id' => 'b-text', 'action' => 'custom_text', 'value' => 'Since 1998', 'x' => 10, 'y' => 90, 'w' => 80, 'h' => 5],
+        ], 'second');
+        $url = "/api/v1/businesses/{$this->business->id}/card";
+
+        // On the first design: a picture cut round, and its own Instagram.
+        $this->putJson($url, ['templateId' => $first], $this->auth)->assertOk();
+        $this->putJson($url, ['spotImage' => ['id' => 'a-photo', 'url' => 'https://cdn.example.test/cards/images/shop.jpg']], $this->auth)->assertOk();
+        $this->putJson($url, ['spotShape' => ['id' => 'a-photo', 'shape' => 'round']], $this->auth)->assertOk();
+        $card = BusinessCard::where('businessId', $this->business->id)->first();
+        $card->update(['hotspots' => collect($card->hotspots)->map(fn ($h) => $h['id'] === 'a-link' ? [...$h, 'value' => '@spiceshop'] : $h)->all()]);
+        // Still the first design as made: ticked.
+        $this->getJson($url, $this->auth)->assertJsonPath('data.imageTemplates.0.inUse', true);
+
+        // Switching to the second design takes them along.
+        $this->putJson($url, ['templateId' => $second], $this->auth)->assertOk();
+        $card = BusinessCard::where('businessId', $this->business->id)->first();
+        $spots = collect($card->hotspots)->keyBy('id');
+        $this->assertSame('https://cdn.example.test/cards/images/second.jpg', $card->imageUrl);
+        $this->assertSame('https://cdn.example.test/cards/images/shop.jpg', $spots['b-photo']['value']);
+        $this->assertNull($spots['b-photo']['fit'] ?? null); // fits its new box
+        $this->assertNull($spots['b-photo']['shape'] ?? null); // the new design's own shape
+        $this->assertSame('@spiceshop', $spots['b-link']['value']);
+        $this->assertSame('Since 1998', $spots['b-text']['value']);
+        $this->assertEquals([20, 10, 60, 30], [$spots['b-photo']['x'], $spots['b-photo']['y'], $spots['b-photo']['w'], $spots['b-photo']['h']]);
+        // The second design is the one ticked.
+        $in = collect($this->getJson($url, $this->auth)->json('data.imageTemplates'))->firstWhere('inUse', true);
+        $this->assertSame($second, $in['id']);
+
+        // And back again: the picture comes with it.
+        $this->putJson($url, ['templateId' => $first], $this->auth)->assertOk();
+        $this->assertSame('https://cdn.example.test/cards/images/shop.jpg', collect(BusinessCard::where('businessId', $this->business->id)->first()->hotspots)->firstWhere('id', 'a-photo')['value']);
+
+        // Re-picking the design already worn resets it to the design as made.
+        $this->putJson($url, ['templateId' => $first], $this->auth)->assertOk()->assertJsonPath('data.imageUrl', null);
+    }
+
     public function test_the_card_details_have_one_save_button_for_all(): void
     {
         $this->withoutVite();

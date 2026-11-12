@@ -134,7 +134,7 @@ class CardController extends Controller
                 'name' => $t->name,
                 'imageUrl' => $t->imageUrl,
                 'actionCount' => count($t->hotspots ?? []),
-                'inUse' => $t->id === $current?->id && ! $card?->imageUrl,
+                'inUse' => $t->id === $current?->id && ImageCard::wears($card, $t),
             ])->values(),
             'aiProvider' => BackgroundGenerator::provider(),
             'aiStyles' => BackgroundGenerator::STYLES,
@@ -227,6 +227,17 @@ class CardController extends Controller
             // image (if it has one) shows — unless an image is sent with it.
             if (! array_key_exists('imageUrl', $data)) {
                 $changes += ['imageUrl' => null, 'imageWidth' => null, 'imageHeight' => null, 'hotspots' => null];
+                // Switching to another design takes what was put on the old one with it:
+                // uploaded pictures, a logo, typed numbers, links and text, in the
+                // matching boxes of the new design (re-picking the same design resets it).
+                $old = ImageCard::source($business);
+                $current = CardEngine::templateFor($business, $business->card);
+                if ($old && $template->imageUrl && $template->id !== $current?->id) {
+                    [$hotspots, $filled] = ImageCard::carryOver($old['hotspots'] ?? [], $template->hotspots ?? []);
+                    if ($filled) {
+                        $changes = ['imageUrl' => $template->imageUrl, 'imageWidth' => $template->imageWidth, 'imageHeight' => $template->imageHeight, 'hotspots' => $hotspots] + $changes;
+                    }
+                }
             }
         }
         if (array_key_exists('backgroundImageUrl', $data)) {

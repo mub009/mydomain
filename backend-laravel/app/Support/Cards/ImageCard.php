@@ -311,6 +311,69 @@ class ImageCard
         return count($out) >= 3 ? $out : null;
     }
 
+    /**
+     * A new design's boxes with what was put on the old design carried over:
+     * each empty box of the new design takes the value (an uploaded picture,
+     * a logo, a typed phone number, link or text) of an old box of the same
+     * kind — the same id first, then the same name, then the next in order.
+     * A box the new design fills itself keeps its own. The pictures start
+     * fitting their new boxes (their old zoom and position belonged to the
+     * old box); the new design's shapes stay.
+     *
+     * @return array{0: array, 1: int} the new boxes, and how many were filled
+     */
+    public static function carryOver(array $old, array $new): array
+    {
+        $pool = [];
+        foreach ($old as $h) {
+            $action = $h['action'] ?? null;
+            if ($action && (self::ACTIONS[$action]['value'] ?? null) !== null && isset($h['value']) && trim((string) $h['value']) !== '') {
+                $pool[$action][] = $h;
+            }
+        }
+        $filled = 0;
+        foreach ($new as &$h) {
+            $action = $h['action'] ?? null;
+            if (! $action || empty($pool[$action]) || (isset($h['value']) && trim((string) $h['value']) !== '')) {
+                continue;
+            }
+            $pick = null;
+            foreach (['id', 'label'] as $key) {
+                foreach ($pool[$action] as $i => $o) {
+                    if ($pick === null && ! empty($h[$key]) && ($o[$key] ?? null) === $h[$key]) {
+                        $pick = $i;
+                    }
+                }
+            }
+            $pick ??= array_key_first($pool[$action]);
+            $h['value'] = $pool[$action][$pick]['value'];
+            $h['fit'] = null;
+            unset($pool[$action][$pick]);
+            $filled++;
+        }
+        unset($h);
+
+        return [$new, $filled];
+    }
+
+    /**
+     * Whether a card's own copy is still a design as made — the same image and
+     * the same boxes in the same places — with only what's in them changed
+     * (pictures, values, zoom, shape). Then the design counts as "in use".
+     */
+    public static function wears(?BusinessCard $card, CardTemplate $template): bool
+    {
+        if (! $card?->imageUrl) {
+            return true;
+        }
+        if ($card->imageUrl !== $template->imageUrl) {
+            return false;
+        }
+        $layout = fn ($spots) => collect($spots ?? [])->map(fn ($h) => [$h['id'] ?? null, $h['action'] ?? null, (float) ($h['x'] ?? 0), (float) ($h['y'] ?? 0), (float) ($h['w'] ?? 0), (float) ($h['h'] ?? 0)])->sortBy(0)->values()->all();
+
+        return $layout($card->hotspots) == $layout($template->hotspots);
+    }
+
     // The ready shapes a free image can be cut to from the open card.
     public const SHAPE_PRESETS = ['normal', 'square', 'round', 'oval'];
 
