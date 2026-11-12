@@ -81,7 +81,8 @@ class ReviewLinkController extends Controller
 
         return ApiResponse::ok([
             'query' => $query,
-            'places' => GooglePlaces::search($query, $business->latitude, $business->longitude),
+            // Admins are told why Google refused, so they can fix the key.
+            'places' => GooglePlaces::search($query, $business->latitude, $business->longitude, ($actor['role'] ?? null) === 'ADMIN'),
         ]);
     }
 
