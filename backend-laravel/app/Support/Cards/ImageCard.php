@@ -615,6 +615,10 @@ class ImageCard
         $found = false;
         foreach ($hotspots as &$h) {
             if (($h['id'] ?? null) === $spotId && ($h['action'] ?? null) === 'custom_image') {
+                // A different picture starts centred again: the old one's zoom and position don't fit it.
+                if (($h['value'] ?? null) !== $url) {
+                    $h['fit'] = null;
+                }
                 $h['value'] = $url;
                 $found = true;
             }

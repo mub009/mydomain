@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Support\Cards\CardEngine;
 use App\Support\Cards\ImageCard;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
@@ -239,7 +240,7 @@ class ImageCardTest extends TestCase
         // The open card marks the logo box to arrange, and the bar offers it.
         $this->post('/login', ['email' => $this->ownerEmail, 'password' => 'Password123!']);
         $html = $this->get('/card/spice-garden')->assertOk()->getContent();
-        $this->assertStringContainsString('data-arrange="h-logo" data-arrange-label="Logo"', $html);
+        $this->assertStringContainsString('data-arrange="h-logo" data-arrange-kind="logo" data-arrange-label="Logo"', $html);
         $this->assertStringContainsString('Arrange pictures', $html);
         $this->assertStringContainsString('aria-label="Zoom in"', $html);
         preg_match('~body.owner = "([^"]+)"~', $html, $t);
@@ -379,6 +380,42 @@ class ImageCardTest extends TestCase
         $this->patchJson("/api/v1/admin/card-templates/{$id}", ['imageUrl' => null], $admin)->assertOk()->assertJsonPath('data.colourAreas', []);
         // Only admins edit templates.
         $this->patchJson("/api/v1/admin/card-templates/{$id}", ['colourAreas' => []], $this->auth)->assertStatus(403);
+    }
+
+    public function test_the_dealer_changes_and_zooms_a_free_image_from_the_open_card(): void
+    {
+        Storage::fake('spaces', ['url' => 'https://cdn.example.test']);
+        $this->save([$this->spot('call'), $this->spot('custom_image', ['label' => 'Shop photo', 'value' => 'https://cdn.example.test/cards/images/old.jpg', 'fit' => ['l' => -10, 't' => 0, 'w' => 140, 'h' => 140]])])->assertOk();
+        $this->postJson("/api/v1/businesses/{$this->business->id}/card/publish", [], $this->auth)->assertOk();
+
+        // The dealer's open card: the free image can be arranged and its picture changed.
+        $this->post('/login', ['email' => $this->dealerEmail, 'password' => 'Password123!']);
+        $html = $this->get('/card/spice-garden')->assertOk()->getContent();
+        $this->assertStringContainsString('data-arrange="h-custom_image" data-arrange-kind="custom_image"', $html);
+        $this->assertStringContainsString('data-arrange-change', $html);
+        preg_match('~body.owner = "([^"]+)"~', $html, $t);
+
+        // A new picture, uploaded with the page's pass, goes into that box — centred again.
+        $img = imagecreatetruecolor(400, 300);
+        ob_start();
+        imagejpeg($img);
+        $file = UploadedFile::fake()->createWithContent('shop.jpg', ob_get_clean());
+        $this->post('/api/v1/cards/spice-garden/owner/picture', ['owner' => $t[1], 'spotId' => 'h-custom_image', 'file' => $file], ['Accept' => 'application/json'])->assertOk();
+        $spot = collect(BusinessCard::where('businessId', $this->business->id)->first()->hotspots)->firstWhere('id', 'h-custom_image');
+        $this->assertStringContainsString('/cards/images/', $spot['value']);
+        $this->assertStringNotContainsString('old.jpg', $spot['value']);
+        $this->assertNull($spot['fit'] ?? null);
+        Storage::disk('spaces')->assertExists('cards/images/'.basename($spot['value']));
+
+        // Then zoomed in, as the bar's Save sends it.
+        $this->postJson('/api/v1/cards/spice-garden/owner', ['owner' => $t[1], 'spotFit' => ['id' => 'h-custom_image', 'fit' => ['l' => -25, 't' => -25, 'w' => 150, 'h' => 150]]])->assertOk();
+        $this->assertEquals(150, collect(BusinessCard::where('businessId', $this->business->id)->first()->hotspots)->firstWhere('id', 'h-custom_image')['fit']['w']);
+
+        // Only a free-image box takes a picture this way, and only with a real pass.
+        $again = UploadedFile::fake()->createWithContent('x.jpg', file_get_contents($file->getRealPath()));
+        $this->post('/api/v1/cards/spice-garden/owner/picture', ['owner' => $t[1], 'spotId' => 'h-call', 'file' => $again], ['Accept' => 'application/json'])->assertStatus(400);
+        $this->post('/logout');
+        $this->post('/api/v1/cards/spice-garden/owner/picture', ['owner' => 'bad.'.str_repeat('0', 64), 'spotId' => 'h-custom_image', 'file' => $again], ['Accept' => 'application/json'])->assertStatus(403);
     }
 
     public function test_the_card_details_have_one_save_button_for_all(): void

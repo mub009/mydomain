@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\CardController;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\UploadController;
 use App\Models\Business;
 use App\Models\BusinessCard;
 use App\Models\CardTemplate;
@@ -141,6 +142,31 @@ class CardPageController extends Controller
         $sub->attributes->set('auth', ['sub' => $user->id, 'role' => $user->role]);
 
         return app()->call([app(CardController::class), 'update'], ['request' => $sub, 'id' => $business->id]);
+    }
+
+    /**
+     * The bar's "Change picture": a new picture uploaded into one of the
+     * card's free-image boxes, with the page's pass — the same upload and
+     * save the dashboard uses, as the pass's user, and nothing else.
+     */
+    public function ownerPicture(Request $request, string $slug)
+    {
+        $business = Business::with(['category', 'card'])->where('slug', $slug)->first();
+        abort_unless($business, 404);
+        $user = self::manager($business, $request->input('owner'));
+        abort_unless($user, 403);
+        $spotId = (string) $request->input('spotId');
+        abort_unless($spotId !== '' && strlen($spotId) <= 40 && $request->hasFile('file'), 422);
+        $auth = ['sub' => $user->id, 'role' => $user->role];
+
+        $upload = Request::create('/', 'POST', ['purpose' => 'card-images'], [], ['file' => $request->file('file')], ['HTTP_ACCEPT' => 'application/json']);
+        $upload->attributes->set('auth', $auth);
+        $url = app()->call([app(UploadController::class), 'image'], ['request' => $upload])->getData(true)['data']['url'];
+
+        $save = Request::create('/', 'PUT', [], [], [], ['CONTENT_TYPE' => 'application/json', 'HTTP_ACCEPT' => 'application/json'], json_encode(['spotImage' => ['id' => $spotId, 'url' => $url]]));
+        $save->attributes->set('auth', $auth);
+
+        return app()->call([app(CardController::class), 'update'], ['request' => $save, 'id' => $business->id]);
     }
 
     // The card as a PDF, every action a working link. ?design=<id>: one of
