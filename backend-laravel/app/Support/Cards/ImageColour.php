@@ -216,8 +216,13 @@ class ImageColour
         if (! preg_match(self::HEX, $hex)) {
             return $hex;
         }
-        $m = self::matrix($c);
         $rgb = sscanf($hex, '#%02x%02x%02x');
+        // White and black (and nearly so) stay as they are — they keep text and buttons readable on any
+        // colour; greys and coloured text (gold lettering, say) follow the new colour.
+        if (max($rgb) - min($rgb) < 24 && (min($rgb) >= 225 || max($rgb) <= 40)) {
+            return strtolower($hex);
+        }
+        $m = self::matrix($c);
         $out = array_map(fn ($row) => (int) max(0, min(255, round($row[0] * $rgb[0] + $row[1] * $rgb[1] + $row[2] * $rgb[2]))), $m);
 
         return vsprintf('#%02x%02x%02x', $out);

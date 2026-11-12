@@ -679,6 +679,24 @@ class ImageCardTest extends TestCase
         $this->assertSame(['h-email'], collect(ImageCard::source($this->business->fresh())['hotspots'])->pluck('id')->all());
     }
 
+    public function test_a_colour_picked_on_the_open_card_changes_it_completely_and_keeps_text_readable(): void
+    {
+        $this->save([$this->spot('call')])->assertOk();
+        $this->postJson("/api/v1/businesses/{$this->business->id}/card/publish", [], $this->auth)->assertOk();
+        $this->post('/login', ['email' => $this->ownerEmail, 'password' => 'Password123!']);
+        // The bar sends the picked colour at full strength (not mixed with the design's own).
+        $this->assertStringContainsString('strength: 100,', $this->get('/card/spice-garden')->getContent());
+
+        $red = \App\Support\Cards\ImageColour::normalize(['tint' => '#dc2626', 'strength' => 100]);
+        // White and black text and buttons stay readable…
+        $this->assertSame('#ffffff', \App\Support\Cards\ImageColour::hex('#ffffff', $red));
+        $this->assertSame('#111827', \App\Support\Cards\ImageColour::hex('#111827', $red));
+        // …while gold lettering follows the new colour.
+        $gold = \App\Support\Cards\ImageColour::hex('#d4a017', $red);
+        [$r, $g, $b] = sscanf($gold, '#%02x%02x%02x');
+        $this->assertGreaterThan($g * 2, $r);
+    }
+
     public function test_the_card_details_have_one_save_button_for_all(): void
     {
         $this->withoutVite();
