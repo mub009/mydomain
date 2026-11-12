@@ -604,6 +604,31 @@ class ImageCardTest extends TestCase
         $this->putJson("/api/v1/businesses/{$this->business->id}/card", ['spotText' => ['id' => 'h-call', 'text' => 'x']], $owner)->assertStatus(400);
     }
 
+    public function test_the_dealer_moves_a_picture_box_anywhere_on_the_open_card(): void
+    {
+        $this->business->update(['logoUrl' => 'https://cdn.example.test/logos/logo.png']);
+        $this->save([$this->spot('call'), $this->spot('logo', ['y' => 5]), $this->spot('custom_image', ['y' => 40, 'value' => 'https://cdn.example.test/cards/images/p.jpg'])])->assertOk();
+        $this->postJson("/api/v1/businesses/{$this->business->id}/card/publish", [], $this->auth)->assertOk();
+        $this->post('/login', ['email' => $this->dealerEmail, 'password' => 'Password123!']);
+        $html = $this->get('/card/spice-garden')->getContent();
+        $this->assertStringContainsString('data-drag-mode="box"', $html);
+        preg_match('~body.owner = "([^"]+)"~', $html, $t);
+        $spot = fn ($id) => collect(BusinessCard::where('businessId', $this->business->id)->first()->hotspots)->firstWhere('id', $id);
+        $move = fn ($id, $x, $y) => $this->postJson('/api/v1/cards/spice-garden/owner', ['owner' => $t[1], 'spotPlace' => ['id' => $id, 'x' => $x, 'y' => $y]]);
+
+        // Anywhere on the card: x and y, its size unchanged, drawn there.
+        $move('h-custom_image', 55, 12.5)->assertOk();
+        $this->assertEquals([55, 12.5, 30, 8], [$spot('h-custom_image')['x'], $spot('h-custom_image')['y'], $spot('h-custom_image')['w'], $spot('h-custom_image')['h']]);
+        $this->assertStringContainsString('left:55%;top:12.5%;width:30%;height:8%', $this->get('/card/spice-garden')->getContent());
+        // Never past the card's edges (a 30% × 8% box stops at 70% / 92%).
+        $move('h-custom_image', 95, 99)->assertOk();
+        $this->assertEquals([70, 92], [$spot('h-custom_image')['x'], $spot('h-custom_image')['y']]);
+        // The logo's box moves too; other boxes don't.
+        $move('h-logo', 0, 0)->assertOk();
+        $this->assertEquals([0, 0], [$spot('h-logo')['x'], $spot('h-logo')['y']]);
+        $move('h-call', 10, 10)->assertStatus(400);
+    }
+
     public function test_the_card_details_have_one_save_button_for_all(): void
     {
         $this->withoutVite();

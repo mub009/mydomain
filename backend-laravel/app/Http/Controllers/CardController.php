@@ -186,6 +186,11 @@ class CardController extends Controller
             'extraTemplateIds' => ['sometimes', 'nullable', 'array', 'max:50'],
             'extraTemplateIds.*' => ['uuid'],
             // A picture for one of the design's free-image spots ("Missing on your listing").
+            // A picture box moved to another place on the card (open card): its new top-left corner, in percent.
+            'spotPlace' => ['sometimes', 'array'],
+            'spotPlace.id' => ['required_with:spotPlace', 'string', 'max:40'],
+            'spotPlace.x' => ['required_with:spotPlace', 'numeric', 'min:0', 'max:100'],
+            'spotPlace.y' => ['required_with:spotPlace', 'numeric', 'min:0', 'max:100'],
             // The words in one custom text box (Card details): the business team can change them.
             'spotText' => ['sometimes', 'array'],
             'spotText.id' => ['required_with:spotText', 'string', 'max:40'],
@@ -284,6 +289,18 @@ class CardController extends Controller
                     }
                 }
                 unset($h);
+            }
+            $changes['hotspots'] = $hotspots;
+            if ($source['fromTemplate']) {
+                $changes += ['imageUrl' => $source['imageUrl'], 'imageWidth' => $source['imageWidth'], 'imageHeight' => $source['imageHeight']];
+            }
+        }
+        // Moving a picture's box on the card, from the open card: the whole business team can.
+        if (isset($data['spotPlace']) && ! array_key_exists('hotspots', $changes)) {
+            $source = ImageCard::source($business);
+            $hotspots = $source ? ImageCard::withSpotPlace($source['hotspots'], $data['spotPlace']['id'], (float) $data['spotPlace']['x'], (float) $data['spotPlace']['y']) : null;
+            if ($hotspots === null) {
+                throw ApiException::badRequest('Your card has no such picture');
             }
             $changes['hotspots'] = $hotspots;
             if ($source['fromTemplate']) {

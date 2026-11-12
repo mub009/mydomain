@@ -136,7 +136,7 @@ class CardPageController extends Controller
         $user = self::manager($business, $request->input('owner'));
         abort_unless($user, 403);
 
-        $payload = array_intersect_key($request->all(), array_flip(['imageColour', 'templateId', 'spotFit', 'spotShape']));
+        $payload = array_intersect_key($request->all(), array_flip(['imageColour', 'templateId', 'spotFit', 'spotShape', 'spotPlace']));
         abort_unless($payload, 422);
         $sub = Request::create('/', 'PUT', [], [], [], ['CONTENT_TYPE' => 'application/json', 'HTTP_ACCEPT' => 'application/json'], json_encode($payload));
         $sub->attributes->set('auth', ['sub' => $user->id, 'role' => $user->role]);
