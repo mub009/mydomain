@@ -242,7 +242,7 @@ class CardEngine
 
     public static function ownerToken(Business $business, string $userId, int $hours = 12): string
     {
-        $expires = time() + $hours * 3600;
+        $expires = now()->getTimestamp() + $hours * 3600;
         $payload = rtrim(strtr(base64_encode("{$userId}.{$expires}"), '+/', '-_'), '=');
 
         return $payload.'.'.self::ownerSignature($business, $userId, $expires);
@@ -259,7 +259,7 @@ class CardEngine
             return null;
         }
         [, $userId, $expires] = $p;
-        if ((int) $expires < time() || ! hash_equals(self::ownerSignature($business, $userId, (int) $expires), $m[2])) {
+        if ((int) $expires < now()->getTimestamp() || ! hash_equals(self::ownerSignature($business, $userId, (int) $expires), $m[2])) {
             return null;
         }
 
