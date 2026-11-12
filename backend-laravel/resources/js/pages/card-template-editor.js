@@ -79,10 +79,9 @@ $("[data-areas-clear]", areasBox).addEventListener("click", () => {
 showAreas();
 
 // --- Colour versions: the same design in other colours, each its own image ---
-const GRID = ["#dc2626", "#ea580c", "#d4a017", "#16a34a", "#0d9488", "#0891b2", "#2563eb", "#4f46e5", "#7c3aed", "#db2777", "#78350f", "#111827"];
 let variants = (templateData.colourVariants || []).map((v) => ({ ...v }));
 let variantsDirty = false;
-let pickedColour = GRID[0];
+let pickedColour = "#dc2626";
 let replacing = null; // a version whose image is being changed
 const variantsBox = $("[data-template-variants]");
 const variantFile = $("[data-variant-file]", variantsBox);
@@ -116,19 +115,13 @@ function showVariants() {
       </li>`,
     )
     .join("");
-  $("[data-variant-grid]", variantsBox).innerHTML =
-    GRID.map(
-      (c) => `<button type="button" role="radio" aria-checked="${c === pickedColour}" aria-label="${c}" title="${c}" data-variant-colour="${c}"
-        class="h-8 w-8 rounded-full border-2 border-white shadow ring-2 ${c === pickedColour ? "ring-brand-600" : "ring-transparent"}" style="background:${c}"></button>`,
-    ).join("") +
-    `<label title="Your own colour" class="relative flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border-2 ${GRID.includes(pickedColour) ? "border-dashed border-gray-400 text-gray-500" : "border-white ring-2 ring-brand-600"}" style="${GRID.includes(pickedColour) ? "" : `background:${pickedColour}`}">
-      ${GRID.includes(pickedColour) ? "+" : ""}<input type="color" value="${pickedColour}" class="absolute inset-0 h-full w-full cursor-pointer opacity-0" aria-label="Your own colour" data-variant-custom /></label>`;
+  $("[data-variant-preview]", variantsBox).style.background = pickedColour;
+  $("[data-variant-hex]", variantsBox).textContent = pickedColour;
   $("[data-variant-upload]", variantsBox).disabled = !imageEditor.payload().imageUrl || variants.length >= 12;
 }
 variantsBox.addEventListener("click", (e) => {
-  const t = e.target.closest("[data-variant-colour], [data-variant-remove], [data-variant-replace], [data-variant-upload]");
+  const t = e.target.closest("[data-variant-remove], [data-variant-replace], [data-variant-upload]");
   if (!t) return;
-  if (t.dataset.variantColour) pickedColour = t.dataset.variantColour;
   if (t.dataset.variantRemove !== undefined) {
     variants.splice(Number(t.dataset.variantRemove), 1);
     variantsDirty = true;
@@ -164,6 +157,43 @@ variantFile.addEventListener("change", async () => {
   }
 });
 showVariants();
+
+// --- Colours businesses can pick: chosen by the admin for this design ---
+let choices = [...(templateData.colourChoices || [])];
+let choicesDirty = false;
+const choicesBox = $("[data-template-choices]");
+const choiceInput = $("[data-choice-input]", choicesBox);
+function showChoices() {
+  const n = choices.length;
+  $("[data-choices-status]", choicesBox).textContent = n
+    ? `Businesses can pick ${n === 1 ? "this colour" : `these ${n} colours`} (or Original) — no others.${choicesDirty ? " Save to keep it." : ""}`
+    : `None chosen — businesses see the standard colours and can pick their own.${choicesDirty ? " Save to keep it." : ""}`;
+  $("[data-choices-list]", choicesBox).innerHTML = choices
+    .map(
+      (c, i) => `<span class="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-white py-1 pl-1 pr-2 text-[11px] font-mono text-ink-700">
+        <span class="h-5 w-5 rounded-full border border-white shadow ring-1 ring-gray-300" style="background:${esc(c)}"></span>${esc(c)}
+        <button type="button" class="ml-0.5 text-red-700 hover:underline" data-choice-remove="${i}" aria-label="Remove ${esc(c)}">×</button></span>`,
+    )
+    .join("");
+  $("[data-choice-add]", choicesBox).disabled = choices.length >= 16;
+}
+choiceInput.addEventListener("input", () => {
+  $("[data-choice-preview]", choicesBox).style.background = choiceInput.value;
+  $("[data-choice-hex]", choicesBox).textContent = choiceInput.value;
+});
+choicesBox.addEventListener("click", (e) => {
+  if (e.target.closest("[data-choice-add]") && !choices.includes(choiceInput.value.toLowerCase())) {
+    choices.push(choiceInput.value.toLowerCase());
+    choicesDirty = true;
+  }
+  const remove = e.target.closest("[data-choice-remove]");
+  if (remove) {
+    choices.splice(Number(remove.dataset.choiceRemove), 1);
+    choicesDirty = true;
+  }
+  showChoices();
+});
+showChoices();
 
 function values() {
   const f = new FormData(form);
@@ -219,11 +249,12 @@ form.addEventListener("submit", async (e) => {
   const button = $("[data-save]", form);
   button.disabled = true;
   try {
-    const body = { ...values(), ...imageEditor.payload(), colourAreas, colourVariants: variants };
+    const body = { ...values(), ...imageEditor.payload(), colourAreas, colourVariants: variants, colourChoices: choices };
     const { data } = id ? await api.patch(`/admin/card-templates/${id}`, body) : await api.post("/admin/card-templates", body);
     imageEditor.markClean();
     areasDirty = false;
     variantsDirty = false;
+    choicesDirty = false;
     reloadWithFlash(id ? "Template saved." : "Template created.", `/admin/card-templates/${data.id}`);
   } catch (err) {
     button.disabled = false;
@@ -232,7 +263,7 @@ form.addEventListener("submit", async (e) => {
 });
 
 window.addEventListener("beforeunload", (e) => {
-  if (imageEditor.dirty || areasDirty || variantsDirty) {
+  if (imageEditor.dirty || areasDirty || variantsDirty || choicesDirty) {
     e.preventDefault();
     e.returnValue = "";
   }

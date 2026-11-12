@@ -100,7 +100,11 @@ class CardPageController extends Controller
                 'variants' => ImageCard::colourVariants($current?->colourVariants),
                 'variantId' => ImageCard::variantFor($card, $current)['id'] ?? null,
                 'colour' => ImageColour::normalize($business->card?->imageColour),
-                'swatches' => ImageColour::SWATCHES,
+                // The admin's colours for this design (Original first), else the standard swatches and a free picker.
+                'swatches' => ($choices = ImageCard::colourChoices($current?->colourChoices))
+                    ? [ImageColour::SWATCHES[0], ...array_map(fn ($hex) => [$hex, $hex, $hex, $hex, 100], $choices)]
+                    : ImageColour::SWATCHES,
+                'ownColour' => ! $choices,
                 'manageUrl' => "/dashboard/businesses/{$business->id}?section=".urlencode('Visiting Card'),
             ])->render();
             $html = str_contains($html, '</body>') ? preg_replace('~</body>~i', $bar.'</body>', $html, 1) : $html.$bar;

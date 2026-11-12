@@ -355,6 +355,13 @@ class CardController extends Controller
             }
         }
         if (array_key_exists('imageColour', $data)) {
+            // A design with its own colours: the team may pick only those (or Original).
+            $choices = ImageCard::colourChoices(CardEngine::templateFor($business, $business->card)?->colourChoices);
+            $picked = is_array($data['imageColour']) ? $data['imageColour'] : [];
+            $recolours = isset($picked['tint']) || (int) ($picked['saturation'] ?? 100) !== 100 || (int) ($picked['hue'] ?? 0) !== 0;
+            if ($choices && $actor['role'] !== 'ADMIN' && $recolours && ! in_array(strtolower((string) ($picked['tint'] ?? '')), $choices, true)) {
+                throw ApiException::badRequest('That colour is not offered for this design');
+            }
             $changes['imageColour'] = ImageColour::normalize(self::withOwnAreas($actor, $data['imageColour'], $business->card?->imageColour));
             // Recoloured by hand: back to the master image underneath.
             if (! array_key_exists('colourVariant', $data)) {

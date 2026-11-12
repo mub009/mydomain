@@ -772,6 +772,41 @@ class ImageCardTest extends TestCase
         $this->patchJson("/api/v1/admin/card-templates/{$master['id']}", ['imageUrl' => null], $admin)->assertOk()->assertJsonPath('data.colourVariants', []);
     }
 
+    public function test_the_admin_chooses_which_colours_a_business_can_pick(): void
+    {
+        $admin = $this->admin();
+        $id = $this->imageTemplate($admin);
+        $this->postJson("/api/v1/businesses/{$this->business->id}/card/publish", [], $this->auth)->assertOk();
+        $this->post('/login', ['email' => $this->ownerEmail, 'password' => 'Password123!']);
+
+        // None chosen: the standard colours and a free picker.
+        $html = $this->get('/card/spice-garden')->getContent();
+        $this->assertStringContainsString('aria-label="Green"', $html);
+        $this->assertStringContainsString('aria-label="Pick your own colour"', $html);
+
+        // The admin chooses the colours (any, each once).
+        $this->patchJson("/api/v1/admin/card-templates/{$id}", ['colourChoices' => ['#7C3AED', '#0f766e', '#7c3aed']], $admin)
+            ->assertOk()->assertJsonPath('data.colourChoices', ['#7c3aed', '#0f766e']);
+        $this->patchJson("/api/v1/admin/card-templates/{$id}", ['colourChoices' => ['purple']], $admin)->assertStatus(400);
+
+        // The open card offers Original and those — nothing else, no free picker.
+        $html = $this->get('/card/spice-garden')->getContent();
+        $this->assertStringContainsString('aria-label="Original"', $html);
+        $this->assertStringContainsString('aria-label="#7c3aed"', $html);
+        $this->assertStringContainsString('aria-label="#0f766e"', $html);
+        $this->assertStringNotContainsString('aria-label="Green"', $html);
+        $this->assertStringNotContainsString('aria-label="Pick your own colour"', $html);
+        preg_match('~body.owner = "([^"]+)"~', $html, $t);
+        $pick = fn (?array $colour) => $this->postJson('/api/v1/cards/spice-garden/owner', ['owner' => $t[1], 'imageColour' => $colour]);
+
+        // Only those can be picked (and Original); the picked one shows as chosen.
+        $pick(['tint' => '#0F766E', 'strength' => 100])->assertOk();
+        $this->assertMatchesRegularExpression('~title="\#0f766e" aria-label="\#0f766e" aria-checked="true"~', $this->get('/card/spice-garden')->getContent());
+        $pick(['tint' => '#dc2626', 'strength' => 100])->assertStatus(400);
+        $pick(['tint' => null, 'saturation' => 0])->assertStatus(400);
+        $pick(null)->assertOk(); // Original
+    }
+
     public function test_the_card_details_have_one_save_button_for_all(): void
     {
         $this->withoutVite();
