@@ -18,16 +18,18 @@
     :root{
       --brand:#0f9e68;--brand-dark:#0c8a5a;--brand-light:#34d399;--bg-light:#c7f5de;--bg-dark:#04281c;
       --ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--star:#f5b301;
-      --card-bg:#ffffff;--content-bg:#ffffff;--bar-bg:rgba(255,255,255,.9);
+      --card-bg:#ffffff;--content-bg:#ffffff;
       --page-grad:linear-gradient(160deg,var(--bg-light) 0%,#eaf7f0 42%,#f1f5f9 100%);
       --shadow:0 10px 30px -12px rgba(15,23,42,.18);--overlay-bg:rgba(15,23,42,.5);
       --copy-bg:#0f172a;--copy-fg:#ffffff;--chip-bg:#ffffff;
     }
-    html.dark{
-      --ink:#f1f5f9;--muted:#94a3b8;--line:#334155;--card-bg:#0f1b2b;--content-bg:#16233a;
-      --bar-bg:rgba(15,23,43,.85);--page-grad:linear-gradient(160deg,var(--bg-dark) 0%,#0b1726 55%,#0b1220 100%);
-      --shadow:0 10px 30px -12px rgba(0,0,0,.6);--overlay-bg:rgba(0,0,0,.65);
-      --copy-bg:#ffffff;--copy-fg:#0f172a;--chip-bg:#16233a;
+    @media (prefers-color-scheme: dark){
+      :root{
+        --ink:#f1f5f9;--muted:#94a3b8;--line:#334155;--card-bg:#0f1b2b;--content-bg:#16233a;
+        --page-grad:linear-gradient(160deg,var(--bg-dark) 0%,#0b1726 55%,#0b1220 100%);
+        --shadow:0 10px 30px -12px rgba(0,0,0,.6);--overlay-bg:rgba(0,0,0,.65);
+        --copy-bg:#ffffff;--copy-fg:#0f172a;--chip-bg:#16233a;
+      }
     }
     *{box-sizing:border-box}
     html,body{margin:0;padding:0}
@@ -38,20 +40,7 @@
     @keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
     @keyframes spin{to{transform:rotate(360deg)}}
 
-    .bar{position:fixed;top:12px;left:50%;transform:translateX(-50%);width:min(440px,calc(100% - 24px));background:var(--bar-bg);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid var(--line);border-radius:999px;box-shadow:var(--shadow);display:flex;align-items:center;justify-content:space-between;padding:8px 8px 8px 16px;z-index:50}
-    .bar-logo{display:flex;align-items:center;gap:6px;font-weight:800;font-size:14px;color:var(--brand-dark)}
-    html.dark .bar-logo{color:var(--brand-light)}
-    .bar-logo svg{width:16px;height:16px;flex-shrink:0}
-    .theme-btn{width:32px;height:32px;border-radius:50%;border:0;background:none;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);-webkit-tap-highlight-color:transparent}
-    .theme-btn:hover{background:rgba(15,23,42,.06)}
-    html.dark .theme-btn:hover{background:rgba(255,255,255,.1)}
-    .theme-btn svg{width:18px;height:18px}
-    .theme-btn .moon{display:block}
-    .theme-btn .sun{display:none}
-    html.dark .theme-btn .moon{display:none}
-    html.dark .theme-btn .sun{display:block}
-
-    .page{max-width:460px;margin:0 auto;padding:76px 16px calc(32px + env(safe-area-inset-bottom))}
+    .page{max-width:460px;margin:0 auto;padding:24px 16px calc(32px + env(safe-area-inset-bottom))}
     section{animation:fadeUp .5s ease both}
 
     .biz-card{background:var(--card-bg);border-radius:22px;box-shadow:var(--shadow);padding:20px 18px 18px;border:1px solid var(--line);position:relative;margin-bottom:16px}
@@ -101,7 +90,7 @@
     .copy-btn:disabled{opacity:.55;cursor:default}
     .copy-btn svg{width:17px;height:17px;flex-shrink:0}
     .regen-btn{width:46px;height:46px;border-radius:50%;border:0;background:var(--bg-light);color:var(--brand-dark);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:transform .15s ease;-webkit-tap-highlight-color:transparent}
-    html.dark .regen-btn{background:rgba(255,255,255,.1);color:var(--brand-light)}
+    @media (prefers-color-scheme: dark){.regen-btn{background:rgba(255,255,255,.1);color:var(--brand-light)}}
     .regen-btn:active{transform:scale(.92)}
     .regen-btn:disabled{opacity:.55;cursor:default}
     .regen-btn svg{width:19px;height:19px}
@@ -123,21 +112,10 @@
     .loader::before{content:"";position:absolute;inset:0 auto 0 0;width:40%;background:var(--brand);border-radius:999px;animation:loaderMove 1s ease-in-out infinite}
     @keyframes loaderMove{0%{left:-40%}50%{left:60%}100%{left:100%}}
     .redirect-label{font-size:10px;font-weight:800;letter-spacing:.06em;color:var(--brand-dark);text-transform:uppercase}
-    html.dark .redirect-label{color:var(--brand-light)}
+    @media (prefers-color-scheme: dark){.redirect-label{color:var(--brand-light)}}
   </style>
 </head>
 <body>
-  <div class="bar">
-    <span class="bar-logo">
-      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3l-5.9 3.3 1.3-6.6L2.5 9.4l6.6-.8z"/></svg>
-      Markkito
-    </span>
-    <button type="button" class="theme-btn" data-theme-toggle aria-label="Toggle dark mode">
-      <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
-      <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5"/><path d="M12 1v3M12 20v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M1 12h3M20 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>
-    </button>
-  </div>
-
   <div class="page">
     <section class="biz-card" style="animation-delay:.02s">
       <div class="logo">
@@ -240,16 +218,9 @@
     (() => {
       const cfg = JSON.parse(document.getElementById("ai-review-data").textContent);
       const $ = (s) => document.querySelector(s);
-      const root = document.documentElement;
       const text = $("[data-review]"), err = $("[data-error]");
       const go = $("[data-go]"), copyBtn = $("[data-copy]"), again = $("[data-again]");
       let rating = 0, language = cfg.language, edited = false, seq = 0;
-
-      // Theme: a saved choice wins; otherwise the device's own preference.
-      const stored = (() => { try { return localStorage.getItem("ai-review-theme"); } catch (e) { return null; } })();
-      const setDark = (on) => { root.classList.toggle("dark", on); try { localStorage.setItem("ai-review-theme", on ? "dark" : "light"); } catch (e) {} };
-      setDark(stored ? stored === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches);
-      $("[data-theme-toggle]").addEventListener("click", () => setDark(!root.classList.contains("dark")));
 
       const ready = () => { const has = text.value.trim().length > 0; go.disabled = copyBtn.disabled = !has; };
       text.addEventListener("input", () => { edited = true; ready(); });
