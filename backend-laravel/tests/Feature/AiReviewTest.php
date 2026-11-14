@@ -118,6 +118,16 @@ class AiReviewTest extends TestCase
         $this->putJson($url, ['theme' => 'not-a-colour'], $this->auth)->assertStatus(400);
     }
 
+    public function test_the_business_chooses_whether_customers_pick_a_rating_first(): void
+    {
+        $url = "/api/v1/businesses/{$this->business->id}/ai-review";
+        $this->getJson($url, $this->auth)->assertOk()->assertJsonPath('data.askRating', false);
+        $this->get('/review/spice-garden')->assertOk()->assertDontSee('data-star=', false);
+
+        $this->putJson($url, ['askRating' => true], $this->auth)->assertOk()->assertJsonPath('data.askRating', true);
+        $this->get('/review/spice-garden')->assertOk()->assertSee('data-star="1"', false);
+    }
+
     public function test_gemini_writes_the_review_in_the_chosen_language(): void
     {
         config(['services.ai.provider' => 'gemini', 'services.gemini.key' => 'test-key']);

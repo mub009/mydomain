@@ -26,6 +26,7 @@ class AiReviewPageController extends Controller
             'googleUrl' => ReviewChannels::google($business),
             'languages' => collect($settings['languages'])->map(fn ($code) => ['code' => $code, 'label' => AiReview::LANGUAGES[$code][1]])->all(),
             'theme' => AiReview::themeColors($settings['theme']),
+            'askRating' => $settings['askRating'],
         ])->header('Cache-Control', 'no-store');
     }
 }

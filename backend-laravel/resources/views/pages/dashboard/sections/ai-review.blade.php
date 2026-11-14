@@ -113,6 +113,10 @@
       <label class="flex items-center gap-2 text-sm text-ink-700">
         <input type="checkbox" name="emoji" value="1" class="rounded text-brand-600" @checked($r['emoji']) /> Allow an emoji or two in reviews
       </label>
+      <label class="flex items-center gap-2 text-sm text-ink-700">
+        <input type="checkbox" name="askRating" value="1" class="rounded text-brand-600" @checked($r['askRating']) /> Ask customers to pick a star rating first
+        <span class="font-normal text-ink-400">(off: the page writes a 5-star review the moment it opens)</span>
+      </label>
       <fieldset>
         <legend class="mb-1 block text-xs font-semibold text-ink-700">Review page colour</legend>
         <div class="mt-1 flex flex-wrap gap-2.5">

@@ -91,6 +91,9 @@ class AiReview
     public const DEFAULTS = [
         'highlights' => '', 'languages' => ['en'], 'tone' => 'mixed', 'length' => 'medium',
         'keywords' => '', 'avoid' => '', 'staff' => '', 'emoji' => false, 'theme' => 'green',
+        // Hidden by default: the page writes a 5-star review the moment it opens,
+        // instead of asking the customer to pick a rating first.
+        'askRating' => false,
     ];
 
     // How many recent drafts a new one is compared with, and how many are kept.
@@ -120,6 +123,7 @@ class AiReview
             'staff' => ['sometimes', 'nullable', 'string', 'max:200'],
             'emoji' => ['sometimes', 'boolean'],
             'theme' => ['sometimes', 'string', 'in:'.implode(',', array_keys(self::THEMES))],
+            'askRating' => ['sometimes', 'boolean'],
         ];
     }
 
@@ -140,6 +144,7 @@ class AiReview
             'staff' => $text('staff'),
             'emoji' => (bool) ($raw['emoji'] ?? false),
             'theme' => isset(self::THEMES[$raw['theme'] ?? null]) ? $raw['theme'] : self::DEFAULTS['theme'],
+            'askRating' => (bool) ($raw['askRating'] ?? self::DEFAULTS['askRating']),
         ];
     }
 

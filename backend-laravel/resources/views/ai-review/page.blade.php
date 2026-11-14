@@ -148,36 +148,40 @@
       @endif
     </section>
 
-    <section class="picker" style="animation-delay:.08s">
-      <span class="label" id="stars-label">Your rating</span>
-      <div class="stars" role="radiogroup" aria-labelledby="stars-label" data-stars>
-        @for ($i = 1; $i <= 5; $i++)
-          <button type="button" role="radio" aria-checked="false" aria-label="{{ $i }} star{{ $i > 1 ? 's' : '' }}" data-star="{{ $i }}">
-            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3l-5.9 3.3 1.3-6.6L2.5 9.4l6.6-.8z"/></svg>
-          </button>
-        @endfor
-      </div>
+    @if ($askRating || count($languages) > 1)
+      <section class="picker" style="animation-delay:.08s">
+        @if ($askRating)
+          <span class="label" id="stars-label">Your rating</span>
+          <div class="stars" role="radiogroup" aria-labelledby="stars-label" data-stars>
+            @for ($i = 1; $i <= 5; $i++)
+              <button type="button" role="radio" aria-checked="false" aria-label="{{ $i }} star{{ $i > 1 ? 's' : '' }}" data-star="{{ $i }}">
+                <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3l-5.9 3.3 1.3-6.6L2.5 9.4l6.6-.8z"/></svg>
+              </button>
+            @endfor
+          </div>
+        @endif
 
-      @if (count($languages) > 1)
-        <span class="label">Language</span>
-        <div class="chips" data-langs>
-          @foreach ($languages as $i => $l)
-            <button type="button" data-lang="{{ $l['code'] }}" class="{{ $i === 0 ? 'on' : '' }}" aria-pressed="{{ $i === 0 ? 'true' : 'false' }}">{{ $l['label'] }}</button>
-          @endforeach
-        </div>
-      @endif
-    </section>
+        @if (count($languages) > 1)
+          <span class="label">Language</span>
+          <div class="chips" data-langs>
+            @foreach ($languages as $i => $l)
+              <button type="button" data-lang="{{ $l['code'] }}" class="{{ $i === 0 ? 'on' : '' }}" aria-pressed="{{ $i === 0 ? 'true' : 'false' }}">{{ $l['label'] }}</button>
+            @endforeach
+          </div>
+        @endif
+      </section>
+    @endif
 
     <section class="review-card" style="animation-delay:.14s">
       <div class="review-head">
-        <div class="review-status"><span class="spin" data-spin></span><span data-busy-text>TAP A STAR TO START</span></div>
+        <div class="review-status"><span class="spin" data-spin></span><span data-busy-text>{{ $askRating ? 'TAP A STAR TO START' : 'WRITING YOUR REVIEW…' }}</span></div>
         <button type="button" class="edit-btn" data-focus-review aria-label="Edit your review">
           <span class="dot" data-edit-dot></span>
           <svg data-edit-pencil viewBox="0 0 306.637 306.637" aria-hidden="true"><path d="M12.809 238.52 0 306.637l68.118-12.809 184.277-184.277-55.309-55.309zm47.981 41.423-41.992 7.896 7.896-41.992L197.086 75.455l34.096 34.096zM251.329 0l-41.507 41.507 55.308 55.308 41.507-41.507zm-20.294 41.507 20.294-20.294 34.095 34.095-20.294 20.294z"/></svg>
         </button>
       </div>
       <div class="review-body">
-        <textarea data-review aria-label="Your review — you can change it" placeholder="Tap a star above to get your review"></textarea>
+        <textarea data-review aria-label="Your review — you can change it" placeholder="{{ $askRating ? 'Tap a star above to get your review' : 'Your review' }}"></textarea>
         <p class="hint">You can edit it before posting.</p>
         <p class="error" data-error role="alert"></p>
         <div class="review-actions">
@@ -213,14 +217,17 @@
     </div>
   </div>
 
-  <script type="application/json" id="ai-review-data">@json(['slug' => $slug, 'googleUrl' => $googleUrl, 'language' => $languages[0]['code']])</script>
+  {{-- A variable instead of an inline array: @json(['a'=>..,'b'=>..,'c'=>..,'d'=>..]) truncates past
+       its third pair in this Blade version — it silently drops the rest. --}}
+  @php($pageConfig = ['slug' => $slug, 'googleUrl' => $googleUrl, 'language' => $languages[0]['code'], 'askRating' => $askRating])
+  <script type="application/json" id="ai-review-data">@json($pageConfig)</script>
   <script>
     (() => {
       const cfg = JSON.parse(document.getElementById("ai-review-data").textContent);
       const $ = (s) => document.querySelector(s);
       const text = $("[data-review]"), err = $("[data-error]");
       const go = $("[data-go]"), copyBtn = $("[data-copy]"), again = $("[data-again]");
-      let rating = 0, language = cfg.language, edited = false, seq = 0;
+      let rating = cfg.askRating ? 0 : 5, language = cfg.language, edited = false, seq = 0;
 
       const ready = () => { const has = text.value.trim().length > 0; go.disabled = copyBtn.disabled = !has; };
       text.addEventListener("input", () => { edited = true; ready(); });
@@ -313,6 +320,7 @@
         setTimeout(() => { location.href = cfg.googleUrl; }, ok ? 1200 : 2500);
       });
 
+      if (!cfg.askRating) write(); // Rating is hidden: write a 5-star review right away.
       document.body.classList.add("ready");
     })();
   </script>
