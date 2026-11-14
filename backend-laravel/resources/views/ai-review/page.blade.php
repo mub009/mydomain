@@ -4,7 +4,7 @@
      business's Google page to paste and post it. Self-contained like the
      visiting card: no app CSS or JS. $b is escaped by Blade. --}}
 <!doctype html>
-<html lang="en">
+<html lang="en" style="--brand:{{ $theme['brand'] }};--brand-dark:{{ $theme['brandDark'] }};--brand-light:{{ $theme['brandLight'] }};--bg-light:{{ $theme['bgLight'] }};--bg-dark:{{ $theme['bgDark'] }}">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -16,15 +16,16 @@
   @if ($b['logoUrl'])<meta property="og:image" content="{{ $b['logoUrl'] }}" />@endif
   <style>
     :root{
-      --brand:#0f9e68;--brand-dark:#0c8a5a;--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--star:#f5b301;
+      --brand:#0f9e68;--brand-dark:#0c8a5a;--brand-light:#34d399;--bg-light:#c7f5de;--bg-dark:#04281c;
+      --ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--star:#f5b301;
       --card-bg:#ffffff;--content-bg:#ffffff;--bar-bg:rgba(255,255,255,.9);
-      --page-grad:linear-gradient(160deg,#c7f5de 0%,#eaf7f0 42%,#f1f5f9 100%);
+      --page-grad:linear-gradient(160deg,var(--bg-light) 0%,#eaf7f0 42%,#f1f5f9 100%);
       --shadow:0 10px 30px -12px rgba(15,23,42,.18);--overlay-bg:rgba(15,23,42,.5);
       --copy-bg:#0f172a;--copy-fg:#ffffff;--chip-bg:#ffffff;
     }
     html.dark{
       --ink:#f1f5f9;--muted:#94a3b8;--line:#334155;--card-bg:#0f1b2b;--content-bg:#16233a;
-      --bar-bg:rgba(15,23,43,.85);--page-grad:linear-gradient(160deg,#04281c 0%,#0b1726 55%,#0b1220 100%);
+      --bar-bg:rgba(15,23,43,.85);--page-grad:linear-gradient(160deg,var(--bg-dark) 0%,#0b1726 55%,#0b1220 100%);
       --shadow:0 10px 30px -12px rgba(0,0,0,.6);--overlay-bg:rgba(0,0,0,.65);
       --copy-bg:#ffffff;--copy-fg:#0f172a;--chip-bg:#16233a;
     }
@@ -39,7 +40,7 @@
 
     .bar{position:fixed;top:12px;left:50%;transform:translateX(-50%);width:min(440px,calc(100% - 24px));background:var(--bar-bg);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid var(--line);border-radius:999px;box-shadow:var(--shadow);display:flex;align-items:center;justify-content:space-between;padding:8px 8px 8px 16px;z-index:50}
     .bar-logo{display:flex;align-items:center;gap:6px;font-weight:800;font-size:14px;color:var(--brand-dark)}
-    html.dark .bar-logo{color:#34d399}
+    html.dark .bar-logo{color:var(--brand-light)}
     .bar-logo svg{width:16px;height:16px;flex-shrink:0}
     .theme-btn{width:32px;height:32px;border-radius:50%;border:0;background:none;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);-webkit-tap-highlight-color:transparent}
     .theme-btn:hover{background:rgba(15,23,42,.06)}
@@ -62,10 +63,10 @@
     .tick svg{width:16px;height:16px;display:block}
     .tick .tip{position:absolute;bottom:135%;left:50%;transform:translateX(-50%);width:200px;background:var(--content-bg);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:11px;line-height:1.5;font-weight:400;box-shadow:var(--shadow);opacity:0;visibility:hidden;transition:opacity .2s ease;pointer-events:none;z-index:5}
     .tick:hover .tip,.tick:focus .tip{opacity:1;visibility:visible}
-    .social{display:flex;gap:8px;margin-top:12px}
-    .social a{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px -2px rgba(15,23,42,.3);transition:transform .15s ease}
+    .social{display:flex;gap:10px;margin-top:12px}
+    .social a{width:46px;height:46px;border-radius:13px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px -2px rgba(15,23,42,.3);transition:transform .15s ease}
     .social a:hover{transform:translateY(-2px)}
-    .social svg{width:17px;height:17px;fill:#fff}
+    .social svg{width:24px;height:24px;fill:#fff}
     .social a.facebook{background:#1877F2}
     .social a.instagram{background:radial-gradient(circle at 30% 107%,#fdf497 0%,#fdf497 5%,#fd5949 45%,#d6249f 60%,#285AEB 90%)}
     .social a.youtube{background:#FF0000}
@@ -85,7 +86,7 @@
     .review-card{border-radius:22px;overflow:hidden;background:linear-gradient(135deg,var(--brand),var(--brand-dark));box-shadow:var(--shadow);margin-bottom:16px}
     .review-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px}
     .review-status{display:flex;align-items:center;gap:10px;color:#fff;font-size:13px;font-weight:800;letter-spacing:.06em}
-    .spin{width:16px;height:16px;border-radius:50%;border:2.5px solid rgba(255,255,255,.35);border-top-color:#fff;animation:spin .8s linear infinite;flex-shrink:0}
+    .spin{display:none;width:16px;height:16px;border-radius:50%;border:2.5px solid rgba(255,255,255,.35);border-top-color:#fff;animation:spin .8s linear infinite;flex-shrink:0}
     .edit-btn{width:28px;height:28px;border-radius:8px;border:0;background:rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;-webkit-tap-highlight-color:transparent}
     .edit-btn .dot{width:10px;height:10px;border-radius:2px;background:#fff;display:block}
     .edit-btn svg{width:15px;height:15px;fill:#fff;display:none}
@@ -99,8 +100,8 @@
     .copy-btn:active{transform:scale(.97)}
     .copy-btn:disabled{opacity:.55;cursor:default}
     .copy-btn svg{width:17px;height:17px;flex-shrink:0}
-    .regen-btn{width:46px;height:46px;border-radius:50%;border:0;background:rgba(15,158,104,.12);color:var(--brand-dark);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:transform .15s ease;-webkit-tap-highlight-color:transparent}
-    html.dark .regen-btn{background:rgba(52,211,153,.15);color:#34d399}
+    .regen-btn{width:46px;height:46px;border-radius:50%;border:0;background:var(--bg-light);color:var(--brand-dark);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:transform .15s ease;-webkit-tap-highlight-color:transparent}
+    html.dark .regen-btn{background:rgba(255,255,255,.1);color:var(--brand-light)}
     .regen-btn:active{transform:scale(.92)}
     .regen-btn:disabled{opacity:.55;cursor:default}
     .regen-btn svg{width:19px;height:19px}
@@ -122,7 +123,7 @@
     .loader::before{content:"";position:absolute;inset:0 auto 0 0;width:40%;background:var(--brand);border-radius:999px;animation:loaderMove 1s ease-in-out infinite}
     @keyframes loaderMove{0%{left:-40%}50%{left:60%}100%{left:100%}}
     .redirect-label{font-size:10px;font-weight:800;letter-spacing:.06em;color:var(--brand-dark);text-transform:uppercase}
-    html.dark .redirect-label{color:#34d399}
+    html.dark .redirect-label{color:var(--brand-light)}
   </style>
 </head>
 <body>
@@ -173,7 +174,7 @@
       <span class="label" id="stars-label">Your rating</span>
       <div class="stars" role="radiogroup" aria-labelledby="stars-label" data-stars>
         @for ($i = 1; $i <= 5; $i++)
-          <button type="button" role="radio" aria-checked="{{ $i === 5 ? 'true' : 'false' }}" aria-label="{{ $i }} star{{ $i > 1 ? 's' : '' }}" data-star="{{ $i }}" class="on">
+          <button type="button" role="radio" aria-checked="false" aria-label="{{ $i }} star{{ $i > 1 ? 's' : '' }}" data-star="{{ $i }}">
             <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3l-5.9 3.3 1.3-6.6L2.5 9.4l6.6-.8z"/></svg>
           </button>
         @endfor
@@ -191,14 +192,14 @@
 
     <section class="review-card" style="animation-delay:.14s">
       <div class="review-head">
-        <div class="review-status"><span class="spin" data-spin></span><span data-busy-text>WRITING YOUR REVIEW…</span></div>
+        <div class="review-status"><span class="spin" data-spin></span><span data-busy-text>TAP A STAR TO START</span></div>
         <button type="button" class="edit-btn" data-focus-review aria-label="Edit your review">
           <span class="dot" data-edit-dot></span>
           <svg data-edit-pencil viewBox="0 0 306.637 306.637" aria-hidden="true"><path d="M12.809 238.52 0 306.637l68.118-12.809 184.277-184.277-55.309-55.309zm47.981 41.423-41.992 7.896 7.896-41.992L197.086 75.455l34.096 34.096zM251.329 0l-41.507 41.507 55.308 55.308 41.507-41.507zm-20.294 41.507 20.294-20.294 34.095 34.095-20.294 20.294z"/></svg>
         </button>
       </div>
       <div class="review-body">
-        <textarea data-review aria-label="Your review — you can change it" placeholder="Your review"></textarea>
+        <textarea data-review aria-label="Your review — you can change it" placeholder="Tap a star above to get your review"></textarea>
         <p class="hint">You can edit it before posting.</p>
         <p class="error" data-error role="alert"></p>
         <div class="review-actions">
@@ -242,7 +243,7 @@
       const root = document.documentElement;
       const text = $("[data-review]"), err = $("[data-error]");
       const go = $("[data-go]"), copyBtn = $("[data-copy]"), again = $("[data-again]");
-      let rating = 5, language = cfg.language, edited = false, seq = 0;
+      let rating = 0, language = cfg.language, edited = false, seq = 0;
 
       // Theme: a saved choice wins; otherwise the device's own preference.
       const stored = (() => { try { return localStorage.getItem("ai-review-theme"); } catch (e) { return null; } })();
@@ -262,6 +263,7 @@
       }
 
       async function write() {
+        if (!rating) return; // Nothing to ask the AI for until the customer picks a star.
         const mine = ++seq;
         setBusy(true); err.style.display = "none";
         // While the AI writes: a few steps, so the wait feels like progress.
@@ -298,7 +300,7 @@
       document.querySelectorAll("[data-lang]").forEach((btn) => btn.addEventListener("click", () => {
         language = btn.dataset.lang;
         document.querySelectorAll("[data-lang]").forEach((l) => { l.classList.toggle("on", l === btn); l.setAttribute("aria-pressed", String(l === btn)); });
-        write();
+        if (rating) write();
       }));
       again.addEventListener("click", () => {
         const icon = again.querySelector("svg"); icon.classList.add("spin-icon");
@@ -340,7 +342,6 @@
         setTimeout(() => { location.href = cfg.googleUrl; }, ok ? 1200 : 2500);
       });
 
-      write();
       document.body.classList.add("ready");
     })();
   </script>

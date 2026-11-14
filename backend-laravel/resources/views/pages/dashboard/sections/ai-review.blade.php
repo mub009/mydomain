@@ -113,6 +113,18 @@
       <label class="flex items-center gap-2 text-sm text-ink-700">
         <input type="checkbox" name="emoji" value="1" class="rounded text-brand-600" @checked($r['emoji']) /> Allow an emoji or two in reviews
       </label>
+      <fieldset>
+        <legend class="mb-1 block text-xs font-semibold text-ink-700">Review page colour</legend>
+        <div class="mt-1 flex flex-wrap gap-2.5">
+          @foreach ($r['themeOptions'] as $t)
+            <label class="relative flex h-10 w-10 cursor-pointer items-center justify-center rounded-full ring-2 ring-offset-2 ring-transparent has-[:checked]:ring-ink-900" title="{{ $t['label'] }}">
+              <input type="radio" name="theme" value="{{ $t['key'] }}" class="peer sr-only" @checked($r['theme'] === $t['key']) />
+              <span class="h-full w-full rounded-full" style="background-color: {{ $t['brand'] }}"></span>
+              <x-icon name="check" :size="15" class="absolute text-white opacity-0 peer-checked:opacity-100" />
+            </label>
+          @endforeach
+        </div>
+      </fieldset>
       <p class="flex items-start gap-1.5 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
         <x-icon name="check-circle-2" :size="14" class="mt-0.5 shrink-0" />
         <span>Every review is unique: each one is checked against the last {{ number_format(min($r['remembered'], 150)) }} reviews written for you, and written again if it reads too much like one of them.</span>

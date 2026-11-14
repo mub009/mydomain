@@ -54,6 +54,7 @@ if (root && data) {
         staff: form.staff.value.trim(),
         avoid: form.avoid.value.trim(),
         emoji: form.emoji.checked,
+        theme: form.theme.value,
       });
       // The sample's language list follows what is offered.
       const select = $("[data-sample-language]", root);

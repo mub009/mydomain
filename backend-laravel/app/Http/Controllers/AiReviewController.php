@@ -41,6 +41,7 @@ class AiReviewController extends Controller
             'languageOptions' => collect(AiReview::LANGUAGES)->map(fn ($l, $code) => ['code' => $code, 'name' => $l[0], 'native' => $l[1]])->values(),
             'toneOptions' => collect(AiReview::TONES)->map(fn ($label, $key) => ['key' => $key, 'label' => $label])->values(),
             'lengthOptions' => collect(AiReview::LENGTHS)->map(fn ($l, $key) => ['key' => $key, 'label' => $l[0]])->values(),
+            'themeOptions' => collect(AiReview::THEMES)->map(fn ($t, $key) => ['key' => $key, 'label' => $t[0], 'brand' => $t[1]])->values(),
             // Reviews remembered so new ones read differently.
             'remembered' => AiReview::draftCount($business),
         ]);

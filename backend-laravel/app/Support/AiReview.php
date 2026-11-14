@@ -73,9 +73,24 @@ class AiReview
         'long' => ['Long (60–110 words)', 60, 110],
     ];
 
+    // The public review page's colour (App\Http\Controllers\Web\AiReviewPageController):
+    // label, brand, brand-dark (buttons, the review card), brand-light (accents
+    // on a dark background), and the two background-gradient corners (light, dark).
+    public const THEMES = [
+        'green' => ['Green', '#0f9e68', '#0c8a5a', '#34d399', '#c7f5de', '#04281c'],
+        'blue' => ['Blue', '#2563eb', '#1d4ed8', '#60a5fa', '#bfdbfe', '#0b1f45'],
+        'indigo' => ['Indigo', '#4f46e5', '#4338ca', '#818cf8', '#dcdafb', '#1a1640'],
+        'purple' => ['Purple', '#7c3aed', '#6d28d9', '#a78bfa', '#e0d4fb', '#1e1138'],
+        'pink' => ['Pink', '#db2777', '#be185d', '#f472b6', '#fbd4e6', '#3b0f26'],
+        'red' => ['Red', '#dc2626', '#b91c1c', '#f87171', '#fbd4d4', '#370b0b'],
+        'orange' => ['Orange', '#ea580c', '#c2410c', '#fb923c', '#fde1c7', '#3a1705'],
+        'teal' => ['Teal', '#0d9488', '#0f766e', '#2dd4bf', '#c8f5ee', '#042e29'],
+        'charcoal' => ['Charcoal', '#334155', '#1e293b', '#94a3b8', '#e2e8f0', '#05070d'],
+    ];
+
     public const DEFAULTS = [
         'highlights' => '', 'languages' => ['en'], 'tone' => 'mixed', 'length' => 'medium',
-        'keywords' => '', 'avoid' => '', 'staff' => '', 'emoji' => false,
+        'keywords' => '', 'avoid' => '', 'staff' => '', 'emoji' => false, 'theme' => 'green',
     ];
 
     // How many recent drafts a new one is compared with, and how many are kept.
@@ -104,6 +119,7 @@ class AiReview
             'avoid' => ['sometimes', 'nullable', 'string', 'max:300'],
             'staff' => ['sometimes', 'nullable', 'string', 'max:200'],
             'emoji' => ['sometimes', 'boolean'],
+            'theme' => ['sometimes', 'string', 'in:'.implode(',', array_keys(self::THEMES))],
         ];
     }
 
@@ -123,7 +139,16 @@ class AiReview
             'avoid' => $text('avoid'),
             'staff' => $text('staff'),
             'emoji' => (bool) ($raw['emoji'] ?? false),
+            'theme' => isset(self::THEMES[$raw['theme'] ?? null]) ? $raw['theme'] : self::DEFAULTS['theme'],
         ];
+    }
+
+    /** A theme's colours, by key — the default theme's if the key is unknown. */
+    public static function themeColors(string $key): array
+    {
+        [, $brand, $brandDark, $brandLight, $bgLight, $bgDark] = self::THEMES[$key] ?? self::THEMES[self::DEFAULTS['theme']];
+
+        return ['brand' => $brand, 'brandDark' => $brandDark, 'brandLight' => $brandLight, 'bgLight' => $bgLight, 'bgDark' => $bgDark];
     }
 
     /** A comma- or line-separated setting as a clean list. */
