@@ -124,6 +124,25 @@ class AiReviewTest extends TestCase
             ->assertOk()->assertJsonPath('data.source', 'builtin');
     }
 
+    public function test_nvidia_writes_the_review_in_the_chosen_language(): void
+    {
+        config(['services.ai.provider' => 'nvidia', 'services.nvidia.key' => 'test-key']);
+        $this->business->update(['aiReview' => ['languages' => ['en', 'ml']]]);
+        Http::fake(['integrate.api.nvidia.com/*' => Http::sequence()
+            ->push(['choices' => [['message' => ['content' => json_encode(['review' => 'നല്ല ഭക്ഷണം, നല്ല സേവനം.'])]]]])
+            ->push('quota', 429)]);
+
+        $this->postJson('/api/v1/ai-review/spice-garden/generate', ['rating' => 5, 'language' => 'ml'])
+            ->assertOk()->assertJsonPath('data.source', 'nvidia')->assertJsonPath('data.review', 'നല്ല ഭക്ഷണം, നല്ല സേവനം.');
+        Http::assertSent(fn ($request) => str_contains(json_encode($request->data(), JSON_UNESCAPED_UNICODE), 'Language: Malayalam')
+            && str_contains(json_encode($request->data()), 'Star rating: 5 out of 5')
+            && $request->data()['response_format'] === ['type' => 'json_object']);
+
+        // When NVIDIA fails, the built-in writer still gives the customer a review.
+        $this->postJson('/api/v1/ai-review/spice-garden/generate', ['rating' => 5, 'language' => 'en'])
+            ->assertOk()->assertJsonPath('data.source', 'builtin');
+    }
+
     public function test_the_dashboard_has_the_ai_google_review_section(): void
     {
         $this->withoutVite();

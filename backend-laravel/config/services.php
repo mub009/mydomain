@@ -25,8 +25,8 @@ return [
     ],
 
     // Writing listing descriptions (App\Support\AiWriter). AI_PROVIDER is
-    // gemini | claude | builtin; left empty, it uses whichever has a key,
-    // else the free built-in writer.
+    // gemini | claude | nvidia | builtin; left empty, it uses whichever has
+    // a key, else the free built-in writer.
     'ai' => [
         'provider' => env('AI_PROVIDER'),
     ],
@@ -80,6 +80,16 @@ return [
     'anthropic' => [
         'key' => env('ANTHROPIC_API_KEY'),
         'model' => env('ANTHROPIC_MODEL', 'claude-opus-5-5'),
+    ],
+
+    // NVIDIA's hosted model catalog (build.nvidia.com) — an OpenAI-compatible
+    // chat/completions endpoint. Get a free NIM API key there, pick a model
+    // from the catalog, and set both below.
+    'nvidia' => [
+        'key' => env('NVIDIA_API_KEY'),
+        'model' => env('NVIDIA_MODEL', 'meta/llama-3.1-70b-instruct'),
+        'base_url' => env('NVIDIA_BASE_URL', 'https://integrate.api.nvidia.com'),
+        'ca_bundle' => env('HTTP_CA_BUNDLE'),
     ],
 
     'resend' => [

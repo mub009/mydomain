@@ -17,13 +17,16 @@ use RuntimeException;
  *  - "gemini": Google Gemini — free with a key from Google AI Studio, up to
  *    a daily quota.
  *  - "claude": Anthropic Claude — paid, with an Anthropic API key.
+ *  - "nvidia": NVIDIA's hosted model catalog (build.nvidia.com) — an
+ *    OpenAI-compatible endpoint, free to try with a NIM API key.
  *  - "builtin": BuiltinWriter — free and offline, no key at all.
  *
- * Left unset it picks whichever has a key, else the built-in writer. If the
- * AI service fails (quota used up, network, a declined request) the built-in
- * writer steps in, so the button always gives the owner something. Every
- * writer only says what follows from the name and category — never contact
- * details, prices, years or awards.
+ * Left unset it picks whichever has a key (gemini, then claude, then
+ * nvidia), else the built-in writer. If the AI service fails (quota used
+ * up, network, a declined request) the built-in writer steps in, so the
+ * button always gives the owner something. Every writer only says what
+ * follows from the name and category — never contact details, prices,
+ * years or awards.
  */
 class AiWriter
 {
@@ -110,7 +113,7 @@ class AiWriter
                 'Style' => $style,
             ]))->map(fn ($value, $label) => "{$label}: {$value}")->implode("\n");
             try {
-                $text = ($provider === 'gemini' ? self::gemini(self::REVIEW_SYSTEM, $brief, ['review'], $timeout) : self::claude(self::REVIEW_SYSTEM, $brief, ['review'], $timeout))['review'];
+                $text = self::write($provider, self::REVIEW_SYSTEM, $brief, ['review'], $timeout)['review'];
 
                 return ['review' => trim(mb_substr($text, 0, 1500), " \"“”\n"), 'source' => $provider];
             } catch (RuntimeException|ConnectionException|AnthropicException $e) {
@@ -127,13 +130,14 @@ class AiWriter
     public static function provider(): string
     {
         $chosen = strtolower((string) config('services.ai.provider'));
-        if (in_array($chosen, ['gemini', 'claude', 'builtin'], true)) {
+        if (in_array($chosen, ['gemini', 'claude', 'nvidia', 'builtin'], true)) {
             return $chosen;
         }
 
         return match (true) {
             (bool) config('services.gemini.key') => 'gemini',
             (bool) config('services.anthropic.key') => 'claude',
+            (bool) config('services.nvidia.key') => 'nvidia',
             default => 'builtin',
         };
     }
@@ -148,7 +152,7 @@ class AiWriter
         if ($provider !== 'builtin') {
             $brief = self::brief($name, $category, $city, $businessType);
             try {
-                $text = ($provider === 'gemini' ? self::gemini(self::SYSTEM, $brief, ['description']) : self::claude(self::SYSTEM, $brief, ['description']))['description'];
+                $text = self::write($provider, self::SYSTEM, $brief, ['description'])['description'];
 
                 return ['description' => mb_substr($text, 0, self::MAX_DESCRIPTION), 'source' => $provider];
             } catch (RuntimeException|ConnectionException|AnthropicException $e) {
@@ -174,7 +178,7 @@ class AiWriter
             $brief = self::seoBrief($facts);
             $fields = array_keys(self::SEO_LIMITS);
             try {
-                $answer = $provider === 'gemini' ? self::gemini(self::SEO_SYSTEM, $brief, $fields) : self::claude(self::SEO_SYSTEM, $brief, $fields);
+                $answer = self::write($provider, self::SEO_SYSTEM, $brief, $fields);
 
                 return [...self::fitSeo($answer), 'source' => $provider];
             } catch (RuntimeException|ConnectionException|AnthropicException $e) {
@@ -238,6 +242,27 @@ class AiWriter
     }
 
     /**
+     * Routes to whichever writer is configured. Isolated from the three
+     * public methods above so adding a provider means changing this one
+     * spot instead of three near-identical ternaries. $timeout is left null
+     * when a caller doesn't care, so each writer keeps its own default
+     * (gemini/nvidia 30s, claude 60s) instead of all converging on one.
+     *
+     * @param  array<int, string>  $fields
+     * @return array<string, string>
+     */
+    private static function write(string $provider, string $system, string $brief, array $fields, ?int $timeout = null): array
+    {
+        $args = $timeout === null ? [$system, $brief, $fields] : [$system, $brief, $fields, $timeout];
+
+        return match ($provider) {
+            'gemini' => self::gemini(...$args),
+            'nvidia' => self::nvidia(...$args),
+            default => self::claude(...$args),
+        };
+    }
+
+    /**
      * Google Gemini, answering with one string per field.
      *
      * @param  array<int, string>  $fields
@@ -252,6 +277,26 @@ class AiWriter
         ], 2048, $timeout);
 
         return self::fieldsFrom(json_encode($answer), $fields, 'Gemini');
+    }
+
+    /**
+     * NVIDIA's hosted model catalog, answering with one string per field.
+     * Unlike Gemini's responseSchema or Claude's json_schema output, NVIDIA's
+     * OpenAI-compatible endpoint only guarantees valid JSON (response_format
+     * "json_object"), not which keys it uses — so the field names it must
+     * answer with are spelled out in the prompt itself.
+     *
+     * @param  array<int, string>  $fields
+     * @return array<string, string>
+     */
+    private static function nvidia(string $system, string $brief, array $fields, int $timeout = 30): array
+    {
+        $keys = implode(', ', $fields);
+        $system .= "\n\nRespond with nothing but a single JSON object with exactly these keys, each a string: {$keys}.";
+
+        $answer = Nvidia::json($system, [['role' => 'user', 'text' => $brief]], 2048, $timeout);
+
+        return self::fieldsFrom(json_encode($answer), $fields, 'NVIDIA');
     }
 
     /**
