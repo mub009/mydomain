@@ -1,10 +1,8 @@
 /** Agent 1 - Lotappi: short-term hunter (swing trades, 1-10 trading days). */
 import type { AgentReport, Snapshot } from "../types";
-import { Agent, clamp, round, shortList, signalFor } from "./base";
+import { byScore, clamp, round, signalFor } from "./base";
 
-export class Lotappi extends Agent {
-  name = "Lotappi" as const;
-  role = "short-term (1-10 day) swing-trade scanner";
+export class Lotappi {
 
   score(symbol: string, s: Snapshot): AgentReport {
     let pts = 30;
@@ -33,11 +31,7 @@ export class Lotappi extends Agent {
     return { symbol, score, signal: signalFor(score), reasons, warnings, horizon: "1-10 days" };
   }
 
-  async run(snaps: Record<string, Snapshot>): Promise<AgentReport[]> {
-    const reports = Object.entries(snaps).map(([k, v]) => this.score(k, v)).sort((a, b) => b.score - a.score);
-    const text = `Scanned ${reports.length} stocks for short-term trades. Top picks:\n${shortList(reports)}`;
-    const note = await this.explain("In 4-6 lines, summarise your best short-term setups and the main risk.", reports.slice(0, 5));
-    this.bus.send(this.name, "Mubashir", "Short-term scan report", text, reports, note);
-    return reports;
+  scan(snaps: Record<string, Snapshot>): AgentReport[] {
+    return Object.entries(snaps).map(([k, v]) => this.score(k, v)).sort(byScore);
   }
 }

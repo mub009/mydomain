@@ -16,7 +16,17 @@ A React web app where four AI agents analyse Indian (NSE) stocks, talk to each o
 | 3 | **Mubashir** | **Analyses** Lotappi's and Mayavi's reports | Combines scores, finds agreement/conflict, rates risk, picks the horizon, sets entry / stop-loss / target (2:1 reward-to-risk) |
 | 4 | **Final Decision** | **Decides** | Asks Mubashir about conflicts, then gives STRONG BUY / BUY / WATCH / AVOID and the final picks (plus share quantity if you enter capital) |
 
-The app shows each agent working live, the full conversation between them, the final picks, and a sortable table of all stocks. Results can be downloaded as JSON.
+## What you see
+
+- **Overview** - summary tiles, the final picks (with 60-day price sparklines, entry, stop-loss, target and share quantity), a chart of where Lotappi and Mayavi agree, and a **live team chat** panel.
+- **Team chat** - a Slack-style chat. The agents act like a real team and talk one-to-one in real time, with "typing…" indicators:
+  - *Lotappi & Mayavi* compare their lists and argue about stocks they disagree on
+  - *Lotappi & Mubashir*, *Mayavi & Mubashir* - reports, and Mubashir's follow-up questions
+  - *Mubashir & Final Decision* - the combined analysis and questions about conflicts
+  - *Team room* - Final Decision announces the picks to everyone
+- **Screener** - every stock, sortable and filterable by verdict.
+
+The final picks stay hidden until Final Decision announces them in the chat. Chat speed can be set to slow / normal / fast, or skipped to the end.
 
 ## Run
 
@@ -54,9 +64,12 @@ npm test
 src/lib/indicators.ts        RSI, EMA/SMA, MACD, ATR, returns
 src/lib/data.ts              Yahoo Finance + demo data, Nifty 50 list
 src/lib/bus.ts               message bus the agents talk through
-src/lib/agents/*.ts          Lotappi, Mayavi, Mubashir, FinalDecision
-src/lib/pipeline.ts          runs the four agents in order
-src/components/*.tsx         UI: agent flow, picks, table, conversation
+src/lib/agents/*.ts          Lotappi, Mayavi, Mubashir, FinalDecision (scoring rules)
+src/lib/dialogue.ts          the team conversation (who says what to whom)
+src/lib/pipeline.ts          runs the agents, then the conversation
+src/hooks/usePlayback.ts     real-time chat playback with typing delays
+src/views/*.tsx              Overview, Team chat, Screener
+src/components/*.tsx         chat message, sparkline, agreement chart, badges
 ```
 
 ## Disclaimer

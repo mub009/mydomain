@@ -67,18 +67,30 @@ export interface Decision extends Analysis {
   clarification?: string;
   quantity?: number;
   investment?: number;
+  spark: number[]; // last ~60 closes
 }
 
 export type AgentName = "System" | "Lotappi" | "Mayavi" | "Mubashir" | "FinalDecision";
+
+/** A row shown inside a report message (a small table in the chat). */
+export interface ReportRow {
+  symbol: string;
+  score: number;
+  tag: string;
+  note: string;
+}
 
 export interface Message {
   id: number;
   sender: AgentName;
   to: AgentName | "ALL";
-  subject: string;
+  /** "team" for the team room, otherwise the two agent names sorted and joined by "|" */
+  thread: string;
+  kind: "system" | "chat" | "report" | "decision";
   text: string;
+  tickers: string[];
+  rows?: ReportRow[];
   aiNote?: string;
-  time: string;
 }
 
 export interface RunResult {

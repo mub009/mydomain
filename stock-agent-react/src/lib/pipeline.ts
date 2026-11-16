@@ -1,13 +1,15 @@
-/** Runs the agents in order: Lotappi + Mayavi -> Mubashir -> Final Decision. */
+/** Runs the agents: Lotappi + Mayavi -> Mubashir -> Final Decision,
+ *  then plays out their conversation on the message bus. */
 import { FinalDecision } from "./agents/finalDecision";
 import { Lotappi } from "./agents/lotappi";
 import { Mayavi } from "./agents/mayavi";
 import { Mubashir } from "./agents/mubashir";
 import { MessageBus } from "./bus";
 import { load } from "./data";
+import { runDialogue } from "./dialogue";
 import { pctReturn, snapshot } from "./indicators";
 import { aiModel, LLM } from "./llm";
-import type { AgentName, Message, RunResult } from "./types";
+import type { Message, RunResult } from "./types";
 
 export interface RunOptions {
   symbols: string[];
@@ -17,34 +19,36 @@ export interface RunOptions {
   capital?: number;
   riskPerTrade?: number;
   onMessage?: (m: Message) => void;
-  onStage?: (agent: AgentName | "Data" | "Done", detail?: string) => void;
+  onProgress?: (text: string) => void;
 }
 
 export async function runAgents(o: RunOptions): Promise<RunResult> {
   const bus = new MessageBus(o.onMessage);
   const llm = new LLM(Boolean(o.useAI));
-  const stage = o.onStage ?? (() => {});
+  const top = o.top ?? 5;
 
-  stage("Data", "Loading prices...");
+  o.onProgress?.("Loading prices…");
   const { frames, indexClose, mode, skipped } = await load(o.symbols, Boolean(o.demo),
-    (d, t) => stage("Data", `Loading prices ${d}/${t}`));
+    (d, t) => o.onProgress?.(`Loading prices ${d}/${t}`));
   const snaps = Object.fromEntries(Object.entries(frames).map(([k, v]) => [k, snapshot(v)]));
+  const sparks = Object.fromEntries(Object.entries(frames).map(([k, v]) => [k, v.slice(-60).map((b) => b.close)]));
   const indexRet21d = indexClose.length > 21 ? pctReturn(indexClose, 21) : 0;
 
-  bus.send("System", "ALL", "Start",
-    `Data mode: ${mode.toUpperCase()} | stocks: ${Object.keys(snaps).length}` +
-    `${skipped.length ? ` | skipped: ${skipped.join(", ")}` : ""} | AI commentary: ${llm.enabled ? `on (${aiModel})` : "off"}`);
+  const lot = new Lotappi().scan(snaps);
+  const may = new Mayavi().scan(snaps, indexRet21d);
+  const mubashir = new Mubashir();
+  const rows = mubashir.analyse(lot, may, snaps);
+  const fd = new FinalDecision();
+  const conflicted = fd.conflicted(rows, top);
+  const clarifications = Object.fromEntries(conflicted.map((r) => [r.symbol, mubashir.adviseOnConflict(r)]));
+  const { all, picks, watchlist } = fd.decide(rows, sparks, top, clarifications, o.capital, o.riskPerTrade ?? 1);
 
-  stage("Lotappi");
-  await new Lotappi(bus, llm).run(snaps);
-  stage("Mayavi");
-  await new Mayavi(bus, llm).run(snaps, indexRet21d);
-  stage("Mubashir");
-  const mubashir = new Mubashir(bus, llm);
-  await mubashir.run(snaps);
-  stage("FinalDecision");
-  const { picks, watchlist, all } = await new FinalDecision(bus, llm).run(mubashir, o.top ?? 5, o.capital, o.riskPerTrade ?? 1);
-  stage("Done");
+  o.onProgress?.("Agents are talking…");
+  await runDialogue(bus, llm, {
+    mode, stockCount: rows.length, skipped, indexRet21d,
+    aiLabel: llm.enabled ? `on (${aiModel})` : "off",
+    lot, may, rows, conflicted, clarifications, picks, watchlist,
+  });
 
   return { mode, indexRet21d: Math.round(indexRet21d * 100) / 100, picks, watchlist, all, conversation: bus.log, skipped };
 }

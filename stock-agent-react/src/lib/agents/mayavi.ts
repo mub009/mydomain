@@ -1,10 +1,8 @@
 /** Agent 2 - Mayavi: short-month positional picker (about 1 month). */
 import type { AgentReport, Snapshot } from "../types";
-import { Agent, clamp, round, shortList, signalFor } from "./base";
+import { byScore, clamp, round, signalFor } from "./base";
 
-export class Mayavi extends Agent {
-  name = "Mayavi" as const;
-  role = "1-month positional trend scanner";
+export class Mayavi {
 
   score(symbol: string, s: Snapshot, indexRet21d: number): AgentReport {
     let pts = 25;
@@ -37,11 +35,7 @@ export class Mayavi extends Agent {
     return { symbol, score, signal: signalFor(score), reasons, warnings, horizon: "~1 month" };
   }
 
-  async run(snaps: Record<string, Snapshot>, indexRet21d: number): Promise<AgentReport[]> {
-    const reports = Object.entries(snaps).map(([k, v]) => this.score(k, v, indexRet21d)).sort((a, b) => b.score - a.score);
-    const text = `Scanned ${reports.length} stocks for 1-month holds (Nifty 1M: ${indexRet21d >= 0 ? "+" : ""}${indexRet21d.toFixed(1)}%). Top picks:\n${shortList(reports)}`;
-    const note = await this.explain("In 4-6 lines, summarise your best 1-month positional picks and the main risk.", reports.slice(0, 5));
-    this.bus.send(this.name, "Mubashir", "1-month scan report", text, reports, note);
-    return reports;
+  scan(snaps: Record<string, Snapshot>, indexRet21d: number): AgentReport[] {
+    return Object.entries(snaps).map(([k, v]) => this.score(k, v, indexRet21d)).sort(byScore);
   }
 }

@@ -36,5 +36,12 @@ describe("four agents", () => {
     }
     for (const p of res.picks) expect(["STRONG BUY", "BUY"]).toContain(p.verdict);
     for (const a of ["Lotappi", "Mayavi", "Mubashir", "FinalDecision"]) expect(seen).toContain(a);
+    // one-to-one threads exist, and the decision goes to the team room
+    const threads = new Set(res.conversation.map((m) => m.thread));
+    for (const t of ["Lotappi|Mayavi", "Lotappi|Mubashir", "Mayavi|Mubashir", "FinalDecision|Mubashir", "team"]) expect(threads).toContain(t);
+    expect(res.conversation.some((m) => m.kind === "decision" && m.to === "ALL")).toBe(true);
+    // no "undefined"/"NaN" leaks into chat text
+    for (const m of res.conversation) expect(m.text).not.toMatch(/undefined|NaN/);
+    for (const d of res.all) expect(d.spark.length).toBeGreaterThan(0);
   });
 });

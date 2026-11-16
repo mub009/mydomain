@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react";
 import type { Decision, Verdict } from "../lib/types";
-import { inr, verdictClass } from "./Picks";
+import { Sparkline } from "../components/Sparkline";
+import { inr, VerdictBadge } from "../components/ui";
 
 type Key = "symbol" | "combined" | "lotappi" | "mayavi" | "rsi" | "ret5d" | "ret21d";
 const FILTERS: ("ALL" | Verdict)[] = ["ALL", "STRONG BUY", "BUY", "WATCH", "AVOID"];
 
-export function AllStocks({ rows }: { rows: Decision[] }) {
+export function Screener({ rows }: { rows: Decision[] }) {
   const [sort, setSort] = useState<{ key: Key; desc: boolean }>({ key: "combined", desc: true });
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>("ALL");
 
@@ -35,12 +36,12 @@ export function AllStocks({ rows }: { rows: Decision[] }) {
           </button>
         ))}
       </div>
-      <div className="table-wrap">
-        <table>
+      <div className="table-wrap screener-wrap">
+        <table className="data">
           <thead>
             <tr>
               {th("symbol", "Stock")}<th>Verdict</th>{th("combined", "Combined")}{th("lotappi", "Lotappi")}
-              {th("mayavi", "Mayavi")}<th>Risk</th>{th("rsi", "RSI")}{th("ret5d", "5D")}{th("ret21d", "1M")}
+              {th("mayavi", "Mayavi")}<th>Risk</th><th>60-day trend</th>{th("rsi", "RSI")}{th("ret5d", "5D")}{th("ret21d", "1M")}
               <th>Entry</th><th>Stop-loss</th><th>Target</th><th>Notes</th>
             </tr>
           </thead>
@@ -48,11 +49,12 @@ export function AllStocks({ rows }: { rows: Decision[] }) {
             {view.map((d) => (
               <tr key={d.symbol}>
                 <td><b>{d.symbol}</b></td>
-                <td><span className={verdictClass(d.verdict)}>{d.verdict}</span></td>
-                <td>{d.combined}</td><td>{d.lotappi}</td><td>{d.mayavi}</td>
-                <td className={`risk-${d.risk}`}>{d.risk}</td>
-                <td>{d.rsi}</td><td>{pct(d.ret5d)}</td><td>{pct(d.ret21d)}</td>
-                <td>{inr(d.entry)}</td><td>{inr(d.stopLoss)}</td><td>{inr(d.target)}</td>
+                <td><VerdictBadge v={d.verdict} /></td>
+                <td className="num"><b>{d.combined}</b></td><td className="num">{d.lotappi}</td><td className="num">{d.mayavi}</td>
+                <td className={`risk-${d.risk}`}>{d.risk.toLowerCase()}</td>
+                <td><Sparkline data={d.spark} width={80} height={24} /></td>
+                <td className="num">{d.rsi}</td><td className="num">{pct(d.ret5d)}</td><td className="num">{pct(d.ret21d)}</td>
+                <td className="num">{inr(d.entry)}</td><td className="num">{inr(d.stopLoss)}</td><td className="num">{inr(d.target)}</td>
                 <td className="notes">{[...d.notes, ...d.warnings.slice(0, 2)].join("; ")}</td>
               </tr>
             ))}

@@ -1,12 +1,9 @@
 /** Agent 3 - Mubashir: the analyst. Merges Lotappi's and Mayavi's reports,
  *  checks agreement, rates risk and prepares trade levels. */
 import type { AgentReport, Analysis, Risk, Snapshot } from "../types";
-import { Agent, clamp, round } from "./base";
+import { clamp, round } from "./base";
 
-export class Mubashir extends Agent {
-  name = "Mubashir" as const;
-  role = "analyst who combines the short-term and 1-month reports and checks risk";
-
+export class Mubashir {
   analyseOne(symbol: string, lot: AgentReport, may: AgentReport, s: Snapshot): Analysis {
     let combined = 0.5 * lot.score + 0.5 * may.score;
     const notes: string[] = [];
@@ -21,7 +18,7 @@ export class Mubashir extends Agent {
     combined -= 5 * riskPts;
     if (riskPts) notes.push(`Risk ${risk}: ATR ${s.atrPct.toFixed(1)}% of price, volatility ${s.volatility21d.toFixed(0)}%`);
 
-    const horizon = agree ? "Both (swing now, hold ~1 month)"
+    const horizon = agree ? "Swing now, hold ~1 month"
       : lot.score >= may.score ? "Short-term swing (1-10 days)" : "1-month positional";
 
     // Wider stop for longer holds; target at 2:1 reward-to-risk.
@@ -38,40 +35,16 @@ export class Mubashir extends Agent {
     };
   }
 
-  async run(snaps: Record<string, Snapshot>): Promise<Analysis[]> {
-    const lot = new Map(this.bus.latest<AgentReport[]>(this.name, "Lotappi").map((r) => [r.symbol, r]));
-    const may = new Map(this.bus.latest<AgentReport[]>(this.name, "Mayavi").map((r) => [r.symbol, r]));
-    const rows = [...lot.keys()].map((sym) => this.analyseOne(sym, lot.get(sym)!, may.get(sym)!, snaps[sym]))
+  analyse(lot: AgentReport[], may: AgentReport[], snaps: Record<string, Snapshot>): Analysis[] {
+    const m = new Map(may.map((r) => [r.symbol, r]));
+    return lot.map((l) => this.analyseOne(l.symbol, l, m.get(l.symbol)!, snaps[l.symbol]))
       .sort((a, b) => b.combined - a.combined);
-
-    const agreed = rows.filter((r) => r.agree).map((r) => r.symbol);
-    const conflicts = rows.slice(0, 10).filter((r) => r.conflict).map((r) => r.symbol);
-    const text = [
-      `Combined ${rows.length} stocks.`,
-      `Both agents agree on: ${agreed.join(", ") || "none"}`,
-      `Conflicts in top 10: ${conflicts.join(", ") || "none"}`,
-      "Top combined scores:",
-      ...rows.slice(0, 8).map((r) => `  ${r.symbol.padEnd(12)} ${r.combined.toFixed(1).padStart(5)}  risk ${r.risk.padEnd(6)} ${r.horizon}`),
-    ].join("\n");
-    const note = await this.explain(
-      "In 5-7 lines, explain where the short-term and 1-month views agree or conflict, and which stocks look strongest after risk.",
-      rows.slice(0, 8));
-    this.bus.send(this.name, "FinalDecision", "Combined analysis", text, rows, note);
-    return rows;
   }
 
-  /** Reply to the Final Decision agent's questions about conflicted stocks. */
-  answer(symbols: string[], rows: Analysis[]): Record<string, string> {
-    const by = new Map(rows.map((r) => [r.symbol, r]));
-    const answers: Record<string, string> = {};
-    for (const sym of symbols) {
-      const r = by.get(sym)!;
-      answers[sym] = r.lotappi > r.mayavi
-        ? "Trust the short-term view only: momentum is there but the monthly trend is weak. Use the tight stop and book profits fast."
-        : "Trust the 1-month view: trend is good but short-term timing is weak. Wait for a dip or a fresh breakout before entering.";
-    }
-    this.bus.send(this.name, "FinalDecision", "Re: conflicted stocks",
-      Object.entries(answers).map(([k, v]) => `${k}: ${v}`).join("\n"), answers);
-    return answers;
+  /** Mubashir's advice when Lotappi and Mayavi disagree on a stock. */
+  adviseOnConflict(r: Analysis): string {
+    return r.lotappi > r.mayavi
+      ? `trust Lotappi's short-term view only. Momentum is there but the monthly trend is weak, so use the tight stop and book profits quickly.`
+      : `trust Mayavi's 1-month view. The trend is good but short-term timing is weak, so wait for a dip or a fresh breakout before entering.`;
   }
 }
