@@ -122,6 +122,10 @@ class BusinessFeatures
     /** Whether a Manage-page section is open to this business. */
     public static function allowsSection(Business|array $business, string $section): bool
     {
+        // A full website has its own channels, so the QR board is redundant.
+        if ($section === 'Reviews & QR' && self::has($business, self::WEBSITE)) {
+            return false;
+        }
         // A business taken for its visiting card alone (no website) is kept
         // to what the card needs: these listing extras are left off its menu.
         // Reviews & QR never comes back for it — a mini website has no QR

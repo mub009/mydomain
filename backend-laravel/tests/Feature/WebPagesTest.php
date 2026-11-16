@@ -201,7 +201,9 @@ class WebPagesTest extends TestCase
         $this->get('/dashboard?tab=leads')->assertOk()->assertSee('No leads yet.');
         $this->get('/dashboard?tab=bookings')->assertOk()->assertSee('No bookings yet.');
 
-        foreach (['Contact', 'Logo', 'Slider', 'Services', 'Our Gallery', 'Reviews & QR', 'Social Media', 'Hours', 'Website', 'SEO', 'Products', 'Orders', 'Customers'] as $section) {
+        // Reviews & QR is covered separately (FeaturePlansTest): a full
+        // website business — this one — doesn't get it on its menu.
+        foreach (['Contact', 'Logo', 'Slider', 'Services', 'Our Gallery', 'Social Media', 'Hours', 'Website', 'SEO', 'Products', 'Orders', 'Customers'] as $section) {
             $this->get("/dashboard/businesses/{$business->id}?section=".urlencode($section))
                 ->assertOk()->assertDontSee('Could not', false);
         }

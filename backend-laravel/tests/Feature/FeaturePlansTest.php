@@ -122,12 +122,18 @@ class FeaturePlansTest extends TestCase
             $this->assertFalse(BusinessFeatures::allowsSection($withReviews, 'Hours'), $feature);
         }
 
-        // With a website too, or no card, they are all back.
+        // Hours, Services and SEO come back with a website too, or no card at all.
         foreach ([['features' => ['VISITING_CARD', 'WEBSITE']], ['features' => ['GOLD_RATE']], ['features' => null]] as $biz) {
-            foreach ($hidden as $section) {
+            foreach (['Hours', 'Services', 'SEO'] as $section) {
                 $this->assertTrue(BusinessFeatures::allowsSection($biz, $section), $section);
             }
         }
+        // Reviews & QR does not: a full website's own channels make its QR
+        // board redundant, so it stays off even without the card at all.
+        $this->assertFalse(BusinessFeatures::allowsSection(['features' => ['VISITING_CARD', 'WEBSITE']], 'Reviews & QR'));
+        $this->assertFalse(BusinessFeatures::allowsSection(['features' => null], 'Reviews & QR'));
+        // Without a website or a card, the QR board is still useful.
+        $this->assertTrue(BusinessFeatures::allowsSection(['features' => ['GOLD_RATE']], 'Reviews & QR'));
     }
 
     public function test_an_expired_feature_switches_off_until_renewed(): void
