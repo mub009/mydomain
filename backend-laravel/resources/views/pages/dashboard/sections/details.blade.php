@@ -44,20 +44,10 @@
     </div>
   </div>
 
-  {{-- Branding — the logo appears in the header of the business website --}}
+  {{-- The cover image appears behind the header of the business website.
+       The logo has its own Logo section now. --}}
   <div class="rounded-lg border border-gray-200 bg-gray-50/60 p-3">
-    <p class="mb-2 text-xs font-bold uppercase tracking-wide text-ink-500">Branding</p>
-    <div class="flex gap-3">
-      <div class="flex-1 space-y-3">
-        <x-upload-field name="logoUrl" purpose="business-logo" remove-background label="Logo image" :value="$biz['logoUrl'] ?? ''" placeholder="https://…/logo.png" hint="Shown in your website header and next to your name. Square images work best." clearable />
-        <x-upload-field name="coverImageUrl" purpose="business-cover" label="Cover image" :value="$biz['coverImageUrl'] ?? ''" placeholder="https://…/cover.jpg" clearable />
-      </div>
-      <div class="shrink-0 text-center">
-        <p class="mb-1 text-[11px] font-medium text-ink-500">Preview</p>
-        <img src="{{ $biz['logoUrl'] ?? '' }}" alt="Logo preview" data-logo-preview class="h-16 w-16 rounded-full border border-gray-200 object-cover" @if (empty($biz['logoUrl'])) hidden @endif />
-        <span data-logo-letter class="flex h-16 w-16 items-center justify-center rounded-full bg-brand-600 text-2xl font-extrabold text-white" @if (! empty($biz['logoUrl'])) hidden @endif>{{ mb_strtoupper(mb_substr(trim($biz['name']), 0, 1)) ?: '?' }}</span>
-      </div>
-    </div>
+    <x-upload-field name="coverImageUrl" purpose="business-cover" label="Cover image" :value="$biz['coverImageUrl'] ?? ''" placeholder="https://…/cover.jpg" clearable />
   </div>
   <div>
     <label class="block text-xs font-semibold text-ink-700 mb-1">Address line 1</label>

@@ -49,12 +49,13 @@ class DashboardController extends Controller
 
     // WhatsApp broadcasts and Poster Studio are not part of the Laravel
     // backend yet (see README), so the manager doesn't offer them.
-    public const SECTIONS = ['Contact', 'Hours', 'Slider', 'Services', 'Our Gallery', 'Reviews & QR', 'Social Media', 'AI Google Review', 'One Review', 'Visiting Card', 'Gold Rate', 'Website', 'SEO', 'Products', 'Orders', 'Customers', 'Your Plan'];
+    public const SECTIONS = ['Contact', 'Logo', 'Slider', 'Services', 'Our Gallery', 'Reviews & QR', 'Social Media', 'Hours', 'AI Google Review', 'One Review', 'Visiting Card', 'Gold Rate', 'Website', 'SEO', 'Products', 'Orders', 'Customers', 'Your Plan'];
 
     // How each section appears on the business's menu page: its icon, the
     // icon's colours, and one line on what it is for.
     public const SECTION_TILES = [
         'Contact' => ['icon' => 'phone', 'tint' => 'bg-blue-50 text-blue-600', 'blurb' => 'Name, category, contact details and address'],
+        'Logo' => ['icon' => 'image', 'tint' => 'bg-cyan-50 text-cyan-600', 'blurb' => 'Your logo, shown on your website and card'],
         'Hours' => ['icon' => 'clock', 'tint' => 'bg-amber-50 text-amber-600', 'blurb' => 'Opening and closing times for each day'],
         'Services' => ['icon' => 'image-plus', 'tint' => 'bg-pink-50 text-pink-600', 'blurb' => 'Photos on your listing page'],
         'Slider' => ['icon' => 'play', 'tint' => 'bg-orange-50 text-orange-600', 'blurb' => 'Banner photos that slide on your website'],

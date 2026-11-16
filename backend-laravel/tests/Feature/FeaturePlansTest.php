@@ -114,10 +114,11 @@ class FeaturePlansTest extends TestCase
         $this->assertTrue(BusinessFeatures::allowsSection(['features' => ['VISITING_CARD', 'WEBSITE']], 'Social Media'));
         $this->assertTrue(BusinessFeatures::allowsSection($cardOnly, 'Visiting Card'));
 
-        // One Review and AI Google Review need Reviews & QR, so it stays for them.
+        // A mini website never gets Reviews & QR back — it has no QR board
+        // to manage — even with One Review or AI Google Review.
         foreach (['ONE_REVIEW', 'AI_REVIEW'] as $feature) {
             $withReviews = ['features' => ['VISITING_CARD', $feature]];
-            $this->assertTrue(BusinessFeatures::allowsSection($withReviews, 'Reviews & QR'), $feature);
+            $this->assertFalse(BusinessFeatures::allowsSection($withReviews, 'Reviews & QR'), $feature);
             $this->assertFalse(BusinessFeatures::allowsSection($withReviews, 'Hours'), $feature);
         }
 

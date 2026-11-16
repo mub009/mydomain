@@ -124,9 +124,11 @@ class BusinessFeatures
     {
         // A business taken for its visiting card alone (no website) is kept
         // to what the card needs: these listing extras are left off its menu.
+        // Reviews & QR never comes back for it — a mini website has no QR
+        // board to manage — but Social Media does with One Review or AI
+        // Google Review, which draw on those links.
         if (in_array($section, self::CARD_ONLY_HIDDEN, true) && self::cardOnly($business)
-            // One Review and AI Google Review work from the review and social links and QR, so they keep those.
-            && ! (in_array($section, ['Reviews & QR', 'Social Media'], true) && (self::has($business, self::ONE_REVIEW) || self::has($business, self::AI_REVIEW)))) {
+            && ! ($section === 'Social Media' && (self::has($business, self::ONE_REVIEW) || self::has($business, self::AI_REVIEW)))) {
             return false;
         }
         foreach (self::SECTIONS as $feature => $sections) {

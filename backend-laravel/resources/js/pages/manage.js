@@ -120,33 +120,55 @@ $("[data-delete-business]")?.addEventListener("click", () => {
   });
 });
 
-// --- Details ----------------------------------------------------------------
-const details = $("[data-details-form]");
-initAiDescription(details);
-if (details) {
-  const preview = $("[data-logo-preview]", details);
-  const letter = $("[data-logo-letter]", details);
+// --- Logo ---------------------------------------------------------------
+const logoForm = $("[data-logo-form]");
+if (logoForm) {
+  const preview = $("[data-logo-preview]", logoForm);
+  const letter = $("[data-logo-letter]", logoForm);
+  const field = $("[data-upload-field]", logoForm);
+  const urlInput = $("[data-upload-url]", field);
+  const saved = $("[data-upload-saved]", field);
+  const error = $("[data-upload-error]", field);
   const syncLogo = () => {
-    const url = details.logoUrl.value.trim();
+    const url = urlInput.value.trim();
     preview.hidden = !url;
     letter.hidden = Boolean(url);
     if (url) {
       preview.style.visibility = "visible";
       preview.src = url;
     }
-    letter.textContent = (details.name.value.trim()[0] ?? "?").toUpperCase();
   };
   preview.addEventListener("error", () => (preview.style.visibility = "hidden"));
-  details.logoUrl.addEventListener("input", syncLogo);
-  details.name.addEventListener("input", syncLogo);
+  urlInput.addEventListener("input", syncLogo);
 
-  // An uploaded logo or cover is saved at once — no need to press Save.
+  // An uploaded logo is saved at once — no need to press a button.
+  const save = async (value, done, failed) => {
+    error.hidden = true;
+    saved.hidden = false;
+    saved.textContent = "Saving…";
+    try {
+      await api.patch(base, { logoUrl: value });
+      saved.textContent = done;
+    } catch (err) {
+      saved.hidden = true;
+      error.textContent = `${failed}: ${errorMessage(err)}`;
+      error.hidden = false;
+    }
+  };
+  field.addEventListener("upload:done", (e) => save(e.detail.url, "Logo saved.", "Uploaded, but not saved"));
+  field.addEventListener("upload:cleared", () => save(null, "Logo removed.", "Could not remove"));
+}
+
+// --- Details ----------------------------------------------------------------
+const details = $("[data-details-form]");
+initAiDescription(details);
+if (details) {
+  // An uploaded cover image is saved at once — no need to press Save.
   $$("[data-upload-field]", details).forEach((field) => {
     const input = $("[data-upload-url]", field);
-    if (!["logoUrl", "coverImageUrl"].includes(input.name)) return;
+    if (input.name !== "coverImageUrl") return;
     const saved = $("[data-upload-saved]", field);
     const error = $("[data-upload-error]", field);
-    const what = input.name === "logoUrl" ? "Logo" : "Cover image";
     const save = async (value, done, failed) => {
       error.hidden = true;
       saved.hidden = false;
@@ -160,8 +182,8 @@ if (details) {
         error.hidden = false;
       }
     };
-    field.addEventListener("upload:done", (e) => save(e.detail.url, `${what} saved.`, "Uploaded, but not saved"));
-    field.addEventListener("upload:cleared", () => save(null, `${what} removed.`, "Could not remove"));
+    field.addEventListener("upload:done", (e) => save(e.detail.url, "Cover image saved.", "Uploaded, but not saved"));
+    field.addEventListener("upload:cleared", () => save(null, "Cover image removed.", "Could not remove"));
   });
 
   initDetectLocation(details);
@@ -189,7 +211,6 @@ if (details) {
           email: f.email || undefined,
           website: f.website || undefined,
           // null (not undefined) so an emptied field is actually cleared.
-          logoUrl: f.logoUrl.trim() || null,
           coverImageUrl: f.coverImageUrl.trim() || null,
           addressLine2: f.addressLine2 || undefined,
         }),

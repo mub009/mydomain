@@ -100,6 +100,7 @@
 
     @switch($section)
       @case('Contact') @include('pages.dashboard.sections.details') @break
+      @case('Logo') @include('pages.dashboard.sections.logo') @break
       @case('Hours') @include('pages.dashboard.sections.hours') @break
       @case('Services') @include('pages.dashboard.sections.photos') @break
       @case('Slider') @include('pages.dashboard.sections.image-set', [
