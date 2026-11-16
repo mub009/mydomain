@@ -49,15 +49,14 @@ class DashboardController extends Controller
 
     // WhatsApp broadcasts and Poster Studio are not part of the Laravel
     // backend yet (see README), so the manager doesn't offer them.
-    public const SECTIONS = ['Contact', 'Hours', 'Services', 'Photos', 'Slider', 'Our Gallery', 'Reviews & QR', 'Social Media', 'AI Google Review', 'One Review', 'Visiting Card', 'Gold Rate', 'Website', 'SEO', 'Products', 'Orders', 'Customers', 'Your Plan'];
+    public const SECTIONS = ['Contact', 'Hours', 'Slider', 'Services', 'Our Gallery', 'Reviews & QR', 'Social Media', 'AI Google Review', 'One Review', 'Visiting Card', 'Gold Rate', 'Website', 'SEO', 'Products', 'Orders', 'Customers', 'Your Plan'];
 
     // How each section appears on the business's menu page: its icon, the
     // icon's colours, and one line on what it is for.
     public const SECTION_TILES = [
         'Contact' => ['icon' => 'phone', 'tint' => 'bg-blue-50 text-blue-600', 'blurb' => 'Name, category, contact details and address'],
         'Hours' => ['icon' => 'clock', 'tint' => 'bg-amber-50 text-amber-600', 'blurb' => 'Opening and closing times for each day'],
-        'Services' => ['icon' => 'wrench', 'tint' => 'bg-violet-50 text-violet-600', 'blurb' => 'What you offer, with prices'],
-        'Photos' => ['icon' => 'image-plus', 'tint' => 'bg-pink-50 text-pink-600', 'blurb' => 'Photos on your listing page'],
+        'Services' => ['icon' => 'image-plus', 'tint' => 'bg-pink-50 text-pink-600', 'blurb' => 'Photos on your listing page'],
         'Slider' => ['icon' => 'play', 'tint' => 'bg-orange-50 text-orange-600', 'blurb' => 'Banner photos that slide on your website'],
         'Our Gallery' => ['icon' => 'layout-grid', 'tint' => 'bg-teal-50 text-teal-600', 'blurb' => 'The gallery section of your website'],
         'Reviews & QR' => ['icon' => 'qr-code', 'tint' => 'bg-yellow-50 text-yellow-600', 'blurb' => 'QR boards and where they send customers'],
@@ -100,6 +99,17 @@ class DashboardController extends Controller
     {
         $user = WebAuth::user();
         $isDealer = $user->role === 'DEALER';
+
+        // A business owner with exactly one listing has nothing to choose:
+        // skip the businesses list and open it straight in Manage. Only on a
+        // bare visit (no query at all) — not a search, a chosen tab, a page,
+        // or anything else that means they're deliberately using this page.
+        if (! $isDealer && $user->role === 'BUSINESS_OWNER' && $request->query() === []) {
+            $mineIds = Business::where('ownerId', $user->id)->pluck('id');
+            if ($mineIds->count() === 1) {
+                return redirect("/dashboard/businesses/{$mineIds->first()}");
+            }
+        }
 
         // Dealers are gated by their granted privileges; business owners and
         // admins implicitly hold every privilege on their own resources.

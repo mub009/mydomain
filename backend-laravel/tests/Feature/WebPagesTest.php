@@ -185,6 +185,9 @@ class WebPagesTest extends TestCase
     {
         $owner = $this->user(['role' => 'BUSINESS_OWNER']);
         $business = $this->business($owner);
+        // A second listing, so a bare /dashboard here shows the list, not
+        // the single-business shortcut (covered in its own test below).
+        $this->business($owner, ['name' => 'Second Shop']);
         $other = $this->business($this->user(['role' => 'BUSINESS_OWNER']));
         $this->signIn($owner);
 
@@ -198,7 +201,7 @@ class WebPagesTest extends TestCase
         $this->get('/dashboard?tab=leads')->assertOk()->assertSee('No leads yet.');
         $this->get('/dashboard?tab=bookings')->assertOk()->assertSee('No bookings yet.');
 
-        foreach (['Contact', 'Hours', 'Services', 'Photos', 'Slider', 'Our Gallery', 'Reviews & QR', 'Social Media', 'Website', 'SEO', 'Products', 'Orders', 'Customers'] as $section) {
+        foreach (['Contact', 'Hours', 'Slider', 'Services', 'Our Gallery', 'Reviews & QR', 'Social Media', 'Website', 'SEO', 'Products', 'Orders', 'Customers'] as $section) {
             $this->get("/dashboard/businesses/{$business->id}?section=".urlencode($section))
                 ->assertOk()->assertDontSee('Could not', false);
         }
@@ -209,6 +212,29 @@ class WebPagesTest extends TestCase
 
         $this->get("/dashboard/businesses/{$other->id}")->assertForbidden();
         $this->get('/dashboard/businesses/no-such-id')->assertNotFound();
+    }
+
+    public function test_a_business_owner_with_one_listing_goes_straight_to_manage(): void
+    {
+        $owner = $this->user(['role' => 'BUSINESS_OWNER']);
+        $business = $this->business($owner);
+        $this->signIn($owner);
+
+        // A bare visit has nothing to choose from — straight into Manage.
+        $this->get('/dashboard')->assertRedirect("/dashboard/businesses/{$business->id}");
+        // Anything deliberate (a chosen tab, a search) still shows the list.
+        $this->get('/dashboard?tab=businesses')->assertOk()->assertSee('My business');
+        $this->get('/dashboard?search=Diner')->assertOk()->assertSee('My business');
+
+        // A second listing: nothing to shortcut to any more.
+        $this->business($owner, ['name' => 'Second Shop']);
+        $this->get('/dashboard')->assertOk()->assertSee('My business');
+
+        // A dealer always sees the list, even owning just one business.
+        $dealer = $this->user(['role' => 'DEALER', 'privileges' => ['MANAGE_LISTINGS'], 'points' => 3]);
+        $this->business($dealer);
+        $this->signIn($dealer);
+        $this->get('/dashboard')->assertOk()->assertSee('Dealer dashboard');
     }
 
     public function test_the_manage_page_shows_only_the_features_a_business_has(): void
@@ -283,9 +309,10 @@ class WebPagesTest extends TestCase
         }
         $this->get('/dashboard?tab=logins&search=nobody-here')->assertOk()->assertSee('No logins match');
 
-        // Business owners don't have the tab.
+        // Business owners don't have the tab. (Ravi owns one business, which
+        // would otherwise send a bare /dashboard straight into Manage.)
         $this->signIn($ravi);
-        $this->get('/dashboard')->assertOk()->assertDontSee('tab=logins', false);
+        $this->get('/dashboard?tab=businesses')->assertOk()->assertDontSee('tab=logins', false);
         $this->get('/dashboard?tab=logins')->assertOk()->assertDontSee('Reset password');
     }
 

@@ -1,6 +1,6 @@
 <div class="space-y-4">
   <div class="card p-5">
-    <h3 class="font-bold text-ink-900 mb-3 flex items-center gap-1.5"><x-icon name="image-plus" :size="16" class="text-brand-600" /> Photos</h3>
+    <h3 class="font-bold text-ink-900 mb-3 flex items-center gap-1.5"><x-icon name="image-plus" :size="16" class="text-brand-600" /> Services</h3>
     @if (count($biz['photos'] ?? []) > 0)
       <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
         @foreach ($biz['photos'] as $p)

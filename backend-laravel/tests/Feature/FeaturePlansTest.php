@@ -99,7 +99,7 @@ class FeaturePlansTest extends TestCase
 
     public function test_a_visiting_card_only_business_skips_the_listing_sections(): void
     {
-        $hidden = ['Hours', 'Services', 'Photos', 'Reviews & QR', 'SEO'];
+        $hidden = ['Hours', 'Services', 'Reviews & QR', 'SEO'];
         $cardOnly = ['features' => ['VISITING_CARD']];
         foreach ($hidden as $section) {
             $this->assertFalse(BusinessFeatures::allowsSection($cardOnly, $section), $section);
@@ -438,7 +438,9 @@ class FeaturePlansTest extends TestCase
         $this->travel(15)->days();
         $this->get("/dashboard/businesses/{$business->id}?section=".urlencode('Your Plan'))->assertOk()
             ->assertSee('Expiring soon')->assertSee('To renew or add features, contact your dealer')->assertSee('Ravi Dealer');
-        $this->get('/dashboard')->assertOk()->assertSee('Features to renew')->assertSee('View plan');
+        // Owning one business, a bare /dashboard sends them straight into
+        // Manage; force the list to check the renewal reminder on it.
+        $this->get('/dashboard?tab=businesses')->assertOk()->assertSee('Features to renew')->assertSee('View plan');
 
         // Past the end: expired and switched off.
         $this->travel(1)->months();

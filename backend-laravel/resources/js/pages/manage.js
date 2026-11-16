@@ -224,44 +224,7 @@ if (hoursForm) {
   });
 }
 
-// --- Services ---------------------------------------------------------------
-$("[data-service-form]")?.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const f = Object.fromEntries(new FormData(e.currentTarget));
-  try {
-    await api.post(`${base}/services`, {
-      name: f.name,
-      description: f.description || undefined,
-      priceCents: Math.round(Number(f.price || 0) * 100),
-      durationMins: Number(f.durationMins),
-    });
-    reloadWithFlash("Service added.");
-  } catch (err) {
-    fail(err);
-  }
-});
-$$("[data-toggle-service]").forEach((button) =>
-  button.addEventListener("click", async () => {
-    try {
-      await api.patch(`${base}/services/${button.dataset.toggleService}`, { isActive: button.dataset.active !== "1" });
-      window.location.reload();
-    } catch (err) {
-      fail(err);
-    }
-  }),
-);
-$$("[data-delete-service]").forEach((button) =>
-  button.addEventListener("click", async () => {
-    try {
-      await api.delete(`${base}/services/${button.dataset.deleteService}`);
-      reloadWithFlash("Service removed.");
-    } catch (err) {
-      fail(err);
-    }
-  }),
-);
-
-// --- Photos -----------------------------------------------------------------
+// --- Services (the business's photos, shown under that tab) -----------------
 const photoForm = $("[data-photo-form]");
 if (photoForm) {
   const add = $("[data-add-photo]", photoForm);

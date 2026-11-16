@@ -56,7 +56,7 @@ class BusinessFeatures
 
     // Manage-page sections a visiting-card-only business doesn't see.
     // Social Media too: the card's own links (Instagram, Facebook, YouTube, Google review) are set in its Card details.
-    public const CARD_ONLY_HIDDEN = ['Hours', 'Services', 'Photos', 'Reviews & QR', 'Social Media', 'SEO'];
+    public const CARD_ONLY_HIDDEN = ['Hours', 'Services', 'Reviews & QR', 'Social Media', 'SEO'];
 
     /** Has the digital visiting card but no website. */
     public static function cardOnly(Business|array $business): bool
