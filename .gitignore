@@ -30,6 +30,3 @@ Thumbs.db
 
 ## Docker
 docker-compose.override.yml
-stock_trading_agent/reports/
-__pycache__/
-.pytest_cache/
