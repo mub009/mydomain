@@ -55,7 +55,7 @@ class DashboardController extends Controller
     // icon's colours, and one line on what it is for.
     public const SECTION_TILES = [
         'Contact' => ['icon' => 'phone', 'tint' => 'bg-blue-50 text-blue-600', 'blurb' => 'Name, category, contact details and address'],
-        'Logo' => ['icon' => 'image', 'tint' => 'bg-cyan-50 text-cyan-600', 'blurb' => 'Your logo, shown on your website and card'],
+        'Logo' => ['icon' => 'image', 'tint' => 'bg-cyan-50 text-cyan-600', 'blurb' => 'Your logo and cover image'],
         'Hours' => ['icon' => 'clock', 'tint' => 'bg-amber-50 text-amber-600', 'blurb' => 'Opening and closing times for each day'],
         'Services' => ['icon' => 'image-plus', 'tint' => 'bg-pink-50 text-pink-600', 'blurb' => 'Photos on your listing page'],
         'Slider' => ['icon' => 'play', 'tint' => 'bg-orange-50 text-orange-600', 'blurb' => 'Banner photos that slide on your website'],

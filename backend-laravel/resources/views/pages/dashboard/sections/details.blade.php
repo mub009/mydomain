@@ -44,11 +44,6 @@
     </div>
   </div>
 
-  {{-- The cover image appears behind the header of the business website.
-       The logo has its own Logo section now. --}}
-  <div class="rounded-lg border border-gray-200 bg-gray-50/60 p-3">
-    <x-upload-field name="coverImageUrl" purpose="business-cover" label="Cover image" :value="$biz['coverImageUrl'] ?? ''" placeholder="https://…/cover.jpg" clearable />
-  </div>
   <div>
     <label class="block text-xs font-semibold text-ink-700 mb-1">Address line 1</label>
     <input required name="addressLine1" value="{{ $biz['addressLine1'] ?? '' }}" class="input" />

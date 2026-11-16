@@ -10,4 +10,7 @@
       <span data-logo-letter class="flex h-16 w-16 items-center justify-center rounded-full bg-brand-600 text-2xl font-extrabold text-white" @if (! empty($biz['logoUrl'])) hidden @endif>{{ mb_strtoupper(mb_substr(trim($biz['name']), 0, 1)) ?: '?' }}</span>
     </div>
   </div>
+
+  {{-- The cover image appears behind the header of the business website. --}}
+  <x-upload-field name="coverImageUrl" purpose="business-cover" label="Cover image" :value="$biz['coverImageUrl'] ?? ''" placeholder="https://…/cover.jpg" clearable />
 </div>
