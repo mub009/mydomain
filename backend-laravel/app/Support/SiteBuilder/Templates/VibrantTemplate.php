@@ -39,11 +39,7 @@ class VibrantTemplate
         $instagram = Icons::INSTAGRAM;
         $star = Icons::STAR;
 
-        $galleryHtml = collect($ctx['gallery'])->map(fn ($p) => <<<HTML
-                <figure class="mk-bubble">
-                  <img src="{$p['url']}" alt="{$p['caption']}" loading="lazy"/>
-                </figure>
-            HTML)->implode('');
+        $galleryHtml = Helpers::gallerySlider(collect($ctx['gallery']));
 
         $servicesHtml = collect($ctx['services'])->map(function ($s) use ($ctx) {
             $desc = $s['description'] ? "<p>{$s['description']}</p>" : '';
@@ -76,7 +72,7 @@ class VibrantTemplate
             <section class="mk-section mk-section-wide" id="gallery">
               <span class="mk-kicker">Gallery</span>
               <h2>Our Gallery</h2>
-              <div class="mk-bubbles">{$galleryHtml}</div>
+              {$galleryHtml}
             </section>
             HTML : '';
         $servicesSection = $servicesHtml ? <<<HTML

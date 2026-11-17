@@ -38,11 +38,7 @@ class ElegantTemplate
         $mail = Icons::MAIL;
         $instagram = Icons::INSTAGRAM;
 
-        $galleryHtml = collect($ctx['gallery'])->map(fn ($p) => <<<HTML
-                <figure class="mk-frame">
-                  <img src="{$p['url']}" alt="{$p['caption']}" loading="lazy"/>
-                </figure>
-            HTML)->implode('');
+        $galleryHtml = Helpers::gallerySlider(collect($ctx['gallery']));
 
         $servicesHtml = collect($ctx['services'])->map(function ($s) {
             $desc = $s['description'] ? "<p>{$s['description']}</p>" : '';
@@ -77,7 +73,7 @@ class ElegantTemplate
               <span class="mk-kicker">Gallery</span>
               <h2>Our Gallery</h2>
               <span class="mk-flourish mk-center"></span>
-              <div class="mk-frames">{$galleryHtml}</div>
+              {$galleryHtml}
             </section>
             HTML : '';
         $servicesSection = $servicesHtml ? <<<HTML

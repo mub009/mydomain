@@ -56,12 +56,12 @@ class ShowcaseTemplate
         })->implode('');
 
         $navServices = ($tilesHtml || $pricesHtml) ? '<a href="#services">Services</a>' : '';
-        $galleryHtml = collect($ctx['gallery'])->map(fn ($g) => "<figure><img src=\"{$g['url']}\" alt=\"{$g['caption']}\" loading=\"lazy\"/></figure>")->implode('');
+        $galleryHtml = Helpers::gallerySlider(collect($ctx['gallery']));
         $navGallery = $galleryHtml ? '<a href="#gallery">Gallery</a>' : '';
         $gallerySection = $galleryHtml ? <<<HTML
             <section class="mk-section" id="gallery">
               <div class="mk-title"><h2>Our Gallery</h2></div>
-              <div class="mk-gallery">{$galleryHtml}</div>
+              {$galleryHtml}
             </section>
             HTML : '';
         $categoryLine = $ctx['category'] ? '<h3 class="mk-about-sub">'.$ctx['category'].($ctx['city'] ? " · {$ctx['city']}" : '').'</h3>' : '';

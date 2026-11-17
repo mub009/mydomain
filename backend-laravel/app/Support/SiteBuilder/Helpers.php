@@ -177,6 +177,25 @@ class Helpers
     }
 
     /**
+     * The gallery as a swipeable, draggable Swiper carousel with a GLightbox
+     * popup on tap — swiper > swiper-wrapper of slides, each a lightbox
+     * link, with pagination dots. Unlike the hero slideshow, this one is
+     * real JS (resources/js/pages/site.js), not CSS-only, because the touch
+     * drag and the lightbox need actual script; both still work on a
+     * published page since that JS ships separately from the stored HTML
+     * that the sanitizer strips <script> tags from.
+     */
+    public static function gallerySlider(\Illuminate\Support\Collection $images): string
+    {
+        if ($images->isEmpty()) {
+            return '';
+        }
+        $slides = $images->map(fn ($g) => "<div class=\"swiper-slide\"><a href=\"{$g['url']}\" class=\"glightbox2\" data-gallery=\"gallery2\"><img src=\"{$g['url']}\" alt=\"{$g['caption']}\" loading=\"lazy\"/></a></div>")->implode('');
+
+        return "<div class=\"swiper gallery_slider\"><div class=\"swiper-wrapper\">{$slides}</div><div class=\"swiper-pagination\"></div></div>";
+    }
+
+    /**
      * Shared pure-CSS hero slideshow. Published pages have scripts stripped,
      * so the slider is a track of N slides stepped along by a keyframe
      * animation, generated to match the number of photos the shop actually

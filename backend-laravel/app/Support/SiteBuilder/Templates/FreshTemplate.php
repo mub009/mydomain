@@ -40,11 +40,7 @@ class FreshTemplate
         $instagram = Icons::INSTAGRAM;
         $star = Icons::STAR;
 
-        $galleryHtml = collect($ctx['gallery'])->map(fn ($p) => <<<HTML
-                <figure class="mk-tile">
-                  <img src="{$p['url']}" alt="{$p['caption']}" loading="lazy"/>
-                </figure>
-            HTML)->implode('');
+        $galleryHtml = Helpers::gallerySlider(collect($ctx['gallery']));
 
         $servicesHtml = collect($ctx['services'])->values()->map(function ($s, $i) {
             $num = str_pad((string) ($i + 1), 2, '0', STR_PAD_LEFT);
@@ -83,7 +79,7 @@ class FreshTemplate
               <div class="mk-wrap">
                 <span class="mk-kicker">Gallery</span>
                 <h2>Our Gallery</h2>
-                <div class="mk-tiles">{$galleryHtml}</div>
+                {$galleryHtml}
               </div>
             </section>
             HTML : '';

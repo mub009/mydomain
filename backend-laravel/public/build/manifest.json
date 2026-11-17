@@ -342,12 +342,16 @@
     ]
   },
   "resources/js/pages/site.js": {
-    "file": "assets/site-Dd3CLiuw.js",
+    "file": "assets/site-BSpaze2i.js",
     "name": "site",
     "src": "resources/js/pages/site.js",
     "isEntry": true,
     "imports": [
+      "__commonjsHelpers-CqkleIqs.js",
       "_api-B_riRJ0q.js"
+    ],
+    "css": [
+      "assets/site-eVh3qiib.css"
     ]
   },
   "resources/js/pages/storefront.js": {

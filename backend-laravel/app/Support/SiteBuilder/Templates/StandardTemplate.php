@@ -112,14 +112,14 @@ class StandardTemplate
             </div>
             HTML;
 
-        $galleryItems = collect($ctx['gallery'])->map(fn ($g) => "<div class=\"col-lg-3 col-md-4 col-6 g-item\"><a href=\"{$g['url']}\" target=\"_blank\" rel=\"noreferrer\"><img src=\"{$g['url']}\" alt=\"{$g['caption']}\" loading=\"lazy\"></a></div>")->implode('');
+        $galleryItems = Helpers::gallerySlider(collect($ctx['gallery']));
         $gallerySection = $galleryItems === '' ? '' : <<<HTML
             <div class="popular_sec our_gallery" id="gallery">
                 <div class="container">
                     <div class="title">
                         <h2>Our Gallery</h2>
                     </div>
-                    <div class="row">{$galleryItems}</div>
+                    {$galleryItems}
                 </div>
             </div>
             HTML;

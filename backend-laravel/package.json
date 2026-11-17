@@ -6,9 +6,11 @@
         "dev": "vite"
     },
     "dependencies": {
+        "glightbox": "^3.3.1",
         "grapesjs": "^0.23.3",
         "grapesjs-preset-webpage": "^1.0.3",
-        "qrcode": "^1.5.4"
+        "qrcode": "^1.5.4",
+        "swiper": "^14.4.0"
     },
     "devDependencies": {
         "autoprefixer": "^10.4.20",

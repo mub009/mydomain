@@ -35,11 +35,7 @@ class ClassicTemplate
         $mail = Icons::MAIL;
         $instagram = Icons::INSTAGRAM;
 
-        $galleryHtml = collect($ctx['gallery'])->map(fn ($p) => <<<HTML
-                <figure class="mk-card">
-                  <div class="mk-card-img"><img src="{$p['url']}" alt="{$p['caption']}" loading="lazy"/></div>
-                </figure>
-            HTML)->implode('');
+        $galleryHtml = Helpers::gallerySlider(collect($ctx['gallery']));
 
         $servicesHtml = collect($ctx['services'])->map(function ($s) {
             $desc = $s['description'] ? "<p>{$s['description']}</p>" : '';
@@ -61,7 +57,7 @@ class ClassicTemplate
         $gallerySection = $galleryHtml ? <<<HTML
             <section class="mk-section mk-section-alt" id="gallery">
               <h2>Our Gallery</h2><span class="mk-rule"></span>
-              <div class="mk-grid">{$galleryHtml}</div>
+              {$galleryHtml}
             </section>
             HTML : '';
         $servicesSection = $servicesHtml ? <<<HTML

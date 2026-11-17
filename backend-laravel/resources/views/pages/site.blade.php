@@ -19,6 +19,14 @@
     #mk-site-root{display:block;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#1a1a1a;line-height:1.5}
     #mk-site-root *{box-sizing:border-box}
     #mk-site-root img{max-width:100%}
+    {{-- The gallery slider (App\Support\SiteBuilder\Helpers::gallerySlider):
+         shared across every template, since the carousel is the same widget
+         everywhere even though each template's own CSS gives it a different
+         surrounding section. --}}
+    #mk-site-root .gallery_slider{padding-bottom:34px}
+    #mk-site-root .gallery_slider .swiper-slide{width:220px;flex-shrink:0;aspect-ratio:4/3;border-radius:10px;overflow:hidden}
+    #mk-site-root .gallery_slider .swiper-slide img{width:100%;height:100%;object-fit:cover;display:block}
+    #mk-site-root .gallery_slider .swiper-pagination-bullet{background:#1a1a1a}
     {!! str_ireplace('</style', '<\/style', $site['css']) !!}
   </style>
 @endpush

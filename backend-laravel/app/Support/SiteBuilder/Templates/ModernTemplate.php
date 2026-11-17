@@ -39,11 +39,7 @@ class ModernTemplate
         $instagram = Icons::INSTAGRAM;
         $star = Icons::STAR;
 
-        $galleryHtml = collect($ctx['gallery'])->map(fn ($p) => <<<HTML
-                <figure class="mk-tile">
-                  <img src="{$p['url']}" alt="{$p['caption']}" loading="lazy"/>
-                </figure>
-            HTML)->implode('');
+        $galleryHtml = Helpers::gallerySlider(collect($ctx['gallery']));
 
         $servicesHtml = collect($ctx['services'])->values()->map(function ($s, $i) {
             $no = str_pad((string) ($i + 1), 2, '0', STR_PAD_LEFT);
@@ -78,7 +74,7 @@ class ModernTemplate
             <section class="mk-section mk-section-wide" id="gallery">
               <span class="mk-kicker">Gallery</span>
               <h2>Our Gallery</h2>
-              <div class="mk-mosaic">{$galleryHtml}</div>
+              {$galleryHtml}
             </section>
             HTML : '';
         $servicesSection = $servicesHtml ? <<<HTML

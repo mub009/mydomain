@@ -1,3 +1,9 @@
+import Swiper from "swiper";
+import { Pagination } from "swiper/modules";
+import "swiper/css";
+import "swiper/css/pagination";
+import GLightbox from "glightbox";
+import "glightbox/dist/css/glightbox.min.css";
 import { api, errorMessage } from "../lib/api";
 
 // The page's contact form is plain markup with no action (the sanitizer
@@ -5,6 +11,24 @@ import { api, errorMessage } from "../lib/api";
 // business's Leads inbox.
 const root = document.getElementById("mk-site-root");
 const businessId = root?.dataset.businessId;
+
+// The gallery: a swipeable, draggable slider with a lightbox popup on tap.
+// Lives here, not in the stored site HTML — embedded <script> tags are
+// stripped from it once a business saves anything in the builder.
+root?.querySelectorAll(".gallery_slider").forEach((el) => {
+  const slides = el.querySelectorAll(".swiper-slide").length;
+  new Swiper(el, {
+    modules: [Pagination],
+    slidesPerView: "auto",
+    spaceBetween: 10,
+    loop: slides > 2,
+    grabCursor: true,
+    pagination: { el: el.querySelector(".swiper-pagination"), clickable: true },
+  });
+});
+if (root?.querySelector(".glightbox2")) {
+  GLightbox({ selector: ".glightbox2" });
+}
 
 root?.addEventListener("submit", async (event) => {
   const form = event.target;
