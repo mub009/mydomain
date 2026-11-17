@@ -4,9 +4,9 @@
     @if (count($biz['photos'] ?? []) > 0)
       <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
         @foreach ($biz['photos'] as $p)
-          <div class="relative group aspect-[4/3] rounded-lg overflow-hidden bg-gray-100">
+          <div class="relative aspect-[4/3] rounded-lg overflow-hidden bg-gray-100">
             <img src="{{ $p['url'] }}" alt="{{ $p['caption'] ?? '' }}" class="h-full w-full object-cover" />
-            <button type="button" data-delete-photo="{{ $p['id'] }}" class="absolute top-2 right-2 h-7 w-7 flex items-center justify-center rounded-full bg-white/90 text-red-500 shadow opacity-0 group-hover:opacity-100 transition-opacity" title="Remove"><x-icon name="trash-2" :size="14" /></button>
+            <button type="button" data-delete-photo="{{ $p['id'] }}" class="absolute top-2 right-2 h-7 w-7 flex items-center justify-center rounded-full bg-white/90 text-red-500 shadow" title="Remove"><x-icon name="trash-2" :size="14" /></button>
           </div>
         @endforeach
       </div>
