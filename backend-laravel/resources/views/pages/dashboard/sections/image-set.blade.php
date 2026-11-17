@@ -16,14 +16,18 @@
     @if (count($images) > 0)
       <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
         @foreach ($images as $i => $url)
-          <div class="relative aspect-video rounded-lg overflow-hidden bg-gray-100">
-            <img src="{{ $url }}" alt="Photo {{ $i + 1 }}" class="h-full w-full object-cover" />
-            <span class="absolute left-2 top-2 rounded bg-black/60 px-1.5 py-0.5 text-[11px] font-bold text-white">{{ $i + 1 }}</span>
-            <div class="absolute right-2 top-2 flex gap-1">
-              <button type="button" data-image-move="{{ $i }}" data-to="{{ $i - 1 }}" @disabled($i === 0) class="h-7 w-7 flex items-center justify-center rounded-full bg-white/90 text-ink-700 shadow disabled:opacity-30" title="Move earlier"><x-icon name="chevron-left" :size="14" /></button>
-              <button type="button" data-image-move="{{ $i }}" data-to="{{ $i + 1 }}" @disabled($i === count($images) - 1) class="h-7 w-7 flex items-center justify-center rounded-full bg-white/90 text-ink-700 shadow disabled:opacity-30" title="Move later"><x-icon name="chevron-right" :size="14" /></button>
-              <button type="button" data-image-remove="{{ $i }}" class="h-7 w-7 flex items-center justify-center rounded-full bg-white/90 text-red-500 shadow" title="Remove"><x-icon name="trash-2" :size="14" /></button>
+          <div class="overflow-hidden rounded-lg border border-gray-200 bg-gray-100">
+            <div class="relative aspect-video">
+              <img src="{{ $url }}" alt="Photo {{ $i + 1 }}" class="h-full w-full object-cover" />
+              <span class="absolute left-2 top-2 rounded bg-black/60 px-1.5 py-0.5 text-[11px] font-bold text-white">{{ $i + 1 }}</span>
+              <div class="absolute right-2 top-2 flex gap-1">
+                <button type="button" data-image-move="{{ $i }}" data-to="{{ $i - 1 }}" @disabled($i === 0) class="h-7 w-7 flex items-center justify-center rounded-full bg-white/90 text-ink-700 shadow disabled:opacity-30" title="Move earlier"><x-icon name="chevron-left" :size="14" /></button>
+                <button type="button" data-image-move="{{ $i }}" data-to="{{ $i + 1 }}" @disabled($i === count($images) - 1) class="h-7 w-7 flex items-center justify-center rounded-full bg-white/90 text-ink-700 shadow disabled:opacity-30" title="Move later"><x-icon name="chevron-right" :size="14" /></button>
+              </div>
             </div>
+            <button type="button" data-image-remove="{{ $i }}" class="flex w-full items-center justify-center gap-1.5 border-t border-gray-200 bg-white py-2 text-xs font-semibold text-red-600 hover:bg-red-50">
+              <x-icon name="trash-2" :size="13" /> Remove
+            </button>
           </div>
         @endforeach
       </div>
