@@ -39,9 +39,12 @@ const state = {
   // Whatever design the editor was last seeded from — it also backs Reset,
   // so resetting keeps the design the owner chose rather than the default.
   draft: { templateId: site.renderedTemplateId, html: site.starterHtml, css: site.starterCss },
-  // A shop that has never saved has nothing to lose, so show the choices up
-  // front; an existing site keeps the picker tucked away.
-  pickerOpen: !site.hasSavedDraft,
+  // The drag-and-drop editor is heavy, so it stays closed until asked for —
+  // the default view is just the website's status and its template.
+  editorOpen: false,
+  // The template dropdown's current pick, which may differ from templateId
+  // until "Change" is pressed.
+  selectedTemplate: site.templateId,
   busyTemplate: "",
   saving: false,
   publishing: false,
@@ -59,57 +62,57 @@ let editor = null;
 root.innerHTML = `
   <div class="card p-4" data-slot="header"></div>
   <div class="card p-4" data-slot="types"></div>
-  <div class="card p-4" data-slot="picker"></div>
   <div data-slot="shop"></div>
+  <div class="card flex flex-wrap items-center justify-between gap-2 p-3" data-slot="editor-toolbar"></div>
   <div class="overflow-hidden rounded-xl border border-gray-200 bg-white" data-slot="editor-wrap"><div data-editor></div></div>`;
 const slot = (name) => $(`[data-slot="${name}"]`, root);
 
 function headerView() {
   const isShop = state.siteType === "ECOMMERCE";
-  const active = state.templates.find((t) => t.id === state.templateId);
   // The business's subdomain when configured, else /site/<slug>.
   const publicUrl = site.publicUrl;
+  const isLive = isShop ? state.isPublished : state.listingLive;
   return `<div class="flex flex-wrap items-start justify-between gap-3">
       <div>
         <h3 class="flex items-center gap-1.5 font-bold text-ink-900">${icon(isShop ? "shopping-bag" : "globe", { size: 16, className: "text-brand-600" })} ${isShop ? "Your online shop" : "Your website"}</h3>
         <p class="mt-0.5 text-xs text-ink-500">${
           isShop
             ? "Customers browse your products, add them to a cart and check out. Orders arrive in the Orders tab."
-            : `Pick a template, then drag blocks in to make it yours. It starts from the details you entered for ${esc(business.name)}, and every save goes straight to your website.`
+            : `Starts from the details you entered for ${esc(business.name)}. Open the editor to make it your own — every save goes straight to your website.`
         }</p>
         ${state.savedAt ? `<p class="mt-1 text-[11px] text-ink-400">Last saved ${esc(formatDateTime(state.savedAt))}</p>` : ""}
       </div>
-      <div class="flex flex-wrap items-center gap-2">
-        ${
-          isShop
-            ? `<span class="badge ${state.isPublished ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-600"}">${state.isPublished ? "Open" : "Closed"}</span>`
-            : `<span class="badge ${state.listingLive ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-600"}">${state.listingLive ? "Live" : "Not live yet"}</span>`
-        }
-        <button type="button" data-action="toggle-picker" class="btn-secondary px-3 py-2 text-sm">${icon("layout-template", { size: 14 })} ${esc(active ? active.name : "Templates")}</button>
-        ${
-          isShop
-            ? ""
-            : `<button type="button" data-action="reset" class="btn-secondary px-3 py-2 text-sm">${icon("rotate-ccw", { size: 14 })} Reset</button>
-               <button type="button" data-action="save" ${state.saving ? "disabled" : ""} class="btn-secondary px-3 py-2 text-sm disabled:opacity-50">${icon("save", { size: 14 })} ${state.saving ? "Saving…" : "Save"}</button>`
-        }
-        ${
-          isShop
-            ? `<button type="button" data-action="publish" ${state.publishing ? "disabled" : ""} class="px-3 py-2 text-sm ${state.isPublished ? "btn-secondary" : "btn-primary"} disabled:opacity-50">${icon("upload", { size: 14 })} ${
-                state.publishing ? "Working…" : state.isPublished ? "Close shop" : "Open shop"
-              }</button>`
-            : ""
-        }
-      </div>
+      <span class="badge ${isLive ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-600"}">${isShop ? (isLive ? "Open" : "Closed") : isLive ? "Live" : "Not live yet"}</span>
     </div>
     ${state.notice ? `<p class="mt-3 rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-800">${esc(state.notice)}</p>` : ""}
     ${state.error ? `<p class="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">${esc(state.error)}</p>` : ""}
-    ${
-      (isShop ? state.isPublished : state.listingLive)
-        ? `<a href="${esc(publicUrl)}" target="_blank" rel="noreferrer" class="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-brand-600 hover:underline">${icon("external-link", { size: 14 })} ${esc(publicUrl)}</a>`
-        : isShop
+    <div class="mt-4 flex flex-wrap items-center gap-2">
+      ${
+        isLive
+          ? `<a href="${esc(publicUrl)}" target="_blank" rel="noreferrer" class="btn-secondary px-3 py-2 text-sm">${icon("external-link", { size: 14 })} Open ${isShop ? "shop" : "website"}</a>`
+          : `<span class="text-xs text-ink-500">${isShop ? "" : "Goes live once your listing is published."}</span>`
+      }
+      ${
+        isShop
+          ? `<button type="button" data-action="publish" ${state.publishing ? "disabled" : ""} class="px-3 py-2 text-sm ${state.isPublished ? "btn-secondary" : "btn-primary"} disabled:opacity-50">${icon("upload", { size: 14 })} ${
+              state.publishing ? "Working…" : state.isPublished ? "Close shop" : "Open shop"
+            }</button>`
+          : ""
+      }
+      <label class="flex items-center gap-1.5 text-sm">
+        <span class="text-xs font-semibold text-ink-700">Template</span>
+        <select data-template-select class="input w-auto py-1.5 text-sm">${state.templates.map((t) => `<option value="${esc(t.id)}" ${t.id === state.selectedTemplate ? "selected" : ""}>${esc(t.name)}</option>`).join("")}</select>
+      </label>
+      ${isShop ? "" : `<button type="button" data-action="preview-template" ${state.busyTemplate ? "disabled" : ""} class="btn-secondary px-2.5 py-2 text-sm disabled:opacity-50" title="Preview this template">${icon("eye", { size: 14 })}</button>`}
+      <button type="button" data-action="change-template" ${state.selectedTemplate === state.templateId || state.busyTemplate ? "disabled" : ""} class="btn-secondary px-3 py-2 text-sm disabled:opacity-50">${state.busyTemplate ? "…" : "Change"}</button>
+      ${
+        isShop
           ? ""
-          : `<p class="mt-3 text-xs text-ink-500">Your website goes live by itself once your listing is published.</p>`
-    }`;
+          : state.editorOpen
+            ? `<button type="button" data-action="close-editor" class="btn-secondary px-3 py-2 text-sm">${icon("x", { size: 14 })} Close editor</button>`
+            : `<button type="button" data-action="open-editor" class="btn-primary px-3 py-2 text-sm">${icon("layout-template", { size: 14 })} Open website editor</button>`
+      }
+    </div>`;
 }
 
 function typesView() {
@@ -129,44 +132,14 @@ function typesView() {
     }).join("")}</div>`;
 }
 
-function pickerView() {
-  const isShop = state.siteType === "ECOMMERCE";
-  return `<div class="flex items-center justify-between gap-3">
-      <div>
-        <h4 class="text-sm font-bold text-ink-900">Website template</h4>
-        <p class="mt-0.5 text-xs text-ink-500">${
-          isShop
-            ? "The template sets your shop's colours and style. Your products, cart and checkout stay the same."
-            : "Every template is filled in with your own photos, services, hours and contact details. Preview one before you switch — applying it replaces what is in the builder."
-        }</p>
-      </div>
-      <button type="button" data-action="toggle-picker" class="rounded-md p-1.5 text-ink-400 hover:bg-gray-100 hover:text-ink-700" aria-label="Hide templates">${icon("x", { size: 16 })}</button>
-    </div>
-    <div class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">${state.templates
-      .map((choice) => {
-        const active = choice.id === state.templateId;
-        const isBusy = state.busyTemplate === choice.id;
-        return `<div class="flex flex-col overflow-hidden rounded-lg border ${active ? "border-brand-500 ring-1 ring-brand-500" : "border-gray-200"}">
-          <div class="flex h-14" style="background:${esc(choice.theme.bg)}">
-            <span class="w-1/2" style="background:${esc(choice.accent)}"></span>
-            <span class="w-1/4" style="background:${esc(choice.theme.surface)}"></span>
-            <span class="w-1/4" style="background:${esc(choice.theme.accentAlt)}"></span>
-          </div>
-          <div class="flex flex-1 flex-col p-3">
-            <div class="flex items-center gap-1.5">
-              <span class="text-sm font-bold text-ink-900">${esc(choice.name)}</span>
-              ${active ? `<span class="inline-flex items-center gap-0.5 rounded-full bg-brand-50 px-1.5 py-0.5 text-[10px] font-bold text-brand-700">${icon("check", { size: 10 })} In use</span>` : ""}
-            </div>
-            <p class="mt-1 text-xs leading-relaxed text-ink-500">${esc(choice.description)}</p>
-            <p class="mt-1.5 text-[11px] font-medium text-ink-400">Good for: ${esc(choice.bestFor)}</p>
-            <div class="mt-3 flex gap-2 pt-1">
-              ${isShop ? "" : `<button type="button" data-preview="${esc(choice.id)}" ${isBusy ? "disabled" : ""} class="btn-secondary flex-1 px-2 py-1.5 text-xs disabled:opacity-50">${icon("eye", { size: 13 })} Preview</button>`}
-              <button type="button" data-apply="${esc(choice.id)}" ${isBusy || active ? "disabled" : ""} class="btn-primary flex-1 px-2 py-1.5 text-xs disabled:opacity-40">${isBusy ? "…" : active ? "Applied" : "Use"}</button>
-            </div>
-          </div>
-        </div>`;
-      })
-      .join("")}</div>`;
+// Shown above the editor only once it is open: drag-and-drop instructions
+// plus Reset/Save, kept out of the default (closed-editor) view.
+function editorToolbarView() {
+  return `<p class="text-xs text-ink-500">Drag blocks onto the page to make it yours.</p>
+    <div class="flex gap-2">
+      <button type="button" data-action="reset" class="btn-secondary px-3 py-2 text-sm">${icon("rotate-ccw", { size: 14 })} Reset</button>
+      <button type="button" data-action="save" ${state.saving ? "disabled" : ""} class="btn-primary px-3 py-2 text-sm disabled:opacity-50">${icon("save", { size: 14 })} ${state.saving ? "Saving…" : "Save"}</button>
+    </div>`;
 }
 
 function shopView() {
@@ -200,14 +173,18 @@ function render() {
   const isShop = state.siteType === "ECOMMERCE";
   slot("header").innerHTML = headerView();
   slot("types").innerHTML = typesView();
-  slot("picker").hidden = !state.pickerOpen;
-  if (state.pickerOpen) slot("picker").innerHTML = pickerView();
   // The delivery form keeps what's typed, so it is only drawn on entering
   // shop mode, not on every render.
   if (isShop && !$("[data-delivery-form]", slot("shop"))) slot("shop").innerHTML = shopView();
   if (!isShop) slot("shop").innerHTML = "";
-  slot("editor-wrap").hidden = isShop;
-  if (!isShop) mountEditor();
+  // The editor is heavy, so it only mounts once opened.
+  const showEditor = !isShop && state.editorOpen;
+  slot("editor-toolbar").hidden = !showEditor;
+  if (showEditor) {
+    slot("editor-toolbar").innerHTML = editorToolbarView();
+    mountEditor();
+  }
+  slot("editor-wrap").hidden = !showEditor;
 }
 
 function setMessage(notice = "", error = "") {
@@ -364,8 +341,12 @@ async function applyTemplate(choice, rendered) {
     return;
   }
 
-  if (!editor) return;
   if (!(await confirmBox(`Rebuild your page with the "${choice.name}" design? Any changes you made in the builder will be replaced.`, "Use this design"))) return;
+  // The editor is lazy — opening it here mounts it if it isn't already.
+  if (!state.editorOpen) {
+    state.editorOpen = true;
+    render();
+  }
   state.busyTemplate = choice.id;
   setMessage();
   render();
@@ -375,6 +356,7 @@ async function applyTemplate(choice, rendered) {
     editor.setStyle(next.css);
     state.draft = next;
     state.templateId = next.templateId;
+    state.selectedTemplate = next.templateId;
     closePreview();
     setMessage(`Switched to the ${choice.name} design. Save to keep it.`);
   } catch (err) {
@@ -465,21 +447,32 @@ async function openPreview(choice) {
 }
 
 // --- Events -------------------------------------------------------------------
+const findTemplate = (id) => state.templates.find((t) => t.id === id);
+
 root.addEventListener("click", (e) => {
   const target = e.target.closest("button");
   if (!target || target.disabled) return;
   const action = target.dataset.action;
-  if (action === "toggle-picker") {
-    state.pickerOpen = !state.pickerOpen;
+  if (action === "open-editor") {
+    state.editorOpen = true;
+    return render();
+  }
+  if (action === "close-editor") {
+    state.editorOpen = false;
     return render();
   }
   if (action === "reset") return resetToAccountData();
   if (action === "save") return save();
   if (action === "publish") return togglePublish();
+  if (action === "preview-template") return openPreview(findTemplate(state.selectedTemplate));
+  if (action === "change-template") return applyTemplate(findTemplate(state.selectedTemplate));
   if (target.dataset.siteType) return changeSiteType(target.dataset.siteType);
-  const find = (id) => state.templates.find((t) => t.id === id);
-  if (target.dataset.preview) return openPreview(find(target.dataset.preview));
-  if (target.dataset.apply) return applyTemplate(find(target.dataset.apply));
+});
+
+root.addEventListener("change", (e) => {
+  if (!e.target.matches("[data-template-select]")) return;
+  state.selectedTemplate = e.target.value;
+  render();
 });
 
 root.addEventListener("submit", async (e) => {

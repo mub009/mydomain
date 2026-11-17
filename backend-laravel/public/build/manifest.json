@@ -88,7 +88,7 @@
     ]
   },
   "resources/css/app.css": {
-    "file": "assets/app-X_JAx6Ah.css",
+    "file": "assets/app-CJUy2ycY.css",
     "src": "resources/css/app.css",
     "isEntry": true
   },
@@ -328,7 +328,7 @@
     ]
   },
   "resources/js/pages/site-builder.js": {
-    "file": "assets/site-builder-B8flu3iz.js",
+    "file": "assets/site-builder-UfySyZPr.js",
     "name": "site-builder",
     "src": "resources/js/pages/site-builder.js",
     "isEntry": true,
