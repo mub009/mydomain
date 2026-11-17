@@ -8,6 +8,8 @@ An AI stock research desk for the Indian market (NSE / Nifty 50). Four AI agents
 
 | Agent | Role | What they do |
 |-------|------|--------------|
+| **Morning Session** | News Scout | Collects stock news, sorts it into positive and negative, sends the positive stocks to Lotappi and Mayavi (+6 on their scores) and flags the negative ones |
+| **IV Index Agent** | Volatility Analyst | Tracks India VIX: level, 1-day and 5-day change, regime; lists the likely reasons for the move and the stocks expected to move next (high-beta "at risk" or "likely up", low-beta "holds up") |
 | **Lotappi** | Short-term Trader (1-10 days) | EMA 9/21, RSI 14, MACD, 20-day breakout, relative volume, 5-day return |
 | **Mayavi** | Positional Trader (~1 month) | SMA 20/50/200, 1-month return, strength vs Nifty 50, distance from 52-week high |
 | **Mubashir** | Research Analyst | Combines both reports, finds agreement and conflict, rates risk, sets entry / stop-loss / target |
@@ -19,6 +21,14 @@ Rules worth knowing:
 - Quantity = floor((Capital × Risk %) / (Entry − Stop-loss)), capped so the total never exceeds your capital
 - No more than 2 picks from one sector
 - Final picks stay hidden until Final Decision announces them in the chat
+
+## The 9 AM Morning Session
+
+With `MORNING_SESSION_ENABLED=true`, the server runs the whole team by itself at `MORNING_SESSION_TIME` (default 09:00 IST, before the 09:15 open) on NSE trading days. It skips weekends and the holidays in `calendar.ts`, and runs at most once a day. The run is saved to `.data/morning-session.json`; the Overview shows when it last ran and a **Replay 9 AM session** button plays its conversation back.
+
+The schedule lives in the Next.js server process, so it only fires while `npm start` (or `npm run dev`) is running. On a serverless host, call `POST /api/session` from an external cron at 09:00 IST with `Authorization: Bearer <SESSION_TRIGGER_TOKEN>`.
+
+News: demo mode uses fictional sample headlines, clearly labelled. With demo off, `NEWS_PROVIDER=google` reads Google News RSS and matches headlines to company names. Sentiment is a keyword score, good for sorting headlines but not a substitute for reading them. The IV Index agent's reasons are inferences from prices and headlines; results, RBI policy, expiry and global cues can also move VIX.
 
 ## Run it
 

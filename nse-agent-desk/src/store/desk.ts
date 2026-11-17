@@ -9,6 +9,13 @@ export type Speed = "slow" | "normal" | "fast";
 const SPEED: Record<Speed, number> = { slow: 0.55, normal: 1, fast: 2.6 };
 export type Presence = "Idle" | "Online" | "Typing" | "Analyzing" | "Reviewing";
 
+export interface SessionInfo {
+  enabled: boolean;
+  time: string;
+  /** When the latest 9 AM run happened, if any. */
+  ranAt: string | null;
+}
+
 export interface ServerConfig {
   aiAvailable: boolean;
   aiModel: string;
@@ -28,6 +35,9 @@ interface Settings {
 
 interface DeskState extends Settings {
   config: ServerConfig | null;
+  session: SessionInfo | null;
+  /** Set while showing a saved Morning Session run instead of a live one. */
+  replayOf: string | null;
   running: boolean; // server is still working
   progress: string | null;
   error: string | null;
@@ -41,6 +51,7 @@ interface DeskState extends Settings {
 
   set: (patch: Partial<Settings>) => void;
   loadConfig: () => Promise<void>;
+  replaySession: () => Promise<void>;
   run: () => Promise<void>;
   skip: () => void;
   markSeen: (thread: string) => void;
@@ -75,7 +86,7 @@ export const useDesk = create<DeskState>((set, get) => {
   return {
     universe: "nifty", custom: "RELIANCE, TCS, INFY, HDFCBANK, ICICIBANK, SBIN, LT, ITC, MARUTI, TITAN",
     top: 5, capital: "500000", risk: 1, demo: true, aiNotes: false, speed: "normal",
-    config: null, running: false, progress: null, error: null,
+    config: null, session: null, replayOf: null, running: false, progress: null, error: null,
     messages: [], shown: 0, typing: null, times: {}, result: null, seen: {}, drawerSymbol: null,
 
     set: (patch) => {
@@ -83,7 +94,27 @@ export const useDesk = create<DeskState>((set, get) => {
       if (patch.speed && get().shown < get().messages.length) play(); // re-time the pending message
     },
 
+    replaySession: async () => {
+      abort?.abort();
+      clearTimeout(timer);
+      skipping = false;
+      try {
+        const res = await (await fetch("/api/session")).json();
+        if (!res.session) { set({ error: "No Morning Session has run yet." }); return; }
+        set({
+          running: false, progress: null, error: null, messages: res.session.messages, shown: 0, typing: null, times: {},
+          result: res.session.result, seen: {}, drawerSymbol: null, replayOf: res.session.ranAt,
+        });
+        play();
+      } catch (e) {
+        set({ error: (e as Error).message });
+      }
+    },
+
     loadConfig: async () => {
+      fetch("/api/session").then((r) => r.json())
+        .then((r) => set({ session: { enabled: r.enabled, time: r.time, ranAt: r.session?.ranAt ?? null } }))
+        .catch(() => { /* optional */ });
       try { set({ config: await (await fetch("/api/config")).json() }); } catch { /* keep defaults */ }
     },
 
@@ -92,7 +123,7 @@ export const useDesk = create<DeskState>((set, get) => {
       clearTimeout(timer);
       skipping = false;
       const s = get();
-      set({ running: true, progress: "Starting…", error: null, messages: [], shown: 0, typing: null, times: {}, result: null, seen: {}, drawerSymbol: null });
+      set({ replayOf: null, running: true, progress: "Starting…", error: null, messages: [], shown: 0, typing: null, times: {}, result: null, seen: {}, drawerSymbol: null });
       abort = new AbortController();
       try {
         const res = await fetch("/api/analysis", {
@@ -191,7 +222,7 @@ export function usePresence(): Record<Person, Presence> {
     let v: Presence = "Idle";
     if (active) {
       v = "Online";
-      if (loading) v = p === "Lotappi" || p === "Mayavi" ? "Analyzing" : "Idle";
+      if (loading) v = p === "FinalDecision" || p === "Mubashir" ? "Idle" : "Analyzing";
       else if (!done) {
         if (stage === "scan" && p === "FinalDecision") v = "Idle";
         if (stage === "scan" && p === "Mubashir") v = "Reviewing";

@@ -57,6 +57,20 @@ export function demoBars(symbol: string, seed: number, days = 260): Bar[] {
   });
 }
 
+/** Fictional India VIX series: rises when the demo index falls, drifts back towards ~14. */
+export function demoVix(indexClose: number[], seed: number): number[] {
+  const r = seeded(`vix:${seed}`);
+  let v = r.uniform(11, 19);
+  return indexClose.map((c, i) => {
+    if (i > 0) {
+      const ret = Math.log(c / indexClose[i - 1]);
+      v *= Math.exp(-7 * ret + r.normal(0, 0.035) + 0.04 * Math.log(14 / v));
+      v = Math.min(45, Math.max(9, v));
+    }
+    return Math.round(v * 100) / 100;
+  });
+}
+
 /** Equal-weight demo index built from the demo stocks (base 100). */
 export function demoIndex(all: Bar[][]): number[] {
   const n = Math.min(...all.map((b) => b.length));

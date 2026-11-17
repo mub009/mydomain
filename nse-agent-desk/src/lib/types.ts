@@ -77,7 +77,7 @@ export interface Decision extends Analysis {
   spark: number[]; // last ~60 closes
 }
 
-export type Person = "Lotappi" | "Mayavi" | "Mubashir" | "FinalDecision";
+export type Person = "MorningSession" | "IVIndex" | "Lotappi" | "Mayavi" | "Mubashir" | "FinalDecision";
 export type AgentName = Person | "System";
 export type Stage = "scan" | "analyze" | "debate" | "decide";
 
@@ -101,6 +101,44 @@ export interface Message {
   aiNote?: string;
 }
 
+export interface NewsItem {
+  symbol: string;
+  headline: string;
+  source: string;
+  url?: string;
+  publishedAt?: string;
+  sentiment: "positive" | "negative" | "neutral";
+  /** True for fictional sample headlines used in demo mode. */
+  sample: boolean;
+}
+
+export interface NewsBrief {
+  /** e.g. "Sample headlines (demo)" or "Google News" */
+  label: string;
+  sample: boolean;
+  total: number;
+  items: NewsItem[]; // positive and negative items that mention a scanned stock
+}
+
+export interface VixMover {
+  symbol: string;
+  expect: "Likely up" | "Bigger swings" | "Holds up" | "At risk";
+  why: string;
+}
+
+export interface VixReport {
+  level: number;
+  change1d: number; // %
+  change5d: number; // %
+  direction: "up" | "down" | "flat";
+  regime: "Calm" | "Normal" | "Elevated" | "Fear";
+  /** Likely drivers, inferred from price and news data. */
+  reasons: string[];
+  movers: VixMover[];
+  spark: number[];
+  sample: boolean;
+}
+
 export interface DataSource {
   kind: "demo" | "eod";
   /** Human label, e.g. "Demo data" or "Yahoo Finance (unofficial, end-of-day)". */
@@ -117,6 +155,8 @@ export interface RunResult {
   capital?: number;
   riskPerTrade: number;
   indexRet21d: number;
+  news: NewsBrief | null;
+  vix: VixReport | null;
   picks: Decision[];
   watchlist: Decision[];
   all: Decision[];

@@ -34,4 +34,5 @@ export const yahooProvider: MarketDataProvider = {
   realtime: false,
   getDailyBars: chart,
   getIndexBars: () => chart("^NSEI"),
+  getVixBars: () => chart("^INDIAVIX"),
 };

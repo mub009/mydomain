@@ -95,7 +95,7 @@ export default function ChatPage() {
             <MessageFeed key={thread} messages={list} times={times} typing={typingHere}
               empty={messages.length ? "No messages in this conversation yet." : "Run an analysis to start the conversation."} />
             <footer className="flex items-center justify-center gap-1.5 border-t bg-muted/40 px-4 py-2 text-[11.5px] text-muted-foreground">
-              <Lock className="size-3 shrink-0" /> Read-only feed<span className="hidden sm:inline">. Agent messages are simulated from the analysis results.</span>
+              <Lock className="size-3 shrink-0" /><span>Read-only feed<span className="hidden sm:inline">. Agent messages are simulated from the analysis results.</span></span>
             </footer>
           </section>
         </div>

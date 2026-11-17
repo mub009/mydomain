@@ -18,4 +18,6 @@ export interface MarketDataProvider {
   getDailyBars(symbol: string): Promise<Bar[]>;
   /** Daily bars for the Nifty 50 index. */
   getIndexBars(): Promise<Bar[]>;
+  /** Daily bars for India VIX (the NSE volatility index). */
+  getVixBars(): Promise<Bar[]>;
 }
