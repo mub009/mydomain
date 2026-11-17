@@ -51,6 +51,17 @@ Each bullish timeframe adds 1.5 points to the combined score and each bearish on
 
 If intraday data can't be loaded, 4H, 1H and 30m are marked as not rated. In demo mode the intraday candles are generated to match the demo daily prices.
 
+## Forecast (prediction chart)
+
+Each stock's panel has a **Forecast** tab: the last 60 days of price, then the likely range for the next **10 trading days** or **1 month**.
+
+- **How:** 2,000 possible price paths, built by re-sampling the stock's own daily moves from the past year (so big up and down days are included), scaled to its recent volatility, with half of its past average trend (past trends often fade).
+- **Shown:** the middle path, the 50% and 80% ranges, and the entry, stop-loss and target lines.
+- **Odds:** how often the price touched the target before the stop-loss, the stop-loss first, or neither in that time.
+- **Track record:** for each week of the past year, the same 80% range is built from data available then and checked against the real price later. Near 80% means the ranges have been reliable for that stock; well below means its moves have been bigger than expected.
+
+This shows what has been normal for the stock, not what will happen. News, results and shocks can push the price outside any range.
+
 ## Macro Agent: Gold, crude and USD/INR
 
 Before Mubashir combines the lists, the Macro Agent reports how **Gold**, **Brent crude** and **USD/INR** moved (1 day, 5 days, 1 month, trend) and which stocks that helps or hurts.
