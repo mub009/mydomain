@@ -12,6 +12,7 @@ import { pctReturn, snapshot } from "./indicators";
 import { aiModel, LLM } from "./llm";
 import { analyseChart } from "./chart";
 import { loadIntraday, loadMarket } from "./market";
+import { capThresholds, loadFundamentals } from "./fundamentals";
 import { loadNews } from "./news";
 import type { RunRequest, RunResult, StreamEvent } from "./types";
 
@@ -23,6 +24,13 @@ export async function runAnalysis(o: RunRequest, emit: (e: StreamEvent) => void)
   emit({ type: "progress", text: "Loading prices…" });
   const { frames, indexClose, vixClose, source, skipped } = await loadMarket(o.symbols, o.demo,
     (d, t) => emit({ type: "progress", text: `Loading prices ${d}/${t}` }));
+  // Mubashir's size filter: leave out companies below the minimum market cap (default ₹300 Cr).
+  emit({ type: "progress", text: "Checking market cap and EPS…" });
+  const funds = await loadFundamentals(Object.fromEntries(Object.entries(frames).map(([k, v]) => [k, v[v.length - 1].close])), source.kind === "demo", source.seed);
+  const { min: minCapCr } = capThresholds();
+  const excluded = Object.entries(funds).filter(([, f]) => f.cap === "Too small").map(([symbol, f]) => ({ symbol, marketCapCr: f.marketCapCr ?? 0 }));
+  for (const e of excluded) delete frames[e.symbol];
+  if (Object.keys(frames).length < 3) throw new Error(`Fewer than 3 stocks are above ₹${minCapCr} Cr market cap. Add more stocks to the list.`);
   const snaps = Object.fromEntries(Object.entries(frames).map(([k, v]) => [k, snapshot(v)]));
   const sparks = Object.fromEntries(Object.entries(frames).map(([k, v]) => [k, v.slice(-60).map((b) => Math.round(b.close * 100) / 100)]));
   const indexRet21d = indexClose.length > 21 ? pctReturn(indexClose, 21) : 0;
@@ -38,7 +46,7 @@ export async function runAnalysis(o: RunRequest, emit: (e: StreamEvent) => void)
   const mubashir = new Mubashir();
   // Mubashir checks the charts of the leading candidates on 1M / 1D / 4H / 1H / 30m
   // and finds each one's best buy area from 1M, 3M, 6M and 1Y history.
-  const first = mubashir.analyse(lot, may, snaps);
+  const first = mubashir.applyFundamentals(mubashir.analyse(lot, may, snaps), funds);
   const candidates = first.slice(0, Math.max(12, o.top * 2)).map((r) => r.symbol);
   emit({ type: "progress", text: "Checking charts…" });
   const intraday = await loadIntraday(candidates, source, frames);
@@ -53,14 +61,14 @@ export async function runAnalysis(o: RunRequest, emit: (e: StreamEvent) => void)
     source, stockCount: rows.length, skipped, indexRet21d,
     aiLabel: llm.enabled ? `on (${aiModel()})` : "off",
     capital: o.capital, riskPerTrade: o.riskPerTrade,
-    news, vix, positive: morning.positive(news), negative: morning.negative(news),
+    excluded, minCapCr, news, vix, positive: morning.positive(news), negative: morning.negative(news),
     snaps, lot, may, rows, conflicted, clarifications, picks, passed, watchlist,
   });
 
   const result: RunResult = {
     source, generatedAt: new Date().toISOString(), simulatedAgents: !llm.enabled,
     capital: o.capital, riskPerTrade: o.riskPerTrade,
-    indexRet21d: Math.round(indexRet21d * 100) / 100, news, vix, picks, watchlist, all, skipped,
+    indexRet21d: Math.round(indexRet21d * 100) / 100, news, vix, excluded, minCapCr, picks, watchlist, all, skipped,
   };
   emit({ type: "result", result });
   console.log(`[nse-agent-desk] run: ${rows.length} stocks, source=${source.kind}${source.seed !== undefined ? `#${source.seed}` : ""}, ` +

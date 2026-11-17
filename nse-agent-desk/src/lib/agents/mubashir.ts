@@ -1,7 +1,7 @@
 /** Agent 3 - Mubashir: the analyst. Merges Lotappi's and Mayavi's reports,
  *  checks agreement, rates risk and prepares the trade scenario. */
 import { sectorOf } from "../market/universe";
-import type { AgentReport, Analysis, ChartAnalysis, Risk, Snapshot } from "../types";
+import type { AgentReport, Analysis, ChartAnalysis, Fundamentals, Risk, Snapshot } from "../types";
 import { clamp, round } from "./base";
 
 export class Mubashir {
@@ -40,6 +40,31 @@ export class Mubashir {
     const m = new Map(may.map((r) => [r.symbol, r]));
     return lot.map((l) => this.analyseOne(l.symbol, l, m.get(l.symbol)!, snaps[l.symbol]))
       .sort((a, b) => b.combined - a.combined);
+  }
+
+  /**
+   * Earnings and size check.
+   *  EPS over the last year: +5 if up 20% or more, +3 if up 10-20%, +1 if up
+   *  0-10%, -4 if down, -6 if the company is loss-making (negative EPS).
+   *  Small caps move more, so their risk is at least Medium.
+   */
+  applyFundamentals(rows: Analysis[], funds: Record<string, Fundamentals>): Analysis[] {
+    return rows.map((r) => {
+      const f = funds[r.symbol];
+      if (!f) return r;
+      const notes = [...r.notes];
+      let adj = 0, risk = r.risk;
+      const g = f.epsGrowth1y;
+      if (f.epsTTM !== undefined && f.epsTTM < 0) { adj = -6; notes.push(`Loss-making: EPS ₹${f.epsTTM} over the last year`); }
+      else if (g === undefined) notes.push(f.epsTTM === undefined ? "EPS not available" : "EPS growth can't be measured (loss a year ago)");
+      else if (g >= 20) { adj = 5; notes.push(`EPS up ${g}% in a year`); }
+      else if (g >= 10) { adj = 3; notes.push(`EPS up ${g}% in a year`); }
+      else if (g >= 0) { adj = 1; notes.push(`EPS up ${g}% in a year (slow)`); }
+      else { adj = -4; notes.push(`EPS down ${Math.abs(g)}% in a year`); }
+      if (f.cap === "Small") { notes.push("Small cap: bigger swings, size carefully"); if (risk === "LOW") risk = "MEDIUM"; }
+      if (f.cap === "Unknown") notes.push("Market cap not verified");
+      return { ...r, fundamentals: f, notes, risk, combined: round(clamp(r.combined + adj)) };
+    }).sort((a, b) => b.combined - a.combined);
   }
 
   /**

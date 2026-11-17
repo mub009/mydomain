@@ -9,6 +9,7 @@ import type { Decision, Person } from "@/lib/types";
 import { findStock, useDesk } from "@/store/desk";
 import { AgentAvatar } from "./agent-avatar";
 import { ChartCheck } from "./chart-check";
+import { FundamentalsCard } from "./fundamentals";
 import { RiskTag, VerdictBadge } from "./primitives";
 
 function ScoreBar({ label, value, color }: { label: string; value: number; color: string }) {
@@ -74,6 +75,7 @@ function Body({ d, isPick }: { d: Decision; isPick: boolean }) {
 
       <AgentView who="Lotappi" score={d.lotappi} reasons={d.lotReasons} warnings={d.lotWarnings} />
       <AgentView who="Mayavi" score={d.mayavi} reasons={d.mayReasons} warnings={d.mayWarnings} />
+      {d.fundamentals && <FundamentalsCard f={d.fundamentals} />}
       <AgentView who="Mubashir" score={d.combined}>
         <p className="mt-2 text-[12.5px]">Holding plan: <b>{d.horizon}</b>. Risk <RiskTag risk={d.risk} /> (ATR {d.atrPct.toFixed(1)}% of price).</p>
         {d.notes.length > 0 && <ul className="mt-1 list-disc pl-4 text-[12.5px] text-muted-foreground">{d.notes.map((n) => <li key={n}>{n}</li>)}</ul>}

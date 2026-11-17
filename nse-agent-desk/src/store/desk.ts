@@ -1,7 +1,7 @@
 "use client";
 
 import { create } from "zustand";
-import { NIFTY50 } from "@/lib/market/universe";
+import { UNIVERSES, type Universe } from "@/lib/market/universe";
 import { PEOPLE } from "@/lib/team";
 import type { AgentName, Decision, Message, Person, RunResult, Stage, StreamEvent } from "@/lib/types";
 
@@ -23,7 +23,7 @@ export interface ServerConfig {
 }
 
 interface Settings {
-  universe: "nifty" | "custom";
+  universe: Universe;
   custom: string;
   top: number;
   capital: string;
@@ -63,7 +63,7 @@ let skipping = false;
 let abort: AbortController | undefined;
 
 export const symbolsOf = (s: Pick<Settings, "universe" | "custom">) =>
-  s.universe === "nifty" ? NIFTY50
+  s.universe !== "custom" ? UNIVERSES[s.universe].symbols
     : [...new Set(s.custom.split(/[\s,]+/).map((x) => x.trim().toUpperCase()).filter(Boolean))];
 
 export const useDesk = create<DeskState>((set, get) => {
@@ -84,7 +84,7 @@ export const useDesk = create<DeskState>((set, get) => {
   }
 
   return {
-    universe: "nifty", custom: "RELIANCE, TCS, INFY, HDFCBANK, ICICIBANK, SBIN, LT, ITC, MARUTI, TITAN",
+    universe: "large", custom: "RELIANCE, TCS, INFY, HDFCBANK, ICICIBANK, SBIN, LT, ITC, MARUTI, TITAN",
     top: 5, capital: "500000", risk: 1, demo: true, aiNotes: false, speed: "normal",
     config: null, session: null, replayOf: null, running: false, progress: null, error: null,
     messages: [], shown: 0, typing: null, times: {}, result: null, seen: {}, drawerSymbol: null,

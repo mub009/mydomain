@@ -90,6 +90,26 @@ export interface ChartAnalysis {
   closes: number[];
 }
 
+export type CapSize = "Large" | "Mid" | "Small" | "Too small" | "Unknown";
+
+export interface Fundamentals {
+  /** Market cap in ₹ crore (shares outstanding × last price). */
+  marketCapCr?: number;
+  cap: CapSize;
+  /** Earnings per share over the last 12 months, in ₹. */
+  epsTTM?: number;
+  /** EPS for the 12 months ending a year earlier. */
+  epsYearAgo?: number;
+  /** % change between the two; undefined when it can't be computed. */
+  epsGrowth1y?: number;
+  /** How the EPS figures were built: "TTM" (last 4 vs previous 4 quarters) or "FY" (latest vs previous fiscal year). */
+  epsBasis?: "TTM" | "FY";
+  /** Recent EPS by period, oldest first. */
+  epsHistory: { period: string; eps: number }[];
+  source: string;
+  sample: boolean;
+}
+
 export interface Analysis {
   symbol: string;
   sector: string;
@@ -113,6 +133,8 @@ export interface Analysis {
   mayReasons: string[];
   mayWarnings: string[];
   notes: string[];
+  /** Market cap and EPS check. */
+  fundamentals?: Fundamentals;
   /** Mubashir's multi-timeframe chart check (top candidates only). */
   chart?: ChartAnalysis;
 }
@@ -207,6 +229,9 @@ export interface RunResult {
   indexRet21d: number;
   news: NewsBrief | null;
   vix: VixReport | null;
+  /** Stocks left out for being below the minimum market cap. */
+  excluded: { symbol: string; marketCapCr: number }[];
+  minCapCr: number;
   picks: Decision[];
   watchlist: Decision[];
   all: Decision[];

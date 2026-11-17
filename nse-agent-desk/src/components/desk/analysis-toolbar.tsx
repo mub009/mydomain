@@ -11,7 +11,7 @@ export function AnalysisToolbar() {
   const s = useDesk();
   const busy = useBusy();
   const symbols = symbolsOf(s);
-  const valid = symbols.length >= 3 && symbols.length <= 60;
+  const valid = symbols.length >= 3 && symbols.length <= 150;
   const playing = !s.running && busy;
 
   function exportJson() {
@@ -28,7 +28,7 @@ export function AnalysisToolbar() {
     <section className="card flex flex-wrap items-end gap-x-4 gap-y-3 p-3.5" aria-label="Analysis controls">
       <Field label="Universe">
         <Segmented label="Stock universe" value={s.universe} onChange={(universe) => s.set({ universe })}
-          options={[{ value: "nifty", label: "Nifty 50" }, { value: "custom", label: "My List" }]} />
+          options={[{ value: "large", label: "Large" }, { value: "mid", label: "Mid" }, { value: "small", label: "Small" }, { value: "all", label: "All caps" }, { value: "custom", label: "My List" }]} />
       </Field>
       {s.universe === "custom" && (
         <Field label={`Symbols (${symbols.length})`} className="min-w-52 flex-1">
@@ -65,7 +65,7 @@ export function AnalysisToolbar() {
           {s.running ? s.progress ?? "Working…" : playing ? "Agents talking…" : "Run Analysis"}
         </Button>
       </div>
-      {!valid && <p className="w-full text-xs text-neg">Enter between 3 and 60 NSE symbols.</p>}
+      {!valid && <p className="w-full text-xs text-neg">Enter between 3 and 150 NSE symbols.</p>}
     </section>
   );
 }

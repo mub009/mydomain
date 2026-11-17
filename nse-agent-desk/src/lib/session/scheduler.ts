@@ -11,11 +11,12 @@
  *   MORNING_SESSION_ENABLED  "true" to turn the schedule on (default off)
  *   MORNING_SESSION_TIME     "HH:MM" IST, default "09:00"
  *   MORNING_SESSION_DEMO     "true" to use demo data (default: live provider)
+ *   MORNING_SESSION_UNIVERSE large | mid | small | all (default all)
  */
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { NSE_HOLIDAYS } from "../market/calendar";
-import { NIFTY50 } from "../market/universe";
+import { UNIVERSES, type Universe } from "../market/universe";
 import { runAnalysis } from "../pipeline";
 import type { Message, RunResult } from "../types";
 
@@ -62,7 +63,7 @@ export function runMorningSession(trigger: SessionRecord["trigger"]): Promise<Se
     const messages: Message[] = [];
     let failure: string | null = null;
     const result = await runAnalysis(
-      { symbols: NIFTY50, top: 5, demo: process.env.MORNING_SESSION_DEMO === "true", aiNotes: true, riskPerTrade: 1 },
+      { symbols: UNIVERSES[(process.env.MORNING_SESSION_UNIVERSE as Exclude<Universe, "custom">) in UNIVERSES ? process.env.MORNING_SESSION_UNIVERSE as Exclude<Universe, "custom"> : "all"].symbols, top: 5, demo: process.env.MORNING_SESSION_DEMO === "true", aiNotes: true, riskPerTrade: 1 },
       (e) => { if (e.type === "message") messages.push(e.message); if (e.type === "error") failure = e.message; },
     );
     if (failure) throw new Error(failure);

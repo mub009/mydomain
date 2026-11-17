@@ -6,10 +6,17 @@ export const MAX_PER_SECTOR = 2;
 
 export class FinalDecision {
   verdict(r: Analysis): Verdict {
-    if (r.combined >= 70 && r.agree && r.risk !== "HIGH") return "STRONG BUY";
-    if (r.combined >= 60 && r.risk !== "HIGH") return "BUY";
-    if (r.combined >= 48) return "WATCH";
-    return "AVOID";
+    const f = r.fundamentals;
+    const loss = f?.epsTTM !== undefined && f.epsTTM < 0;
+    const epsFalling = f?.epsGrowth1y !== undefined && f.epsGrowth1y < 0;
+    let v: Verdict = "AVOID";
+    if (r.combined >= 70 && r.agree && r.risk !== "HIGH") v = "STRONG BUY";
+    else if (r.combined >= 60 && r.risk !== "HIGH") v = "BUY";
+    else if (r.combined >= 48) v = "WATCH";
+    // Earnings caps: never a strong buy with falling EPS, never a buy while loss-making.
+    if (v === "STRONG BUY" && epsFalling) v = "BUY";
+    if ((v === "STRONG BUY" || v === "BUY") && loss) v = "WATCH";
+    return v;
   }
 
   /** Stocks among the candidates that Final Decision wants to ask Mubashir about. */

@@ -7,6 +7,7 @@ import { DataBanner, RiskTag, VerdictBadge } from "@/components/desk/primitives"
 import { PageHeader } from "@/components/desk/shell";
 import { StockSparkline } from "@/components/desk/stock-sparkline";
 import { PlanTag, TimeframeDots } from "@/components/desk/chart-check";
+import { CapTag, EpsGrowth } from "@/components/desk/fundamentals";
 import { Button } from "@/components/ui/button";
 import { Field, inputClass } from "@/components/ui/segmented";
 import { inr, pct } from "@/lib/format";
@@ -32,6 +33,10 @@ const columns: ColumnDef<Decision>[] = [
   { accessorKey: "entry", header: "Entry", meta: { num: true }, cell: ({ getValue }) => inr(getValue() as number) },
   { accessorKey: "stopLoss", header: "Stop-loss", meta: { num: true }, cell: ({ getValue }) => inr(getValue() as number) },
   { accessorKey: "target", header: "Target", meta: { num: true }, cell: ({ getValue }) => inr(getValue() as number) },
+  { id: "size", header: "Size", accessorFn: (d) => d.fundamentals?.marketCapCr ?? -1,
+    cell: ({ row: { original: d } }) => (d.fundamentals ? <div><CapTag cap={d.fundamentals.cap} /><div className="mt-0.5 text-[11px] text-muted-foreground">{d.fundamentals.marketCapCr !== undefined ? `${inr(d.fundamentals.marketCapCr, 0)} Cr` : "–"}</div></div> : "–") },
+  { id: "eps", header: "EPS 1Y", meta: { num: true }, accessorFn: (d) => (d.fundamentals?.epsTTM !== undefined && d.fundamentals.epsTTM < 0 ? -999 : d.fundamentals?.epsGrowth1y ?? -998),
+    cell: ({ row: { original: d } }) => <EpsGrowth f={d.fundamentals} /> },
   { id: "charts", header: "Charts", accessorFn: (d) => (d.chart ? d.chart.bullish - d.chart.bearish : -99), meta: { num: false },
     cell: ({ row: { original: d } }) => (d.chart ? <TimeframeDots chart={d.chart} /> : <span className="text-xs text-muted-foreground">–</span>) },
   { id: "zone", header: "Buy zone", accessorFn: (d) => d.chart?.zone?.distancePct ?? 999,
@@ -46,6 +51,7 @@ export default function ScreenerPage() {
   const [verdict, setVerdict] = useState<(typeof VERDICTS)[number]>("ALL");
   const [sector, setSector] = useState("ALL");
   const [risk, setRisk] = useState("ALL");
+  const [size, setSize] = useState("ALL");
   const [rsiMin, setRsiMin] = useState("");
   const [rsiMax, setRsiMax] = useState("");
   const [minScore, setMinScore] = useState(0);
@@ -56,12 +62,12 @@ export default function ScreenerPage() {
   // everything except the verdict filter, so the chips can show live counts
   const base = useMemo(() => all.filter((d) =>
     (!q || d.symbol.includes(q.trim().toUpperCase())) &&
-    (sector === "ALL" || d.sector === sector) && (risk === "ALL" || d.risk === risk) &&
+    (sector === "ALL" || d.sector === sector) && (risk === "ALL" || d.risk === risk) && (size === "ALL" || d.fundamentals?.cap === size) &&
     (rsiMin === "" || d.rsi >= Number(rsiMin)) && (rsiMax === "" || d.rsi <= Number(rsiMax)) && d.combined >= minScore),
-  [all, q, sector, risk, rsiMin, rsiMax, minScore]);
+  [all, q, sector, risk, size, rsiMin, rsiMax, minScore]);
   const data = useMemo(() => (verdict === "ALL" ? base : base.filter((d) => d.verdict === verdict)), [base, verdict]);
-  const filtered = q || sector !== "ALL" || risk !== "ALL" || rsiMin || rsiMax || minScore > 0 || verdict !== "ALL";
-  const reset = () => { setQ(""); setSector("ALL"); setRisk("ALL"); setRsiMin(""); setRsiMax(""); setMinScore(0); setVerdict("ALL"); };
+  const filtered = q || sector !== "ALL" || risk !== "ALL" || size !== "ALL" || rsiMin || rsiMax || minScore > 0 || verdict !== "ALL";
+  const reset = () => { setQ(""); setSector("ALL"); setRisk("ALL"); setSize("ALL"); setRsiMin(""); setRsiMax(""); setMinScore(0); setVerdict("ALL"); };
 
   const table = useReactTable({ data, columns, state: { sorting }, onSortingChange: setSorting, getCoreRowModel: getCoreRowModel(), getSortedRowModel: getSortedRowModel() });
 
@@ -82,6 +88,8 @@ export default function ScreenerPage() {
             </Field>
             <Field label="Sector"><select className={inputClass} value={sector} onChange={(e) => setSector(e.target.value)} aria-label="Sector">
               <option value="ALL">All sectors</option>{sectors.map((s) => <option key={s}>{s}</option>)}</select></Field>
+            <Field label="Size"><select className={inputClass} value={size} onChange={(e) => setSize(e.target.value)} aria-label="Company size">
+              <option value="ALL">Any size</option><option value="Large">Large cap</option><option value="Mid">Mid cap</option><option value="Small">Small cap</option><option value="Unknown">Unknown</option></select></Field>
             <Field label="Risk"><select className={inputClass} value={risk} onChange={(e) => setRisk(e.target.value)} aria-label="Risk">
               <option value="ALL">Any risk</option><option value="LOW">Low</option><option value="MEDIUM">Medium</option><option value="HIGH">High</option></select></Field>
             <Field label="RSI range">

@@ -22,6 +22,16 @@ Rules worth knowing:
 - No more than 2 picks from one sector
 - Final picks stay hidden until Final Decision announces them in the chat
 
+## Mubashir's earnings and size check
+
+**Stock lists:** Large (Nifty 50), Mid cap (30 stocks), Small cap (30 stocks), All caps, or My List. The mid and small lists are starter presets of well-known NSE stocks, not an official index; edit them in `src/lib/market/universe.ts`.
+
+**Size:** market cap = shares outstanding × last price. Stocks below **₹300 Cr** are left out (`MIN_MARKET_CAP_CR`). The rest are labelled by approximate rupee bands: Large ≥ ₹1,00,000 Cr, Mid ≥ ₹30,000 Cr, otherwise Small. India's official classification is by rank (top 100 large, next 150 mid), so adjust `LARGE_CAP_MIN_CR` and `MID_CAP_MIN_CR` to match the latest AMFI list. Small caps are treated as at least medium risk.
+
+**EPS over one year:** EPS for the last 12 months (sum of the last 4 quarters) against the 12 months before; if fewer than 8 quarters are available, the latest fiscal year against the one before. Score: +5 for growth of 20% or more, +3 for 10-20%, +1 for 0-10%, -4 if EPS fell, -6 if loss-making. Final Decision never gives STRONG BUY with falling EPS, and never BUY while loss-making.
+
+With demo data off, market cap and EPS come from Yahoo Finance's fundamentals data (unofficial, untested from the build environment). If a stock's data can't be loaded it's marked "Unknown" and kept, with a note that its size wasn't verified.
+
 ## Mubashir's chart check
 
 For the top candidates (at least 12), Mubashir reads five timeframes:

@@ -31,6 +31,8 @@ const lc = (s?: string) => (!s ? "" : /^[A-Z]{2}/.test(s) ? s : s.charAt(0).toLo
 const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
 
 export interface DialogueInput {
+  excluded: { symbol: string; marketCapCr: number }[];
+  minCapCr: number;
   source: DataSource;
   stockCount: number;
   skipped: string[];
@@ -81,7 +83,8 @@ export async function runDialogue(bus: MessageBus, llm: LLM, d: DialogueInput) {
     `Analysis started · ${plural(d.stockCount, "stock")} · ${d.source.label}` +
     `${d.source.seed !== undefined ? ` · run #${d.source.seed}` : ""} · Nifty 50 1-month ${pct(d.indexRet21d)} · ` +
     `agent conversation is simulated from the analysis · AI notes ${d.aiLabel}` +
-    (d.skipped.length ? ` · skipped: ${d.skipped.join(", ")}` : ""), { kind: "system" });
+    (d.skipped.length ? ` · skipped: ${d.skipped.join(", ")}` : "") +
+    (d.excluded.length ? ` · left out below ₹${d.minCapCr} Cr market cap: ${d.excluded.map((e) => e.symbol).join(", ")}` : ""), { kind: "system" });
 
   // ---------- Step 0: Morning Session hands over the news ----------
   if (d.news) {
@@ -184,6 +187,32 @@ export async function runDialogue(bus: MessageBus, llm: LLM, d: DialogueInput) {
       v.direction === "up" ? `Understood. With VIX rising I'll treat ${risky.length ? list(risky) : "high-beta names"} with extra care and keep the stops firm.`
         : v.direction === "down" ? "Good. Falling VIX supports holding trends longer. I'll still size every trade by its stop-loss."
         : "Thanks. A steady VIX means I rate each stock on its own chart today.", { tickers: risky });
+  }
+
+  // ---------- Mubashir's earnings and size check ----------
+  const withF = d.rows.filter((r) => r.fundamentals);
+  if (withF.length) {
+    const sizes = ["Large", "Mid", "Small"].map((c) => `${withF.filter((r) => r.fundamentals!.cap === c).length} ${c.toLowerCase()}`).join(", ");
+    const growing = withF.filter((r) => (r.fundamentals!.epsGrowth1y ?? -1) >= 10).length;
+    const falling = withF.filter((r) => (r.fundamentals!.epsGrowth1y ?? 0) < 0).map((r) => r.symbol);
+    const losses = withF.filter((r) => (r.fundamentals!.epsTTM ?? 0) < 0).map((r) => r.symbol);
+    const sample = withF.some((r) => r.fundamentals!.sample) ? " (sample figures in demo mode)" : "";
+    const unknownN = withF.filter((r) => r.fundamentals!.cap === "Unknown").length;
+    const top8 = d.rows.slice(0, 8);
+    const capText = (r: Analysis) => (r.fundamentals?.marketCapCr !== undefined ? `${inr(r.fundamentals.marketCapCr, 0)} Cr` : "-");
+    const epsText = (v?: number) => (v === undefined ? "-" : inr(v));
+    bus.send("Mubashir", "FinalDecision",
+      `Earnings and size check${sample}: ${sizes} cap stocks above ₹${d.minCapCr} Cr.` +
+      (d.excluded.length ? ` I left out ${list(d.excluded.map((e) => `${e.symbol} (${inr(e.marketCapCr, 0)} Cr)`))} as too small.` : "") +
+      (unknownN ? ` ${plural(unknownN, "stock")} had no market-cap data, so I couldn't verify ${unknownN === 1 ? "its" : "their"} size.` : "") +
+      ` ${plural(growing, "stock")} grew EPS by 10% or more over the last year.` +
+      (falling.length ? ` EPS fell for ${plural(falling.length, "stock")}${falling.length <= 4 ? ` (${list(falling)})` : ""}, which I marked down.` : "") +
+      (losses.length ? ` Loss-making: ${list(losses.slice(0, 4))}.` : "") + " Top eight:",
+      { kind: "report", tickers: names(top8), table: {
+        columns: ["Symbol", "Size", "Market cap", "EPS now", "EPS 1Y ago", "EPS growth"],
+        rows: top8.map((r) => [r.symbol, r.fundamentals?.cap ?? "Unknown", capText(r), epsText(r.fundamentals?.epsTTM), epsText(r.fundamentals?.epsYearAgo),
+          (r.fundamentals?.epsTTM ?? 0) < 0 ? "Loss" : r.fundamentals?.epsGrowth1y !== undefined ? pct(r.fundamentals.epsGrowth1y) : "-"]),
+      } });
   }
 
   // ---------- Mubashir's chart check: 1M / 1D / 4H / 1H / 30m + best buy area ----------
