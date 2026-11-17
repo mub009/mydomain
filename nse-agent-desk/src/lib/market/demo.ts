@@ -57,6 +57,39 @@ export function demoBars(symbol: string, seed: number, days = 260): Bar[] {
   });
 }
 
+/**
+ * Fictional intraday candles that match the demo daily bars: each day is
+ * split into 13 half-hour bars (09:15-15:30 IST) along a random path from
+ * that day's open to its close, inside its high-low range.
+ */
+export function demoIntraday(daily: Bar[], symbol: string, seed: number, days = 120): Bar[] {
+  const r = seeded(`intra:${symbol}:${seed}`);
+  const out: Bar[] = [];
+  for (const d of daily.slice(-days)) {
+    const n = 13;
+    const path = [d.open];
+    for (let k = 1; k <= n; k++) {
+      const drift = d.open + ((d.close - d.open) * k) / n;
+      const noise = k === n ? 0 : r.normal(0, (d.high - d.low) * 0.18);
+      path.push(Math.min(d.high, Math.max(d.low, drift + noise)));
+    }
+    for (let k = 0; k < n; k++) {
+      const o = path[k], c = path[k + 1];
+      const wiggle = (d.high - d.low) * 0.06;
+      const t = new Date(`${d.date}T03:45:00Z`);
+      t.setUTCMinutes(t.getUTCMinutes() + 30 * k);
+      const shape = 1.6 - Math.sin((Math.PI * k) / (n - 1)); // more volume at the open and close
+      out.push({
+        date: t.toISOString(), open: o, close: c,
+        high: Math.min(d.high, Math.max(o, c) + Math.abs(r.normal(0, wiggle))),
+        low: Math.max(d.low, Math.min(o, c) - Math.abs(r.normal(0, wiggle))),
+        volume: (d.volume / n) * shape,
+      });
+    }
+  }
+  return out;
+}
+
 /** Fictional India VIX series: rises when the demo index falls, drifts back towards ~14. */
 export function demoVix(indexClose: number[], seed: number): number[] {
   const r = seeded(`vix:${seed}`);

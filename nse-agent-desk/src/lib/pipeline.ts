@@ -10,7 +10,8 @@ import { MessageBus } from "./bus";
 import { runDialogue } from "./dialogue";
 import { pctReturn, snapshot } from "./indicators";
 import { aiModel, LLM } from "./llm";
-import { loadMarket } from "./market";
+import { analyseChart } from "./chart";
+import { loadIntraday, loadMarket } from "./market";
 import { loadNews } from "./news";
 import type { RunRequest, RunResult, StreamEvent } from "./types";
 
@@ -35,7 +36,14 @@ export async function runAnalysis(o: RunRequest, emit: (e: StreamEvent) => void)
   const lot = morning.apply(new Lotappi().scan(snaps), news);
   const may = morning.apply(new Mayavi().scan(snaps, indexRet21d), news);
   const mubashir = new Mubashir();
-  const rows = mubashir.analyse(lot, may, snaps);
+  // Mubashir checks the charts of the leading candidates on 1M / 1D / 4H / 1H / 30m
+  // and finds each one's best buy area from 1M, 3M, 6M and 1Y history.
+  const first = mubashir.analyse(lot, may, snaps);
+  const candidates = first.slice(0, Math.max(12, o.top * 2)).map((r) => r.symbol);
+  emit({ type: "progress", text: "Checking charts…" });
+  const intraday = await loadIntraday(candidates, source, frames);
+  const charts = Object.fromEntries(candidates.map((s) => [s, analyseChart(frames[s], intraday[s]?.m30 ?? null, intraday[s]?.h1 ?? null)]));
+  const rows = mubashir.applyCharts(first, charts);
   const fd = new FinalDecision();
   const conflicted = fd.conflicted(rows, o.top);
   const clarifications = Object.fromEntries(conflicted.map((r) => [r.symbol, mubashir.adviseOnConflict(r)]));

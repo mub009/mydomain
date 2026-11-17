@@ -20,4 +20,6 @@ export interface MarketDataProvider {
   getIndexBars(): Promise<Bar[]>;
   /** Daily bars for India VIX (the NSE volatility index). */
   getVixBars(): Promise<Bar[]>;
+  /** Intraday bars: "30m" for ~60 days, "60m" for ~6 months. Times are ISO (UTC). */
+  getIntradayBars(symbol: string, interval: "30m" | "60m"): Promise<Bar[]>;
 }

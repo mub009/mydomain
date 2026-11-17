@@ -53,6 +53,18 @@ export interface DialogueInput {
   watchlist: Decision[];
 }
 
+/** How to enter each pick, from Mubashir's buy zones. */
+function entryPlan(picks: Decision[]): string {
+  const by = (plan: string) => picks.filter((p) => p.chart?.zone?.plan === plan).map((p) => p.symbol);
+  const now = by("In buy zone"), dip = by("Wait for dip"), ext = by("Extended");
+  const parts = [
+    now.length ? `buy now (in the buy zone): ${list(now)}` : "",
+    dip.length ? `wait for a dip into the buy zone: ${list(dip)}` : "",
+    ext.length ? `extended, buy only on a pullback: ${list(ext)}` : "",
+  ].filter(Boolean);
+  return parts.length ? ` How to enter: ${parts.join("; ")}.` : "";
+}
+
 export async function runDialogue(bus: MessageBus, llm: LLM, d: DialogueInput) {
   const note = (who: Person, task: string, data: unknown) =>
     llm.comment(`${who}, the ${ROLE[who]}`, task, data);
@@ -174,6 +186,40 @@ export async function runDialogue(bus: MessageBus, llm: LLM, d: DialogueInput) {
         : "Thanks. A steady VIX means I rate each stock on its own chart today.", { tickers: risky });
   }
 
+  // ---------- Mubashir's chart check: 1M / 1D / 4H / 1H / 30m + best buy area ----------
+  const charted = d.rows.filter((r) => r.chart).slice(0, 6);
+  if (charted.length) {
+    const cell = (t: string) => (t === "Bullish" ? "Bullish" : t === "Bearish" ? "Bearish" : "Neutral");
+    const zoneText = (r: Analysis) => (r.chart!.zone ? `${inr(r.chart!.zone.low, 0)}-${inr(r.chart!.zone.high, 0)}` : "None below price");
+    const lead = charted[0], lc_ = lead.chart!, z = lc_.zone;
+    const intraNote = charted.some((r) => !r.chart!.intraday) ? " Intraday candles were missing for some stocks, so those are read on 1M and 1D only." : "";
+    bus.send("Mubashir", "FinalDecision",
+      `I checked the charts of the top candidates on five timeframes (1M, 1D, 4H, 1H, 30m) and found each one's best buy area from its 1-month, 3-month, 6-month and 1-year history.${intraNote}`,
+      { kind: "report", tickers: names(charted), table: {
+        columns: ["Symbol", "1M", "1D", "4H", "1H", "30m", "Buy zone", "Plan"],
+        rows: charted.map((r) => [r.symbol, ...r.chart!.timeframes.map((t) => cell(t.trend)), zoneText(r), r.chart!.zone?.plan ?? "No zone"]),
+      } });
+    const hist = lc_.history.map((h) => `${h.label}: range ${inr(h.low, 0)}-${inr(h.high, 0)}, most traded ${inr(h.poc, 0)}`).join("\n");
+    bus.send("Mubashir", "FinalDecision",
+      `${lead.symbol} in detail: ${lc_.bullish} of 5 timeframes bullish.\n${hist}\n\n` +
+      (z ? `Best buy area: ${inr(z.low)}-${inr(z.high)}, from ${z.basis.join("; ")}. ` +
+        (z.plan === "In buy zone" ? "Price is inside it now, so it can be bought here" : z.plan === "Wait for dip" ? `Price is ${z.distancePct.toFixed(1)}% above it, so I'd wait for a dip into the zone` : `Price is ${z.distancePct.toFixed(1)}% above it, which is extended; I wouldn't chase it`) +
+        `. A stop under the zone would be ${inr(z.stop)}.`
+        : "Price is below all its recent support levels, so there is no buy area I'd trust yet."),
+      { tickers: [lead.symbol] });
+
+    // If the daily trend is up but the short charts are down, ask Lotappi whether it's just a dip.
+    const dip = charted.find((r) => r.chart!.timeframes[1].trend === "Bullish" && r.chart!.timeframes.slice(3).every((t) => t.trend === "Bearish"));
+    if (dip) {
+      const dz = dip.chart!.zone;
+      bus.send("Mubashir", "Lotappi", `Lotappi, ${dip.symbol} is bullish on the daily chart but bearish on 1H and 30m. Is that just a pullback?`, { tickers: [dip.symbol] });
+      bus.send("Lotappi", "Mubashir",
+        `Looks like a pullback inside an uptrend: 30-minute RSI is ${dip.chart!.timeframes[4].rsi.toFixed(0)}. ` +
+        (dz ? `I'd only buy once it reaches the ${inr(dz.low, 0)}-${inr(dz.high, 0)} area or the 30m chart turns up again.` : "I'd wait for the 30m chart to turn up before buying."),
+        { tickers: [dip.symbol] });
+    }
+  }
+
   // ---------- Step 4: combined analysis ----------
   const agreeN = d.rows.filter((r) => r.agree).length;
   const highN = d.rows.filter((r) => r.risk === "HIGH").length;
@@ -225,15 +271,16 @@ export async function runDialogue(bus: MessageBus, llm: LLM, d: DialogueInput) {
   bus.stage = "decide";
   bus.send("FinalDecision", "ALL",
     d.picks.length
-      ? `Decision made. We go with ${list(names(d.picks))}.` +
+      ? `Decision made. We go with ${list(names(d.picks))}.` + entryPlan(d.picks) +
         (d.watchlist.length ? ` Watchlist: ${list(names(d.watchlist))}.` : "") + " Lotappi, Mayavi, please confirm."
       : `Decision made: no stock passes our buy rules today, so we stay in cash.` +
         (d.watchlist.length ? ` Watchlist: ${list(names(d.watchlist))}.` : ""),
     {
       kind: "decision", tickers: [...names(d.picks), ...names(d.watchlist)],
       table: d.picks.length ? {
-        columns: ["Symbol", "Verdict", "Entry", "Stop-loss", "Target"],
-        rows: d.picks.map((p) => [p.symbol, p.verdict, inr(p.entry), inr(p.stopLoss), inr(p.target)]),
+        columns: ["Symbol", "Verdict", "Entry", "Stop-loss", "Target", "Buy zone"],
+        rows: d.picks.map((p) => [p.symbol, p.verdict, inr(p.entry), inr(p.stopLoss), inr(p.target),
+          p.chart?.zone ? `${inr(p.chart.zone.low, 0)}-${inr(p.chart.zone.high, 0)}` : "-"]),
       } : undefined,
       aiNote: await note("FinalDecision", "In 4-6 short lines, tell the team why these picks and how to manage them (stop-loss, target). End with one sentence saying this is not financial advice.",
         { picks: d.picks.map(({ spark: _s, ...p }) => p), watchlist: names(d.watchlist) }),

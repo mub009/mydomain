@@ -4,6 +4,7 @@ import { motion } from "motion/react";
 import { inr, pct } from "@/lib/format";
 import type { Decision, Stage } from "@/lib/types";
 import { ResearchProgress, RiskTag, TypingIndicator, VerdictBadge } from "./primitives";
+import { PlanTag } from "./chart-check";
 import { StockSparkline } from "./stock-sparkline";
 
 /** Small line illustration: four desks around a chart, for the waiting state. */
@@ -53,11 +54,11 @@ export function FinalPicksTable({ picks, onSelect }: { picks: Decision[]; onSele
     <>
       {/* desktop */}
       <div className="hidden overflow-x-auto scroll-thin md:block">
-        <table className="w-full min-w-[700px] text-left text-[12.5px] tnum">
+        <table className="w-full min-w-[660px] text-left text-[12.5px] tnum">
           <thead>
             <tr className="border-y bg-muted/50 text-[10.5px] uppercase tracking-wider text-muted-foreground">
-              {["Stock", "Holding period", "Risk", "Verdict", "60-day trend"].map((h) => <th key={h} className="whitespace-nowrap px-1.5 py-2 font-semibold first:pl-4">{h}</th>)}
-              {["Entry", "Stop-loss", "Target", "Upside", ...(sized ? ["Qty"] : [])].map((h) => <th key={h} className="whitespace-nowrap px-1.5 py-2 text-right font-semibold last:pr-4">{h}</th>)}
+              {["Stock", "Risk", "Verdict · plan", "60-day trend"].map((h) => <th key={h} className="whitespace-nowrap px-1.5 py-2 font-semibold first:pl-4">{h}</th>)}
+              {["Entry", "Stop-loss", "Target", "Buy zone", ...(sized ? ["Qty"] : [])].map((h) => <th key={h} className="whitespace-nowrap px-1.5 py-2 text-right font-semibold last:pr-4">{h}</th>)}
             </tr>
           </thead>
           <tbody>
@@ -66,14 +67,15 @@ export function FinalPicksTable({ picks, onSelect }: { picks: Decision[]; onSele
                 onClick={() => onSelect?.(d.symbol)} tabIndex={0} onKeyDown={(e) => e.key === "Enter" && onSelect?.(d.symbol)}
                 className="cursor-pointer border-b last:border-0 hover:bg-muted/50">
                 <td className="px-1.5 py-2.5 pl-4"><div className="font-semibold">{d.symbol}</div><div className="text-[11.5px] text-muted-foreground">{d.sector}</div></td>
-                <td className="max-w-24 px-1.5 py-2.5 text-xs leading-snug text-muted-foreground">{d.horizon}</td>
                 <td className="px-1.5 py-2.5"><RiskTag risk={d.risk} /></td>
-                <td className="px-1.5 py-2.5"><VerdictBadge verdict={d.verdict} /></td>
+                <td className="px-1.5 py-2.5"><VerdictBadge verdict={d.verdict} /><div className="mt-0.5 text-[11px] text-muted-foreground">{d.horizon}</div></td>
                 <td className="px-1.5 py-2.5"><StockSparkline data={d.spark} width={64} showChange={false} /></td>
                 <td className="whitespace-nowrap px-1.5 py-2.5 text-right font-medium">{inr(d.entry)}</td>
                 <td className="whitespace-nowrap px-1.5 py-2.5 text-right text-neg">{inr(d.stopLoss)}</td>
                 <td className="whitespace-nowrap px-1.5 py-2.5 text-right text-pos">{inr(d.target)}</td>
-                <td className="whitespace-nowrap px-1.5 py-2.5 text-right font-medium">{pct(upside(d))}</td>
+                <td className="whitespace-nowrap px-1.5 py-2.5 text-right">
+                  {d.chart?.zone ? <><div className="text-xs font-medium">{inr(d.chart.zone.low, 0)}–{inr(d.chart.zone.high, 0)}</div><PlanTag zone={d.chart.zone} /></> : <span className="text-xs text-muted-foreground">–</span>}
+                </td>
                 {sized && <td className="px-1.5 py-2.5 pr-4 text-right font-semibold" title={d.investment !== undefined ? `Invests ${inr(d.investment, 0)}` : undefined}>{d.quantity ?? "–"}</td>}
               </motion.tr>
             ))}
@@ -98,6 +100,7 @@ export function FinalPicksTable({ picks, onSelect }: { picks: Decision[]; onSele
             </dl>
             <div className="mt-2 flex flex-wrap justify-between gap-x-3 border-t pt-2 text-[11.5px] text-muted-foreground">
               <span>{d.horizon}</span>
+              {d.chart?.zone && <span className="w-full">Buy zone <b className="text-foreground">{inr(d.chart.zone.low, 0)}–{inr(d.chart.zone.high, 0)}</b> · <PlanTag zone={d.chart.zone} /></span>}
               <span className="font-semibold text-foreground">Upside {pct(upside(d))}{d.quantity !== undefined ? ` · ${d.quantity} sh` : ""}</span>
             </div>
           </button>

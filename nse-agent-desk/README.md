@@ -12,7 +12,7 @@ An AI stock research desk for the Indian market (NSE / Nifty 50). Four AI agents
 | **IV Index Agent** | Volatility Analyst | Tracks India VIX: level, 1-day and 5-day change, regime; lists the likely reasons for the move and the stocks expected to move next (high-beta "at risk" or "likely up", low-beta "holds up") |
 | **Lotappi** | Short-term Trader (1-10 days) | EMA 9/21, RSI 14, MACD, 20-day breakout, relative volume, 5-day return |
 | **Mayavi** | Positional Trader (~1 month) | SMA 20/50/200, 1-month return, strength vs Nifty 50, distance from 52-week high |
-| **Mubashir** | Research Analyst | Combines both reports, finds agreement and conflict, rates risk, sets entry / stop-loss / target |
+| **Mubashir** | Research Analyst | Combines both reports, finds agreement and conflict, rates risk, sets entry / stop-loss / target. Checks the charts of the top candidates on **1M, 1D, 4H, 1H and 30m** and finds each one's **best buy area** from 1-month, 3-month, 6-month and 1-year history |
 | **Final Decision** | Portfolio Head | Challenges conflicts, applies the sector cap and capital limits, gives STRONG BUY / BUY / WATCH / AVOID, announces the picks |
 
 Rules worth knowing:
@@ -21,6 +21,24 @@ Rules worth knowing:
 - Quantity = floor((Capital × Risk %) / (Entry − Stop-loss)), capped so the total never exceeds your capital
 - No more than 2 picks from one sector
 - Final picks stay hidden until Final Decision announces them in the chat
+
+## Mubashir's chart check
+
+For the top candidates (at least 12), Mubashir reads five timeframes:
+
+| Timeframe | Built from | Bullish when |
+|-----------|-----------|--------------|
+| 1M | daily bars grouped by month | price above a rising 6-month average |
+| 1D | daily bars | price above EMA20, EMA20 above EMA50 |
+| 4H | hourly bars, two per day (09:15-13:15, 13:15-15:30) | same EMA rule |
+| 1H | Yahoo 60-minute bars (~6 months) | same EMA rule |
+| 30m | Yahoo 30-minute bars (~60 days) | same EMA rule |
+
+Each bullish timeframe adds 1.5 points to the combined score and each bearish one takes 1.5 away.
+
+**Best buy area:** for the 1M, 3M, 6M and 1Y windows he finds the highest swing low below today's price and the price where the most volume traded. Levels within one ATR of each other are grouped; the group confirmed by the most windows is the buy zone. The plan is **In buy zone** (price within 1% of it), **Wait for dip** (up to 6% above) or **Extended** (more than 6% above). Final Decision's announcement says how to enter each pick.
+
+If intraday data can't be loaded, 4H, 1H and 30m are marked as not rated. In demo mode the intraday candles are generated to match the demo daily prices.
 
 ## The 9 AM Morning Session
 
