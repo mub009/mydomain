@@ -1,15 +1,16 @@
 "use client";
 
-import { Handshake, ScanSearch, TrendingUp, Trophy } from "lucide-react";
+import { History, Handshake, ScanSearch, TrendingUp, Trophy } from "lucide-react";
 import Link from "next/link";
 import { AgentAgreementScatter } from "@/components/desk/agent-agreement-scatter";
 import { AnalysisToolbar } from "@/components/desk/analysis-toolbar";
 import { FinalPicksTable, PicksWaiting } from "@/components/desk/final-picks-table";
 import { MessageFeed } from "@/components/desk/message-feed";
+import { MorningNewsCard, VixCard } from "@/components/desk/morning-cards";
 import { DataBanner, KPICard, ResearchProgress } from "@/components/desk/primitives";
 import { PageHeader } from "@/components/desk/shell";
 import { Button } from "@/components/ui/button";
-import { pct } from "@/lib/format";
+import { istDate, istTime, pct } from "@/lib/format";
 import { useBusy, useDecided, useDesk, useStage } from "@/store/desk";
 
 export default function OverviewPage() {
@@ -24,6 +25,11 @@ export default function OverviewPage() {
   const typing = useDesk((s) => s.typing);
   const times = useDesk((s) => s.times);
   const openStock = useDesk((s) => s.openStock);
+  const result = useDesk((s) => s.result);
+  const session = useDesk((s) => s.session);
+  const replayOf = useDesk((s) => s.replayOf);
+  const replaySession = useDesk((s) => s.replaySession);
+  const said = (who: string) => messages.slice(0, shown).some((m) => m.sender === who);
   const idle = !busy && !messages.length;
 
   const buys = r?.all.filter((d) => d.verdict === "STRONG BUY" || d.verdict === "BUY").length;
@@ -35,6 +41,17 @@ export default function OverviewPage() {
       <div className="space-y-4">
         {source ? <DataBanner source={source} /> : demo && <DataBanner source={{ kind: "demo", label: "Demo data" }} />}
         <AnalysisToolbar />
+        {(session?.ranAt || session?.enabled) && (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border bg-card px-3.5 py-2.5 text-[13px]">
+            <History className="size-4 text-[#EC4899]" aria-hidden />
+            <span className="min-w-0 flex-1">
+              {replayOf ? <>Showing the Morning Session from <b className="font-semibold">{istDate(replayOf)}, {istTime(replayOf)} IST</b>.</>
+                : session.ranAt ? <>Morning Session last ran <b className="font-semibold">{istDate(session.ranAt)}, {istTime(session.ranAt)} IST</b>.</>
+                : <>Morning Session is scheduled for <b className="font-semibold">{session.time} IST</b> on trading days. No run yet.</>}
+            </span>
+            {session.ranAt && !replayOf && <Button variant="outline" size="sm" onClick={replaySession} disabled={busy}>Replay 9 AM session</Button>}
+          </div>
+        )}
         {error && <div role="alert" className="rounded-xl border border-neg/40 bg-neg/10 px-3.5 py-2.5 text-[13px] font-medium text-neg">Could not finish the analysis: {error}</div>}
 
         <section className="grid grid-cols-2 gap-3 xl:grid-cols-4" aria-label="Key figures">
@@ -44,6 +61,11 @@ export default function OverviewPage() {
           <KPICard label="Nifty 50 · 1-Month" value={r ? pct(r.indexRet21d, 2) : "–"} sub={r?.source.kind === "demo" ? "Demo index" : "Benchmark return"}
             tone={r ? (r.indexRet21d >= 0 ? "pos" : "neg") : undefined} icon={<TrendingUp />} />
         </section>
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          <MorningNewsCard news={result?.news} revealed={Boolean(result) && said("MorningSession")} busy={busy && !said("MorningSession")} time={session?.time ?? "09:00"} />
+          <VixCard vix={result?.vix} revealed={Boolean(result) && said("IVIndex")} busy={busy && !said("IVIndex")} />
+        </div>
 
         <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
           <div className="min-w-0 space-y-4">

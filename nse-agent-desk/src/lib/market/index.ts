@@ -1,5 +1,5 @@
 import type { Bar, DataSource } from "../types";
-import { demoBars, demoIndex } from "./demo";
+import { demoBars, demoIndex, demoVix } from "./demo";
 import type { MarketDataProvider } from "./provider";
 import { yahooProvider } from "./yahoo";
 
@@ -14,6 +14,8 @@ export function getProvider(): MarketDataProvider | null {
 export interface Loaded {
   frames: Record<string, Bar[]>;
   indexClose: number[];
+  /** India VIX closes; empty when unavailable. */
+  vixClose: number[];
   source: DataSource;
   skipped: string[];
 }
@@ -21,8 +23,9 @@ export interface Loaded {
 function loadDemo(symbols: string[], fallbackReason?: string): Loaded {
   const seed = Math.floor(Math.random() * 1_000_000);
   const frames = Object.fromEntries(symbols.map((s) => [s, demoBars(s, seed)]));
+  const indexClose = demoIndex(Object.values(frames));
   return {
-    frames, indexClose: demoIndex(Object.values(frames)), skipped: [],
+    frames, indexClose, vixClose: demoVix(indexClose, seed), skipped: [],
     source: { kind: "demo", label: "Demo data (fictional prices)", seed, fallbackReason },
   };
 }
@@ -54,5 +57,7 @@ export async function loadMarket(
 
   let indexClose: number[] = [];
   try { indexClose = (await provider.getIndexBars()).map((b) => b.close); } catch { /* index is optional */ }
-  return { frames, indexClose, skipped, source: { kind: "eod", label: provider.label } };
+  let vixClose: number[] = [];
+  try { vixClose = (await provider.getVixBars()).map((b) => b.close); } catch { /* VIX is optional */ }
+  return { frames, indexClose, vixClose, skipped, source: { kind: "eod", label: provider.label } };
 }

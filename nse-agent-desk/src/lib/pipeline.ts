@@ -1,6 +1,8 @@
 /** Server-side orchestration: load market data, run the four agents, then
  *  stream their conversation and the result. */
 import { FinalDecision } from "./agents/finalDecision";
+import { IVIndex } from "./agents/ivIndex";
+import { MorningSession } from "./agents/morningSession";
 import { Lotappi } from "./agents/lotappi";
 import { Mayavi } from "./agents/mayavi";
 import { Mubashir } from "./agents/mubashir";
@@ -9,6 +11,7 @@ import { runDialogue } from "./dialogue";
 import { pctReturn, snapshot } from "./indicators";
 import { aiModel, LLM } from "./llm";
 import { loadMarket } from "./market";
+import { loadNews } from "./news";
 import type { RunRequest, RunResult, StreamEvent } from "./types";
 
 export async function runAnalysis(o: RunRequest, emit: (e: StreamEvent) => void): Promise<RunResult> {
@@ -17,15 +20,20 @@ export async function runAnalysis(o: RunRequest, emit: (e: StreamEvent) => void)
   const llm = new LLM(o.aiNotes);
 
   emit({ type: "progress", text: "Loading prices…" });
-  const { frames, indexClose, source, skipped } = await loadMarket(o.symbols, o.demo,
+  const { frames, indexClose, vixClose, source, skipped } = await loadMarket(o.symbols, o.demo,
     (d, t) => emit({ type: "progress", text: `Loading prices ${d}/${t}` }));
   const snaps = Object.fromEntries(Object.entries(frames).map(([k, v]) => [k, snapshot(v)]));
   const sparks = Object.fromEntries(Object.entries(frames).map(([k, v]) => [k, v.slice(-60).map((b) => Math.round(b.close * 100) / 100)]));
   const indexRet21d = indexClose.length > 21 ? pctReturn(indexClose, 21) : 0;
 
   emit({ type: "progress", text: "Agents are analysing…" });
-  const lot = new Lotappi().scan(snaps);
-  const may = new Mayavi().scan(snaps, indexRet21d);
+  // Morning Session collects the news; positive stories boost Lotappi's and Mayavi's scores.
+  emit({ type: "progress", text: "Collecting news…" });
+  const news = await loadNews(Object.keys(snaps), source.kind === "demo", snaps, source.seed);
+  const morning = new MorningSession();
+  const vix = new IVIndex().analyse(vixClose, indexClose, frames, snaps, news, source.kind === "demo");
+  const lot = morning.apply(new Lotappi().scan(snaps), news);
+  const may = morning.apply(new Mayavi().scan(snaps, indexRet21d), news);
   const mubashir = new Mubashir();
   const rows = mubashir.analyse(lot, may, snaps);
   const fd = new FinalDecision();
@@ -37,13 +45,14 @@ export async function runAnalysis(o: RunRequest, emit: (e: StreamEvent) => void)
     source, stockCount: rows.length, skipped, indexRet21d,
     aiLabel: llm.enabled ? `on (${aiModel()})` : "off",
     capital: o.capital, riskPerTrade: o.riskPerTrade,
+    news, vix, positive: morning.positive(news), negative: morning.negative(news),
     snaps, lot, may, rows, conflicted, clarifications, picks, passed, watchlist,
   });
 
   const result: RunResult = {
     source, generatedAt: new Date().toISOString(), simulatedAgents: !llm.enabled,
     capital: o.capital, riskPerTrade: o.riskPerTrade,
-    indexRet21d: Math.round(indexRet21d * 100) / 100, picks, watchlist, all, skipped,
+    indexRet21d: Math.round(indexRet21d * 100) / 100, news, vix, picks, watchlist, all, skipped,
   };
   emit({ type: "result", result });
   console.log(`[nse-agent-desk] run: ${rows.length} stocks, source=${source.kind}${source.seed !== undefined ? `#${source.seed}` : ""}, ` +

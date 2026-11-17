@@ -12,9 +12,12 @@ import { MAX_PER_SECTOR } from "./agents/finalDecision";
 import type { MessageBus } from "./bus";
 import { inr, pct } from "./format";
 import type { LLM } from "./llm";
-import type { AgentReport, Analysis, DataSource, Decision, MessageTable, Person, Snapshot } from "./types";
+import { NEWS_BOOST } from "./agents/morningSession";
+import type { AgentReport, Analysis, DataSource, Decision, MessageTable, NewsBrief, NewsItem, Person, Snapshot, VixReport } from "./types";
 
 const ROLE: Record<Person, string> = {
+  MorningSession: "news scout who collects the morning stock news",
+  IVIndex: "volatility analyst who tracks India VIX",
   Lotappi: "short-term (1-10 day) swing-trade scanner",
   Mayavi: "1-month positional trend scanner",
   Mubashir: "analyst who combines the short-term and 1-month reports and checks risk",
@@ -35,6 +38,10 @@ export interface DialogueInput {
   aiLabel: string;
   capital?: number;
   riskPerTrade: number;
+  news: NewsBrief | null;
+  vix: VixReport | null;
+  positive: NewsItem[];
+  negative: NewsItem[];
   snaps: Record<string, Snapshot>;
   lot: AgentReport[];
   may: AgentReport[];
@@ -48,7 +55,7 @@ export interface DialogueInput {
 
 export async function runDialogue(bus: MessageBus, llm: LLM, d: DialogueInput) {
   const note = (who: Person, task: string, data: unknown) =>
-    llm.comment(`${who === "FinalDecision" ? "Final Decision" : who}, the ${ROLE[who]}`, task, data);
+    llm.comment(`${who}, the ${ROLE[who]}`, task, data);
   const lotBy = new Map(d.lot.map((r) => [r.symbol, r]));
   const mayBy = new Map(d.may.map((r) => [r.symbol, r]));
   const reportTable = (rs: AgentReport[]): MessageTable => ({
@@ -63,6 +70,30 @@ export async function runDialogue(bus: MessageBus, llm: LLM, d: DialogueInput) {
     `${d.source.seed !== undefined ? ` · run #${d.source.seed}` : ""} · Nifty 50 1-month ${pct(d.indexRet21d)} · ` +
     `agent conversation is simulated from the analysis · AI notes ${d.aiLabel}` +
     (d.skipped.length ? ` · skipped: ${d.skipped.join(", ")}` : ""), { kind: "system" });
+
+  // ---------- Step 0: Morning Session hands over the news ----------
+  if (d.news) {
+    const pos = d.positive.slice(0, 6);
+    const newsTable: MessageTable = { columns: ["Symbol", "Headline", "Source"], rows: pos.map((n) => [n.symbol, n.headline, n.source]) };
+    const tag = d.news.sample ? " These are sample headlines, not real news." : "";
+    if (pos.length) {
+      bus.send("MorningSession", "Lotappi",
+        `Hi Lotappi, Morning Session here. I went through ${d.news.total} headlines from ${d.news.label}: ${plural(d.positive.length, "stock")} with positive news, ${d.negative.length} with negative. Here are the positive ones for your scan.${tag}`,
+        { kind: "report", table: newsTable, tickers: names(pos) });
+      const weakL = pos.filter((n) => (lotBy.get(n.symbol)?.score ?? 0) < 50).map((n) => n.symbol);
+      bus.send("Lotappi", "MorningSession",
+        `Thanks. Each one gets +${NEWS_BOOST} on my score.` + (weakL.length ? ` ${list(weakL)} still ${weakL.length === 1 ? "fails" : "fail"} my momentum rules, so good news alone doesn't make ${weakL.length === 1 ? "it" : "them"} a trade.` : " They all look tradable on my charts too."),
+        { tickers: weakL });
+      bus.send("MorningSession", "Mayavi", `Mayavi, same positive list for your 1-month view.${d.negative.length ? ` Be careful with ${list(names(d.negative.slice(0, 3)))}: negative headlines there.` : ""}`,
+        { kind: "report", table: newsTable, tickers: [...names(pos), ...names(d.negative.slice(0, 3))] });
+      const strongM = pos.filter((n) => (mayBy.get(n.symbol)?.score ?? 0) >= 60).map((n) => n.symbol);
+      bus.send("Mayavi", "MorningSession",
+        `Noted, +${NEWS_BOOST} for each. ` + (strongM.length ? `${list(strongM)} already ${strongM.length === 1 ? "has" : "have"} a good monthly trend, so the news supports the chart.` : "None of them has a strong monthly trend yet, so I'll wait for the chart to confirm."),
+        { tickers: strongM });
+    } else {
+      bus.send("MorningSession", "Lotappi", `Morning Session here. I went through ${d.news.total} headlines from ${d.news.label} and found no clearly positive news on the stocks we scan. Nothing to add to your scores today.`);
+    }
+  }
 
   const l3 = d.lot.slice(0, 3), m3 = d.may.slice(0, 3);
   const lead = d.lot[0];
@@ -127,6 +158,21 @@ export async function runDialogue(bus: MessageBus, llm: LLM, d: DialogueInput) {
     `${Number.isNaN(ts.sma200) ? "" : `, and ${above(ts.sma200)} the 200-day`}. Against the Nifty it is ${rs >= 0 ? "ahead" : "behind"} by ${Math.abs(rs).toFixed(1)}%. ` +
     `${tm.score >= 60 ? "I'm comfortable holding it for a month." : `My score is only ${tm.score.toFixed(0)}, so I'm not convinced for a month.`}`,
     { tickers: [top.symbol] });
+
+  // ---------- IV Index agent reports to Mubashir ----------
+  if (d.vix) {
+    const v = d.vix;
+    bus.send("IVIndex", "Mubashir",
+      `Mubashir, India VIX is at ${v.level.toFixed(2)}, ${v.direction === "flat" ? "little changed" : v.direction} ${pct(v.change1d)} today and ${pct(v.change5d)} over 5 days. Regime: ${v.regime.toLowerCase()}.` +
+      `${v.sample ? " (Demo VIX, not the real index.)" : ""}\n\nLikely why:\n${v.reasons.map((r) => `• ${r}`).join("\n")}\n\nThese are my inferences from prices and headlines. Stocks I expect to move next:`,
+      { kind: "report", tickers: names(v.movers), table: { columns: ["Symbol", "Expect", "Why"], rows: v.movers.map((m) => [m.symbol, m.expect, m.why]) },
+        aiNote: await note("IVIndex", "In 3-4 short lines, explain to Mubashir what the India VIX move means for the stocks listed. Do not claim causes that are not in the data.", v) });
+    const risky = v.movers.filter((m) => m.expect === "At risk" || m.expect === "Bigger swings").map((m) => m.symbol);
+    bus.send("Mubashir", "IVIndex",
+      v.direction === "up" ? `Understood. With VIX rising I'll treat ${risky.length ? list(risky) : "high-beta names"} with extra care and keep the stops firm.`
+        : v.direction === "down" ? "Good. Falling VIX supports holding trends longer. I'll still size every trade by its stop-loss."
+        : "Thanks. A steady VIX means I rate each stock on its own chart today.", { tickers: risky });
+  }
 
   // ---------- Step 4: combined analysis ----------
   const agreeN = d.rows.filter((r) => r.agree).length;
