@@ -59,7 +59,12 @@ Light and dark themes, and a mobile layout with a bottom navigation bar.
 
 The scores, verdicts and picks come from fixed, tested rules. The chat messages are generated from each run's analysis results, so the conversation is **simulated** and labelled that way.
 
-Set `ANTHROPIC_API_KEY` (see `.env.example`) and switch on **AI notes** to add real model commentary under each report. The key stays on the server.
+To add real model commentary under each report, set an API key in `.env.local` (see `.env.example`) and switch on **AI notes**. Keys stay on the server.
+
+- **NVIDIA (free developer key):** sign in at [build.nvidia.com](https://build.nvidia.com), create an API key, and set `NVIDIA_API_KEY`. The default model is `meta/llama-3.3-70b-instruct`; change it with `NVIDIA_MODEL` to any chat model in NVIDIA's catalog. Free access is rate-limited.
+- **Claude:** set `ANTHROPIC_API_KEY` (and optionally `STOCK_AGENT_MODEL`).
+
+If both are set, `AI_PROVIDER` picks one. NVIDIA provides AI models only, not stock prices or news.
 
 ## How it fits together
 

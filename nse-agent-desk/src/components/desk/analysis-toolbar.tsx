@@ -53,7 +53,7 @@ export function AnalysisToolbar() {
       <div className="flex h-9 items-center gap-4">
         <label className="flex items-center gap-2 text-[13px] font-medium"><Switch checked={s.demo} onCheckedChange={(demo) => s.set({ demo })} />Demo data</label>
         <label className={cn("flex items-center gap-2 text-[13px] font-medium", !s.config?.aiAvailable && "text-muted-foreground")}
-          title={s.config?.aiAvailable ? `Real model notes (${s.config.aiModel})` : "Set ANTHROPIC_API_KEY on the server to enable AI notes"}>
+          title={s.config?.aiAvailable ? `Real model notes (${s.config.aiModel})` : "Set NVIDIA_API_KEY or ANTHROPIC_API_KEY on the server to enable AI notes"}>
           <Switch checked={s.aiNotes && Boolean(s.config?.aiAvailable)} disabled={!s.config?.aiAvailable} onCheckedChange={(aiNotes) => s.set({ aiNotes })} />AI notes
         </label>
       </div>
