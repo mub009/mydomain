@@ -50,6 +50,18 @@ Each bullish timeframe adds 1.5 points to the combined score and each bearish on
 
 If intraday data can't be loaded, 4H, 1H and 30m are marked as not rated. In demo mode the intraday candles are generated to match the demo daily prices.
 
+## Company: peers, balance sheet, cash flow, owners
+
+Open any stock and choose the **Company** tab:
+
+- **Balance sheet & cash-flow quality:** Mubashir grades the company A-D on cash conversion (operating cash flow ÷ net profit over 3 years, counted double), free cash flow (years positive out of 4), debt/equity, current ratio, return on equity and interest cover. A loss-making company can't grade above C. Banks and NBFCs are graded only on ROE and profit growth, because debt and cash flow work differently for lenders.
+- **Peers:** the closest companies by market cap in the same sector, from the current run's stock list (use "All caps" for more), with size, P/E, EPS growth, ROE, debt/equity, cash conversion, quality grade and verdict. Click a peer to open it.
+- **Profit vs cash flow:** net profit, operating cash flow and free cash flow for 4 years.
+- **Balance sheet:** revenue, profit, assets, liabilities, equity, debt, cash, capital spending, debt/equity and current ratio by fiscal year (₹ Cr).
+- **Who owns it:** holder groups, largest holders, promoter trend and pledges where available.
+
+Data: with demo data off, statements come from Yahoo Finance's annual fundamentals and holders from Yahoo's holders data (both unofficial, untested from the build environment). Yahoo groups FIIs and DIIs together as "institutions" and doesn't show the official promoter split or pledges; each stock links to its NSE page for the official quarterly shareholding pattern. In demo mode all figures are samples and holder names are generic placeholders.
+
 ## Follow-up on trades you take
 
 Open any stock (from Final Picks, the Screener, or a chip in the chat) and press **Track this trade**. Enter what you actually bought: buy price, quantity, stop-loss and target (pre-filled from the analysis). The exit plan is:

@@ -11,6 +11,9 @@ import { AgentAvatar } from "./agent-avatar";
 import { ChartCheck } from "./chart-check";
 import { FundamentalsCard } from "./fundamentals";
 import { TrackTradeButton } from "./positions-ui";
+import { CompanyTab } from "./company-tab";
+import { Tabs } from "radix-ui";
+import { useState } from "react";
 import { RiskTag, VerdictBadge } from "./primitives";
 
 function ScoreBar({ label, value, color }: { label: string; value: number; color: string }) {
@@ -99,6 +102,7 @@ export function StockDrawer() {
   const result = useDesk((s) => s.result);
   const openStock = useDesk((s) => s.openStock);
   const d = findStock(result, symbol);
+  const [tab, setTab] = useState("research");
   return (
     <Sheet open={Boolean(d)} onOpenChange={(o) => !o && openStock(null)}>
       <SheetContent>
@@ -114,7 +118,19 @@ export function StockDrawer() {
               </SheetDescription>
               <TrackTradeButton d={d} className="mt-3 w-full" />
             </div>
-            <Body d={d} isPick={Boolean(result?.picks.some((p) => p.symbol === d.symbol))} />
+            <Tabs.Root value={tab} onValueChange={setTab} className="flex min-h-0 flex-1 flex-col">
+              <Tabs.List className="mx-5 mb-3 grid grid-cols-2 rounded-lg bg-muted p-0.5" aria-label="Stock details">
+                {[["research", "Research"], ["company", "Company: peers, financials, owners"]].map(([v, l]) => (
+                  <Tabs.Trigger key={v} value={v} className="truncate rounded-md px-2 py-1.5 text-[13px] font-medium text-muted-foreground data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm">{l}</Tabs.Trigger>
+                ))}
+              </Tabs.List>
+              <Tabs.Content value="research" className="flex min-h-0 flex-1 flex-col outline-none">
+                <Body d={d} isPick={Boolean(result?.picks.some((p) => p.symbol === d.symbol))} />
+              </Tabs.Content>
+              <Tabs.Content value="company" className="min-h-0 flex-1 overflow-y-auto outline-none scroll-thin">
+                <CompanyTab d={d} />
+              </Tabs.Content>
+            </Tabs.Root>
           </>
         )}
       </SheetContent>

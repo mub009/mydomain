@@ -11,6 +11,7 @@
  * ₹300 Cr) are left out of the analysis.
  */
 import { listOf } from "../market/universe";
+import { yahooTimeseries } from "../market/yahoo-timeseries";
 import type { CapSize, Fundamentals } from "../types";
 
 const num = (v: string | undefined, d: number) => (v && Number.isFinite(Number(v)) ? Number(v) : d);
@@ -68,23 +69,9 @@ export function demoFundamentals(symbol: string, price: number, seed: number): F
 }
 
 // ---------- Yahoo fundamentals time series ----------
-type Point = { asOfDate: string; periodType?: string; reportedValue?: { raw: number } };
 
 async function yahooFundamentals(symbol: string, price: number): Promise<Fundamentals> {
-  const y = symbol.endsWith(".NS") || symbol.endsWith(".BO") ? symbol : `${symbol}.NS`;
-  const now = Math.floor(Date.now() / 1000);
-  const types = ["quarterlyDilutedEPS", "annualDilutedEPS", "quarterlyOrdinarySharesNumber", "annualOrdinarySharesNumber"];
-  const url = `https://query1.finance.yahoo.com/ws/fundamentals-timeseries/v1/finance/timeseries/${encodeURIComponent(y)}` +
-    `?symbol=${encodeURIComponent(y)}&type=${types.join(",")}&period1=${now - 6 * 366 * 86400}&period2=${now}`;
-  const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" }, cache: "no-store", signal: AbortSignal.timeout(10000) });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const json = await res.json();
-  const series: Record<string, { date: string; v: number }[]> = {};
-  for (const r of json?.timeseries?.result ?? []) {
-    const t = r?.meta?.type?.[0];
-    const pts = (r?.[t] as (Point | null)[] | undefined)?.filter((p): p is Point => Boolean(p?.reportedValue)) ?? [];
-    if (t) series[t] = pts.map((p) => ({ date: p.asOfDate, v: p.reportedValue!.raw })).sort((a, b) => a.date.localeCompare(b.date));
-  }
+  const series = await yahooTimeseries(symbol, ["quarterlyDilutedEPS", "annualDilutedEPS", "quarterlyOrdinarySharesNumber", "annualOrdinarySharesNumber"]);
   const q = series.quarterlyDilutedEPS ?? [], a = series.annualDilutedEPS ?? [];
   const sum = (xs: { v: number }[]) => xs.reduce((s, x) => s + x.v, 0);
   let epsTTM: number | undefined, epsYearAgo: number | undefined, epsBasis: Fundamentals["epsBasis"];

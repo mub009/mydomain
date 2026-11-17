@@ -15,7 +15,7 @@ export function SheetContent({ className, children, ...props }: React.ComponentP
       <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40 backdrop-blur-[1px]" />
       <Dialog.Content
         className={cn(
-          "fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l bg-card shadow-2xl outline-none",
+          "fixed inset-y-0 right-0 z-50 flex w-full max-w-xl flex-col border-l bg-card shadow-2xl outline-none",
           "transition-transform duration-200 data-[state=closed]:translate-x-full", className)}
         {...props}
       >

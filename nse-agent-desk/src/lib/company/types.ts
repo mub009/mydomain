@@ -1,0 +1,77 @@
+/** Company financials for the research drawer. Amounts in ₹ crore. */
+export interface YearFinancials {
+  /** Fiscal year label, e.g. "FY25" (Indian fiscal year ending March). */
+  year: string;
+  revenue?: number;
+  netIncome?: number;
+  totalAssets?: number;
+  totalLiabilities?: number;
+  equity?: number;
+  debt?: number;
+  cash?: number;
+  currentAssets?: number;
+  currentLiabilities?: number;
+  operatingCashFlow?: number;
+  capex?: number; // positive number = money spent
+  freeCashFlow?: number;
+  ebit?: number;
+  interestExpense?: number;
+}
+
+export interface QualityCheck {
+  label: string;
+  value: string;
+  verdict: "good" | "ok" | "weak" | "n/a";
+  note: string;
+}
+
+export interface Quality {
+  grade: "A" | "B" | "C" | "D" | "n/a";
+  checks: QualityCheck[];
+  summary: string;
+  /** Banks and NBFCs: cash-flow and debt ratios don't apply the usual way. */
+  financialSector: boolean;
+}
+
+export interface Ratios {
+  roe?: number; // %
+  debtToEquity?: number;
+  currentRatio?: number;
+  cashConversion?: number; // operating cash flow / net profit, 3-year
+  interestCover?: number;
+  fcfPositiveYears?: number;
+  years: number;
+}
+
+export interface Shareholding {
+  /** Holder groups and their % of shares. */
+  categories: { label: string; pct: number }[];
+  /** Largest named holders, if the source lists them. */
+  top: { name: string; type: string; pct: number }[];
+  /** Promoter holding over recent quarters, oldest first (when available). */
+  promoterTrend?: { period: string; pct: number }[];
+  pledgedPct?: number;
+  asOf?: string;
+  source: string;
+  sample: boolean;
+  note?: string;
+}
+
+export interface CompanyReport {
+  symbol: string;
+  sector: string;
+  years: YearFinancials[];
+  ratios: Ratios;
+  quality: Quality;
+  shareholding: Shareholding | null;
+  source: string;
+  sample: boolean;
+  /** Official sources to double-check against. */
+  links: { label: string; url: string }[];
+}
+
+export interface PeerRow {
+  symbol: string;
+  ratios: Ratios;
+  grade: Quality["grade"];
+}
