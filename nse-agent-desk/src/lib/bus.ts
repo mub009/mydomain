@@ -1,7 +1,9 @@
+import { isDeskAgent } from "./team";
 import type { AgentName, Message, Stage } from "./types";
 
+/** One-to-one threads, except the research desk (Research Agent and its three sub-agents), which shares one. */
 export const threadOf = (a: AgentName, b: AgentName | "ALL") =>
-  b === "ALL" ? "team" : [a, b].sort().join("|");
+  b === "ALL" ? "team" : isDeskAgent(a) || isDeskAgent(b) ? "desk" : [a, b].sort().join("|");
 
 /** Message bus the four agents talk through. Each message is emitted as soon
  *  as it is sent (streamed to the browser over Server-Sent Events). */

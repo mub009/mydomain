@@ -1,12 +1,15 @@
 import type { AgentName, Person } from "./types";
 
-export const TEAM: Record<Person, { name: string; title: string; focus: string; color: string }> = {
+export const TEAM: Record<Person, { name: string; title: string; focus: string; color: string; /** Sub-agent of this agent. */ lead?: Person }> = {
   News: { name: "News Agent", title: "Pre-market news & sentiment", focus: "Collects stock news · 9:00 AM IST", color: "#EC4899" },
   Volatility: { name: "Volatility Agent", title: "India VIX analysis", focus: "Tracks market fear · explains moves", color: "#84CC16" },
   Macro: { name: "Macro Agent", title: "Gold · crude · USD/INR", focus: "Commodity & currency effects", color: "#06B6D4" },
   Momentum: { name: "Momentum Agent", title: "Short-term trades · 1-10 days", focus: "Breakouts, RSI, volume, MACD", color: "#3B82F6" },
   Trend: { name: "Trend Agent", title: "Positional trades · ~1 month", focus: "Moving averages, relative strength", color: "#A855F7" },
   Research: { name: "Research Agent", title: "Combines signals, risk & charts", focus: "EPS, sectors, charts, buy zones", color: "#14B8A6" },
+  Performance: { name: "Performance Agent", title: "Returns · YTD, 5Y, expected", focus: "Reports to Research Agent", color: "#F97316", lead: "Research" },
+  Valuation: { name: "Valuation Agent", title: "P/E, P/B, P/CFO", focus: "Reports to Research Agent", color: "#6366F1", lead: "Research" },
+  Growth: { name: "Growth Agent", title: "3-year revenue, cash flow, profit", focus: "Reports to Research Agent", color: "#22C55E", lead: "Research" },
   Decision: { name: "Decision Agent", title: "Final picks & portfolio rules", focus: "Verdicts, sector cap, sizing", color: "#F59E0B" },
 };
 
@@ -17,6 +20,8 @@ export const LEGACY_AGENT: Record<string, Person> = {
 export const migrateAgent = <T extends string>(n: T): T | Person => LEGACY_AGENT[n] ?? n;
 
 export const PEOPLE = Object.keys(TEAM) as Person[];
+export const DESK_AGENTS = ["Performance", "Valuation", "Growth"] as const;
+export const isDeskAgent = (n: string) => (DESK_AGENTS as readonly string[]).includes(n);
 
 export const displayName = (n: AgentName | "ALL") =>
   n === "ALL" ? "Team" : n === "System" ? "System" : TEAM[n].name;
@@ -31,5 +36,6 @@ export const THREADS: { id: string; title: string; members: Person[] }[] = [
   { id: "Research|Trend", title: "Trend Agent & Research Agent", members: ["Trend", "Research"] },
   { id: "Macro|Research", title: "Macro Agent & Research Agent", members: ["Macro", "Research"] },
   { id: "Research|Volatility", title: "Volatility Agent & Research Agent", members: ["Volatility", "Research"] },
+  { id: "desk", title: "Research desk", members: ["Research", "Performance", "Valuation", "Growth"] },
   { id: "Decision|Research", title: "Research Agent & Decision Agent", members: ["Research", "Decision"] },
 ];

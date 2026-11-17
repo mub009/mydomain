@@ -17,6 +17,7 @@ import { loadNews } from "./news";
 import { analyseSectors, applySectors, enrichSectors } from "./sectors";
 import { analyseMacro, applyMacro, loadMacro } from "./macro";
 import { sectorOf } from "./market/universe";
+import { runResearchDesk } from "./research-desk";
 import type { RunRequest, RunResult, StreamEvent } from "./types";
 
 export async function runAnalysis(o: RunRequest, emit: (e: StreamEvent) => void): Promise<RunResult> {
@@ -57,10 +58,13 @@ export async function runAnalysis(o: RunRequest, emit: (e: StreamEvent) => void)
   const macro = macroData ? analyseMacro(frames, macroData.series, macroData.sample) : null;
   const first = applySectors(mubashir.applyFundamentals(applyMacro(mubashir.analyse(lot, may, snaps), macro), funds), sectors);
   const candidates = first.slice(0, Math.max(12, o.top * 2)).map((r) => r.symbol);
+  // Research desk: Performance, Valuation and Growth Agents check the candidates for Research Agent.
+  emit({ type: "progress", text: "Research desk: performance, valuation, growth…" });
+  const desk = await runResearchDesk(candidates, { frames, funds, source, indexClose, sectorOf });
   emit({ type: "progress", text: "Checking charts…" });
   const intraday = await loadIntraday(candidates, source, frames);
   const charts = Object.fromEntries(candidates.map((s) => [s, analyseChart(frames[s], intraday[s]?.m30 ?? null, intraday[s]?.h1 ?? null)]));
-  const rows = mubashir.applyCharts(first, charts);
+  const rows = mubashir.applyCharts(mubashir.applyDesk(first, desk), charts);
   const fd = new DecisionAgent();
   const conflicted = fd.conflicted(rows, o.top);
   const clarifications = Object.fromEntries(conflicted.map((r) => [r.symbol, mubashir.adviseOnConflict(r)]));

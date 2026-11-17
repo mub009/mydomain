@@ -46,6 +46,7 @@ export function demoFinancials(symbol: string, price: number, seed: number): Yea
   const capexShare = 0.3 + r() * 0.75;
   return f.epsHistory.map((h, i) => {
     const ni = (h.eps * shares) / CR;
+    const m = margin * (1 + (r() - 0.5) * 0.3);
     const equity = Math.abs(ni) / roe * (0.85 + 0.05 * i);
     const debt = equity * de * (0.85 + r() * 0.3);
     const cfo = bank ? ni * (0.6 + r() * 1.2) : ni * (conv + (r() - 0.5) * 0.3);
@@ -53,7 +54,7 @@ export function demoFinancials(symbol: string, price: number, seed: number): Yea
     const ca = (equity + debt) * (bank ? 0.3 : 0.35 + r() * 0.2);
     const q = (n: number) => Math.round(n);
     return {
-      year: h.period, revenue: q(Math.abs(ni) / margin), netIncome: q(ni), equity: q(equity), debt: q(debt),
+      year: h.period, revenue: q(Math.abs(ni) / m), netIncome: q(ni), equity: q(equity), debt: q(debt),
       totalAssets: q(equity + debt + equity * 0.4), totalLiabilities: q(debt + equity * 0.4),
       cash: q(equity * (0.05 + r() * 0.25)), currentAssets: q(ca), currentLiabilities: q(ca / (bank ? 1 : 0.8 + r() * 0.9)),
       operatingCashFlow: q(cfo), capex: q(capex), freeCashFlow: q(cfo - capex),
@@ -151,7 +152,6 @@ async function yahooShareholding(symbol: string): Promise<Shareholding> {
   };
 }
 
-// ---------- public ----------
 const cache = new Map<string, { at: number; v: unknown }>();
 async function cached<T>(key: string, fn: () => Promise<T>): Promise<T> {
   const hit = cache.get(key);
@@ -160,6 +160,34 @@ async function cached<T>(key: string, fn: () => Promise<T>): Promise<T> {
   cache.set(key, { at: Date.now(), v });
   return v;
 }
+
+/** Analysts' mean 12-month price target (live only). */
+export async function yahooAnalystTarget(symbol: string): Promise<{ mean: number; analysts: number } | null> {
+  return cached(`tgt:${symbol}`, async () => {
+    const c = await yahooCrumb();
+    const url = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(yahooSymbol(symbol))}?modules=financialData&crumb=${encodeURIComponent(c.crumb)}`;
+    const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0", cookie: c.cookie }, signal: AbortSignal.timeout(10000) });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const fd = (await res.json())?.quoteSummary?.result?.[0]?.financialData;
+    const mean = fd?.targetMeanPrice?.raw, analysts = fd?.numberOfAnalystOpinions?.raw ?? 0;
+    return typeof mean === "number" && mean > 0 && analysts > 0 ? { mean, analysts } : null;
+  }).catch(() => null);
+}
+
+/** Annual financials for several companies (demo or live). Missing companies get []. */
+export async function loadFinancials(prices: Record<string, number>, opts: { demo: boolean; seed: number }): Promise<Record<string, YearFinancials[]>> {
+  const out: Record<string, YearFinancials[]> = {};
+  const queue = Object.keys(prices);
+  await Promise.all(Array.from({ length: 4 }, async () => {
+    for (let s = queue.shift(); s; s = queue.shift()) {
+      out[s] = opts.demo ? demoFinancials(s, prices[s], opts.seed)
+        : await cached(`fin:${s}`, () => yahooFinancials(s)).catch(() => [] as YearFinancials[]);
+    }
+  }));
+  return out;
+}
+
+// ---------- public ----------
 
 export async function companyReport(symbol: string, opts: { demo: boolean; price: number; seed: number }): Promise<CompanyReport> {
   const sector = sectorOf(symbol);

@@ -13,7 +13,7 @@ An AI stock research desk for the Indian market (NSE / Nifty 50). Four AI agents
 | **Macro Agent** | Gold · crude · USD/INR | Tracks Gold, Brent crude and USD/INR, finds which stocks depend on them, and tells Research Agent about tailwinds and headwinds before it combines the lists |
 | **Momentum Agent** | Short-term trades (1-10 days) | EMA 9/21, RSI 14, MACD, 20-day breakout, relative volume, 5-day return |
 | **Trend Agent** | Positional trades (~1 month) | SMA 20/50/200, 1-month return, strength vs Nifty 50, distance from 52-week high |
-| **Research Agent** | Combines signals, risk & charts | Combines both reports, finds agreement and conflict, rates risk, sets entry / stop-loss / target. Checks the charts of the top candidates on **1M, 1D, 4H, 1H and 30m** and finds each one's **best buy area** from 1-month, 3-month, 6-month and 1-year history |
+| **Research Agent** | Combines signals, risk & charts. Leads the research desk (Performance, Valuation and Growth Agents) | Combines both reports, finds agreement and conflict, rates risk, sets entry / stop-loss / target. Checks the charts of the top candidates on **1M, 1D, 4H, 1H and 30m** and finds each one's **best buy area** from 1-month, 3-month, 6-month and 1-year history |
 | **Decision Agent** | Final picks & portfolio rules | Challenges conflicts, applies the sector cap and capital limits, gives STRONG BUY / BUY / WATCH / AVOID, announces the picks |
 
 Rules worth knowing:
@@ -32,6 +32,18 @@ Rules worth knowing:
 **EPS over one year:** EPS for the last 12 months (sum of the last 4 quarters) against the 12 months before; if fewer than 8 quarters are available, the latest fiscal year against the one before. Score: +5 for growth of 20% or more, +3 for 10-20%, +1 for 0-10%, -4 if EPS fell, -6 if loss-making. Decision Agent never gives STRONG BUY with falling EPS, and never BUY while loss-making.
 
 With demo data off, market cap and EPS come from Yahoo Finance's fundamentals data (unofficial, untested from the build environment). If a stock's data can't be loaded it's marked "Unknown" and kept, with a note that its size wasn't verified.
+
+## Research desk: Performance, Valuation and Growth Agents
+
+Three sub-agents report to the Research Agent on the top candidates (at least 12) before it ranks them. Their points are added to the combined score, at most ±8 per stock in total. They talk in the **Research desk** chat thread, and each stock's panel shows their figures.
+
+| Agent | Checks | Points |
+|---|---|---|
+| **Performance Agent** | Absolute return **YTD** (since the last close of the previous year, compared with the Nifty 50), **annualised 5-year return** (CAGR from weekly prices) and **expected 1-year return** | +1 for 5Y ≥ 15% a year, −1 if negative; +1 if YTD beats the Nifty by 5 points, −1 if it lags by 10; +1 for expected ≥ 15%, −1 if negative |
+| **Valuation Agent** | **TTM P/E** against the median P/E of its sector in this run, **P/B** (market cap ÷ equity) and **P/CFO** (market cap ÷ operating cash flow) | +2 for P/E ≤ 0.8× sector, −1 above 1.2×, −2 above 1.5×; −1 if loss-making; −1 if P/CFO is more than 1.5× P/E (profits not backed by cash) or cash flow is negative |
+| **Growth Agent** | **3-year CAGR** of revenue, operating cash flow and net profit, from the last four annual reports | Average ≥ 15%: +3, ≥ 10%: +2, ≥ 5%: +1, below 0: −2; loss-making now: −2 |
+
+**Expected return:** with live data, the analysts' mean 12-month price target from Yahoo when it exists. Otherwise an estimate: 3-year EPS growth (capped −10% to +25%) plus up to ±8 for the P/E against its sector. It's a rough guide, not a forecast. Banks and NBFCs skip P/CFO and cash-flow growth, because cash flow works differently for lenders. In demo mode every figure is a sample.
 
 ## Research Agent's chart check
 

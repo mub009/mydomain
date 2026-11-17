@@ -59,8 +59,8 @@ export default function ChatPage() {
                   className={cn("flex shrink-0 items-center gap-2.5 rounded-xl px-2.5 py-2 text-left transition-colors md:w-full",
                     on ? "bg-card shadow-card ring-1 ring-border" : "hover:bg-muted")}>
                   <span className="flex w-9 shrink-0 justify-center">
-                    {t.members.length === 2
-                      ? <span className="flex">{t.members.map((p, i) => <AgentAvatar key={p} who={p} size={24} className={i ? "-ml-2.5 rounded-full ring-2 ring-card" : ""} />)}</span>
+                    {t.members.length >= 2 && t.id !== "team"
+                      ? <span className="flex">{t.members.slice(0, 2).map((p, i) => <AgentAvatar key={p} who={p} size={24} className={i ? "-ml-2.5 rounded-full ring-2 ring-card" : ""} />)}</span>
                       : <span className="grid size-8 place-items-center rounded-lg bg-primary-soft text-primary">{t.id === "all" ? <Layers className="size-4" /> : <Hash className="size-4" />}</span>}
                   </span>
                   <span className="min-w-0 flex-1">
@@ -82,11 +82,11 @@ export default function ChatPage() {
           {/* messages */}
           <section className="flex min-h-0 min-w-0 flex-col">
             <header className="flex items-center gap-3 border-b px-5 py-3">
-              {current.members.length === 2 && <span className="flex">{current.members.map((p, i) => <AgentAvatar key={p} who={p} size={32} className={i ? "-ml-3 rounded-full ring-2 ring-card" : ""} />)}</span>}
+              {current.members.length >= 2 && current.id !== "team" && <span className="flex">{current.members.map((p, i) => <AgentAvatar key={p} who={p} size={32} className={i ? "-ml-3 rounded-full ring-2 ring-card" : ""} />)}</span>}
               <div className="min-w-0">
                 <h2 className="truncate text-[15px] font-semibold">{current.title}</h2>
                 <p className="truncate text-xs text-muted-foreground">
-                  {thread === "all" ? "Every conversation, in order" : thread === "team" ? "All four agents · announcements"
+                  {thread === "all" ? "Every conversation, in order" : thread === "team" ? "Whole team · announcements"
                     : current.members.map((p) => `${TEAM[p].name} · ${TEAM[p].title}`).join("  |  ")}
                 </p>
               </div>

@@ -35,6 +35,7 @@ export const yahooProvider: MarketDataProvider = {
   realtime: false,
   getDailyBars: chart,
   getIndexBars: () => chart("^NSEI"),
+  getLongBars: (symbol) => chart(symbol, "5y", "1wk"),
   getVixBars: () => chart("^INDIAVIX"),
   getLastPrice: async (symbol) => {
     const bars = await chart(symbol, "1d", "5m");

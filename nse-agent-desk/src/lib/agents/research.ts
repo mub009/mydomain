@@ -1,7 +1,7 @@
 /** Agent 3 - Research: the analyst. Merges Momentum Agent's and Trend Agent's reports,
  *  checks agreement, rates risk and prepares the trade scenario. */
 import { sectorOf } from "../market/universe";
-import type { AgentReport, Analysis, ChartAnalysis, Fundamentals, Risk, Snapshot } from "../types";
+import type { AgentReport, Analysis, ChartAnalysis, Fundamentals, Risk, Snapshot, ResearchDesk } from "../types";
 import { clamp, round } from "./base";
 
 export class ResearchAgent {
@@ -64,6 +64,19 @@ export class ResearchAgent {
       if (f.cap === "Small") { notes.push("Small cap: bigger swings, size carefully"); if (risk === "LOW") risk = "MEDIUM"; }
       if (f.cap === "Unknown") notes.push("Market cap not verified");
       return { ...r, fundamentals: f, notes, risk, combined: round(clamp(r.combined + adj)) };
+    }).sort((a, b) => b.combined - a.combined);
+  }
+
+  /**
+   * Fold in the research desk: Performance, Valuation and Growth Agents
+   * (together at most +/-8 points).
+   */
+  applyDesk(rows: Analysis[], desk: Record<string, ResearchDesk>): Analysis[] {
+    return rows.map((r) => {
+      const d = desk[r.symbol];
+      if (!d) return r;
+      const notes = [...r.notes, `Desk: ${d.performance.verdict.toLowerCase()}, ${d.valuation.verdict.toLowerCase()} valuation, ${d.growth.verdict.toLowerCase()} (${d.points >= 0 ? "+" : ""}${d.points})`];
+      return { ...r, desk: d, notes, combined: round(clamp(r.combined + d.points)) };
     }).sort((a, b) => b.combined - a.combined);
   }
 

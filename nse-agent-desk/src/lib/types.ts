@@ -139,6 +139,40 @@ export interface Analysis {
   macro?: MacroExposure[];
   /** Research Agent's multi-timeframe chart check (top candidates only). */
   chart?: ChartAnalysis;
+  /** Research desk: Performance, Valuation and Growth Agents (top candidates only). */
+  desk?: ResearchDesk;
+}
+
+export type DeskAgent = "Performance" | "Valuation" | "Growth";
+export type DeskTone = "good" | "ok" | "weak" | "n/a";
+
+export interface DeskMetric {
+  label: string;
+  /** Percent for returns and growth, a multiple ("x") for valuation ratios. */
+  value?: number;
+  unit: "%" | "x";
+  /** Short context, e.g. "sector median 24.1x" or "analyst mean target". */
+  note?: string;
+}
+
+export interface DeskView {
+  agent: DeskAgent;
+  /** Score points this view adds to the combined score. */
+  points: number;
+  tone: DeskTone;
+  verdict: string;
+  metrics: DeskMetric[];
+  reasons: string[];
+}
+
+export interface ResearchDesk {
+  performance: DeskView;
+  valuation: DeskView;
+  growth: DeskView;
+  /** Sum of the three, capped at +/-8. */
+  points: number;
+  sample: boolean;
+  source: string;
 }
 
 export interface Decision extends Analysis {
@@ -151,7 +185,7 @@ export interface Decision extends Analysis {
   spark: number[]; // last ~60 closes
 }
 
-export type Person = "News" | "Volatility" | "Macro" | "Momentum" | "Trend" | "Research" | "Decision";
+export type Person = "News" | "Volatility" | "Macro" | "Momentum" | "Trend" | "Research" | DeskAgent | "Decision";
 export type AgentName = Person | "System";
 export type Stage = "scan" | "analyze" | "debate" | "decide";
 

@@ -24,6 +24,9 @@ const ROLE: Record<Person, string> = {
   Momentum: "short-term (1-10 day) swing-trade scanner",
   Trend: "1-month positional trend scanner",
   Research: "analyst who combines the short-term and 1-month reports and checks risk",
+  Performance: "performance analyst on the research desk who checks YTD, 5-year and expected returns",
+  Valuation: "valuation analyst on the research desk who checks P/E, P/B and P/CFO",
+  Growth: "growth analyst on the research desk who checks 3-year revenue, cash-flow and profit growth",
   Decision: "final decision maker who picks the stocks to act on",
 };
 
@@ -182,6 +185,62 @@ export async function runDialogue(bus: MessageBus, llm: LLM, d: DialogueInput) {
       active.length
         ? `Thanks. I'll add your points to those scores (at most ±4 per stock)` + (ups.length ? `: a lift for ${list(ups)}` : "") + (downs.length ? `${ups.length ? "," : ":"} a cut for ${list(downs)}` : "") + "."
         : "Understood. No macro adjustments today.",
+      { tickers: [...ups, ...downs] });
+  }
+
+  // ---------- Research desk: Performance, Valuation and Growth Agents → Research Agent ----------
+  const deskRows = d.rows.filter((r) => r.desk).slice(0, 8);
+  if (deskRows.length) {
+    const sample = deskRows[0].desk!.sample ? " (Sample figures in demo mode.)" : "";
+    const fmt = (v: number | undefined, unit: "%" | "x") => (v === undefined ? "–" : unit === "%" ? pct(v) : `${v.toFixed(1)}x`);
+    const best = (pick: (r: Analysis) => number | undefined, n = 3) =>
+      deskRows.filter((r) => pick(r) !== undefined).sort((a, b) => pick(b)! - pick(a)!).slice(0, n).map((r) => r.symbol);
+    bus.send("Research", "Performance",
+      `Research desk, before I rank the top ${plural(deskRows.length, "candidate")}: Performance Agent, check the returns; Valuation Agent, the price against earnings, book and cash flow; Growth Agent, the 3-year growth.`,
+      { tickers: names(deskRows) });
+
+    const perf = (r: Analysis) => r.desk!.performance;
+    const fiveLead = best((r) => perf(r).metrics[1].value);
+    const expLead = best((r) => perf(r).metrics[2].value);
+    const analyst = deskRows.some((r) => perf(r).metrics[2].note?.startsWith("mean target"));
+    bus.send("Performance", "Research",
+      `Returns are in.${sample} ${fiveLead.length ? `Best 5-year compounders: ${list(fiveLead)}. ` : ""}${expLead.length ? `Highest expected 1-year return: ${list(expLead)}` : ""}` +
+      `${expLead.length ? (analyst ? " (analyst targets where available, otherwise my earnings-based estimate)." : " (my estimate from earnings growth and valuation, not a forecast).") : ""}`,
+      { kind: "report", tickers: [...new Set([...fiveLead, ...expLead])], table: {
+        columns: ["Symbol", "YTD", "5Y a year", "Expected 1Y", "View", "Points"],
+        rows: deskRows.map((r) => { const p = perf(r); return [r.symbol, fmt(p.metrics[0].value, "%"), fmt(p.metrics[1].value, "%"), fmt(p.metrics[2].value, "%"), p.verdict, `${p.points >= 0 ? "+" : ""}${p.points}`]; }),
+      } });
+
+    const val = (r: Analysis) => r.desk!.valuation;
+    const cheap = deskRows.filter((r) => val(r).points >= 1).map((r) => r.symbol);
+    const dear = deskRows.filter((r) => val(r).points <= -2).map((r) => r.symbol);
+    const cashGap = deskRows.filter((r) => val(r).reasons.some((x) => x.includes("not fully backed by cash"))).map((r) => r.symbol);
+    bus.send("Valuation", "Research",
+      `I compared each P/E with the median of its sector in this run.` +
+      `${cheap.length ? ` Cheaper than their sector: ${list(cheap)}.` : " None is clearly cheaper than its sector."}` +
+      `${dear.length ? ` Expensive: ${list(dear)}.` : ""}${cashGap.length ? ` Watch ${list(cashGap)}: the price is high against operating cash flow, so profits are not fully backed by cash.` : ""}`,
+      { kind: "report", tickers: [...new Set([...cheap, ...dear, ...cashGap])], table: {
+        columns: ["Symbol", "P/E (TTM)", "Sector P/E", "P/B", "P/CFO", "View", "Points"],
+        rows: deskRows.map((r) => { const v = val(r); return [r.symbol, fmt(v.metrics[0].value, "x"), v.metrics[0].note?.replace("sector median ", "") ?? "–", fmt(v.metrics[1].value, "x"), fmt(v.metrics[2].value, "x"), v.verdict, `${v.points >= 0 ? "+" : ""}${v.points}`]; }),
+      } });
+
+    const gr = (r: Analysis) => r.desk!.growth;
+    const fast = deskRows.filter((r) => gr(r).points >= 3).map((r) => r.symbol);
+    const shrink = deskRows.filter((r) => gr(r).points < 0).map((r) => r.symbol);
+    bus.send("Growth", "Research",
+      `3-year growth, as yearly rates (CAGR) from the annual reports.` +
+      `${fast.length ? ` Growing 15% a year or more on average: ${list(fast)}.` : " None grew 15% a year or more on average."}` +
+      `${shrink.length ? ` Shrinking or loss-making: ${list(shrink)}.` : ""}`,
+      { kind: "report", tickers: [...fast, ...shrink], table: {
+        columns: ["Symbol", "Revenue", "Cash flow", "Profit", "View", "Points"],
+        rows: deskRows.map((r) => { const g = gr(r); return [r.symbol, fmt(g.metrics[0].value, "%"), fmt(g.metrics[1].value, "%"), fmt(g.metrics[2].value, "%"), g.verdict, `${g.points >= 0 ? "+" : ""}${g.points}`]; }),
+      } });
+
+    const ups = deskRows.filter((r) => r.desk!.points >= 3).map((r) => r.symbol);
+    const downs = deskRows.filter((r) => r.desk!.points <= -3).map((r) => r.symbol);
+    bus.send("Research", "Growth",
+      `Thanks, all three. I've added your points to each score, at most ±8 per stock.` +
+      `${ups.length ? ` Clear lift for ${list(ups)}.` : ""}${downs.length ? ` Marked down: ${list(downs)}.` : ""}`,
       { tickers: [...ups, ...downs] });
   }
 

@@ -44,9 +44,11 @@ export function ThemeToggle({ className }: { className?: string }) {
 /** AgentStatusCard: avatar, name, role, live status and latest message. */
 export function AgentStatusCard({ who, presence, lastMessage }: { who: Person; presence: Presence; lastMessage?: string }) {
   const t = TEAM[who];
+  const sub = Boolean(t.lead);
   return (
-    <div className={cn("flex gap-2.5 rounded-xl p-2 transition-colors", presence === "Typing" && "bg-sidebar-hover")}>
-      <AgentAvatar who={who} size={38} presence={presence} ringClass="ring-sidebar" />
+    <div className={cn("flex gap-2.5 rounded-xl p-2 transition-colors", presence === "Typing" && "bg-sidebar-hover",
+      sub && "ml-5 rounded-l-none border-l border-sidebar-border py-1.5 pl-2.5")}>
+      <AgentAvatar who={who} size={sub ? 30 : 38} presence={presence} ringClass="ring-sidebar" />
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-2">
           <span className="truncate text-[13.5px] font-semibold text-white">{t.name}</span>
@@ -55,7 +57,7 @@ export function AgentStatusCard({ who, presence, lastMessage }: { who: Person; p
           </span>
         </div>
         <div className="text-[11.5px] text-sidebar-muted">{t.title}</div>
-        <div className="mt-0.5 line-clamp-2 text-[11.5px] leading-snug text-sidebar-foreground/75">{lastMessage ?? t.focus}</div>
+        <div className={cn("mt-0.5 text-[11.5px] leading-snug text-sidebar-foreground/75", sub ? "line-clamp-1" : "line-clamp-2")}>{lastMessage ?? t.focus}</div>
       </div>
     </div>
   );

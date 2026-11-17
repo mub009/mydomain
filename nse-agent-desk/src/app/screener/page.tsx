@@ -13,6 +13,7 @@ import { Field, inputClass } from "@/components/ui/segmented";
 import { inr, pct } from "@/lib/format";
 import type { Decision, Verdict } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { deskValue } from "@/components/desk/desk-ui";
 import { useDecided, useDesk } from "@/store/desk";
 
 const VERDICTS: ("ALL" | Verdict)[] = ["ALL", "STRONG BUY", "BUY", "WATCH", "AVOID"];
@@ -37,6 +38,12 @@ const columns: ColumnDef<Decision>[] = [
     cell: ({ row: { original: d } }) => (d.fundamentals ? <div><CapTag cap={d.fundamentals.cap} /><div className="mt-0.5 text-[11px] text-muted-foreground">{d.fundamentals.marketCapCr !== undefined ? `${inr(d.fundamentals.marketCapCr, 0)} Cr` : "–"}</div></div> : "–") },
   { id: "eps", header: "EPS 1Y", meta: { num: true }, accessorFn: (d) => (d.fundamentals?.epsTTM !== undefined && d.fundamentals.epsTTM < 0 ? -999 : d.fundamentals?.epsGrowth1y ?? -998),
     cell: ({ row: { original: d } }) => <EpsGrowth f={d.fundamentals} /> },
+  { id: "pe", header: "P/E", meta: { num: true }, accessorFn: (d) => d.desk?.valuation.metrics[0].value ?? 9999,
+    cell: ({ row: { original: d } }) => deskValue(d.desk?.valuation.metrics[0]) },
+  { id: "ret5y", header: "5Y a year", meta: { num: true }, accessorFn: (d) => d.desk?.performance.metrics[1].value ?? -999,
+    cell: ({ row: { original: d } }) => deskValue(d.desk?.performance.metrics[1]) },
+  { id: "rev3y", header: "Revenue 3Y", meta: { num: true }, accessorFn: (d) => d.desk?.growth.metrics[0].value ?? -999,
+    cell: ({ row: { original: d } }) => deskValue(d.desk?.growth.metrics[0]) },
   { id: "charts", header: "Charts", accessorFn: (d) => (d.chart ? d.chart.bullish - d.chart.bearish : -99), meta: { num: false },
     cell: ({ row: { original: d } }) => (d.chart ? <TimeframeDots chart={d.chart} /> : <span className="text-xs text-muted-foreground">–</span>) },
   { id: "zone", header: "Buy zone", accessorFn: (d) => d.chart?.zone?.distancePct ?? 999,
