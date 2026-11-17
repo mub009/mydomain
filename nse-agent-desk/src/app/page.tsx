@@ -45,7 +45,7 @@ export default function OverviewPage() {
 
   return (
     <>
-      <PageHeader title="Overview" subtitle="Seven AI agents scan, analyse, debate and decide." />
+      <PageHeader title="Overview" subtitle="Thirteen AI agents scan, analyse, debate and decide." />
       <div className="space-y-4">
         {source ? <DataBanner source={source} /> : demo && <DataBanner source={{ kind: "demo", label: "Demo data" }} />}
         <AnalysisToolbar />

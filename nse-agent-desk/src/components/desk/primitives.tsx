@@ -1,7 +1,7 @@
 "use client";
 
 import { AlertTriangle, ArrowDownRight, ArrowUpRight, Ban, Check, CircleCheck, Eye, FlaskConical } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { marketStatus, type MarketStatus } from "@/lib/market/calendar";
 import type { DataSource, Stage, Verdict } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -59,24 +59,54 @@ export function TypingIndicator({ className }: { className?: string }) {
   );
 }
 
+/**
+ * Tilt: a card that leans toward the pointer in 3D, with a glare that follows
+ * it. Mouse only, and off when the viewer prefers reduced motion.
+ */
+export function Tilt({ children, className, max = 6 }: { children: React.ReactNode; className?: string; max?: number }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const move = (e: React.PointerEvent) => {
+    const el = ref.current;
+    if (!el || e.pointerType !== "mouse" || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const r = el.getBoundingClientRect();
+    const px = (e.clientX - r.left) / r.width, py = (e.clientY - r.top) / r.height;
+    el.style.transform = `perspective(900px) rotateX(${(0.5 - py) * 2 * max}deg) rotateY(${(px - 0.5) * 2 * max}deg) translateY(-3px)`;
+    el.style.setProperty("--gx", `${px * 100}%`);
+    el.style.setProperty("--gy", `${py * 100}%`);
+    el.dataset.active = "true";
+  };
+  const leave = () => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.transform = "";
+    el.dataset.active = "false";
+  };
+  return (
+    <div ref={ref} onPointerMove={move} onPointerLeave={leave} className={cn("tilt relative", className)}>
+      {children}
+      <span className="tilt-glare" aria-hidden />
+    </div>
+  );
+}
+
 /** KPICard */
 export function KPICard({ label, value, sub, tone, icon }: {
   label: string; value: string; sub: string; tone?: "pos" | "neg"; icon?: React.ReactNode;
 }) {
   return (
-    <div className="card p-4">
+    <Tilt className="card p-4">
       <div className="flex items-center justify-between text-[13px] font-medium text-muted-foreground">
         {label}
-        {icon && <span className="grid size-7 place-items-center rounded-lg bg-muted text-muted-foreground [&_svg]:size-4">{icon}</span>}
+        {icon && <span className="btn-3d-primary grid size-9 place-items-center rounded-xl text-white [&_svg]:size-[18px] tilt-pop">{icon}</span>}
       </div>
-      <div className={cn("mt-1 flex items-center gap-1 text-[28px] font-bold leading-tight tracking-tight tnum",
+      <div className={cn("tilt-pop mt-1 flex items-center gap-1 text-[30px] font-bold leading-tight tracking-tight tnum",
         tone === "pos" && "text-pos", tone === "neg" && "text-neg")}>
         {value}
         {tone === "pos" && <ArrowUpRight className="size-5" aria-hidden />}
         {tone === "neg" && <ArrowDownRight className="size-5" aria-hidden />}
       </div>
       <div className="mt-0.5 text-xs text-muted-foreground">{sub}</div>
-    </div>
+    </Tilt>
   );
 }
 

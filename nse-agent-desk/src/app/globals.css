@@ -3,8 +3,17 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  --background: #f7f9fc;
+  --background: #e9edf6;
   --card: #ffffff;
+  /* 3D depth: lit top edge of a surface, its rim, and the layered drop shadow */
+  --card-top: #ffffff;
+  --card-bottom: #f6f8fc;
+  --card-rim: rgb(255 255 255 / 0.95);
+  --edge: rgb(30 41 82 / 0.10);
+  --glow-1: rgb(99 91 255 / 0.16);
+  --glow-2: rgb(20 184 166 / 0.12);
+  --grid-line: rgb(99 91 255 / 0.10);
+  --well: rgb(30 41 82 / 0.07);
   --muted: #f1f4f9;
   --foreground: #111827;
   --muted-foreground: #64748b;
@@ -28,12 +37,22 @@
   --agree-zone: #16a34a;
   --pick: #16a34a; --watch-dot: #d97706; --other-dot: #b6bdc9;
   --series-1: #2a78d6; --series-2: #eb6834; --series-3: #1baf7a; --series-4: #eda100; --series-5: #e87ba4;
-  --shadow: 0 1px 2px rgb(16 24 40 / 0.04), 0 1px 3px rgb(16 24 40 / 0.06);
+  --shadow: inset 0 1px 0 var(--card-rim), 0 1px 1px rgb(30 41 82 / 0.05), 0 4px 8px -2px rgb(30 41 82 / 0.08), 0 14px 28px -10px rgb(30 41 82 / 0.18), 0 28px 56px -24px rgb(30 41 82 / 0.20);
+  --shadow-lift: inset 0 1px 0 var(--card-rim), 0 2px 2px rgb(30 41 82 / 0.05), 0 8px 16px -4px rgb(30 41 82 / 0.12), 0 24px 40px -12px rgb(30 41 82 / 0.24), 0 40px 72px -28px rgb(30 41 82 / 0.26);
+  --shadow-sm: inset 0 1px 0 var(--card-rim), 0 1px 2px rgb(30 41 82 / 0.10), 0 3px 6px -2px rgb(30 41 82 / 0.10);
 }
 
 .dark {
-  --background: #0b1220;
-  --card: #172238;
+  --background: #070c18;
+  --card: #152038;
+  --card-top: #1b2846;
+  --card-bottom: #131d33;
+  --card-rim: rgb(255 255 255 / 0.07);
+  --edge: rgb(0 0 0 / 0.45);
+  --glow-1: rgb(117 107 255 / 0.20);
+  --glow-2: rgb(20 184 166 / 0.12);
+  --grid-line: rgb(117 107 255 / 0.12);
+  --well: rgb(0 0 0 / 0.30);
   --muted: #1e2b45;
   --foreground: #f8fafc;
   --muted-foreground: #94a3b8;
@@ -54,7 +73,9 @@
   --agree-zone: #22c55e;
   --pick: #22c55e; --watch-dot: #f59e0b; --other-dot: #55637c;
   --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70; --series-4: #c98500; --series-5: #d55181;
-  --shadow: 0 1px 2px rgb(0 0 0 / 0.3);
+  --shadow: inset 0 1px 0 var(--card-rim), 0 1px 1px rgb(0 0 0 / 0.4), 0 6px 12px -4px rgb(0 0 0 / 0.5), 0 20px 40px -12px rgb(0 0 0 / 0.65);
+  --shadow-lift: inset 0 1px 0 var(--card-rim), 0 2px 2px rgb(0 0 0 / 0.4), 0 12px 20px -6px rgb(0 0 0 / 0.55), 0 32px 56px -16px rgb(0 0 0 / 0.75);
+  --shadow-sm: inset 0 1px 0 var(--card-rim), 0 1px 2px rgb(0 0 0 / 0.5), 0 3px 6px -2px rgb(0 0 0 / 0.4);
 }
 
 @theme inline {
@@ -90,7 +111,14 @@
   html { color-scheme: light; }
   html.dark { color-scheme: dark; }
   body {
-    background: var(--background);
+    position: relative;
+    isolation: isolate;
+    min-height: 100dvh;
+    background:
+      radial-gradient(1100px 620px at 8% -12%, var(--glow-1), transparent 60%),
+      radial-gradient(900px 560px at 105% 4%, var(--glow-2), transparent 60%),
+      var(--background);
+    background-attachment: fixed;
     color: var(--foreground);
     font-family: var(--font-sans);
     font-feature-settings: "cv11", "ss01";
@@ -102,7 +130,22 @@
 }
 
 @utility tnum { font-variant-numeric: tabular-nums; }
-@utility card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow); }
+/* Raised 3D surface: lit from above, soft layered shadow below. */
+@utility card {
+  background: linear-gradient(180deg, var(--card-top), var(--card-bottom));
+  border: 1px solid var(--edge);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+}
+/* Floats up on hover (for cards you click). */
+@utility lift {
+  transition: transform 0.25s cubic-bezier(.2,.8,.2,1), box-shadow 0.25s;
+  &:hover { transform: translateY(-3px); box-shadow: var(--shadow-lift); }
+}
+/* Pressed-in well (inputs, segmented tracks). */
+@utility well { background: var(--muted); box-shadow: inset 0 2px 4px var(--well), inset 0 0 0 1px var(--edge); }
+/* Raised chip (selected segment, small badges). */
+@utility raised { background: linear-gradient(180deg, var(--card-top), var(--card-bottom)); box-shadow: var(--shadow-sm); }
 @utility scroll-thin { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
 
 .recharts-wrapper :focus { outline: none; }
@@ -111,3 +154,48 @@
 @keyframes typing-bounce { 0%, 60%, 100% { transform: none; opacity: .45; } 30% { transform: translateY(-3px); opacity: 1; } }
 @keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 currentColor; } 100% { box-shadow: 0 0 0 5px transparent; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; } }
+
+/* Perspective grid floor behind the page, fading into the distance. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: auto -30% -10% -30%;
+  height: 70vh;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: 64px 64px;
+  transform: perspective(700px) rotateX(62deg);
+  transform-origin: bottom center;
+  mask-image: linear-gradient(to top, black 10%, transparent 85%);
+}
+
+/* 3D page titles: a short extrusion under the letters. */
+.title-3d { text-shadow: 0 1px 0 var(--card-rim), 0 2px 0 var(--edge), 0 8px 18px rgb(30 41 82 / 0.18); }
+.dark .title-3d { text-shadow: 0 1px 0 rgb(0 0 0 / 0.6), 0 2px 0 rgb(0 0 0 / 0.4), 0 10px 22px rgb(0 0 0 / 0.6); }
+
+/* Tilt cards: the glare follows the pointer. */
+.tilt { transform-style: preserve-3d; transition: transform 0.35s cubic-bezier(.2,.8,.2,1), box-shadow 0.35s; will-change: transform; }
+.tilt[data-active="true"] { transition-duration: 0.08s; box-shadow: var(--shadow-lift); }
+.tilt-glare { pointer-events: none; position: absolute; inset: 0; border-radius: inherit; opacity: 0; transition: opacity 0.3s;
+  background: radial-gradient(400px circle at var(--gx, 50%) var(--gy, 0%), rgb(255 255 255 / 0.22), transparent 45%); }
+.tilt[data-active="true"] .tilt-glare { opacity: 1; }
+.tilt-pop { transform: translateZ(28px); }
+
+/* Push buttons: a thick bottom edge that sinks when pressed. */
+@utility btn-3d-primary {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--primary) 78%, white), var(--primary) 55%, color-mix(in srgb, var(--primary) 88%, black));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.35), 0 3px 0 color-mix(in srgb, var(--primary) 55%, black), 0 10px 18px -6px color-mix(in srgb, var(--primary) 60%, transparent);
+  transition: transform 0.08s, box-shadow 0.08s, filter 0.15s;
+  &:hover:not(:disabled) { filter: brightness(1.06); }
+  &:active:not(:disabled) { transform: translateY(2px); box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.25), 0 1px 0 color-mix(in srgb, var(--primary) 55%, black), 0 4px 8px -4px color-mix(in srgb, var(--primary) 60%, transparent); }
+}
+@utility btn-3d {
+  background: linear-gradient(180deg, var(--card-top), var(--card-bottom));
+  border: 1px solid var(--edge);
+  box-shadow: inset 0 1px 0 var(--card-rim), 0 2px 0 var(--edge), 0 6px 12px -6px rgb(30 41 82 / 0.25);
+  transition: transform 0.08s, box-shadow 0.08s;
+  &:active:not(:disabled) { transform: translateY(2px); box-shadow: inset 0 1px 0 var(--card-rim), 0 0 0 var(--edge); }
+}

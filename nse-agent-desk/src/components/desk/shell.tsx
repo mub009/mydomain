@@ -24,7 +24,7 @@ const NAV = [
 
 export function Logo() {
   return (
-    <span className="grid size-9 place-items-center rounded-xl bg-primary text-white shadow-sm"><CandlestickChart className="size-5" /></span>
+    <span className="btn-3d-primary grid size-10 place-items-center rounded-xl text-white"><CandlestickChart className="size-5 drop-shadow" /></span>
   );
 }
 
@@ -46,7 +46,7 @@ export function AgentStatusCard({ who, presence, lastMessage }: { who: Person; p
   const t = TEAM[who];
   const sub = Boolean(t.lead);
   return (
-    <div className={cn("flex gap-2.5 rounded-xl p-2 transition-colors", presence === "Typing" && "bg-sidebar-hover",
+    <div className={cn("flex gap-2.5 rounded-xl p-2 transition-all hover:bg-white/[0.04]", presence === "Typing" && "bg-sidebar-hover shadow-[inset_0_1px_0_rgb(255_255_255/0.08),0_6px_14px_-6px_rgb(0_0_0/0.6)]",
       sub && "ml-5 rounded-l-none border-l border-sidebar-border py-1.5 pl-2.5")}>
       <AgentAvatar who={who} size={sub ? 30 : 38} presence={presence} ringClass="ring-sidebar" />
       <div className="min-w-0 flex-1">
@@ -77,7 +77,7 @@ function Sidebar() {
   const shown = useDesk((s) => s.shown);
   const last = (p: Person) => [...messages.slice(0, shown)].reverse().find((m) => m.sender === p)?.text;
   return (
-    <aside className="sticky top-0 hidden h-dvh w-[250px] shrink-0 flex-col bg-sidebar text-sidebar-foreground lg:flex">
+    <aside className="sticky top-0 z-10 hidden h-dvh w-[250px] shrink-0 flex-col bg-[linear-gradient(180deg,#16244a,#0b1428_60%,#0a1124)] text-sidebar-foreground shadow-[inset_-1px_0_0_rgb(255_255_255/0.06),12px_0_32px_-12px_rgb(8_14_32/0.6)] lg:flex">
       <Link href="/" className="flex items-center gap-2.5 border-b border-sidebar-border px-4 py-4">
         <Logo />
         <span><b className="block text-[15px] font-bold leading-tight text-white">NSE Agent Desk</b><span className="text-[11.5px] text-sidebar-muted">AI stock research team</span></span>
@@ -88,7 +88,7 @@ function Sidebar() {
           return (
             <Link key={href} href={href} aria-current={on ? "page" : undefined}
               className={cn("flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13.5px] font-medium transition-colors",
-                on ? "bg-primary text-white shadow-sm" : "hover:bg-sidebar-hover hover:text-white")}>
+                on ? "btn-3d-primary text-white" : "hover:bg-sidebar-hover hover:text-white")}>
               <Icon className="size-4" />{label}
               {href === "/positions" && alertsUnread > 0 && <span className="ml-auto rounded-full bg-neg px-1.5 text-[11px] font-bold leading-[18px] text-white tnum">{alertsUnread}</span>}
               {href === "/chat" && unread > 0 && <span className="ml-auto rounded-full bg-white/20 px-1.5 text-[11px] font-bold leading-[18px] text-white tnum">{unread}</span>}
@@ -162,9 +162,9 @@ export function Shell({ children }: { children: React.ReactNode }) {
 /** Sticky page header: title, market status, theme switch. */
 export function PageHeader({ title, subtitle, children }: { title: string; subtitle: string; children?: React.ReactNode }) {
   return (
-    <header className="-mx-4 mb-3 flex flex-wrap items-center justify-between gap-3 border-b bg-background/85 px-4 pb-2.5 backdrop-blur lg:sticky lg:top-0 lg:z-20 lg:-mx-6 lg:-mt-5 lg:px-6 lg:pt-4">
+    <header className="-mx-4 mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--edge)] bg-background/70 px-4 pb-3 backdrop-blur-xl lg:sticky lg:top-0 lg:z-20 lg:-mx-6 lg:-mt-5 lg:px-6 lg:pt-4">
       <div className="min-w-0">
-        <h1 className="text-xl font-bold tracking-tight">{title}</h1>
+        <h1 className="title-3d text-2xl font-extrabold tracking-tight">{title}</h1>
         <p className="hidden text-[13px] text-muted-foreground sm:block">{subtitle}</p>
       </div>
       <div className="flex items-center gap-2">

@@ -33,8 +33,13 @@ export function AgentAvatar({ who, size = 36, presence, ringClass = "ring-card",
   const color = who === "System" ? "#64748B" : TEAM[who].color;
   return (
     <span className={cn("relative inline-block shrink-0", className)} style={{ width: size, height: size }}>
-      <span className="grid size-full place-items-center rounded-full text-white shadow-sm" style={{ background: color }}>
-        {Icon ? <Icon style={{ width: size * 0.5, height: size * 0.5 }} strokeWidth={2.2} aria-hidden />
+      {/* Glossy orb: a highlight at the top left, shading underneath and a soft coloured glow. */}
+      <span className="grid size-full place-items-center rounded-full text-white"
+        style={{
+          background: `radial-gradient(circle at 32% 26%, rgb(255 255 255 / 0.55), rgb(255 255 255 / 0) 42%), linear-gradient(150deg, ${color}, color-mix(in srgb, ${color} 62%, black))`,
+          boxShadow: `inset 0 -${Math.max(2, size / 9)}px ${Math.max(4, size / 5)}px rgb(0 0 0 / 0.28), inset 0 1px 1px rgb(255 255 255 / 0.4), 0 ${Math.max(2, size / 10)}px ${Math.max(6, size / 4)}px -2px color-mix(in srgb, ${color} 55%, transparent)`,
+        }}>
+        {Icon ? <Icon style={{ width: size * 0.5, height: size * 0.5, filter: "drop-shadow(0 1px 1px rgb(0 0 0 / 0.35))" }} strokeWidth={2.2} aria-hidden />
           : <span className="text-[10px] font-bold">SYS</span>}
       </span>
       {presence && (
