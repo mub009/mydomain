@@ -6,8 +6,16 @@
  *  Valuation Agent    TTM P/E (against the sector median), P/B and P/CFO
  *  Growth Agent       3-year CAGR of revenue, operating cash flow and net profit
  *
- * Each view adds or removes a few points; together at most +/-8 on the
- * combined score. They run on the top candidates only, like the chart check.
+ *  Profitability Agent ROE, net margin, cash conversion (operating cash / profit)
+ *  Red Flag Agent     ASM / GSM surveillance, promoter pledge, unsolicited-tip
+ *                     alerts or pump-like patterns, default probability
+ *  Entry Point Agent  fundamentals (valuation, growth, profitability) plus
+ *                     technicals (chart check, buy zone) give one entry call
+ *
+ * The first four together move the combined score by at most +/-10, red flags
+ * take up to 10 more off, and the entry call adds +/-2. A severe red flag
+ * stops the Decision Agent from rating the stock above WATCH. They run on the
+ * top candidates only, like the chart check.
  *
  * Expected return: with live data it is the analysts' mean 12-month target
  * (Yahoo, when available). Otherwise it is an estimate: earnings growth
@@ -15,11 +23,13 @@
  * to +8 when the P/E is below its sector median and takes up to 8 off when it
  * is above. It is a rough guide, not a forecast.
  */
-import { loadFinancials, yahooAnalystTarget } from "./company";
+import { demoShareholding, loadFinancials, yahooAnalystTarget } from "./company";
+import { computeRatios } from "./company/quality";
+import { loadSurveillance, type Surveillance } from "./surveillance";
 import type { YearFinancials } from "./company/types";
 import { getProvider } from "./market";
 import { demoLongBars } from "./market/demo";
-import type { Bar, DataSource, DeskMetric, DeskTone, DeskView, Fundamentals, ResearchDesk } from "./types";
+import type { Analysis, Bar, DataSource, DeskMetric, DeskTone, DeskView, EntryPlan, Fundamentals, RedFlag, ResearchDesk } from "./types";
 
 const FINANCIAL = new Set(["Banks", "Financials"]);
 const r1 = (n: number) => Math.round(n * 10) / 10;
@@ -180,6 +190,155 @@ export function growthView(years: YearFinancials[], financial: boolean): DeskVie
   };
 }
 
+// ---------- Profitability Agent ----------
+
+export function profitabilityView(years: YearFinancials[], financial: boolean): DeskView {
+  const last = years[years.length - 1];
+  const ratios = computeRatios(years);
+  const margin = last?.netIncome !== undefined && last.revenue ? r1((last.netIncome / last.revenue) * 100) : undefined;
+  const profitYears = years.filter((y) => y.netIncome !== undefined);
+  const inProfit = profitYears.filter((y) => y.netIncome! > 0).length;
+  const conv = financial ? undefined : ratios.cashConversion;
+  let points = 0;
+  const reasons: string[] = [];
+  const roe = ratios.roe;
+  if (last?.netIncome !== undefined && last.netIncome <= 0) { points -= 2; reasons.push(`loss-making in ${last.year}`); }
+  else if (roe !== undefined) {
+    if (roe >= 20) { points += 2; reasons.push(`ROE ${r1(roe)}%: earns very well on shareholders' money`); }
+    else if (roe >= 15) { points += 1; reasons.push(`ROE ${r1(roe)}% is good`); }
+    else if (roe < 8) { points -= 1; reasons.push(`ROE ${r1(roe)}% is low`); }
+    else reasons.push(`ROE ${r1(roe)}% is average`);
+  }
+  if (profitYears.length >= 3 && inProfit < profitYears.length && !(last?.netIncome !== undefined && last.netIncome <= 0)) { points -= 1; reasons.push(`made a loss in ${profitYears.length - inProfit} of the last ${profitYears.length} years`); }
+  if (conv !== undefined) {
+    if (conv >= 1) { points += 1; reasons.push(`cash flow covers ${conv.toFixed(2)}x of profit`); }
+    else if (conv < 0.7) { points -= 1; reasons.push(`only ${Math.round(conv * 100)}% of profit came in as cash`); }
+  }
+  if (financial) reasons.push("lender: cash conversion not used");
+  points = clamp(points, -3, 3);
+  const any = roe !== undefined || margin !== undefined;
+  return {
+    agent: "Profitability", points, tone: tone(points, any),
+    verdict: !any ? "No data" : points >= 2 ? "Highly profitable" : points >= 0 ? "Profitable" : "Weak profits",
+    metrics: [
+      { label: "ROE", unit: "%", value: roe === undefined ? undefined : r1(roe), note: "latest year" },
+      { label: "Net margin", unit: "%", value: margin, note: profitYears.length ? `profit in ${inProfit} of ${profitYears.length} years` : undefined },
+      { label: "Cash / profit", unit: "x", value: conv, note: financial ? "not used for lenders" : "3-year operating cash ÷ profit" },
+    ],
+    reasons,
+  };
+}
+
+// ---------- Red Flag Agent ----------
+
+/** Standard normal CDF (Abramowitz-Stegun). */
+function phi(x: number) {
+  const t = 1 / (1 + 0.2316419 * Math.abs(x));
+  const d = 0.3989423 * Math.exp(-x * x / 2);
+  const p = d * t * (0.3193815 + t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274))));
+  return x > 0 ? 1 - p : p;
+}
+
+/**
+ * One-year default probability from the "naive" Merton distance-to-default
+ * (Bharath & Shumway, 2008): equity value and volatility from the market,
+ * debt from the balance sheet, last year's return as the drift.
+ */
+export function defaultProbability(o: { marketCapCr: number; debtCr: number; equityVol: number; ret1y: number }): number {
+  const E = o.marketCapCr, D = o.debtCr;
+  if (D <= 0) return 0;
+  const sE = Math.max(o.equityVol, 0.05), sD = 0.05 + 0.25 * sE;
+  const V = E + D, sV = (E / V) * sE + (D / V) * sD;
+  const mu = clamp(o.ret1y, -0.9, 1);
+  const dd = (Math.log(V / D) + (mu - 0.5 * sV * sV)) / sV;
+  return Math.round(phi(-dd) * 10000) / 100; // %
+}
+
+/** Price/volume pattern of a tip-driven pump: a sharp run-up on heavy volume in a smaller stock. */
+export function pumpPattern(daily: Bar[], cap?: string): string | null {
+  if (daily.length < 30 || cap === "Large") return null;
+  const n = daily.length, close = daily[n - 1].close;
+  const ret10 = (close / daily[n - 11].close - 1) * 100;
+  const avgVol = daily.slice(n - 30, n - 10).reduce((s, b) => s + b.volume, 0) / 20;
+  const recentVol = daily.slice(n - 10).reduce((s, b) => s + b.volume, 0) / 10;
+  const volX = avgVol > 0 ? recentVol / avgVol : 0;
+  return ret10 >= 25 && volX >= 3 ? `up ${r1(ret10)}% in 10 days on ${r1(volX)}x normal volume` : null;
+}
+
+const SEVERE_ASM = /LT\s*Stage\s*(II|III|IV)/i;
+
+export function redFlagView(o: {
+  symbol: string; surv: Surveillance; pledgePct?: number; pd?: number; financial: boolean; pump: string | null;
+}): DeskView {
+  const flags: RedFlag[] = [];
+  const { surv, symbol } = o;
+  const gsm = surv.gsm[symbol], asm = surv.asm[symbol];
+  flags.push(gsm ? { check: "GSM", status: "severe", detail: `In GSM ${gsm}: graded surveillance, usually for weak fundamentals or price manipulation risk` }
+    : surv.checked.gsm ? { check: "GSM", status: "clear", detail: "Not in the GSM list" } : { check: "GSM", status: "unknown", detail: "GSM list not checked: see NSE surveillance" });
+  flags.push(asm ? { check: "ASM", status: SEVERE_ASM.test(asm) ? "severe" : "warning", detail: `In ASM ${asm}: extra margins because of unusual price moves` }
+    : surv.checked.asm ? { check: "ASM", status: "clear", detail: "Not in the ASM list" } : { check: "ASM", status: "unknown", detail: "ASM list not checked: see NSE surveillance" });
+  const pl = o.pledgePct;
+  flags.push(pl === undefined ? { check: "Promoter pledge", status: "unknown", detail: "Pledge data not available: check the NSE shareholding page" }
+    : pl > 50 ? { check: "Promoter pledge", status: "severe", detail: `${r1(pl)}% of promoter shares pledged: a price fall can force sales` }
+    : pl > 10 ? { check: "Promoter pledge", status: "warning", detail: `${r1(pl)}% of promoter shares pledged` }
+    : { check: "Promoter pledge", status: "clear", detail: pl > 0 ? `${r1(pl)}% pledged (low)` : "No promoter shares pledged" });
+  const listed = surv.unsolicited.includes(symbol);
+  flags.push(listed ? { check: "Unsolicited tips", status: "severe", detail: "Named in an exchange alert about unsolicited SMS/WhatsApp tips" }
+    : o.pump ? { check: "Unsolicited tips", status: "warning", detail: `Pump-like pattern: ${o.pump}. Be wary of tips about this stock` }
+    : { check: "Unsolicited tips", status: "clear", detail: surv.checked.unsolicited ? "Not in the alert list; no pump-like pattern" : "No pump-like price pattern (exchange alert list not checked)" });
+  flags.push(o.financial ? { check: "Default risk", status: "unknown", detail: "Not modelled for banks and NBFCs (their debt is deposits and borrowings they lend on)" }
+    : o.pd === undefined ? { check: "Default risk", status: "unknown", detail: "Debt or market cap not available" }
+    : o.pd > 5 ? { check: "Default risk", status: "severe", detail: `Estimated 1-year default probability ${o.pd}%: debt is high against a volatile share price` }
+    : o.pd > 1 ? { check: "Default risk", status: "warning", detail: `Estimated 1-year default probability ${o.pd}%` }
+    : { check: "Default risk", status: "clear", detail: `Estimated 1-year default probability ${o.pd < 0.01 ? "below 0.01" : o.pd}%` });
+  const severe = flags.filter((f) => f.status === "severe").length, warn = flags.filter((f) => f.status === "warning").length;
+  const points = severe || warn ? Math.max(-10, -4 * severe - warn) : 0;
+  return {
+    agent: "RedFlag", points, tone: severe ? "weak" : warn ? "ok" : "good",
+    verdict: severe ? `${severe} red flag${severe > 1 ? "s" : ""}` : warn ? "Caution" : "Clear",
+    metrics: [
+      { label: "Red flags", unit: "", value: severe, note: warn ? `${warn} warning${warn > 1 ? "s" : ""}` : "no warnings" },
+      { label: "Pledged", unit: "%", value: pl, note: "of promoter shares" },
+      { label: "Default prob.", unit: "%", value: o.financial ? undefined : o.pd, note: o.financial ? "not for lenders" : "1 year, Merton model" },
+    ],
+    reasons: flags.filter((f) => f.status === "severe" || f.status === "warning").map((f) => f.detail),
+    flags,
+  };
+}
+
+// ---------- Entry Point Agent ----------
+
+/** Fundamentals from the desk plus technicals from the chart check give one entry call. */
+export function entryView(r: Analysis): DeskView | undefined {
+  const d = r.desk, c = r.chart;
+  if (!d || !c) return undefined;
+  const fPts = d.valuation.points + d.growth.points + d.profitability.points;
+  const fund = fPts >= 3 ? "Strong" : fPts >= 0 ? "OK" : "Weak";
+  const tPts = c.bullish - c.bearish;
+  const tech = tPts >= 2 && r.rsi < 72 ? "Positive" : tPts <= -2 ? "Negative" : "Mixed";
+  const z = c.zone;
+  let plan: EntryPlan;
+  const reasons = [`fundamentals ${fund.toLowerCase()} (valuation, growth, profitability ${fPts >= 0 ? "+" : ""}${fPts})`, `technicals ${tech.toLowerCase()} (${c.bullish} of 5 timeframes bullish, RSI ${Math.round(r.rsi)})`];
+  if (d.severe) { plan = "Avoid"; reasons.push("a red flag rules out a new entry"); }
+  else if (fund === "Weak" && tech === "Negative") { plan = "Avoid"; reasons.push("weak business and a falling chart"); }
+  else if (!z) { plan = "Wait"; reasons.push("no reliable buy zone below the price yet"); }
+  else if (z.plan === "In buy zone" && tech !== "Negative" && fund !== "Weak") { plan = "Buy now"; reasons.push(`price is inside the buy zone ₹${Math.round(z.low)}-₹${Math.round(z.high)}`); }
+  else if (fund !== "Weak") { plan = "Buy on dip"; reasons.push(`wait for ₹${Math.round(z.low)}-₹${Math.round(z.high)}, ${z.distancePct.toFixed(1)}% below today`); }
+  else { plan = "Wait"; reasons.push("weak fundamentals: only on a deeper dip, if at all"); }
+  if (r.rsi >= 75 && plan === "Buy now") { plan = "Buy on dip"; reasons.push("RSI is stretched"); }
+  const points = { "Buy now": 2, "Buy on dip": 1, Wait: 0, Avoid: -2 }[plan];
+  return {
+    agent: "Entry", points, tone: plan === "Buy now" ? "good" : plan === "Avoid" ? "weak" : "ok", verdict: plan,
+    metrics: [
+      { label: "Fundamentals", unit: "pts", value: fPts, note: fund },
+      { label: "Technicals", unit: "pts", value: tPts, note: tech },
+      { label: "To buy zone", unit: "%", value: z ? -z.distancePct : undefined, note: z ? `₹${Math.round(z.low)}-₹${Math.round(z.high)}` : "no zone" },
+    ],
+    reasons,
+    entry: { plan, low: z?.low, high: z?.high },
+  };
+}
+
 // ---------- the desk ----------
 
 export interface DeskContext {
@@ -225,10 +384,12 @@ export async function runResearchDesk(symbols: string[], ctx: DeskContext): Prom
   const pes = sectorPes(ctx);
   const nifty = niftyYtd(ctx.indexClose, ctx.frames[symbols[0]]);
   const provider = demo ? null : getProvider();
-  const [fin, longs, targets] = await Promise.all([
+  const demoPledge = demo ? Object.fromEntries(symbols.map((s) => [s, demoShareholding(s, seed).pledgedPct ?? 0])) : undefined;
+  const [fin, longs, targets, surv] = await Promise.all([
     loadFinancials(Object.fromEntries(symbols.map((s) => [s, price(s)])), { demo, seed }),
     Promise.all(symbols.map(async (s) => (demo ? demoLongBars(ctx.frames[s], s, seed) : await provider?.getLongBars(s).catch(() => []) ?? []))),
     Promise.all(symbols.map((s) => (demo ? Promise.resolve(null) : yahooAnalystTarget(s)))),
+    loadSurveillance(symbols, { demo, seed, demoPledge }),
   ]);
   const out: Record<string, ResearchDesk> = {};
   symbols.forEach((s, i) => {
@@ -244,10 +405,20 @@ export async function runResearchDesk(symbols: string[], ctx: DeskContext): Prom
       ytd: ytdReturn(ctx.frames[s]), niftyYtd: nifty, five: fiveYearCagr(longs[i]),
       expected: expectedReturn({ price: price(s), target: targets[i], epsCagr, pe, sectorPe: pes[s] }),
     });
+    const profitability = profitabilityView(years, financial);
+    const bars = ctx.frames[s], latest = years[years.length - 1];
+    const rets = bars.slice(1).map((b, k) => Math.log(b.close / bars[k].close));
+    const mean = rets.reduce((a, b) => a + b, 0) / Math.max(1, rets.length);
+    const vol = Math.sqrt(rets.reduce((a, b) => a + (b - mean) ** 2, 0) / Math.max(1, rets.length - 1)) * Math.sqrt(252);
+    const pd = !financial && f?.marketCapCr && latest?.debt !== undefined
+      ? defaultProbability({ marketCapCr: f.marketCapCr, debtCr: latest.debt, equityVol: vol, ret1y: bars[bars.length - 1].close / bars[0].close - 1 }) : undefined;
+    const redFlags = redFlagView({ symbol: s, surv, pledgePct: surv.pledge[s], pd, financial, pump: pumpPattern(bars, f?.cap) });
+    const core = clamp(performance.points + valuation.points + growth.points + profitability.points, -10, 10);
     out[s] = {
-      performance, valuation, growth,
-      points: clamp(performance.points + valuation.points + growth.points, -8, 8),
-      sample: demo, source: demo ? "Sample figures (demo)" : "Yahoo Finance (unofficial)",
+      performance, valuation, growth, profitability, redFlags,
+      points: core + redFlags.points,
+      severe: redFlags.flags!.some((x) => x.status === "severe"),
+      sample: demo, source: demo ? "Sample figures (demo)" : `Yahoo Finance (unofficial); surveillance: ${surv.source}`,
     };
   });
   return out;

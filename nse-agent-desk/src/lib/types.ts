@@ -143,14 +143,14 @@ export interface Analysis {
   desk?: ResearchDesk;
 }
 
-export type DeskAgent = "Performance" | "Valuation" | "Growth";
+export type DeskAgent = "Performance" | "Valuation" | "Growth" | "Profitability" | "Entry" | "RedFlag";
 export type DeskTone = "good" | "ok" | "weak" | "n/a";
 
 export interface DeskMetric {
   label: string;
   /** Percent for returns and growth, a multiple ("x") for valuation ratios. */
   value?: number;
-  unit: "%" | "x";
+  unit: "%" | "x" | "pts" | "";
   /** Short context, e.g. "sector median 24.1x" or "analyst mean target". */
   note?: string;
 }
@@ -163,14 +163,32 @@ export interface DeskView {
   verdict: string;
   metrics: DeskMetric[];
   reasons: string[];
+  /** Red Flag Agent only: each check and what it found. */
+  flags?: RedFlag[];
+  /** Entry Agent only: the entry call and its price area. */
+  entry?: { plan: EntryPlan; low?: number; high?: number };
+}
+
+export type EntryPlan = "Buy now" | "Buy on dip" | "Wait" | "Avoid";
+
+export interface RedFlag {
+  check: "ASM" | "GSM" | "Promoter pledge" | "Unsolicited tips" | "Default risk";
+  status: "severe" | "warning" | "clear" | "unknown";
+  detail: string;
 }
 
 export interface ResearchDesk {
   performance: DeskView;
   valuation: DeskView;
   growth: DeskView;
-  /** Sum of the three, capped at +/-8. */
+  profitability: DeskView;
+  redFlags: DeskView;
+  /** Set after the chart check. */
+  entry?: DeskView;
+  /** Total points: performance + valuation + growth + profitability (capped at +/-10), plus red flags (down to -10) and entry (+/-2). */
   points: number;
+  /** A severe red flag: the Decision Agent won't rate it above WATCH. */
+  severe: boolean;
   sample: boolean;
   source: string;
 }

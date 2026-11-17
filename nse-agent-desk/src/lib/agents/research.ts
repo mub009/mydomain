@@ -1,6 +1,7 @@
 /** Agent 3 - Research: the analyst. Merges Momentum Agent's and Trend Agent's reports,
  *  checks agreement, rates risk and prepares the trade scenario. */
 import { sectorOf } from "../market/universe";
+import { entryView } from "../research-desk";
 import type { AgentReport, Analysis, ChartAnalysis, Fundamentals, Risk, Snapshot, ResearchDesk } from "../types";
 import { clamp, round } from "./base";
 
@@ -75,8 +76,18 @@ export class ResearchAgent {
     return rows.map((r) => {
       const d = desk[r.symbol];
       if (!d) return r;
-      const notes = [...r.notes, `Desk: ${d.performance.verdict.toLowerCase()}, ${d.valuation.verdict.toLowerCase()} valuation, ${d.growth.verdict.toLowerCase()} (${d.points >= 0 ? "+" : ""}${d.points})`];
+      const notes = [...r.notes, `Desk: ${d.performance.verdict.toLowerCase()}, ${d.valuation.verdict.toLowerCase()} valuation, ${d.growth.verdict.toLowerCase()}, ${d.profitability.verdict.toLowerCase()} (${d.points >= 0 ? "+" : ""}${d.points})`];
+      if (d.redFlags.points < 0) notes.push(`Red flags: ${d.redFlags.reasons.join("; ")}`);
       return { ...r, desk: d, notes, combined: round(clamp(r.combined + d.points)) };
+    }).sort((a, b) => b.combined - a.combined);
+  }
+
+  /** Entry Point Agent, after the chart check: one entry call per stock (+/-2 points). */
+  applyEntry(rows: Analysis[]): Analysis[] {
+    return rows.map((r) => {
+      const e = entryView(r);
+      if (!e || !r.desk) return r;
+      return { ...r, desk: { ...r.desk, entry: e, points: r.desk.points + e.points }, notes: [...r.notes, `Entry: ${e.verdict.toLowerCase()}`], combined: round(clamp(r.combined + e.points)) };
     }).sort((a, b) => b.combined - a.combined);
   }
 

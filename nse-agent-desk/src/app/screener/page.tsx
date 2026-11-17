@@ -44,6 +44,12 @@ const columns: ColumnDef<Decision>[] = [
     cell: ({ row: { original: d } }) => deskValue(d.desk?.performance.metrics[1]) },
   { id: "rev3y", header: "Revenue 3Y", meta: { num: true }, accessorFn: (d) => d.desk?.growth.metrics[0].value ?? -999,
     cell: ({ row: { original: d } }) => deskValue(d.desk?.growth.metrics[0]) },
+  { id: "flags", header: "Red flags", meta: { num: true }, accessorFn: (d) => d.desk?.redFlags.points ?? 1,
+    cell: ({ row: { original: d } }) => !d.desk ? "–" : d.desk.severe
+      ? <span className="rounded-md bg-[var(--avoid-bg)] px-1.5 py-px text-[10.5px] font-bold text-[var(--avoid-fg)]">{d.desk.redFlags.verdict}</span>
+      : <span className={cn("text-xs", d.desk.redFlags.points < 0 ? "text-[var(--watch-fg)]" : "text-muted-foreground")}>{d.desk.redFlags.verdict}</span> },
+  { id: "entryCall", header: "Entry", accessorFn: (d) => d.desk?.entry?.points ?? -9,
+    cell: ({ row: { original: d } }) => <span className="whitespace-nowrap text-xs font-medium">{d.desk?.entry?.verdict ?? "–"}</span> },
   { id: "charts", header: "Charts", accessorFn: (d) => (d.chart ? d.chart.bullish - d.chart.bearish : -99), meta: { num: false },
     cell: ({ row: { original: d } }) => (d.chart ? <TimeframeDots chart={d.chart} /> : <span className="text-xs text-muted-foreground">–</span>) },
   { id: "zone", header: "Buy zone", accessorFn: (d) => d.chart?.zone?.distancePct ?? 999,

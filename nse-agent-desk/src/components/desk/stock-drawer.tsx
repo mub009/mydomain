@@ -90,7 +90,7 @@ function Body({ d, isPick }: { d: Decision; isPick: boolean }) {
       <AgentView who="Momentum" score={d.lotappi} reasons={d.lotReasons} warnings={d.lotWarnings} />
       <AgentView who="Trend" score={d.mayavi} reasons={d.mayReasons} warnings={d.mayWarnings} />
       {d.fundamentals && <FundamentalsCard f={d.fundamentals} />}
-      {d.desk ? <ResearchDeskSection desk={d.desk} /> : <p className="rounded-xl border border-dashed p-3 text-[12.5px] text-muted-foreground">The research desk (performance, valuation, growth) checks the top candidates only; this stock ranked lower.</p>}
+      {d.desk ? <ResearchDeskSection desk={d.desk} /> : <p className="rounded-xl border border-dashed p-3 text-[12.5px] text-muted-foreground">The research desk (performance, valuation, growth, profitability, red flags, entry) checks the top candidates only; this stock ranked lower.</p>}
       <AgentView who="Research" score={d.combined}>
         <p className="mt-2 text-[12.5px]">Holding plan: <b>{d.horizon}</b>. Risk <RiskTag risk={d.risk} /> (ATR {d.atrPct.toFixed(1)}% of price).</p>
         {d.notes.length > 0 && <ul className="mt-1 list-disc pl-4 text-[12.5px] text-muted-foreground">{d.notes.map((n) => <li key={n}>{n}</li>)}</ul>}

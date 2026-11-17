@@ -1,4 +1,4 @@
-import { Activity, Gauge, Globe2, IndianRupee, Microscope, Newspaper, Scale, Sprout, TrendingUp, Zap, type LucideIcon } from "lucide-react";
+import { Activity, Crosshair, Flag, Gauge, PiggyBank, Globe2, IndianRupee, Microscope, Newspaper, Scale, Sprout, TrendingUp, Zap, type LucideIcon } from "lucide-react";
 import { TEAM } from "@/lib/team";
 import type { AgentName, Person } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -15,6 +15,9 @@ export const AGENT_ICON: Record<Person, LucideIcon> = {
   Performance: Gauge,    // returns: YTD, 5Y, expected
   Valuation: IndianRupee, // P/E, P/B, P/CFO
   Growth: Sprout,        // 3-year growth
+  Profitability: PiggyBank, // ROE, margins, cash flow
+  RedFlag: Flag,         // ASM / GSM, pledge, tips, default risk
+  Entry: Crosshair,      // where to enter
   Decision: Scale,       // weighs and decides
 };
 

@@ -16,6 +16,8 @@ export class DecisionAgent {
     // Earnings caps: never a strong buy with falling EPS, never a buy while loss-making.
     if (v === "STRONG BUY" && epsFalling) v = "BUY";
     if ((v === "STRONG BUY" || v === "BUY") && loss) v = "WATCH";
+    // Red Flag Agent: a severe flag (GSM, late-stage ASM, heavy pledge, tip alert, high default risk) blocks a buy.
+    if ((v === "STRONG BUY" || v === "BUY") && r.desk?.severe) v = "WATCH";
     return v;
   }
 

@@ -27,6 +27,9 @@ const ROLE: Record<Person, string> = {
   Performance: "performance analyst on the research desk who checks YTD, 5-year and expected returns",
   Valuation: "valuation analyst on the research desk who checks P/E, P/B and P/CFO",
   Growth: "growth analyst on the research desk who checks 3-year revenue, cash-flow and profit growth",
+  Profitability: "profitability analyst on the research desk who checks ROE, profit margins and cash flow",
+  RedFlag: "risk analyst on the research desk who checks ASM/GSM surveillance, promoter pledges, tip alerts and default risk",
+  Entry: "entry-point analyst on the research desk who combines fundamentals and technicals into an entry call",
   Decision: "final decision maker who picks the stocks to act on",
 };
 
@@ -196,7 +199,7 @@ export async function runDialogue(bus: MessageBus, llm: LLM, d: DialogueInput) {
     const best = (pick: (r: Analysis) => number | undefined, n = 3) =>
       deskRows.filter((r) => pick(r) !== undefined).sort((a, b) => pick(b)! - pick(a)!).slice(0, n).map((r) => r.symbol);
     bus.send("Research", "Performance",
-      `Research desk, before I rank the top ${plural(deskRows.length, "candidate")}: Performance Agent, check the returns; Valuation Agent, the price against earnings, book and cash flow; Growth Agent, the 3-year growth.`,
+      `Research desk, before I rank the top ${plural(deskRows.length, "candidate")}: Performance Agent, check the returns; Valuation Agent, the price against earnings, book and cash flow; Growth Agent, the 3-year growth; Profitability Agent, ROE, margins and cash flow; Red Flag Agent, surveillance, pledges, tips and default risk; Entry Point Agent, where to get in.`,
       { tickers: names(deskRows) });
 
     const perf = (r: Analysis) => r.desk!.performance;
@@ -236,11 +239,51 @@ export async function runDialogue(bus: MessageBus, llm: LLM, d: DialogueInput) {
         rows: deskRows.map((r) => { const g = gr(r); return [r.symbol, fmt(g.metrics[0].value, "%"), fmt(g.metrics[1].value, "%"), fmt(g.metrics[2].value, "%"), g.verdict, `${g.points >= 0 ? "+" : ""}${g.points}`]; }),
       } });
 
-    const ups = deskRows.filter((r) => r.desk!.points >= 3).map((r) => r.symbol);
+    const pr = (r: Analysis) => r.desk!.profitability;
+    const highRoe = deskRows.filter((r) => pr(r).points >= 2).map((r) => r.symbol);
+    const weakP = deskRows.filter((r) => pr(r).points < 0).map((r) => r.symbol);
+    bus.send("Profitability", "Research",
+      `Profitability from the latest annual report: ROE, net margin, and how much of the profit arrived as cash over 3 years.` +
+      `${highRoe.length ? ` Highly profitable: ${list(highRoe)}.` : " None stands out on ROE."}${weakP.length ? ` Weak: ${list(weakP)}.` : ""}`,
+      { kind: "report", tickers: [...highRoe, ...weakP], table: {
+        columns: ["Symbol", "ROE", "Net margin", "Cash / profit", "View", "Points"],
+        rows: deskRows.map((r) => { const v = pr(r); return [r.symbol, fmt(v.metrics[0].value, "%"), fmt(v.metrics[1].value, "%"), fmt(v.metrics[2].value, "x"), v.verdict, `${v.points >= 0 ? "+" : ""}${v.points}`]; }),
+      } });
+
+    const rf = (r: Analysis) => r.desk!.redFlags;
+    // Severe flags from every stock the desk checked, not only the top eight shown.
+    const severe = d.rows.filter((r) => r.desk?.severe);
+    const cautious = deskRows.filter((r) => !r.desk!.severe && rf(r).points < 0).map((r) => r.symbol);
+    const unknown = [...new Set(deskRows.flatMap((r) => rf(r).flags!.filter((f) => f.status === "unknown").map((f) => f.check)))].filter((c) => c !== "Default risk");
+    const status = (r: Analysis, c: string) => { const f = rf(r).flags!.find((x) => x.check === c)!; return f.status === "clear" ? "OK" : f.status === "unknown" ? "?" : f.status === "severe" ? "FLAG" : "Watch"; };
+    bus.send("RedFlag", "Research",
+      (severe.length ? `Red flags: ${severe.map((r) => `${r.symbol} (${rf(r).flags!.filter((f) => f.status === "severe").map((f) => f.check).join(", ")})`).join("; ")}. Decision Agent should not rate these above WATCH.` : `No severe red flags among the ${plural(d.rows.filter((r) => r.desk).length, "stock")} we checked.`) +
+      `${cautious.length ? ` Caution on ${list(cautious)}.` : ""}${unknown.length ? ` Not verified this run: ${list(unknown)}.` : ""}` +
+      `${deskRows[0].desk!.sample ? " (Sample lists in demo mode.)" : ""}`,
+      { kind: "report", tickers: [...names(severe), ...cautious], table: {
+        columns: ["Symbol", "ASM", "GSM", "Pledge", "Tips", "Default prob.", "Points"],
+        rows: deskRows.map((r) => [r.symbol, status(r, "ASM"), status(r, "GSM"), status(r, "Promoter pledge"), status(r, "Unsolicited tips"),
+          rf(r).metrics[2].value === undefined ? "–" : rf(r).metrics[2].value! < 0.01 ? "<0.01%" : `${rf(r).metrics[2].value}%`, `${rf(r).points}`]),
+      } });
+
+    const withEntry = deskRows.filter((r) => r.desk!.entry);
+    if (withEntry.length) {
+      const by = (p: string) => withEntry.filter((r) => r.desk!.entry!.verdict === p).map((r) => r.symbol);
+      const now = by("Buy now"), dip = by("Buy on dip"), avoid = by("Avoid");
+      bus.send("Entry", "Research",
+        `Entry calls from fundamentals plus technicals.` +
+        `${now.length ? ` Buy now: ${list(now)}.` : ""}${dip.length ? ` Buy on a dip into the zone: ${list(dip)}.` : ""}${avoid.length ? ` Avoid for now: ${list(avoid)}.` : ""}`,
+        { kind: "report", tickers: [...now, ...dip, ...avoid], table: {
+          columns: ["Symbol", "Fundamentals", "Technicals", "Entry area", "Call"],
+          rows: withEntry.map((r) => { const e = r.desk!.entry!; return [r.symbol, e.metrics[0].note ?? "–", e.metrics[1].note ?? "–", e.metrics[2].note ?? "–", e.verdict]; }),
+        } });
+    }
+
+    const ups = deskRows.filter((r) => r.desk!.points >= 9).map((r) => r.symbol);
     const downs = deskRows.filter((r) => r.desk!.points <= -3).map((r) => r.symbol);
-    bus.send("Research", "Growth",
-      `Thanks, all three. I've added your points to each score, at most ±8 per stock.` +
-      `${ups.length ? ` Clear lift for ${list(ups)}.` : ""}${downs.length ? ` Marked down: ${list(downs)}.` : ""}`,
+    bus.send("Research", "Entry",
+      `Thanks, desk. I've added your points to each score: up to ±10 for performance, valuation, growth and profitability, up to −10 for red flags, ±2 for the entry call.` +
+      `${ups.length ? ` Biggest lift for ${list(ups)}.` : ""}${downs.length ? ` Marked down: ${list(downs)}.` : ""}`,
       { tickers: [...ups, ...downs] });
   }
 

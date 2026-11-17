@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { ALL_CAPS } from "./market/universe";
 import { runAnalysis } from "./pipeline";
-import { cagr, expectedReturn, fiveYearCagr, growthView, performanceView, valuationView, ytdReturn } from "./research-desk";
+import { cagr, defaultProbability, entryView, expectedReturn, fiveYearCagr, growthView, performanceView, profitabilityView, pumpPattern, redFlagView, valuationView, ytdReturn } from "./research-desk";
+import { collectStages, type Surveillance } from "./surveillance";
+import type { Analysis } from "./types";
 import type { Bar, Fundamentals, Message } from "./types";
 
 const bar = (date: string, close: number): Bar => ({ date, open: close, high: close, low: close, close, volume: 0 });
@@ -67,15 +69,82 @@ describe("research desk maths", () => {
   });
 });
 
+const surv = (o: Partial<Surveillance> = {}): Surveillance => ({
+  asm: {}, gsm: {}, unsolicited: [], pledge: {}, checked: { asm: true, gsm: true, unsolicited: true, pledge: true }, source: "t", sample: true, ...o,
+});
+
+describe("profitability, red flags and entry", () => {
+  const years = [
+    { year: "FY24", revenue: 1000, netIncome: 150, equity: 700, operatingCashFlow: 170 },
+    { year: "FY25", revenue: 1100, netIncome: 170, equity: 800, operatingCashFlow: 180 },
+    { year: "FY26", revenue: 1200, netIncome: 200, equity: 900, operatingCashFlow: 220 },
+  ];
+
+  it("profitability: ROE, net margin and cash conversion", () => {
+    const v = profitabilityView(years, false);
+    expect(v.metrics.map((m) => m.value)).toEqual([22.2, 16.7, 1.1]);
+    expect(v.points).toBe(3);
+    const poor = profitabilityView(years.map((y) => ({ ...y, operatingCashFlow: y.netIncome * 0.4, equity: y.equity * 4 })), false); // ROE ~5.6%, 40% cash conversion
+    expect(poor.points).toBe(-2);
+    expect(profitabilityView([...years.slice(0, 2), { ...years[2], netIncome: -10 }], false).verdict).toBe("Weak profits");
+  });
+
+  it("default probability rises with debt and volatility", () => {
+    expect(defaultProbability({ marketCapCr: 10000, debtCr: 0, equityVol: 0.3, ret1y: 0.1 })).toBe(0);
+    const low = defaultProbability({ marketCapCr: 10000, debtCr: 1000, equityVol: 0.25, ret1y: 0.1 });
+    const high = defaultProbability({ marketCapCr: 1000, debtCr: 4000, equityVol: 0.8, ret1y: -0.4 });
+    expect(low).toBeLessThan(0.01);
+    expect(high).toBeGreaterThan(5);
+  });
+
+  it("pump pattern: a sharp run-up on heavy volume in a smaller stock", () => {
+    const bars = Array.from({ length: 40 }, (_, i) => ({ date: `d${i}`, open: 100, high: 100, low: 100, close: i < 30 ? 100 : 100 + (i - 29) * 4, volume: i < 30 ? 1000 : 5000 }));
+    expect(pumpPattern(bars, "Small")).toMatch(/in 10 days/);
+    expect(pumpPattern(bars, "Large")).toBeNull();
+  });
+
+  it("red flags: GSM, late-stage ASM, pledge, tips and default risk", () => {
+    const clean = redFlagView({ symbol: "ABC", surv: surv(), pledgePct: 0, pd: 0.1, financial: false, pump: null });
+    expect(clean.verdict).toBe("Clear");
+    expect(clean.points).toBe(0);
+    const bad = redFlagView({ symbol: "ABC", surv: surv({ gsm: { ABC: "Stage I" }, asm: { ABC: "LT Stage II" } }), pledgePct: 60, pd: 8, financial: false, pump: null });
+    expect(bad.flags!.filter((f) => f.status === "severe").map((f) => f.check)).toEqual(["GSM", "ASM", "Promoter pledge", "Default risk"]);
+    expect(bad.points).toBe(-10);
+    const st = redFlagView({ symbol: "ABC", surv: surv({ asm: { ABC: "ST Stage I" } }), pledgePct: 15, financial: false, pump: "x", pd: 0 });
+    expect(st.flags!.filter((f) => f.status === "warning").map((f) => f.check)).toEqual(["ASM", "Promoter pledge", "Unsolicited tips"]);
+    const unchecked = redFlagView({ symbol: "ABC", surv: surv({ checked: { asm: false, gsm: false, unsolicited: false, pledge: false } }), financial: true, pump: null });
+    expect(unchecked.flags!.filter((f) => f.status === "unknown").length).toBe(4);
+  });
+
+  it("reads NSE-style ASM JSON", () => {
+    const rows = collectStages({ longterm: { data: [{ symbol: "abc", asmSurvIndicator: "Stage II" }] }, shortterm: { data: [{ symbol: "XYZ", asmSurvIndicator: "Stage I" }] } });
+    expect(rows).toEqual([{ symbol: "ABC", stage: "Stage II", trail: "/longterm/data" }, { symbol: "XYZ", stage: "Stage I", trail: "/shortterm/data" }]);
+  });
+
+  it("entry: fundamentals plus technicals", () => {
+    const view = (points: number) => ({ agent: "Valuation" as const, points, tone: "ok" as const, verdict: "", metrics: [], reasons: [] });
+    const desk = { performance: view(0), valuation: view(1), growth: view(2), profitability: view(1), redFlags: view(0), points: 4, severe: false, sample: true, source: "t" };
+    const zone = { low: 95, high: 100, stop: 90, distancePct: 0, plan: "In buy zone" as const, basis: [], confirmations: 3 };
+    const row = { rsi: 60, desk, chart: { bullish: 4, bearish: 0, zone } } as unknown as Analysis;
+    expect(entryView(row)!.verdict).toBe("Buy now");
+    expect(entryView({ ...row, chart: { ...row.chart!, zone: { ...zone, plan: "Wait for dip", distancePct: 4 } } } as Analysis)!.verdict).toBe("Buy on dip");
+    expect(entryView({ ...row, desk: { ...desk, severe: true } } as Analysis)!.verdict).toBe("Avoid");
+  });
+});
+
 describe("research desk in a run", () => {
   it("checks the candidates and reports in the desk thread", async () => {
     const msgs: Message[] = [];
     const res = await runAnalysis({ symbols: ALL_CAPS, top: 5, demo: true, aiNotes: false, riskPerTrade: 1, capital: 500000 }, (e) => { if (e.type === "message") msgs.push(e.message); });
     const withDesk = res.all.filter((d) => d.desk);
     expect(withDesk.length).toBeGreaterThanOrEqual(12);
-    for (const d of withDesk) expect(Math.abs(d.desk!.points)).toBeLessThanOrEqual(8);
+    for (const d of withDesk) {
+      expect(d.desk!.points).toBeLessThanOrEqual(12);
+      expect(d.desk!.points).toBeGreaterThanOrEqual(-22);
+      if (d.desk!.severe) expect(["WATCH", "AVOID"]).toContain(d.verdict);
+    }
     const desk = msgs.filter((m) => m.thread === "desk");
-    expect(desk.map((m) => m.sender)).toEqual(["Research", "Performance", "Valuation", "Growth", "Research"]);
+    expect(desk.map((m) => m.sender)).toEqual(["Research", "Performance", "Valuation", "Growth", "Profitability", "RedFlag", "Entry", "Research"]);
     expect(desk[1].table?.columns).toContain("5Y a year");
     expect(desk[2].table?.columns).toContain("P/CFO");
     expect(desk[3].table?.columns).toContain("Cash flow");

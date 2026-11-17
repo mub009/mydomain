@@ -33,17 +33,29 @@ Rules worth knowing:
 
 With demo data off, market cap and EPS come from Yahoo Finance's fundamentals data (unofficial, untested from the build environment). If a stock's data can't be loaded it's marked "Unknown" and kept, with a note that its size wasn't verified.
 
-## Research desk: Performance, Valuation and Growth Agents
+## Research desk: six sub-agents
 
-Three sub-agents report to the Research Agent on the top candidates (at least 12) before it ranks them. Their points are added to the combined score, at most ±8 per stock in total. They talk in the **Research desk** chat thread, and each stock's panel shows their figures.
+Six sub-agents report to the Research Agent on the top candidates (at least 12) before it ranks them. Performance, Valuation, Growth and Profitability together move the score by at most ±10; red flags take up to 10 more off; the entry call adds ±2. They talk in the **Research desk** chat thread, and each stock's panel shows their figures.
 
 | Agent | Checks | Points |
 |---|---|---|
 | **Performance Agent** | Absolute return **YTD** (since the last close of the previous year, compared with the Nifty 50), **annualised 5-year return** (CAGR from weekly prices) and **expected 1-year return** | +1 for 5Y ≥ 15% a year, −1 if negative; +1 if YTD beats the Nifty by 5 points, −1 if it lags by 10; +1 for expected ≥ 15%, −1 if negative |
 | **Valuation Agent** | **TTM P/E** against the median P/E of its sector in this run, **P/B** (market cap ÷ equity) and **P/CFO** (market cap ÷ operating cash flow) | +2 for P/E ≤ 0.8× sector, −1 above 1.2×, −2 above 1.5×; −1 if loss-making; −1 if P/CFO is more than 1.5× P/E (profits not backed by cash) or cash flow is negative |
 | **Growth Agent** | **3-year CAGR** of revenue, operating cash flow and net profit, from the last four annual reports | Average ≥ 15%: +3, ≥ 10%: +2, ≥ 5%: +1, below 0: −2; loss-making now: −2 |
+| **Profitability Agent** | **ROE** (latest year), **net margin** and profit in how many of the last years, **cash conversion** (3-year operating cash flow ÷ net profit) | ROE ≥ 20%: +2, ≥ 15%: +1, below 8%: −1; loss-making now: −2; a loss in an earlier year: −1; cash conversion ≥ 1: +1, below 0.7: −1 |
+| **Red Flag Agent** | **ASM** and **GSM** surveillance lists, **promoter pledge**, **unsolicited tips** (exchange alert list, or a pump-like pattern: up 25% in 10 days on 3× volume in a non-large-cap), **default probability** (1-year, naive Merton distance-to-default from market cap, debt, share-price volatility and last year's return) | Each severe flag −4, each caution −1 (at most −10). Severe: GSM, ASM long-term stage II or later, pledge above 50%, named in a tip alert, default probability above 5%. **A severe flag stops a BUY: the Decision Agent caps the stock at WATCH.** |
+| **Entry Point Agent** | Fundamentals (valuation + growth + profitability points) and technicals (5-timeframe chart check, RSI, buy zone) | **Buy now** (+2) when the price is in the buy zone, fundamentals are not weak and the chart is not falling; **Buy on dip** (+1) with the zone price; **Wait** (0); **Avoid** (−2) on a severe red flag or weak business with a falling chart |
 
-**Expected return:** with live data, the analysts' mean 12-month price target from Yahoo when it exists. Otherwise an estimate: 3-year EPS growth (capped −10% to +25%) plus up to ±8 for the P/E against its sector. It's a rough guide, not a forecast. Banks and NBFCs skip P/CFO and cash-flow growth, because cash flow works differently for lenders. In demo mode every figure is a sample.
+**Expected return:** with live data, the analysts' mean 12-month price target from Yahoo when it exists. Otherwise an estimate: 3-year EPS growth (capped −10% to +25%) plus up to ±8 for the P/E against its sector. It's a rough guide, not a forecast. Banks and NBFCs skip P/CFO, cash-flow growth, cash conversion and the default model, because cash flow and debt work differently for lenders. In demo mode every figure is a sample.
+
+**Where the red-flag data comes from (live mode):** ASM, GSM and pledge data are read from NSE's website on a best-effort basis; NSE often blocks automated requests. For a reliable check, save the lists to `.data/surveillance.json`:
+
+```json
+{ "asOf": "2026-11-14", "asm": { "SYMBOL": "LT Stage II" }, "gsm": { "SYMBOL": "Stage I" },
+  "unsolicited": ["SYMBOL"], "pledge": { "SYMBOL": 12.5 } }
+```
+
+Anything that couldn't be checked is shown as "not checked", never as clear.
 
 ## Research Agent's chart check
 
