@@ -50,6 +50,23 @@ Each bullish timeframe adds 1.5 points to the combined score and each bearish on
 
 If intraday data can't be loaded, 4H, 1H and 30m are marked as not rated. In demo mode the intraday candles are generated to match the demo daily prices.
 
+## Diversification (Portfolio balance)
+
+Mubashir checks how spread out the money is, in two places:
+
+- **Positions page:** your open positions, weighted by current value.
+- **Overview, under Final Picks:** the day's picks, weighted by the suggested investment (enter your capital for real weights).
+
+| Check | Limit |
+|-------|-------|
+| One sector | 30% of the money |
+| One stock | 20% |
+| Small caps | 30% |
+| Sectors | at least 3 when you hold 3+ stocks |
+| Stocks that move together | daily moves correlated 0.8+ over 60 days count almost as one holding |
+
+Score out of 100: how many "effective" sectors and stocks the money is spread over, minus a penalty for each limit broken (4 points a little over, 9 at 1.25× the limit, 25 at 1.5× or more). Grade: 80+ A, 60-79 B, 40-59 C, below 40 D. Suggestions: which stock to trim, and up to three BUY or STRONG BUY stocks from the latest analysis in sectors you hold little of. Change the limits with the `NEXT_PUBLIC_MAX_*_PCT` settings.
+
 ## Company: peers, balance sheet, cash flow, owners
 
 Open any stock and choose the **Company** tab:

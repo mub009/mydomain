@@ -1,8 +1,11 @@
-import type { Person } from "../types";
+import type { CapSize, Person } from "../types";
 
 export interface Position {
   id: string;
   symbol: string;
+  /** Saved when tracking, for the diversification check. */
+  sector?: string;
+  cap?: CapSize;
   qty: number;
   buyPrice: number;
   stop: number;

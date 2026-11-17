@@ -14,7 +14,7 @@ interface PositionsStore {
   loaded: boolean;
   error: string | null;
   load: () => Promise<void>;
-  add: (p: { symbol: string; qty: number; buyPrice: number; stop: number; target: number; feed: "demo" | "live" }) => Promise<string | null>;
+  add: (p: { symbol: string; qty: number; buyPrice: number; stop: number; target: number; feed: "demo" | "live"; sector?: string; cap?: string }) => Promise<string | null>;
   close: (id: string, exitPrice?: number) => Promise<void>;
   remove: (id: string) => Promise<void>;
   checkNow: () => Promise<void>;

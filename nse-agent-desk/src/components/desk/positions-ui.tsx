@@ -92,7 +92,7 @@ export function TrackTradeButton({ d, size = "sm", className }: { d: Decision; s
 
   async function save() {
     setBusy(true); setErr(null);
-    const e = await add({ symbol: d.symbol, qty: Number(qty), buyPrice: Number(buy), stop: Number(stop), target: Number(target), feed: source === "demo" ? "demo" : "live" });
+    const e = await add({ symbol: d.symbol, qty: Number(qty), buyPrice: Number(buy), stop: Number(stop), target: Number(target), feed: source === "demo" ? "demo" : "live", sector: d.sector, cap: d.fundamentals?.cap });
     setBusy(false);
     if (e) setErr(e); else setOpen(false);
   }

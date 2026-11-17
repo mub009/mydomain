@@ -4,6 +4,10 @@ import { Bell, BellOff, RefreshCw, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/desk/shell";
 import { AlertItem } from "@/components/desk/positions-ui";
+import { DiversificationCard } from "@/components/desk/diversification-card";
+import { diversify } from "@/lib/diversify";
+import { sectorOf } from "@/lib/market/universe";
+import { useDesk } from "@/store/desk";
 import { Button } from "@/components/ui/button";
 import { inr, istDate, istTime, pct } from "@/lib/format";
 import { health, progress, type Health } from "@/lib/positions/rules";
@@ -98,6 +102,15 @@ export default function PositionsPage() {
   const pnlOpen = open.reduce((s, p) => s + ((p.lastPrice ?? p.buyPrice) - p.buyPrice) * p.qty, 0);
   const pnlClosed = closed.reduce((s, p) => s + ((p.exitPrice ?? p.buyPrice) - p.buyPrice) * p.qty, 0);
   const unread = alerts.filter((a) => !a.read).length;
+  const result = useDesk((s) => s.result);
+  const balance = useMemo(() => {
+    const known = new Map((result?.all ?? []).map((d) => [d.symbol, d]));
+    return diversify(open.map((p) => {
+      const d = known.get(p.symbol);
+      return { symbol: p.symbol, sector: p.sector ?? d?.sector ?? sectorOf(p.symbol), cap: p.cap ?? d?.fundamentals?.cap ?? "Unknown",
+        value: p.qty * (p.lastPrice ?? p.buyPrice), closes: d?.spark };
+    }), result?.all ?? []);
+  }, [open, result]);
 
   return (
     <>
@@ -135,6 +148,7 @@ export default function PositionsPage() {
 
         <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
           <div className="space-y-3">
+            {open.length > 0 && <DiversificationCard d={balance} title="Portfolio balance" subtitle={`Your ${open.length} open position${open.length === 1 ? "" : "s"}, weighted by current value${result ? "; suggestions from the latest analysis" : ". Run an analysis to get suggestions"}.`} />}
             <h2 className="text-[15px] font-semibold">Open ({open.length})</h2>
             {!loaded ? <p className="text-sm text-muted-foreground">Loading…</p>
               : !open.length ? <div className="card px-4 py-10 text-center text-sm text-muted-foreground">No open positions. Run an analysis, open a pick and press <b>Track this trade</b>.</div>

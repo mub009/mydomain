@@ -67,10 +67,10 @@ export async function checkPositions(which: "all" | "demo" | "live" = "all"): Pr
   return fresh;
 }
 
-export function newPosition(input: { symbol: string; qty: number; buyPrice: number; stop: number; target: number; feed: "demo" | "live" }): Position {
+export function newPosition(input: { symbol: string; qty: number; buyPrice: number; stop: number; target: number; feed: "demo" | "live"; sector?: string; cap?: Position["cap"] }): Position {
   const { partial } = exitPlan(input.buyPrice, input.stop, input.target);
   return {
-    id: randomUUID(), symbol: input.symbol, qty: input.qty, buyPrice: input.buyPrice, stop: input.stop,
+    id: randomUUID(), symbol: input.symbol, sector: input.sector, cap: input.cap, qty: input.qty, buyPrice: input.buyPrice, stop: input.stop,
     partial: Math.min(partial, input.target), target: input.target,
     openedAt: new Date().toISOString(), feed: input.feed, status: "open", sent: [],
   };

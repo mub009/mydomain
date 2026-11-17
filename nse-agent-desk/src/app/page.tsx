@@ -7,6 +7,9 @@ import { AnalysisToolbar } from "@/components/desk/analysis-toolbar";
 import { FinalPicksTable, PicksWaiting } from "@/components/desk/final-picks-table";
 import { MessageFeed } from "@/components/desk/message-feed";
 import { MorningNewsCard, VixCard } from "@/components/desk/morning-cards";
+import { DiversificationCard } from "@/components/desk/diversification-card";
+import { diversify } from "@/lib/diversify";
+import { useMemo } from "react";
 import { DataBanner, KPICard, ResearchProgress } from "@/components/desk/primitives";
 import { PageHeader } from "@/components/desk/shell";
 import { Button } from "@/components/ui/button";
@@ -32,6 +35,9 @@ export default function OverviewPage() {
   const said = (who: string) => messages.slice(0, shown).some((m) => m.sender === who);
   const idle = !busy && !messages.length;
 
+  const balance = useMemo(() => (r ? diversify(r.picks.map((p) => ({
+    symbol: p.symbol, sector: p.sector, cap: p.fundamentals?.cap ?? "Unknown", value: p.investment || p.entry * (p.quantity || 1), closes: p.spark,
+  })), r.all) : null), [r]);
   const buys = r?.all.filter((d) => d.verdict === "STRONG BUY" || d.verdict === "BUY").length;
   const agree = r?.all.filter((d) => d.agree).length;
 
@@ -82,6 +88,9 @@ export default function OverviewPage() {
               </header>
               {r ? <FinalPicksTable picks={r.picks} onSelect={openStock} /> : <PicksWaiting stage={stage} idle={idle} />}
             </section>
+
+            {balance && <DiversificationCard d={balance} title="Portfolio balance of these picks"
+              subtitle={r?.picks.some((p) => p.investment) ? "Weighted by the suggested investment in each pick." : "Weighted by one share of each pick; enter your capital for real weights."} />}
 
             <section className="card p-4">
               <h2 className="text-[15px] font-semibold">Where the Agents Agree</h2>

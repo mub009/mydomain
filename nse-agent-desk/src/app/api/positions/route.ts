@@ -23,7 +23,9 @@ export async function POST(req: Request) {
   if (!(qty > 0 && qty <= 1e7)) return Response.json({ error: "Quantity must be a whole number above 0" }, { status: 400 });
   if (!(buyPrice > 0 && stop > 0 && target > 0)) return Response.json({ error: "Prices must be above 0" }, { status: 400 });
   if (!(stop < buyPrice && buyPrice < target)) return Response.json({ error: "Stop-loss must be below the buy price, and the target above it" }, { status: 400 });
-  const p = newPosition({ symbol, qty, buyPrice, stop, target, feed: b?.feed === "live" ? "live" : "demo" });
+  const cap = ["Large", "Mid", "Small", "Unknown"].includes(b?.cap) ? b.cap : undefined;
+  const sector = typeof b?.sector === "string" && /^[A-Za-z &]{1,30}$/.test(b.sector) ? b.sector : undefined;
+  const p = newPosition({ symbol, qty, buyPrice, stop, target, feed: b?.feed === "live" ? "live" : "demo", sector, cap });
   await update((s) => { s.positions.unshift(p); });
   return Response.json({ position: p }, { status: 201 });
 }
