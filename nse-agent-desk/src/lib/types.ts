@@ -220,6 +220,30 @@ export interface DataSource {
   fallbackReason?: string;
 }
 
+export interface SectorView {
+  sector: string;
+  members: number;
+  /** "index" = an NSE sector index; "composite" = average of this run's stocks. */
+  source: "index" | "composite";
+  sourceLabel: string;
+  ret1m: number;
+  ret3m: number;
+  /** Sector 1-month return minus Nifty 50 1-month return. */
+  relStrength: number;
+  /** Change in relative strength over the last 10 trading days. */
+  rsMomentum: number;
+  /** % of the sector's stocks above their 50-day average. */
+  breadth: number;
+  state: "Leading" | "Improving" | "Weakening" | "Lagging";
+  rank: number;
+  /** Last 60 closes rebased to 100, and the Nifty over the same days. */
+  closes: number[];
+  niftyCloses: number[];
+  buyPct: number;
+  avgScore: number;
+  leaders: string[];
+}
+
 export interface RunResult {
   source: DataSource;
   generatedAt: string;
@@ -232,6 +256,7 @@ export interface RunResult {
   /** Stocks left out for being below the minimum market cap. */
   excluded: { symbol: string; marketCapCr: number }[];
   minCapCr: number;
+  sectors: SectorView[];
   picks: Decision[];
   watchlist: Decision[];
   all: Decision[];

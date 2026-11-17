@@ -8,6 +8,7 @@ import { FinalPicksTable, PicksWaiting } from "@/components/desk/final-picks-tab
 import { MessageFeed } from "@/components/desk/message-feed";
 import { MorningNewsCard, VixCard } from "@/components/desk/morning-cards";
 import { DiversificationCard } from "@/components/desk/diversification-card";
+import { SectorStrengthCard } from "@/components/desk/sector-ui";
 import { diversify } from "@/lib/diversify";
 import { useMemo } from "react";
 import { DataBanner, KPICard, ResearchProgress } from "@/components/desk/primitives";
@@ -72,6 +73,8 @@ export default function OverviewPage() {
           <MorningNewsCard news={result?.news} revealed={Boolean(result) && said("MorningSession")} busy={busy && !said("MorningSession")} time={session?.time ?? "09:00"} />
           <VixCard vix={result?.vix} revealed={Boolean(result) && said("IVIndex")} busy={busy && !said("IVIndex")} />
         </div>
+
+        {r && <SectorStrengthCard sectors={r.sectors} />}
 
         <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
           <div className="min-w-0 space-y-4">

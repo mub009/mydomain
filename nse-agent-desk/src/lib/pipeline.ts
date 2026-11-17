@@ -14,6 +14,8 @@ import { analyseChart } from "./chart";
 import { loadIntraday, loadMarket } from "./market";
 import { capThresholds, loadFundamentals } from "./fundamentals";
 import { loadNews } from "./news";
+import { analyseSectors, applySectors, enrichSectors } from "./sectors";
+import { sectorOf } from "./market/universe";
 import type { RunRequest, RunResult, StreamEvent } from "./types";
 
 export async function runAnalysis(o: RunRequest, emit: (e: StreamEvent) => void): Promise<RunResult> {
@@ -22,7 +24,7 @@ export async function runAnalysis(o: RunRequest, emit: (e: StreamEvent) => void)
   const llm = new LLM(o.aiNotes);
 
   emit({ type: "progress", text: "Loading prices…" });
-  const { frames, indexClose, vixClose, source, skipped } = await loadMarket(o.symbols, o.demo,
+  const { frames, indexClose, vixClose, sectorIndex, source, skipped } = await loadMarket(o.symbols, o.demo,
     (d, t) => emit({ type: "progress", text: `Loading prices ${d}/${t}` }));
   // Mubashir's size filter: leave out companies below the minimum market cap (default ₹300 Cr).
   emit({ type: "progress", text: "Checking market cap and EPS…" });
@@ -46,7 +48,9 @@ export async function runAnalysis(o: RunRequest, emit: (e: StreamEvent) => void)
   const mubashir = new Mubashir();
   // Mubashir checks the charts of the leading candidates on 1M / 1D / 4H / 1H / 30m
   // and finds each one's best buy area from 1M, 3M, 6M and 1Y history.
-  const first = mubashir.applyFundamentals(mubashir.analyse(lot, may, snaps), funds);
+  // Mubashir's sector check: each sector against the Nifty; leading sectors lift their stocks.
+  const sectors = analyseSectors(frames, snaps, sectorOf, indexClose, sectorIndex);
+  const first = applySectors(mubashir.applyFundamentals(mubashir.analyse(lot, may, snaps), funds), sectors);
   const candidates = first.slice(0, Math.max(12, o.top * 2)).map((r) => r.symbol);
   emit({ type: "progress", text: "Checking charts…" });
   const intraday = await loadIntraday(candidates, source, frames);
@@ -57,18 +61,20 @@ export async function runAnalysis(o: RunRequest, emit: (e: StreamEvent) => void)
   const clarifications = Object.fromEntries(conflicted.map((r) => [r.symbol, mubashir.adviseOnConflict(r)]));
   const { all, picks, watchlist, passed } = fd.decide(rows, sparks, o.top, clarifications, o.capital, o.riskPerTrade);
 
+  const sectorViews = enrichSectors(sectors, all);
+
   await runDialogue(bus, llm, {
     source, stockCount: rows.length, skipped, indexRet21d,
     aiLabel: llm.enabled ? `on (${aiModel()})` : "off",
     capital: o.capital, riskPerTrade: o.riskPerTrade,
-    excluded, minCapCr, news, vix, positive: morning.positive(news), negative: morning.negative(news),
+    sectors: sectorViews, excluded, minCapCr, news, vix, positive: morning.positive(news), negative: morning.negative(news),
     snaps, lot, may, rows, conflicted, clarifications, picks, passed, watchlist,
   });
 
   const result: RunResult = {
     source, generatedAt: new Date().toISOString(), simulatedAgents: !llm.enabled,
     capital: o.capital, riskPerTrade: o.riskPerTrade,
-    indexRet21d: Math.round(indexRet21d * 100) / 100, news, vix, excluded, minCapCr, picks, watchlist, all, skipped,
+    indexRet21d: Math.round(indexRet21d * 100) / 100, news, vix, excluded, minCapCr, sectors: sectorViews, picks, watchlist, all, skipped,
   };
   emit({ type: "result", result });
   console.log(`[nse-agent-desk] run: ${rows.length} stocks, source=${source.kind}${source.seed !== undefined ? `#${source.seed}` : ""}, ` +

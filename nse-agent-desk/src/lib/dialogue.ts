@@ -13,7 +13,8 @@ import type { MessageBus } from "./bus";
 import { inr, pct } from "./format";
 import type { LLM } from "./llm";
 import { NEWS_BOOST } from "./agents/morningSession";
-import type { AgentReport, Analysis, DataSource, Decision, MessageTable, NewsBrief, NewsItem, Person, Snapshot, VixReport } from "./types";
+import { SECTOR_ADJ } from "./sectors";
+import type { AgentReport, Analysis, DataSource, Decision, MessageTable, NewsBrief, NewsItem, Person, SectorView, Snapshot, VixReport } from "./types";
 
 const ROLE: Record<Person, string> = {
   MorningSession: "news scout who collects the morning stock news",
@@ -31,6 +32,7 @@ const lc = (s?: string) => (!s ? "" : /^[A-Z]{2}/.test(s) ? s : s.charAt(0).toLo
 const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
 
 export interface DialogueInput {
+  sectors: SectorView[];
   excluded: { symbol: string; marketCapCr: number }[];
   minCapCr: number;
   source: DataSource;
@@ -187,6 +189,21 @@ export async function runDialogue(bus: MessageBus, llm: LLM, d: DialogueInput) {
       v.direction === "up" ? `Understood. With VIX rising I'll treat ${risky.length ? list(risky) : "high-beta names"} with extra care and keep the stops firm.`
         : v.direction === "down" ? "Good. Falling VIX supports holding trends longer. I'll still size every trade by its stop-loss."
         : "Thanks. A steady VIX means I rate each stock on its own chart today.", { tickers: risky });
+  }
+
+  // ---------- Mubashir's sector check ----------
+  if (d.sectors.length) {
+    const by = (st: SectorView["state"]) => d.sectors.filter((x) => x.state === st).map((x) => x.sector);
+    const lead = by("Leading"), lag = by("Lagging"), imp = by("Improving"), weak = by("Weakening");
+    const indexN = d.sectors.filter((x) => x.source === "index").length;
+    bus.send("Mubashir", "FinalDecision",
+      `Sector check against the Nifty 50 (${indexN ? `${indexN} from NSE sector indices, the rest from` : "from"} the average of each sector's stocks in this run): ` +
+      [lead.length && `leading ${list(lead)}`, imp.length && `improving ${list(imp)}`, weak.length && `weakening ${list(weak)}`, lag.length && `lagging ${list(lag)}`].filter(Boolean).join("; ") +
+      `. I've moved each stock's score by its sector: leading ${SECTOR_ADJ.Leading >= 0 ? "+" : ""}${SECTOR_ADJ.Leading}, improving +${SECTOR_ADJ.Improving}, weakening ${SECTOR_ADJ.Weakening}, lagging ${SECTOR_ADJ.Lagging}.`,
+      { kind: "report", tickers: [], table: {
+        columns: ["Sector", "State", "1M", "vs Nifty", "Breadth", "Rank"],
+        rows: d.sectors.slice(0, 10).map((x) => [x.sector, x.state, pct(x.ret1m), pct(x.relStrength), `${x.breadth}%`, `${x.rank} of ${d.sectors.length}`]),
+      } });
   }
 
   // ---------- Mubashir's earnings and size check ----------

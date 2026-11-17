@@ -50,6 +50,21 @@ Each bullish timeframe adds 1.5 points to the combined score and each bearish on
 
 If intraday data can't be loaded, 4H, 1H and 30m are marked as not rated. In demo mode the intraday candles are generated to match the demo daily prices.
 
+## Sector check
+
+When you open a stock, its panel starts with a **Sector check**, and the Overview has a **Sector Strength** table ranking every sector.
+
+Each sector's line is its NSE sector index where Yahoo has one (Nifty Bank, IT, Pharma, Auto, FMCG, Metal, Energy, Realty, Infrastructure; live data only), otherwise the average of the sector's stocks in the run (needs at least 2). Against the Nifty 50:
+
+| State | Meaning | Effect on the stock's score |
+|-------|---------|------------------------------|
+| Leading | beating the Nifty over 1 month, lead not shrinking | +3 |
+| Weakening | beating the Nifty, but the lead shrank over the last 10 days | −1 |
+| Improving | behind the Nifty, but the gap closed over the last 10 days | +1 |
+| Lagging | behind the Nifty, gap not closing | −3 |
+
+A change counts only if it's more than 0.1 points, so a steady trend isn't read as a turn. The rank also uses the 3-month return and breadth (% of the sector's stocks above their 50-day average). The panel shows 1- and 3-month returns, the lead over the Nifty, breadth, a 60-day sector vs Nifty chart and the sector's strongest stocks. Mubashir reports the sector states to Final Decision in the chat.
+
 ## Diversification (Portfolio balance)
 
 Mubashir checks how spread out the money is, in two places:
