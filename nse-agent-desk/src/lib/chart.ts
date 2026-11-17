@@ -1,5 +1,5 @@
 /**
- * Mubashir's chart check.
+ * Research Agent's chart check.
  *  - Trend on five timeframes: 1M, 1D, 4H, 1H, 30m.
  *  - Best buy area: the strongest support zone below today's price, built from
  *    1-month, 3-month, 6-month and 1-year history (swing lows and the price

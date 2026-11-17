@@ -1,11 +1,11 @@
 /** Server-side orchestration: load market data, run the four agents, then
  *  stream their conversation and the result. */
-import { FinalDecision } from "./agents/finalDecision";
-import { IVIndex } from "./agents/ivIndex";
-import { MorningSession } from "./agents/morningSession";
-import { Lotappi } from "./agents/lotappi";
-import { Mayavi } from "./agents/mayavi";
-import { Mubashir } from "./agents/mubashir";
+import { DecisionAgent } from "./agents/decision";
+import { VolatilityAgent } from "./agents/volatility";
+import { NewsAgent } from "./agents/news";
+import { MomentumAgent } from "./agents/momentum";
+import { TrendAgent } from "./agents/trend";
+import { ResearchAgent } from "./agents/research";
 import { MessageBus } from "./bus";
 import { runDialogue } from "./dialogue";
 import { pctReturn, snapshot } from "./indicators";
@@ -27,7 +27,7 @@ export async function runAnalysis(o: RunRequest, emit: (e: StreamEvent) => void)
   emit({ type: "progress", text: "Loading prices…" });
   const { frames, indexClose, vixClose, sectorIndex, source, skipped } = await loadMarket(o.symbols, o.demo,
     (d, t) => emit({ type: "progress", text: `Loading prices ${d}/${t}` }));
-  // Mubashir's size filter: leave out companies below the minimum market cap (default ₹300 Cr).
+  // Research Agent's size filter: leave out companies below the minimum market cap (default ₹300 Cr).
   emit({ type: "progress", text: "Checking market cap and EPS…" });
   const funds = await loadFundamentals(Object.fromEntries(Object.entries(frames).map(([k, v]) => [k, v[v.length - 1].close])), source.kind === "demo", source.seed);
   const { min: minCapCr } = capThresholds();
@@ -39,19 +39,19 @@ export async function runAnalysis(o: RunRequest, emit: (e: StreamEvent) => void)
   const indexRet21d = indexClose.length > 21 ? pctReturn(indexClose, 21) : 0;
 
   emit({ type: "progress", text: "Agents are analysing…" });
-  // Morning Session collects the news; positive stories boost Lotappi's and Mayavi's scores.
+  // News Agent collects the news; positive stories boost Momentum Agent's and Trend Agent's scores.
   emit({ type: "progress", text: "Collecting news…" });
   const news = await loadNews(Object.keys(snaps), source.kind === "demo", snaps, source.seed);
-  const morning = new MorningSession();
-  const vix = new IVIndex().analyse(vixClose, indexClose, frames, snaps, news, source.kind === "demo");
-  const lot = morning.apply(new Lotappi().scan(snaps), news);
-  const may = morning.apply(new Mayavi().scan(snaps, indexRet21d), news);
-  const mubashir = new Mubashir();
-  // Mubashir checks the charts of the leading candidates on 1M / 1D / 4H / 1H / 30m
+  const morning = new NewsAgent();
+  const vix = new VolatilityAgent().analyse(vixClose, indexClose, frames, snaps, news, source.kind === "demo");
+  const lot = morning.apply(new MomentumAgent().scan(snaps), news);
+  const may = morning.apply(new TrendAgent().scan(snaps, indexRet21d), news);
+  const mubashir = new ResearchAgent();
+  // Research Agent checks the charts of the leading candidates on 1M / 1D / 4H / 1H / 30m
   // and finds each one's best buy area from 1M, 3M, 6M and 1Y history.
-  // Mubashir's sector check: each sector against the Nifty; leading sectors lift their stocks.
+  // Research Agent's sector check: each sector against the Nifty; leading sectors lift their stocks.
   const sectors = analyseSectors(frames, snaps, sectorOf, indexClose, sectorIndex);
-  // Macro Agent: gold, crude and USD/INR, and the stocks that depend on them — before Mubashir's analysis.
+  // Macro Agent: gold, crude and USD/INR, and the stocks that depend on them — before Research Agent's analysis.
   emit({ type: "progress", text: "Reading gold, crude and USD/INR…" });
   const macroData = await loadMacro(source.kind === "demo", source.seed);
   const macro = macroData ? analyseMacro(frames, macroData.series, macroData.sample) : null;
@@ -61,7 +61,7 @@ export async function runAnalysis(o: RunRequest, emit: (e: StreamEvent) => void)
   const intraday = await loadIntraday(candidates, source, frames);
   const charts = Object.fromEntries(candidates.map((s) => [s, analyseChart(frames[s], intraday[s]?.m30 ?? null, intraday[s]?.h1 ?? null)]));
   const rows = mubashir.applyCharts(first, charts);
-  const fd = new FinalDecision();
+  const fd = new DecisionAgent();
   const conflicted = fd.conflicted(rows, o.top);
   const clarifications = Object.fromEntries(conflicted.map((r) => [r.symbol, mubashir.adviseOnConflict(r)]));
   const { all, picks, watchlist, passed } = fd.decide(rows, sparks, o.top, clarifications, o.capital, o.riskPerTrade);

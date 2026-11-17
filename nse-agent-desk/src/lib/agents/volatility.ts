@@ -1,5 +1,5 @@
 /**
- * IV Index agent: tracks India VIX (the market's expected volatility).
+ * Volatility Agent: tracks India VIX (the market's expected volatility).
  * When VIX moves it lists the likely drivers it can see in the data, and
  * names the stocks it expects to move next.
  *
@@ -22,7 +22,7 @@ function beta(stock: number[], index: number[]): number {
   return varM ? cov / varM : 1;
 }
 
-export class IVIndex {
+export class VolatilityAgent {
   analyse(vix: number[], index: number[], frames: Record<string, Bar[]>, snaps: Record<string, Snapshot>,
     news: NewsBrief | null, sample: boolean): VixReport | null {
     if (vix.length < 25) return null;

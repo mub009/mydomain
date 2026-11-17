@@ -1,12 +1,12 @@
 /**
  * Follow-up rules for a tracked position. Pure functions, so they're easy to test.
  *
- *  stop-hit     price at or below the stop-loss              → exit now          (Lotappi, critical)
- *  near-stop    within 1% above the stop                     → get ready to exit (Lotappi, warning)
- *  loss         3% or more below the buy price               → in loss           (Lotappi, warning)
- *  partial      at buy + 1× risk (the first exit)            → book half, move stop to cost (Mayavi, good)
- *  near-target  within 2% of the target                      → exit area close   (Mayavi, info)
- *  target-hit   at or above the target                       → exit              (Mayavi, good)
+ *  stop-hit     price at or below the stop-loss              → exit now          (Momentum Agent, critical)
+ *  near-stop    within 1% above the stop                     → get ready to exit (Momentum Agent, warning)
+ *  loss         3% or more below the buy price               → in loss           (Momentum Agent, warning)
+ *  partial      at buy + 1× risk (the first exit)            → book half, move stop to cost (Trend Agent, good)
+ *  near-target  within 2% of the target                      → exit area close   (Trend Agent, info)
+ *  target-hit   at or above the target                       → exit              (Trend Agent, good)
  *
  * Each alert fires once per position; "near-stop" fires again if the price
  * recovers at least 2% above the stop and then falls back.
@@ -38,34 +38,34 @@ export function evaluate(p: Position, price: number): { fired: Fired[]; sent: Al
 
   if (price <= stop) {
     if (once("stop-hit")) {
-      fire("stop-hit", "critical", "Lotappi", `${p.symbol}: stop-loss hit, exit now`,
+      fire("stop-hit", "critical", "Momentum", `${p.symbol}: stop-loss hit, exit now`,
         `${p.symbol} is at ${inr(price)}, at or below your stop-loss ${inr(stop)}${stopAtCost ? " (moved to your buy price)" : ""}. Exit the position. Result: ${pnl}.`);
     }
   } else if (price <= stop * 1.01) {
     if (once("near-stop")) {
-      fire("near-stop", "warning", "Lotappi", `${p.symbol}: close to stop-loss`,
+      fire("near-stop", "warning", "Momentum", `${p.symbol}: close to stop-loss`,
         `${p.symbol} is at ${inr(price)}, within 1% of your stop-loss ${inr(stop)}. Be ready to exit. Now ${pnl}.`);
     }
   }
 
   if (pnlPct <= -3 && price > stop && once("loss")) {
-    fire("loss", "warning", "Lotappi", `${p.symbol}: in loss ${pnlPct.toFixed(1)}%`,
+    fire("loss", "warning", "Momentum", `${p.symbol}: in loss ${pnlPct.toFixed(1)}%`,
       `${p.symbol} is ${Math.abs(pnlPct).toFixed(1)}% below your buy price ${inr(p.buyPrice)} (now ${inr(price)}). The stop-loss is ${inr(stop)}; don't move it lower.`);
   }
 
   if (price >= p.partial && price < p.target && once("partial")) {
     stop = p.buyPrice; stopAtCost = true;
-    fire("partial", "good", "Mayavi", `${p.symbol}: first exit reached`,
+    fire("partial", "good", "Trend", `${p.symbol}: first exit reached`,
       `${p.symbol} reached ${inr(price)}, your first exit ${inr(p.partial)} (1× risk). Book half (${Math.floor(p.qty / 2)} shares) and move the stop-loss up to your buy price ${inr(p.buyPrice)}, so the rest can't turn into a loss. Now ${pnl}.`);
   }
 
   if (price >= p.target * 0.98 && price < p.target && once("near-target")) {
-    fire("near-target", "info", "Mayavi", `${p.symbol}: near the exit area`,
+    fire("near-target", "info", "Trend", `${p.symbol}: near the exit area`,
       `${p.symbol} is at ${inr(price)}, within 2% of the target ${inr(p.target)}. Get ready to exit. Now ${pnl}.`);
   }
 
   if (price >= p.target && once("target-hit")) {
-    fire("target-hit", "good", "Mayavi", `${p.symbol}: target reached, exit`,
+    fire("target-hit", "good", "Trend", `${p.symbol}: target reached, exit`,
       `${p.symbol} reached ${inr(price)}, at or above the target ${inr(p.target)}. Exit the position (or keep a small part with the stop at ${inr(Math.max(stop, p.partial))}). Result: ${pnl}.`);
   }
 

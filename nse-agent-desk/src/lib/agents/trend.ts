@@ -1,8 +1,8 @@
-/** Agent 2 - Mayavi: short-month positional picker (about 1 month). */
+/** Agent 2 - Trend: short-month positional picker (about 1 month). */
 import type { AgentReport, Snapshot } from "../types";
 import { byScore, clamp, round, signalFor } from "./base";
 
-export class Mayavi {
+export class TrendAgent {
 
   score(symbol: string, s: Snapshot, indexRet21d: number): AgentReport {
     let pts = 25;

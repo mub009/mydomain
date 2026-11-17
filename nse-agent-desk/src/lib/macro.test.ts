@@ -71,15 +71,15 @@ describe("Macro Agent", () => {
 });
 
 describe("in the full run", () => {
-  it("the Macro Agent reports to Mubashir before his follow-up questions", async () => {
+  it("the Macro Agent reports to Research Agent before his follow-up questions", async () => {
     const msgs: Message[] = [];
     const r = await runAnalysis({ symbols: ALL_CAPS, top: 5, demo: true, aiNotes: false, riskPerTrade: 1 }, (e) => { if (e.type === "message") msgs.push(e.message); });
     expect(r.macro?.factors.map((f) => f.id)).toEqual(["gold", "crude", "usdinr"]);
     const macroAt = msgs.findIndex((m) => m.sender === "Macro");
-    const followUp = msgs.findIndex((m) => m.sender === "Mubashir" && m.to === "Lotappi");
+    const followUp = msgs.findIndex((m) => m.sender === "Research" && m.to === "Momentum");
     expect(macroAt).toBeGreaterThan(0);
     expect(macroAt).toBeLessThan(followUp);
-    expect(msgs[macroAt].to).toBe("Mubashir");
+    expect(msgs[macroAt].to).toBe("Research");
     for (const m of msgs) expect(m.text).not.toMatch(/undefined|NaN/);
     // Demo stocks with a known link really do move with their factor.
     const it = r.macro!.exposures.filter((e) => e.factor === "usdinr" && e.link === "benefits" && e.corr !== undefined);

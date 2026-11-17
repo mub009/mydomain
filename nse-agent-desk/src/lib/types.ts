@@ -137,7 +137,7 @@ export interface Analysis {
   fundamentals?: Fundamentals;
   /** Gold / crude / USD-INR links found by the Macro Agent. */
   macro?: MacroExposure[];
-  /** Mubashir's multi-timeframe chart check (top candidates only). */
+  /** Research Agent's multi-timeframe chart check (top candidates only). */
   chart?: ChartAnalysis;
 }
 
@@ -151,7 +151,7 @@ export interface Decision extends Analysis {
   spark: number[]; // last ~60 closes
 }
 
-export type Person = "MorningSession" | "IVIndex" | "Macro" | "Lotappi" | "Mayavi" | "Mubashir" | "FinalDecision";
+export type Person = "News" | "Volatility" | "Macro" | "Momentum" | "Trend" | "Research" | "Decision";
 export type AgentName = Person | "System";
 export type Stage = "scan" | "analyze" | "debate" | "decide";
 

@@ -50,7 +50,7 @@ export function TimeframeDots({ chart }: { chart: ChartAnalysis }) {
   );
 }
 
-/** Drawer section: Mubashir's chart check and best buy area. */
+/** Drawer section: Research Agent's chart check and best buy area. */
 export function ChartCheck({ chart, price }: { chart: ChartAnalysis; price: number }) {
   const z = chart.zone;
   const data = chart.closes.map((v, i) => ({ i, v }));

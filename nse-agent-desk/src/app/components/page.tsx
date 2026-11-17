@@ -26,11 +26,11 @@ const SAMPLE: Decision[] = [
   stock("GOLF", "Pharma", 35, 62, "AVOID", -1, 6), stock("HOTEL", "Telecom", 44, 21, "AVOID", -1.5, 7),
 ];
 const MSG: Message = {
-  id: 1, sender: "Lotappi", to: "Mubashir", thread: "Lotappi|Mubashir", kind: "report", stage: "scan",
-  text: "Mubashir, here is my short-term shortlist. ALPHA leads on volume.", tickers: ["ALPHA"],
+  id: 1, sender: "Momentum", to: "Research", thread: "Momentum|Research", kind: "report", stage: "scan",
+  text: "Research Agent, here is my short-term shortlist. ALPHA leads on volume.", tickers: ["ALPHA"],
   table: { columns: ["Symbol", "Score", "Signal", "Reason"], rows: [["ALPHA", "88.0", "BUY", "Breakout above 20-day high"], ["BRAVO", "74.0", "BUY", "EMA9 above EMA21"], ["DELTA", "52.0", "WATCH", "RSI 51 in momentum zone"]] },
 };
-const DECISION: Message = { id: 2, sender: "FinalDecision", to: "ALL", thread: "team", kind: "decision", stage: "decide", text: "Decision made. We go with ALPHA, BRAVO and CHARLIE.", tickers: ["ALPHA", "BRAVO", "CHARLIE"] };
+const DECISION: Message = { id: 2, sender: "Decision", to: "ALL", thread: "team", kind: "decision", stage: "decide", text: "Decision made. We go with ALPHA, BRAVO and CHARLIE.", tickers: ["ALPHA", "BRAVO", "CHARLIE"] };
 const STATES: Presence[] = ["Online", "Typing", "Analyzing", "Reviewing", "Idle"];
 
 function Block({ n, name, children }: { n: number; name: string; children: React.ReactNode }) {
@@ -51,25 +51,25 @@ export default function ComponentShowcase() {
         <Block n={1} name="AgentAvatarWithPresence">
           <div className="flex flex-wrap items-end gap-5">
             {PEOPLE.map((p, i) => <div key={p} className="flex flex-col items-center gap-1.5 text-[11px] text-muted-foreground"><AgentAvatar who={p} size={56} presence={STATES[i]} />{STATES[i]}</div>)}
-            <div className="flex flex-col items-center gap-1.5 text-[11px] text-muted-foreground"><AgentAvatar who="Lotappi" size={32} presence="Idle" />Idle</div>
+            <div className="flex flex-col items-center gap-1.5 text-[11px] text-muted-foreground"><AgentAvatar who="Momentum" size={32} presence="Idle" />Idle</div>
           </div>
         </Block>
         <Block n={2} name="AgentStatusCard">
           <div className="grid gap-1 rounded-xl bg-sidebar p-2 sm:grid-cols-2">
-            <AgentStatusCard who="Lotappi" presence="Typing" lastMessage="My short-term scan is done." />
-            <AgentStatusCard who="Mubashir" presence="Analyzing" />
+            <AgentStatusCard who="Momentum" presence="Typing" lastMessage="My short-term scan is done." />
+            <AgentStatusCard who="Research" presence="Analyzing" />
           </div>
         </Block>
         <Block n={3} name="ChatMessage"><div className="space-y-3"><ChatMessage m={MSG} time={now} /><ChatMessage m={DECISION} time={now} /></div></Block>
         <div className="grid gap-4">
-          <Block n={4} name="TypingIndicator"><span className="flex items-center gap-2 text-sm text-muted-foreground">Mayavi is typing <TypingIndicator /></span></Block>
+          <Block n={4} name="TypingIndicator"><span className="flex items-center gap-2 text-sm text-muted-foreground">Trend Agent is typing <TypingIndicator /></span></Block>
           <Block n={5} name="StockSymbolChip"><p className="text-sm">We both rate <StockSymbolChip symbol="ALPHA" /> and <StockSymbolChip symbol="BRAVO" /> above 60.</p></Block>
           <Block n={6} name="MiniReportTable"><MiniReportTable table={MSG.table!} /></Block>
           <Block n={7} name="VerdictBadge"><div className="flex flex-wrap gap-2">{["STRONG BUY", "BUY", "WATCH", "AVOID"].map((v) => <VerdictBadge key={v} verdict={v} />)}</div></Block>
         </div>
         <Block n={8} name="KPICard">
           <div className="grid grid-cols-2 gap-3">
-            <KPICard label="Both Agents Agree" value="14" sub="Lotappi and Mayavi both ≥ 60" icon={<Handshake />} />
+            <KPICard label="Both Agents Agree" value="14" sub="Momentum Agent and Trend Agent both ≥ 60" icon={<Handshake />} />
             <KPICard label="Nifty 50 · 1-Month" value="+2.91%" sub="Sample value" tone="pos" icon={<TrendingUp />} />
           </div>
         </Block>

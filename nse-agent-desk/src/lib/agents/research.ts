@@ -1,18 +1,18 @@
-/** Agent 3 - Mubashir: the analyst. Merges Lotappi's and Mayavi's reports,
+/** Agent 3 - Research: the analyst. Merges Momentum Agent's and Trend Agent's reports,
  *  checks agreement, rates risk and prepares the trade scenario. */
 import { sectorOf } from "../market/universe";
 import type { AgentReport, Analysis, ChartAnalysis, Fundamentals, Risk, Snapshot } from "../types";
 import { clamp, round } from "./base";
 
-export class Mubashir {
+export class ResearchAgent {
   analyseOne(symbol: string, lot: AgentReport, may: AgentReport, s: Snapshot): Analysis {
     let combined = 0.5 * lot.score + 0.5 * may.score;
     const notes: string[] = [];
 
     const agree = lot.score >= 60 && may.score >= 60;
     const conflict = !agree && Math.abs(lot.score - may.score) > 25;
-    if (agree) { combined += 5; notes.push("Both Lotappi and Mayavi like it"); }
-    if (conflict) notes.push(`Conflict: Lotappi ${lot.score.toFixed(0)} vs Mayavi ${may.score.toFixed(0)}`);
+    if (agree) { combined += 5; notes.push("Both Momentum Agent and Trend Agent like it"); }
+    if (conflict) notes.push(`Conflict: Momentum Agent ${lot.score.toFixed(0)} vs Trend Agent ${may.score.toFixed(0)}`);
 
     const riskPts = Number(s.atrPct > 4) + Number(s.volatility21d > 45) + Number(s.rsi > 75);
     const risk: Risk = riskPts === 0 ? "LOW" : riskPts === 1 ? "MEDIUM" : "HIGH";
@@ -82,10 +82,10 @@ export class Mubashir {
     }).sort((a, b) => b.combined - a.combined);
   }
 
-  /** Mubashir's advice when Lotappi and Mayavi disagree on a stock: evidence, trade-off, uncertainty. */
+  /** Research Agent's advice when Momentum Agent and Trend Agent disagree on a stock: evidence, trade-off, uncertainty. */
   adviseOnConflict(r: Analysis): string {
     return r.lotappi > r.mayavi
-      ? `Lotappi scores it ${r.lotappi.toFixed(0)}, Mayavi only ${r.mayavi.toFixed(0)}. The evidence favours a short trade: momentum is there (${r.ret5d >= 0 ? "+" : ""}${r.ret5d.toFixed(1)}% in 5 days) but the monthly trend is weak. Trade-off: quick gain vs no trend support, so it is a tight-stop swing at best. I would not hold it for a month.`
-      : `Mayavi scores it ${r.mayavi.toFixed(0)}, Lotappi only ${r.lotappi.toFixed(0)}. The evidence favours the 1-month view: the trend is sound (${r.ret21d >= 0 ? "+" : ""}${r.ret21d.toFixed(1)}% over the month) but short-term timing is poor. Trade-off: buying now risks an early dip. I'd wait for a pullback or a fresh breakout; I can't tell which comes first.`;
+      ? `Momentum Agent scores it ${r.lotappi.toFixed(0)}, Trend Agent only ${r.mayavi.toFixed(0)}. The evidence favours a short trade: momentum is there (${r.ret5d >= 0 ? "+" : ""}${r.ret5d.toFixed(1)}% in 5 days) but the monthly trend is weak. Trade-off: quick gain vs no trend support, so it is a tight-stop swing at best. I would not hold it for a month.`
+      : `Trend Agent scores it ${r.mayavi.toFixed(0)}, Momentum Agent only ${r.lotappi.toFixed(0)}. The evidence favours the 1-month view: the trend is sound (${r.ret21d >= 0 ? "+" : ""}${r.ret21d.toFixed(1)}% over the month) but short-term timing is poor. Trade-off: buying now risks an early dip. I'd wait for a pullback or a fresh breakout; I can't tell which comes first.`;
   }
 }

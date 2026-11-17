@@ -102,9 +102,9 @@ export function ForecastTab({ d }: { d: Decision }) {
             </dl>
 
             <div className="flex gap-2.5 rounded-lg bg-muted/50 p-2.5 text-[12.5px] leading-relaxed">
-              <AgentAvatar who="Mubashir" size={28} />
+              <AgentAvatar who="Research" size={28} />
               <p>
-                <b className="text-[#14B8A6]">Mubashir:</b> In {horizon === 10 ? "10 trading days" : "a month"}, the middle path ends near <b>{inr(f.median)}</b> ({pct((f.median / f.last - 1) * 100)}),
+                <b className="text-[#14B8A6]">Research Agent:</b> In {horizon === 10 ? "10 trading days" : "a month"}, the middle path ends near <b>{inr(f.median)}</b> ({pct((f.median / f.last - 1) * 100)}),
                 and 8 in 10 simulated outcomes end between <b>{inr(f.range80[0])}</b> and <b>{inr(f.range80[1])}</b>. The price ended higher than today in {f.probUp.toFixed(0)}% of them.
                 {f.probTarget > f.probStop * 1.3 ? " The odds favour the target over the stop." : f.probStop > f.probTarget * 1.3 ? " The stop is more likely to be hit than the target in this time; consider waiting for the buy zone." : " Target and stop are about equally likely in this time."}
               </p>

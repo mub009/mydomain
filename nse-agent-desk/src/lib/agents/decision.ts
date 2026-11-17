@@ -1,10 +1,10 @@
-/** Agent 4 - Final Decision: turns Mubashir's analysis into verdicts, applies
+/** Agent 4 - Decision Agent: turns Research Agent's analysis into verdicts, applies
  *  portfolio rules (sector concentration, capital) and chooses the picks. */
 import type { Analysis, Decision, Verdict } from "../types";
 
 export const MAX_PER_SECTOR = 2;
 
-export class FinalDecision {
+export class DecisionAgent {
   verdict(r: Analysis): Verdict {
     const f = r.fundamentals;
     const loss = f?.epsTTM !== undefined && f.epsTTM < 0;
@@ -19,7 +19,7 @@ export class FinalDecision {
     return v;
   }
 
-  /** Stocks among the candidates that Final Decision wants to ask Mubashir about. */
+  /** Stocks among the candidates that Decision Agent wants to ask Research Agent about. */
   conflicted(rows: Analysis[], top: number): Analysis[] {
     return rows.slice(0, Math.max(top * 2, 10)).filter((r) => r.conflict && r.combined >= 48).slice(0, 2);
   }

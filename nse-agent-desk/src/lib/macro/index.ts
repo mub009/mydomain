@@ -14,7 +14,7 @@
  *   points     2, +1 for a big move (2× the threshold), +1 if the stock's measured
  *              correlation with the factor agrees (|corr| ≥ 0.2), −1 if it disagrees
  * A stock with no known link but |corr| ≥ 0.4 is listed as a "measured" link worth 1 point.
- * The total per stock is capped at ±4 and applied to Mubashir's combined score.
+ * The total per stock is capped at ±4 and applied to Research Agent's combined score.
  */
 import type { Analysis, Bar, MacroExposure, MacroFactor, MacroReport } from "../types";
 import { getProvider } from "../market";
@@ -138,7 +138,7 @@ export function analyseMacro(frames: Record<string, Bar[]>, series: FactorSeries
   };
 }
 
-/** Apply the Macro Agent's points to Mubashir's scores (capped at ±4 per stock). */
+/** Apply the Macro Agent's points to Research Agent's scores (capped at ±4 per stock). */
 export function applyMacro(rows: Analysis[], report: MacroReport | null): Analysis[] {
   if (!report) return rows;
   const by = new Map<string, MacroExposure[]>();

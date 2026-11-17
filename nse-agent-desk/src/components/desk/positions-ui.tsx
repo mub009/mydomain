@@ -109,7 +109,7 @@ export function TrackTradeButton({ d, size = "sm", className }: { d: Decision; s
         <Dialog.Content className="card fixed left-1/2 top-1/2 z-[71] w-[min(440px,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
           <Dialog.Title className="text-lg font-bold">Track {d.symbol}</Dialog.Title>
           <Dialog.Description className="mt-0.5 text-[13px] text-muted-foreground">
-            Enter what you actually bought. Lotappi and Mayavi will follow it up and alert you on losses, the stop-loss and the exit area.
+            Enter what you actually bought. Momentum Agent and Trend Agent will follow it up and alert you on losses, the stop-loss and the exit area.
           </Dialog.Description>
           <div className="mt-4 grid grid-cols-2 gap-3">
             <Field label="Buy price (₹)"><input className={inputClass} inputMode="decimal" value={buy} onChange={(e) => setBuy(e.target.value)} /></Field>

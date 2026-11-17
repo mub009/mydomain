@@ -53,8 +53,8 @@ export function DiversificationCard({ d, title, subtitle }: { d: Diversification
       </header>
 
       <div className="flex gap-2.5 rounded-lg bg-muted/50 p-2.5">
-        <AgentAvatar who="Mubashir" size={28} />
-        <p className="text-[12.5px] leading-relaxed"><b className="text-[#14B8A6]">Mubashir:</b> {d.summary} Total {inr(d.total, 0)}.</p>
+        <AgentAvatar who="Research" size={28} />
+        <p className="text-[12.5px] leading-relaxed"><b className="text-[#14B8A6]">Research Agent:</b> {d.summary} Total {inr(d.total, 0)}.</p>
       </div>
 
       <div className="grid gap-5 md:grid-cols-3">

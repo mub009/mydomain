@@ -1,30 +1,30 @@
 /**
  * The team conversation, generated from the analysis results of this run.
- *   1. Lotappi <-> Mayavi          compare top threes, agree / disagree
- *   2. Lotappi, Mayavi -> Mubashir five-stock reports
- *   3. Mubashir follow-ups         RSI / 5-day / volume, then 1-month / averages / relative strength
- *   4. Mubashir -> Final Decision  combined top eight
- *   5. Final Decision <-> Mubashir disagreements, concentration, capital
- *   6. Final Decision -> team      the picks; Lotappi and Mayavi confirm
+ *   1. Momentum Agent <-> Trend Agent          compare top threes, agree / disagree
+ *   2. Momentum Agent, Trend Agent -> Research Agent five-stock reports
+ *   3. Research Agent follow-ups         RSI / 5-day / volume, then 1-month / averages / relative strength
+ *   4. Research Agent -> Decision Agent  combined top eight
+ *   5. Decision Agent <-> Research Agent disagreements, concentration, capital
+ *   6. Decision Agent -> team      the picks; Momentum Agent and Trend Agent confirm
  * Every number comes from the analysis; nothing is invented.
  */
-import { MAX_PER_SECTOR } from "./agents/finalDecision";
+import { MAX_PER_SECTOR } from "./agents/decision";
 import type { MessageBus } from "./bus";
 import { inr, pct } from "./format";
 import type { LLM } from "./llm";
-import { NEWS_BOOST } from "./agents/morningSession";
+import { NEWS_BOOST } from "./agents/news";
 import { SECTOR_ADJ } from "./sectors";
 import { factorName } from "./macro";
 import type { AgentReport, Analysis, DataSource, Decision, MacroReport, MessageTable, NewsBrief, NewsItem, Person, SectorView, Snapshot, VixReport } from "./types";
 
 const ROLE: Record<Person, string> = {
-  MorningSession: "news scout who collects the morning stock news",
-  IVIndex: "volatility analyst who tracks India VIX",
+  News: "news scout who collects the morning stock news",
+  Volatility: "volatility analyst who tracks India VIX",
   Macro: "commodity and currency analyst who tracks gold, crude oil and USD/INR",
-  Lotappi: "short-term (1-10 day) swing-trade scanner",
-  Mayavi: "1-month positional trend scanner",
-  Mubashir: "analyst who combines the short-term and 1-month reports and checks risk",
-  FinalDecision: "final decision maker who picks the stocks to act on",
+  Momentum: "short-term (1-10 day) swing-trade scanner",
+  Trend: "1-month positional trend scanner",
+  Research: "analyst who combines the short-term and 1-month reports and checks risk",
+  Decision: "final decision maker who picks the stocks to act on",
 };
 
 const names = (xs: { symbol: string }[]) => xs.map((x) => x.symbol);
@@ -60,7 +60,7 @@ export interface DialogueInput {
   watchlist: Decision[];
 }
 
-/** How to enter each pick, from Mubashir's buy zones. */
+/** How to enter each pick, from Research Agent's buy zones. */
 function entryPlan(picks: Decision[]): string {
   const by = (plan: string) => picks.filter((p) => p.chart?.zone?.plan === plan).map((p) => p.symbol);
   const now = by("In buy zone"), dip = by("Wait for dip"), ext = by("Extended");
@@ -91,39 +91,39 @@ export async function runDialogue(bus: MessageBus, llm: LLM, d: DialogueInput) {
     (d.skipped.length ? ` · skipped: ${d.skipped.join(", ")}` : "") +
     (d.excluded.length ? ` · left out below ₹${d.minCapCr} Cr market cap: ${d.excluded.map((e) => e.symbol).join(", ")}` : ""), { kind: "system" });
 
-  // ---------- Step 0: Morning Session hands over the news ----------
+  // ---------- Step 0: News Agent hands over the news ----------
   if (d.news) {
     const pos = d.positive.slice(0, 6);
     const newsTable: MessageTable = { columns: ["Symbol", "Headline", "Source"], rows: pos.map((n) => [n.symbol, n.headline, n.source]) };
     const tag = d.news.sample ? " These are sample headlines, not real news." : "";
     if (pos.length) {
-      bus.send("MorningSession", "Lotappi",
-        `Hi Lotappi, Morning Session here. I went through ${d.news.total} headlines from ${d.news.label}: ${plural(d.positive.length, "stock")} with positive news, ${d.negative.length} with negative. Here are the positive ones for your scan.${tag}`,
+      bus.send("News", "Momentum",
+        `News Agent, pre-market report. I went through ${d.news.total} headlines from ${d.news.label}: ${plural(d.positive.length, "stock")} with positive news, ${d.negative.length} with negative. Here are the positive ones for your scan.${tag}`,
         { kind: "report", table: newsTable, tickers: names(pos) });
       const weakL = pos.filter((n) => (lotBy.get(n.symbol)?.score ?? 0) < 50).map((n) => n.symbol);
-      bus.send("Lotappi", "MorningSession",
+      bus.send("Momentum", "News",
         `Thanks. Each one gets +${NEWS_BOOST} on my score.` + (weakL.length ? ` ${list(weakL)} still ${weakL.length === 1 ? "fails" : "fail"} my momentum rules, so good news alone doesn't make ${weakL.length === 1 ? "it" : "them"} a trade.` : " They all look tradable on my charts too."),
         { tickers: weakL });
-      bus.send("MorningSession", "Mayavi", `Mayavi, same positive list for your 1-month view.${d.negative.length ? ` Be careful with ${list(names(d.negative.slice(0, 3)))}: negative headlines there.` : ""}`,
+      bus.send("News", "Trend", `Trend Agent, same positive list for your 1-month view.${d.negative.length ? ` Be careful with ${list(names(d.negative.slice(0, 3)))}: negative headlines there.` : ""}`,
         { kind: "report", table: newsTable, tickers: [...names(pos), ...names(d.negative.slice(0, 3))] });
       const strongM = pos.filter((n) => (mayBy.get(n.symbol)?.score ?? 0) >= 60).map((n) => n.symbol);
-      bus.send("Mayavi", "MorningSession",
+      bus.send("Trend", "News",
         `Noted, +${NEWS_BOOST} for each. ` + (strongM.length ? `${list(strongM)} already ${strongM.length === 1 ? "has" : "have"} a good monthly trend, so the news supports the chart.` : "None of them has a strong monthly trend yet, so I'll wait for the chart to confirm."),
         { tickers: strongM });
     } else {
-      bus.send("MorningSession", "Lotappi", `Morning Session here. I went through ${d.news.total} headlines from ${d.news.label} and found no clearly positive news on the stocks we scan. Nothing to add to your scores today.`);
+      bus.send("News", "Momentum", `News Agent here. I went through ${d.news.total} headlines from ${d.news.label} and found no clearly positive news on the stocks we scan. Nothing to add to your scores today.`);
     }
   }
 
   const l3 = d.lot.slice(0, 3), m3 = d.may.slice(0, 3);
   const lead = d.lot[0];
-  bus.send("Lotappi", "Mayavi",
-    `Hi Mayavi, my short-term scan is done. Top three: ${list(l3.map((r) => `${r.symbol} (${r.score.toFixed(0)})`))}. ` +
+  bus.send("Momentum", "Trend",
+    `Trend Agent, short-term scan complete. Top three: ${list(l3.map((r) => `${r.symbol} (${r.score.toFixed(0)})`))}. ` +
     `${lead.symbol} stands out: ${[lead.reasons[0], lead.reasons[1]].filter(Boolean).map(lc).join(", ") || "it has the best momentum score"}. What does your monthly view say?`,
     { tickers: names(l3) });
 
   const overlap = d.rows.filter((r) => r.agree).slice(0, 3).map((r) => r.symbol);
-  bus.send("Mayavi", "Lotappi",
+  bus.send("Trend", "Momentum",
     `My 1-month leaders are ${list(m3.map((r) => `${r.symbol} (${r.score.toFixed(0)})`))}. ` +
     (overlap.length
       ? `Good news: we both rate ${list(overlap)} above 60, so ${overlap.length === 1 ? "that one looks" : "those look"} solid on both time frames.`
@@ -134,51 +134,51 @@ export async function runDialogue(bus: MessageBus, llm: LLM, d: DialogueInput) {
   if (c) {
     const l = lotBy.get(c.symbol)!, m = mayBy.get(c.symbol)!;
     if (c.lotappi > c.mayavi) {
-      bus.send("Mayavi", "Lotappi",
+      bus.send("Trend", "Momentum",
         `One thing: you give ${c.symbol} ${l.score.toFixed(0)}, but I only give it ${m.score.toFixed(0)}. ` +
         `${m.warnings[0] ?? "The monthly trend is weak"}. I'd treat it as a quick trade only.`, { tickers: [c.symbol] });
-      bus.send("Lotappi", "Mayavi",
-        `Fair point. For ${c.symbol} I'd keep it in and out, with a tight stop. Let's flag it to Mubashir.`, { tickers: [c.symbol] });
+      bus.send("Momentum", "Trend",
+        `Fair point. For ${c.symbol} I'd keep it in and out, with a tight stop. Let's flag it to Research Agent.`, { tickers: [c.symbol] });
     } else {
-      bus.send("Lotappi", "Mayavi",
+      bus.send("Momentum", "Trend",
         `${c.symbol} is ${m.score.toFixed(0)} on your list but only ${l.score.toFixed(0)} on mine. ` +
         `${l.warnings[0] ?? "Short-term momentum is flat"}. The timing looks off right now.`, { tickers: [c.symbol] });
-      bus.send("Mayavi", "Lotappi",
-        `True, ${c.symbol} is a trend hold, not a swing. Better to buy it on a dip. I'll flag it to Mubashir.`, { tickers: [c.symbol] });
+      bus.send("Trend", "Momentum",
+        `True, ${c.symbol} is a trend hold, not a swing. Better to buy it on a dip. I'll flag it to Research Agent.`, { tickers: [c.symbol] });
     }
   } else {
-    bus.send("Lotappi", "Mayavi", "No big disagreements between us today. Sending my report to Mubashir now.");
+    bus.send("Momentum", "Trend", "No big disagreements between us today. Sending my report to Research Agent now.");
   }
 
   // ---------- Step 2: individual reports ----------
-  bus.send("Lotappi", "Mubashir", "Mubashir, here is my short-term shortlist (1-10 trading days).", {
+  bus.send("Momentum", "Research", "Research Agent, here is my short-term shortlist (1-10 trading days).", {
     kind: "report", table: reportTable(d.lot.slice(0, 5)), tickers: names(d.lot.slice(0, 5)),
-    aiNote: await note("Lotappi", "In 3-4 short lines, explain your best short-term setups and the main risk, speaking to your colleague Mubashir.", d.lot.slice(0, 5)),
+    aiNote: await note("Momentum", "In 3-4 short lines, explain your best short-term setups and the main risk, speaking to your colleague Research Agent.", d.lot.slice(0, 5)),
   });
-  bus.send("Mayavi", "Mubashir", `And here is my 1-month list, Mubashir. Nifty 50 is ${pct(d.indexRet21d)} over the month, for comparison.`, {
+  bus.send("Trend", "Research", `And here is my 1-month list, Research Agent. Nifty 50 is ${pct(d.indexRet21d)} over the month, for comparison.`, {
     kind: "report", table: reportTable(d.may.slice(0, 5)), tickers: names(d.may.slice(0, 5)),
-    aiNote: await note("Mayavi", "In 3-4 short lines, explain your best 1-month picks and the main risk, speaking to your colleague Mubashir.", d.may.slice(0, 5)),
+    aiNote: await note("Trend", "In 3-4 short lines, explain your best 1-month picks and the main risk, speaking to your colleague Research Agent.", d.may.slice(0, 5)),
   });
 
-  // ---------- Macro Agent: gold, crude, USD/INR → Mubashir (before his analysis) ----------
+  // ---------- Macro Agent: gold, crude, USD/INR → Research Agent (before his analysis) ----------
   if (d.macro && d.macro.factors.length) {
     const mx = d.macro;
     const scanned = new Set([...d.lot.slice(0, 10), ...d.may.slice(0, 10)].map((r) => r.symbol));
     const active = mx.exposures.filter((e) => e.points !== 0);
     const shown = [...active.filter((e) => scanned.has(e.symbol)), ...active.filter((e) => !scanned.has(e.symbol))].slice(0, 8);
-    bus.send("Macro", "Mubashir",
-      `Mubashir, before you combine the lists: ${mx.summary}${mx.sample ? " (Sample series in demo mode.)" : ""}` +
+    bus.send("Macro", "Research",
+      `Research Agent, before you combine the lists: ${mx.summary}${mx.sample ? " (Sample series in demo mode.)" : ""}` +
       (shown.length ? " These stocks depend on those moves:" : " None of the scanned stocks is strongly exposed to these moves right now."),
       { kind: "report", tickers: [...new Set(shown.map((e) => e.symbol))],
         table: shown.length ? {
           columns: ["Symbol", "Factor", "Effect", "Points", "Why"],
           rows: shown.map((e) => [e.symbol, factorName(e.factor), e.effect, `${e.points > 0 ? "+" : ""}${e.points}`, e.reason + (e.corr !== undefined && e.basis === "known" ? ` (measured correlation ${e.corr.toFixed(2)})` : "")]),
         } : undefined,
-        aiNote: await note("Macro", "In 3-4 short lines, tell Mubashir what the gold, crude and USD/INR moves mean for the listed Indian stocks. Use only the data given.", { factors: mx.factors.map(({ spark: _s, ...f }) => f), exposures: shown }),
+        aiNote: await note("Macro", "In 3-4 short lines, tell Research Agent what the gold, crude and USD/INR moves mean for the listed Indian stocks. Use only the data given.", { factors: mx.factors.map(({ spark: _s, ...f }) => f), exposures: shown }),
       });
     const ups = [...new Set(active.filter((e) => e.effect === "Tailwind").map((e) => e.symbol))].slice(0, 4);
     const downs = [...new Set(active.filter((e) => e.effect === "Headwind").map((e) => e.symbol))].slice(0, 4);
-    bus.send("Mubashir", "Macro",
+    bus.send("Research", "Macro",
       active.length
         ? `Thanks. I'll add your points to those scores (at most ±4 per stock)` + (ups.length ? `: a lift for ${list(ups)}` : "") + (downs.length ? `${ups.length ? "," : ":"} a cut for ${list(downs)}` : "") + "."
         : "Understood. No macro adjustments today.",
@@ -189,42 +189,42 @@ export async function runDialogue(bus: MessageBus, llm: LLM, d: DialogueInput) {
   bus.stage = "analyze";
   const top = d.rows[0];
   const ts = d.snaps[top.symbol], tm = mayBy.get(top.symbol)!;
-  bus.send("Mubashir", "Lotappi", `Thanks, Lotappi. ${top.symbol} ranks highest after I combine both lists. Is the move still fresh, or are we late?`, { tickers: [top.symbol] });
-  bus.send("Lotappi", "Mubashir",
+  bus.send("Research", "Momentum", `Thanks, Momentum Agent. ${top.symbol} ranks highest after I combine both lists. Is the move still fresh, or are we late?`, { tickers: [top.symbol] });
+  bus.send("Momentum", "Research",
     `RSI is ${ts.rsi.toFixed(0)}${ts.rsi > 70 ? ", so it's getting stretched" : ts.rsi < 45 ? ", so momentum is soft" : ", so there's still room"}. ` +
     `It moved ${pct(ts.ret5d)} in 5 days, and today's volume is ${ts.volRatio.toFixed(1)}x the 20-day average` +
     `${ts.volRatio >= 1.5 ? ", which confirms buyers are active." : ts.volRatio < 0.8 ? ", which is thin, so I wouldn't chase it." : ", which is normal."}`,
     { tickers: [top.symbol] });
-  bus.send("Mubashir", "Mayavi", `Mayavi, does ${top.symbol} hold up over a month?`, { tickers: [top.symbol] });
+  bus.send("Research", "Trend", `Trend Agent, does ${top.symbol} hold up over a month?`, { tickers: [top.symbol] });
   const above = (v: number) => (ts.close > v ? "above" : "below");
   const rs = ts.ret21d - d.indexRet21d;
-  bus.send("Mayavi", "Mubashir",
+  bus.send("Trend", "Research",
     `It is ${pct(ts.ret21d)} over the month. Price is ${above(ts.sma20)} its 20-day and ${above(ts.sma50)} its 50-day average` +
     `${Number.isNaN(ts.sma200) ? "" : `, and ${above(ts.sma200)} the 200-day`}. Against the Nifty it is ${rs >= 0 ? "ahead" : "behind"} by ${Math.abs(rs).toFixed(1)}%. ` +
     `${tm.score >= 60 ? "I'm comfortable holding it for a month." : `My score is only ${tm.score.toFixed(0)}, so I'm not convinced for a month.`}`,
     { tickers: [top.symbol] });
 
-  // ---------- IV Index agent reports to Mubashir ----------
+  // ---------- Volatility Agent reports to Research Agent ----------
   if (d.vix) {
     const v = d.vix;
-    bus.send("IVIndex", "Mubashir",
-      `Mubashir, India VIX is at ${v.level.toFixed(2)}, ${v.direction === "flat" ? "little changed" : v.direction} ${pct(v.change1d)} today and ${pct(v.change5d)} over 5 days. Regime: ${v.regime.toLowerCase()}.` +
+    bus.send("Volatility", "Research",
+      `Research Agent, India VIX is at ${v.level.toFixed(2)}, ${v.direction === "flat" ? "little changed" : v.direction} ${pct(v.change1d)} today and ${pct(v.change5d)} over 5 days. Regime: ${v.regime.toLowerCase()}.` +
       `${v.sample ? " (Demo VIX, not the real index.)" : ""}\n\nLikely why:\n${v.reasons.map((r) => `• ${r}`).join("\n")}\n\nThese are my inferences from prices and headlines. Stocks I expect to move next:`,
       { kind: "report", tickers: names(v.movers), table: { columns: ["Symbol", "Expect", "Why"], rows: v.movers.map((m) => [m.symbol, m.expect, m.why]) },
-        aiNote: await note("IVIndex", "In 3-4 short lines, explain to Mubashir what the India VIX move means for the stocks listed. Do not claim causes that are not in the data.", v) });
+        aiNote: await note("Volatility", "In 3-4 short lines, explain to Research Agent what the India VIX move means for the stocks listed. Do not claim causes that are not in the data.", v) });
     const risky = v.movers.filter((m) => m.expect === "At risk" || m.expect === "Bigger swings").map((m) => m.symbol);
-    bus.send("Mubashir", "IVIndex",
+    bus.send("Research", "Volatility",
       v.direction === "up" ? `Understood. With VIX rising I'll treat ${risky.length ? list(risky) : "high-beta names"} with extra care and keep the stops firm.`
         : v.direction === "down" ? "Good. Falling VIX supports holding trends longer. I'll still size every trade by its stop-loss."
         : "Thanks. A steady VIX means I rate each stock on its own chart today.", { tickers: risky });
   }
 
-  // ---------- Mubashir's sector check ----------
+  // ---------- Research Agent's sector check ----------
   if (d.sectors.length) {
     const by = (st: SectorView["state"]) => d.sectors.filter((x) => x.state === st).map((x) => x.sector);
     const lead = by("Leading"), lag = by("Lagging"), imp = by("Improving"), weak = by("Weakening");
     const indexN = d.sectors.filter((x) => x.source === "index").length;
-    bus.send("Mubashir", "FinalDecision",
+    bus.send("Research", "Decision",
       `Sector check against the Nifty 50 (${indexN ? `${indexN} from NSE sector indices, the rest from` : "from"} the average of each sector's stocks in this run): ` +
       [lead.length && `leading ${list(lead)}`, imp.length && `improving ${list(imp)}`, weak.length && `weakening ${list(weak)}`, lag.length && `lagging ${list(lag)}`].filter(Boolean).join("; ") +
       `. I've moved each stock's score by its sector: leading ${SECTOR_ADJ.Leading >= 0 ? "+" : ""}${SECTOR_ADJ.Leading}, improving +${SECTOR_ADJ.Improving}, weakening ${SECTOR_ADJ.Weakening}, lagging ${SECTOR_ADJ.Lagging}.`,
@@ -234,7 +234,7 @@ export async function runDialogue(bus: MessageBus, llm: LLM, d: DialogueInput) {
       } });
   }
 
-  // ---------- Mubashir's earnings and size check ----------
+  // ---------- Research Agent's earnings and size check ----------
   const withF = d.rows.filter((r) => r.fundamentals);
   if (withF.length) {
     const sizes = ["Large", "Mid", "Small"].map((c) => `${withF.filter((r) => r.fundamentals!.cap === c).length} ${c.toLowerCase()}`).join(", ");
@@ -246,7 +246,7 @@ export async function runDialogue(bus: MessageBus, llm: LLM, d: DialogueInput) {
     const top8 = d.rows.slice(0, 8);
     const capText = (r: Analysis) => (r.fundamentals?.marketCapCr !== undefined ? `${inr(r.fundamentals.marketCapCr, 0)} Cr` : "-");
     const epsText = (v?: number) => (v === undefined ? "-" : inr(v));
-    bus.send("Mubashir", "FinalDecision",
+    bus.send("Research", "Decision",
       `Earnings and size check${sample}: ${sizes} cap stocks above ₹${d.minCapCr} Cr.` +
       (d.excluded.length ? ` I left out ${list(d.excluded.map((e) => `${e.symbol} (${inr(e.marketCapCr, 0)} Cr)`))} as too small.` : "") +
       (unknownN ? ` ${plural(unknownN, "stock")} had no market-cap data, so I couldn't verify ${unknownN === 1 ? "its" : "their"} size.` : "") +
@@ -260,21 +260,21 @@ export async function runDialogue(bus: MessageBus, llm: LLM, d: DialogueInput) {
       } });
   }
 
-  // ---------- Mubashir's chart check: 1M / 1D / 4H / 1H / 30m + best buy area ----------
+  // ---------- Research Agent's chart check: 1M / 1D / 4H / 1H / 30m + best buy area ----------
   const charted = d.rows.filter((r) => r.chart).slice(0, 6);
   if (charted.length) {
     const cell = (t: string) => (t === "Bullish" ? "Bullish" : t === "Bearish" ? "Bearish" : "Neutral");
     const zoneText = (r: Analysis) => (r.chart!.zone ? `${inr(r.chart!.zone.low, 0)}-${inr(r.chart!.zone.high, 0)}` : "None below price");
     const lead = charted[0], lc_ = lead.chart!, z = lc_.zone;
     const intraNote = charted.some((r) => !r.chart!.intraday) ? " Intraday candles were missing for some stocks, so those are read on 1M and 1D only." : "";
-    bus.send("Mubashir", "FinalDecision",
+    bus.send("Research", "Decision",
       `I checked the charts of the top candidates on five timeframes (1M, 1D, 4H, 1H, 30m) and found each one's best buy area from its 1-month, 3-month, 6-month and 1-year history.${intraNote}`,
       { kind: "report", tickers: names(charted), table: {
         columns: ["Symbol", "1M", "1D", "4H", "1H", "30m", "Buy zone", "Plan"],
         rows: charted.map((r) => [r.symbol, ...r.chart!.timeframes.map((t) => cell(t.trend)), zoneText(r), r.chart!.zone?.plan ?? "No zone"]),
       } });
     const hist = lc_.history.map((h) => `${h.label}: range ${inr(h.low, 0)}-${inr(h.high, 0)}, most traded ${inr(h.poc, 0)}`).join("\n");
-    bus.send("Mubashir", "FinalDecision",
+    bus.send("Research", "Decision",
       `${lead.symbol} in detail: ${lc_.bullish} of 5 timeframes bullish.\n${hist}\n\n` +
       (z ? `Best buy area: ${inr(z.low)}-${inr(z.high)}, from ${z.basis.join("; ")}. ` +
         (z.plan === "In buy zone" ? "Price is inside it now, so it can be bought here" : z.plan === "Wait for dip" ? `Price is ${z.distancePct.toFixed(1)}% above it, so I'd wait for a dip into the zone` : `Price is ${z.distancePct.toFixed(1)}% above it, which is extended; I wouldn't chase it`) +
@@ -282,12 +282,12 @@ export async function runDialogue(bus: MessageBus, llm: LLM, d: DialogueInput) {
         : "Price is below all its recent support levels, so there is no buy area I'd trust yet."),
       { tickers: [lead.symbol] });
 
-    // If the daily trend is up but the short charts are down, ask Lotappi whether it's just a dip.
+    // If the daily trend is up but the short charts are down, ask Momentum Agent whether it's just a dip.
     const dip = charted.find((r) => r.chart!.timeframes[1].trend === "Bullish" && r.chart!.timeframes.slice(3).every((t) => t.trend === "Bearish"));
     if (dip) {
       const dz = dip.chart!.zone;
-      bus.send("Mubashir", "Lotappi", `Lotappi, ${dip.symbol} is bullish on the daily chart but bearish on 1H and 30m. Is that just a pullback?`, { tickers: [dip.symbol] });
-      bus.send("Lotappi", "Mubashir",
+      bus.send("Research", "Momentum", `Momentum Agent, ${dip.symbol} is bullish on the daily chart but bearish on 1H and 30m. Is that just a pullback?`, { tickers: [dip.symbol] });
+      bus.send("Momentum", "Research",
         `Looks like a pullback inside an uptrend: 30-minute RSI is ${dip.chart!.timeframes[4].rsi.toFixed(0)}. ` +
         (dz ? `I'd only buy once it reaches the ${inr(dz.low, 0)}-${inr(dz.high, 0)} area or the 30m chart turns up again.` : "I'd wait for the 30m chart to turn up before buying."),
         { tickers: [dip.symbol] });
@@ -298,8 +298,8 @@ export async function runDialogue(bus: MessageBus, llm: LLM, d: DialogueInput) {
   const agreeN = d.rows.filter((r) => r.agree).length;
   const highN = d.rows.filter((r) => r.risk === "HIGH").length;
   const top8 = d.rows.slice(0, 8);
-  bus.send("Mubashir", "FinalDecision",
-    `My combined analysis is ready. Lotappi and Mayavi both like ${plural(agreeN, "stock")}; ` +
+  bus.send("Research", "Decision",
+    `My combined analysis is ready. Momentum Agent and Trend Agent both like ${plural(agreeN, "stock")}; ` +
     (highN ? `${plural(highN, "stock")} carry high risk and I've marked them down.` : "none carry high risk.") +
     " Top eight, with a trade scenario for each (target is twice the risk):", {
       kind: "report", tickers: names(top8),
@@ -307,34 +307,34 @@ export async function runDialogue(bus: MessageBus, llm: LLM, d: DialogueInput) {
         columns: ["Symbol", "Combined", "Risk", "Holding plan", "Entry", "Stop-loss", "Target"],
         rows: top8.map((r) => [r.symbol, r.combined.toFixed(1), r.risk, r.horizon, inr(r.entry), inr(r.stopLoss), inr(r.target)]),
       },
-      aiNote: await note("Mubashir", "In 4-5 short lines, tell Final Decision where the short-term and 1-month views agree or conflict, and which stocks look strongest after risk.", top8),
+      aiNote: await note("Research", "In 4-5 short lines, tell Decision Agent where the short-term and 1-month views agree or conflict, and which stocks look strongest after risk.", top8),
     });
 
   // ---------- Step 5: portfolio review ----------
   bus.stage = "debate";
   if (d.conflicted.length) {
     const syms = names(d.conflicted);
-    bus.send("FinalDecision", "Mubashir", `Lotappi and Mayavi disagree on ${list(syms)}. Which view should I trust?`, { tickers: syms });
-    bus.send("Mubashir", "FinalDecision", syms.map((s) => `${s}: ${d.clarifications[s]}`).join("\n\n"), { tickers: syms });
+    bus.send("Decision", "Research", `Momentum Agent and Trend Agent disagree on ${list(syms)}. Which view should I trust?`, { tickers: syms });
+    bus.send("Research", "Decision", syms.map((s) => `${s}: ${d.clarifications[s]}`).join("\n\n"), { tickers: syms });
   } else if (d.picks[0]) {
     const p = d.picks[0];
-    bus.send("FinalDecision", "Mubashir", `No open disagreements in the top group. Any red flags on ${p.symbol} before I commit?`, { tickers: [p.symbol] });
-    bus.send("Mubashir", "FinalDecision",
+    bus.send("Decision", "Research", `No open disagreements in the top group. Any red flags on ${p.symbol} before I commit?`, { tickers: [p.symbol] });
+    bus.send("Research", "Decision",
       `Risk is ${p.risk.toLowerCase()} (ATR ${p.atrPct.toFixed(1)}% of price). The scenario: stop-loss ${inr(p.stopLoss)}, target ${inr(p.target)}. ` +
       `These are research levels, not guaranteed prices. A gap down can skip the stop.`, { tickers: [p.symbol] });
   }
 
   if (d.passed.length) {
     const syms = names(d.passed);
-    bus.send("FinalDecision", "Mubashir",
+    bus.send("Decision", "Research",
       `On concentration: I'm leaving out ${list(d.passed.map((p) => `${p.symbol} (${p.sector})`))}. ` +
       `We already hold ${MAX_PER_SECTOR} from ${d.passed.length === 1 ? "that sector" : "those sectors"}, and I won't put more than that in one sector.`, { tickers: syms });
-    bus.send("Mubashir", "FinalDecision", `Agreed. ${list(syms)} ${syms.length === 1 ? "goes" : "go"} on the watchlist instead.`, { tickers: syms });
+    bus.send("Research", "Decision", `Agreed. ${list(syms)} ${syms.length === 1 ? "goes" : "go"} on the watchlist instead.`, { tickers: syms });
   }
   if (d.capital && d.picks.length) {
     const invested = d.picks.reduce((s, p) => s + (p.investment ?? 0), 0);
     const zero = d.picks.filter((p) => !p.quantity);
-    bus.send("FinalDecision", "Mubashir",
+    bus.send("Decision", "Research",
       `On capital: with ${inr(d.capital, 0)} and ${d.riskPerTrade}% risk per trade, the picks use ${inr(invested, 0)} ` +
       `(${((invested / d.capital) * 100).toFixed(0)}% of capital).` +
       (zero.length ? ` There isn't enough left to size ${list(names(zero))}, so ${zero.length === 1 ? "it stays" : "they stay"} at zero shares.` : ""),
@@ -343,10 +343,10 @@ export async function runDialogue(bus: MessageBus, llm: LLM, d: DialogueInput) {
 
   // ---------- Step 6: final announcement ----------
   bus.stage = "decide";
-  bus.send("FinalDecision", "ALL",
+  bus.send("Decision", "ALL",
     d.picks.length
       ? `Decision made. We go with ${list(names(d.picks))}.` + entryPlan(d.picks) +
-        (d.watchlist.length ? ` Watchlist: ${list(names(d.watchlist))}.` : "") + " Lotappi, Mayavi, please confirm."
+        (d.watchlist.length ? ` Watchlist: ${list(names(d.watchlist))}.` : "") + " Momentum Agent, Trend Agent, please confirm."
       : `Decision made: no stock passes our buy rules today, so we stay in cash.` +
         (d.watchlist.length ? ` Watchlist: ${list(names(d.watchlist))}.` : ""),
     {
@@ -356,17 +356,17 @@ export async function runDialogue(bus: MessageBus, llm: LLM, d: DialogueInput) {
         rows: d.picks.map((p) => [p.symbol, p.verdict, inr(p.entry), inr(p.stopLoss), inr(p.target),
           p.chart?.zone ? `${inr(p.chart.zone.low, 0)}-${inr(p.chart.zone.high, 0)}` : "-"]),
       } : undefined,
-      aiNote: await note("FinalDecision", "In 4-6 short lines, tell the team why these picks and how to manage them (stop-loss, target). End with one sentence saying this is not financial advice.",
+      aiNote: await note("Decision", "In 4-6 short lines, tell the team why these picks and how to manage them (stop-loss, target). End with one sentence saying this is not financial advice.",
         { picks: d.picks.map(({ spark: _s, ...p }) => p), watchlist: names(d.watchlist) }),
     });
 
   if (d.picks.length) {
     const swing = d.picks.filter((p) => p.horizon.startsWith("Swing")).slice(0, 3);
-    bus.send("Lotappi", "ALL",
+    bus.send("Momentum", "ALL",
       `Confirmed. I'll watch the short-term stop-losses daily${swing.length ? `, starting with ${list(names(swing))}` : ""}.`, { tickers: names(swing) });
-    bus.send("Mayavi", "ALL", "Confirmed. I'll track the monthly trend and flag any breakdown early.");
+    bus.send("Trend", "ALL", "Confirmed. I'll track the monthly trend and flag any breakdown early.");
   } else {
-    bus.send("Lotappi", "ALL", "Understood. I'll rescan tomorrow.");
-    bus.send("Mayavi", "ALL", "Agreed. No trend worth holding today.");
+    bus.send("Momentum", "ALL", "Understood. I'll rescan tomorrow.");
+    bus.send("Trend", "ALL", "Agreed. No trend worth holding today.");
   }
 }

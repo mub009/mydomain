@@ -1,5 +1,5 @@
 /**
- * Stock news for the Morning Session agent.
+ * Stock news for the News Agent agent.
  *  - demo:   fictional sample headlines built from the demo price moves (labelled "Sample")
  *  - google: Google News RSS search, matched to stocks by company name
  * Choose with NEWS_PROVIDER (google | none). Sentiment is a simple keyword

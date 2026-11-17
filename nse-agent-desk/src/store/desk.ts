@@ -36,7 +36,7 @@ interface Settings {
 interface DeskState extends Settings {
   config: ServerConfig | null;
   session: SessionInfo | null;
-  /** Set while showing a saved Morning Session run instead of a live one. */
+  /** Set while showing a saved News Agent run instead of a live one. */
   replayOf: string | null;
   running: boolean; // server is still working
   progress: string | null;
@@ -100,7 +100,7 @@ export const useDesk = create<DeskState>((set, get) => {
       skipping = false;
       try {
         const res = await (await fetch("/api/session")).json();
-        if (!res.session) { set({ error: "No Morning Session has run yet." }); return; }
+        if (!res.session) { set({ error: "No News Agent has run yet." }); return; }
         set({
           running: false, progress: null, error: null, messages: res.session.messages, shown: 0, typing: null, times: {},
           result: res.session.result, seen: {}, drawerSymbol: null, replayOf: res.session.ranAt,
@@ -192,7 +192,7 @@ export const useDesk = create<DeskState>((set, get) => {
 /** True while the server is working or messages are still being revealed. */
 export const useBusy = () => useDesk((s) => s.running || s.shown < s.messages.length);
 
-/** The picks are revealed only after Final Decision's announcement has appeared in the chat. */
+/** The picks are revealed only after Decision Agent's announcement has appeared in the chat. */
 export function useDecided(): RunResult | null {
   return useDesk((s) => {
     if (!s.result) return null;
@@ -222,13 +222,13 @@ export function usePresence(): Record<Person, Presence> {
     let v: Presence = "Idle";
     if (active) {
       v = "Online";
-      if (loading) v = p === "FinalDecision" || p === "Mubashir" ? "Idle" : "Analyzing";
+      if (loading) v = p === "Decision" || p === "Research" ? "Idle" : "Analyzing";
       else if (!done) {
-        if (stage === "scan" && p === "FinalDecision") v = "Idle";
-        if (stage === "scan" && p === "Mubashir") v = "Reviewing";
-        if (stage === "analyze" && p === "Mubashir") v = "Analyzing";
-        if (stage === "analyze" && p === "FinalDecision") v = "Idle";
-        if (stage === "debate" && p === "FinalDecision") v = "Reviewing";
+        if (stage === "scan" && p === "Decision") v = "Idle";
+        if (stage === "scan" && p === "Research") v = "Reviewing";
+        if (stage === "analyze" && p === "Research") v = "Analyzing";
+        if (stage === "analyze" && p === "Decision") v = "Idle";
+        if (stage === "debate" && p === "Decision") v = "Reviewing";
       }
       if (typing === p) v = "Typing";
     }

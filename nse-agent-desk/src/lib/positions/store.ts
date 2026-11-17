@@ -1,6 +1,8 @@
 /** Positions and alerts, saved to .data/positions.json (single user, local app). */
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { migrateAgent } from "../team";
+import type { Person } from "../types";
 import type { PositionsState } from "./types";
 
 const FILE = () => path.join(process.env.NSE_DESK_DATA_DIR ?? path.join(process.cwd(), ".data"), "positions.json");
@@ -10,6 +12,8 @@ let chain: Promise<unknown> = Promise.resolve();
 export async function readState(): Promise<PositionsState> {
   if (cache) return cache;
   try { cache = JSON.parse(await readFile(FILE(), "utf8")); } catch { cache = { positions: [], alerts: [] }; }
+  // Alerts saved before the agents were renamed.
+  for (const a of cache!.alerts) a.from = migrateAgent(a.from) as Person;
   return cache!;
 }
 

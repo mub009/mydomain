@@ -23,8 +23,8 @@ const columns: ColumnDef<Decision>[] = [
   { accessorKey: "symbol", header: "Stock", cell: ({ row: { original: d } }) => <div><div className="font-semibold">{d.symbol}</div><div className="text-[11px] text-muted-foreground">{d.sector}</div></div> },
   { accessorKey: "verdict", header: "Verdict", enableSorting: false, cell: ({ row }) => <VerdictBadge verdict={row.original.verdict} /> },
   { accessorKey: "combined", header: "Combined", meta: { num: true }, cell: ({ getValue }) => <b>{(getValue() as number).toFixed(1)}</b> },
-  { accessorKey: "lotappi", header: "Lotappi", meta: { num: true }, cell: ({ getValue }) => (getValue() as number).toFixed(1) },
-  { accessorKey: "mayavi", header: "Mayavi", meta: { num: true }, cell: ({ getValue }) => (getValue() as number).toFixed(1) },
+  { accessorKey: "lotappi", header: "Momentum", meta: { num: true }, cell: ({ getValue }) => (getValue() as number).toFixed(1) },
+  { accessorKey: "mayavi", header: "Trend", meta: { num: true }, cell: ({ getValue }) => (getValue() as number).toFixed(1) },
   { id: "risk", accessorFn: (d) => RISK_ORDER[d.risk], header: "Risk", cell: ({ row }) => <RiskTag risk={row.original.risk} /> },
   { id: "spark", header: "60-day", enableSorting: false, cell: ({ row }) => <StockSparkline data={row.original.spark} width={76} height={24} showChange={false} /> },
   { accessorKey: "rsi", header: "RSI", meta: { num: true }, cell: ({ getValue }) => (getValue() as number).toFixed(0) },
@@ -76,7 +76,7 @@ export default function ScreenerPage() {
       <PageHeader title="Screener" subtitle="Every stock the agents scored. Select a row for the full research." />
       {!r ? (
         <div className="card grid h-72 place-items-center p-6 text-center text-sm text-muted-foreground">
-          The screener fills in once Final Decision has announced the picks. Run an analysis from the Overview.
+          The screener fills in once Decision Agent has announced the picks. Run an analysis from the Overview.
         </div>
       ) : (
         <div className="space-y-4">

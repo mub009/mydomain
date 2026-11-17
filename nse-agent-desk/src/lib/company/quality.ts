@@ -1,5 +1,5 @@
 /**
- * Mubashir's balance-sheet and cash-flow quality check.
+ * Research Agent's balance-sheet and cash-flow quality check.
  *
  * For most companies (6 checks, each +1 good / 0 ok / -1 weak; cash conversion counts double):
  *   cash conversion  operating cash flow ÷ net profit, last 3 years   ≥1.0 good, <0.8 weak

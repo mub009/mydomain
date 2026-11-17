@@ -1,5 +1,5 @@
 /**
- * Mubashir's sector check.
+ * Research Agent's sector check.
  *
  * Each sector's price line is its NSE sector index (live data, where Yahoo
  * has it) or the equal-weight average of the sector's stocks in this run.

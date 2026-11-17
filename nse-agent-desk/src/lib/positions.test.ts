@@ -23,7 +23,7 @@ describe("follow-up alerts", () => {
     const hit = applyPrice(p, 94.8);
     expect(hit.map((a) => a.kind)).toEqual(["stop-hit"]);
     expect(hit[0].severity).toBe("critical");
-    expect(hit[0].from).toBe("Lotappi");
+    expect(hit[0].from).toBe("Momentum");
     expect(hit[0].text).toMatch(/Exit the position/);
   });
 
@@ -45,13 +45,13 @@ describe("follow-up alerts", () => {
     expect(applyPrice(p, 99.9).map((x) => x.kind)).toEqual(["stop-hit"]);
   });
 
-  it("near target, then target hit (from Mayavi)", () => {
+  it("near target, then target hit (from Trend Agent)", () => {
     const p = pos();
     applyPrice(p, 105.2);
     expect(applyPrice(p, 108).map((a) => a.kind)).toEqual(["near-target"]);
     const t = applyPrice(p, 110.4);
     expect(t.map((a) => a.kind)).toEqual(["target-hit"]);
-    expect(t[0].from).toBe("Mayavi");
+    expect(t[0].from).toBe("Trend");
   });
 
   it("health labels", () => {

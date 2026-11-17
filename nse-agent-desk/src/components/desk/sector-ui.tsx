@@ -74,7 +74,7 @@ export function SectorStrengthCard({ sectors, onPick }: { sectors: SectorView[];
     <section className="card overflow-hidden" aria-label="Sector strength">
       <header className="px-4 pb-2 pt-4">
         <h2 className="text-[15px] font-semibold">Sector Strength</h2>
-        <p className="text-xs text-muted-foreground">State compares each sector with the Nifty 50 over 1 month; the rank also counts the 3-month return and breadth. Mubashir lifts stocks in leading sectors and marks down lagging ones.</p>
+        <p className="text-xs text-muted-foreground">State compares each sector with the Nifty 50 over 1 month; the rank also counts the 3-month return and breadth. Research Agent lifts stocks in leading sectors and marks down lagging ones.</p>
       </header>
       <div className="overflow-x-auto scroll-thin">
         <table className="w-full min-w-[640px] text-left text-[12.5px] tnum">

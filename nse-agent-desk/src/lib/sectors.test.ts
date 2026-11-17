@@ -48,7 +48,7 @@ describe("sector states", () => {
 });
 
 describe("in the full run", () => {
-  it("reports sectors and Mubashir talks about them", async () => {
+  it("reports sectors and Research Agent talks about them", async () => {
     const msgs: Message[] = [];
     const r = await runAnalysis({ symbols: ALL_CAPS, top: 5, demo: true, aiNotes: false, riskPerTrade: 1 }, (e) => { if (e.type === "message") msgs.push(e.message); });
     expect(r.sectors.length).toBeGreaterThan(8);
@@ -57,7 +57,7 @@ describe("in the full run", () => {
       expect(s.leaders.every((l) => sectorOf(l) === s.sector)).toBe(true);
     }
     const m = msgs.find((x) => x.text.startsWith("Sector check"));
-    expect(m?.sender).toBe("Mubashir");
+    expect(m?.sender).toBe("Research");
     expect(m?.table?.columns[0]).toBe("Sector");
   });
 });

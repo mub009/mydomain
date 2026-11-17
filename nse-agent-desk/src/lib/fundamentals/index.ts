@@ -1,5 +1,5 @@
 /**
- * Company size (market cap) and earnings (EPS) for Mubashir.
+ * Company size (market cap) and earnings (EPS) for Research Agent.
  *  - demo:  fictional figures, labelled as samples
  *  - yahoo: Yahoo Finance fundamentals time series (unofficial). EPS comes
  *           from reported diluted EPS; market cap = shares outstanding × price.

@@ -32,11 +32,11 @@ export function PicksWaiting({ stage, idle }: { stage: Stage | null; idle: boole
     <div className="flex flex-col items-center gap-3 px-4 py-9 text-center">
       <WaitingArt />
       <div className="flex items-center gap-2 text-sm font-semibold">
-        {idle ? "Run an analysis to start the team" : <>Waiting for Final Decision <TypingIndicator className="text-muted-foreground" /></>}
+        {idle ? "Run an analysis to start the team" : <>Waiting for Decision Agent <TypingIndicator className="text-muted-foreground" /></>}
       </div>
       <p className="max-w-sm text-xs text-muted-foreground">
-        {idle ? "Lotappi and Mayavi scan the market, Mubashir analyses, and Final Decision announces the picks here."
-          : "The picks stay hidden until Final Decision announces them in the team chat."}
+        {idle ? "Momentum Agent and Trend Agent scan the market, Research Agent analyses, and Decision Agent announces the picks here."
+          : "The picks stay hidden until Decision Agent announces them in the team chat."}
       </p>
       <ResearchProgress stage={stage} className="mt-1" />
     </div>

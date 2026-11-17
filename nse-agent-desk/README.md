@@ -8,34 +8,34 @@ An AI stock research desk for the Indian market (NSE / Nifty 50). Four AI agents
 
 | Agent | Role | What they do |
 |-------|------|--------------|
-| **Morning Session** | News Scout | Collects stock news, sorts it into positive and negative, sends the positive stocks to Lotappi and Mayavi (+6 on their scores) and flags the negative ones |
-| **IV Index Agent** | Volatility Analyst | Tracks India VIX: level, 1-day and 5-day change, regime; lists the likely reasons for the move and the stocks expected to move next (high-beta "at risk" or "likely up", low-beta "holds up") |
-| **Macro Agent** | Commodity & Currency Analyst | Tracks Gold, Brent crude and USD/INR, finds which stocks depend on them, and tells Mubashir about tailwinds and headwinds before his analysis |
-| **Lotappi** | Short-term Trader (1-10 days) | EMA 9/21, RSI 14, MACD, 20-day breakout, relative volume, 5-day return |
-| **Mayavi** | Positional Trader (~1 month) | SMA 20/50/200, 1-month return, strength vs Nifty 50, distance from 52-week high |
-| **Mubashir** | Research Analyst | Combines both reports, finds agreement and conflict, rates risk, sets entry / stop-loss / target. Checks the charts of the top candidates on **1M, 1D, 4H, 1H and 30m** and finds each one's **best buy area** from 1-month, 3-month, 6-month and 1-year history |
-| **Final Decision** | Portfolio Head | Challenges conflicts, applies the sector cap and capital limits, gives STRONG BUY / BUY / WATCH / AVOID, announces the picks |
+| **News Agent** | Pre-market news & sentiment | Collects stock news, sorts it into positive and negative, sends the positive stocks to Momentum Agent and Trend Agent (+6 on their scores) and flags the negative ones |
+| **Volatility Agent** | India VIX analysis | Tracks India VIX: level, 1-day and 5-day change, regime; lists the likely reasons for the move and the stocks expected to move next (high-beta "at risk" or "likely up", low-beta "holds up") |
+| **Macro Agent** | Gold · crude · USD/INR | Tracks Gold, Brent crude and USD/INR, finds which stocks depend on them, and tells Research Agent about tailwinds and headwinds before it combines the lists |
+| **Momentum Agent** | Short-term trades (1-10 days) | EMA 9/21, RSI 14, MACD, 20-day breakout, relative volume, 5-day return |
+| **Trend Agent** | Positional trades (~1 month) | SMA 20/50/200, 1-month return, strength vs Nifty 50, distance from 52-week high |
+| **Research Agent** | Combines signals, risk & charts | Combines both reports, finds agreement and conflict, rates risk, sets entry / stop-loss / target. Checks the charts of the top candidates on **1M, 1D, 4H, 1H and 30m** and finds each one's **best buy area** from 1-month, 3-month, 6-month and 1-year history |
+| **Decision Agent** | Final picks & portfolio rules | Challenges conflicts, applies the sector cap and capital limits, gives STRONG BUY / BUY / WATCH / AVOID, announces the picks |
 
 Rules worth knowing:
 
 - Target = Entry + 2 × (Entry − Stop-loss)
 - Quantity = floor((Capital × Risk %) / (Entry − Stop-loss)), capped so the total never exceeds your capital
 - No more than 2 picks from one sector
-- Final picks stay hidden until Final Decision announces them in the chat
+- Final picks stay hidden until Decision Agent announces them in the chat
 
-## Mubashir's earnings and size check
+## Research Agent's earnings and size check
 
 **Stock lists:** Large (Nifty 50), Mid cap (30 stocks), Small cap (30 stocks), All caps, or My List. The mid and small lists are starter presets of well-known NSE stocks, not an official index; edit them in `src/lib/market/universe.ts`.
 
 **Size:** market cap = shares outstanding × last price. Stocks below **₹300 Cr** are left out (`MIN_MARKET_CAP_CR`). The rest are labelled by approximate rupee bands: Large ≥ ₹1,00,000 Cr, Mid ≥ ₹30,000 Cr, otherwise Small. India's official classification is by rank (top 100 large, next 150 mid), so adjust `LARGE_CAP_MIN_CR` and `MID_CAP_MIN_CR` to match the latest AMFI list. Small caps are treated as at least medium risk.
 
-**EPS over one year:** EPS for the last 12 months (sum of the last 4 quarters) against the 12 months before; if fewer than 8 quarters are available, the latest fiscal year against the one before. Score: +5 for growth of 20% or more, +3 for 10-20%, +1 for 0-10%, -4 if EPS fell, -6 if loss-making. Final Decision never gives STRONG BUY with falling EPS, and never BUY while loss-making.
+**EPS over one year:** EPS for the last 12 months (sum of the last 4 quarters) against the 12 months before; if fewer than 8 quarters are available, the latest fiscal year against the one before. Score: +5 for growth of 20% or more, +3 for 10-20%, +1 for 0-10%, -4 if EPS fell, -6 if loss-making. Decision Agent never gives STRONG BUY with falling EPS, and never BUY while loss-making.
 
 With demo data off, market cap and EPS come from Yahoo Finance's fundamentals data (unofficial, untested from the build environment). If a stock's data can't be loaded it's marked "Unknown" and kept, with a note that its size wasn't verified.
 
-## Mubashir's chart check
+## Research Agent's chart check
 
-For the top candidates (at least 12), Mubashir reads five timeframes:
+For the top candidates (at least 12), Research Agent reads five timeframes:
 
 | Timeframe | Built from | Bullish when |
 |-----------|-----------|--------------|
@@ -47,7 +47,7 @@ For the top candidates (at least 12), Mubashir reads five timeframes:
 
 Each bullish timeframe adds 1.5 points to the combined score and each bearish one takes 1.5 away.
 
-**Best buy area:** for the 1M, 3M, 6M and 1Y windows he finds the highest swing low below today's price and the price where the most volume traded. Levels within one ATR of each other are grouped; the group confirmed by the most windows is the buy zone. The plan is **In buy zone** (price within 1% of it), **Wait for dip** (up to 6% above) or **Extended** (more than 6% above). Final Decision's announcement says how to enter each pick.
+**Best buy area:** for the 1M, 3M, 6M and 1Y windows it finds the highest swing low below today's price and the price where the most volume traded. Levels within one ATR of each other are grouped; the group confirmed by the most windows is the buy zone. The plan is **In buy zone** (price within 1% of it), **Wait for dip** (up to 6% above) or **Extended** (more than 6% above). Decision Agent's announcement says how to enter each pick.
 
 If intraday data can't be loaded, 4H, 1H and 30m are marked as not rated. In demo mode the intraday candles are generated to match the demo daily prices.
 
@@ -64,14 +64,14 @@ This shows what has been normal for the stock, not what will happen. News, resul
 
 ## Macro Agent: Gold, crude and USD/INR
 
-Before Mubashir combines the lists, the Macro Agent reports how **Gold**, **Brent crude** and **USD/INR** moved (1 day, 5 days, 1 month, trend) and which stocks that helps or hurts.
+Before Research Agent combines the lists, the Macro Agent reports how **Gold**, **Brent crude** and **USD/INR** moved (1 day, 5 days, 1 month, trend) and which stocks that helps or hurts.
 
 - **Known links** (`src/lib/macro/exposure.ts`, edit to add stocks): a weaker rupee helps IT and pharma exporters and textile exporters; costlier crude hurts oil marketing companies (BPCL, HPCL), paint makers and tyre makers and helps ONGC; BPCL/HPCL also pay for crude in dollars. Reliance (crude) and Titan (gold) are marked mixed.
 - **Measured links:** each stock's daily-return correlation with the factor over ~120 days. It confirms (+1) or questions (−1) a known link; a stock with no known link but a correlation of 0.4+ is listed as a measured link.
 - **When a move matters:** 1-month move of at least 2% for gold, 3% for crude, 0.7% for USD/INR.
 - **Score effect:** tailwind or headwind of 2 points, +1 for a move twice the threshold, ±1 from the measured check; at most ±4 per stock. Mixed links get a note but no points.
 
-Shown in a Gold · Crude · USD/INR card on the Overview, a Macro exposure section in an affected stock's panel, and the Macro Agent & Mubashir chat thread.
+Shown in a Gold · Crude · USD/INR card on the Overview, a Macro exposure section in an affected stock's panel, and the Macro Agent & Research Agent chat thread.
 
 Data: live mode uses Yahoo daily bars for gold futures (GC=F, converted to ₹ per 10 g with USD/INR, without import duty or GST), Brent futures (BZ=F) and USD/INR (INR=X), untested from the build environment. Demo mode uses sample series, and demo stocks with a known link really move with their factor so the measured check has something to find.
 
@@ -88,11 +88,11 @@ Each sector's line is its NSE sector index where Yahoo has one (Nifty Bank, IT, 
 | Improving | behind the Nifty, but the gap closed over the last 10 days | +1 |
 | Lagging | behind the Nifty, gap not closing | −3 |
 
-A change counts only if it's more than 0.1 points, so a steady trend isn't read as a turn. The rank also uses the 3-month return and breadth (% of the sector's stocks above their 50-day average). The panel shows 1- and 3-month returns, the lead over the Nifty, breadth, a 60-day sector vs Nifty chart and the sector's strongest stocks. Mubashir reports the sector states to Final Decision in the chat.
+A change counts only if it's more than 0.1 points, so a steady trend isn't read as a turn. The rank also uses the 3-month return and breadth (% of the sector's stocks above their 50-day average). The panel shows 1- and 3-month returns, the lead over the Nifty, breadth, a 60-day sector vs Nifty chart and the sector's strongest stocks. Research Agent reports the sector states to Decision Agent in the chat.
 
 ## Diversification (Portfolio balance)
 
-Mubashir checks how spread out the money is, in two places:
+Research Agent checks how spread out the money is, in two places:
 
 - **Positions page:** your open positions, weighted by current value.
 - **Overview, under Final Picks:** the day's picks, weighted by the suggested investment (enter your capital for real weights).
@@ -111,7 +111,7 @@ Score out of 100: how many "effective" sectors and stocks the money is spread ov
 
 Open any stock and choose the **Company** tab:
 
-- **Balance sheet & cash-flow quality:** Mubashir grades the company A-D on cash conversion (operating cash flow ÷ net profit over 3 years, counted double), free cash flow (years positive out of 4), debt/equity, current ratio, return on equity and interest cover. A loss-making company can't grade above C. Banks and NBFCs are graded only on ROE and profit growth, because debt and cash flow work differently for lenders.
+- **Balance sheet & cash-flow quality:** Research Agent grades the company A-D on cash conversion (operating cash flow ÷ net profit over 3 years, counted double), free cash flow (years positive out of 4), debt/equity, current ratio, return on equity and interest cover. A loss-making company can't grade above C. Banks and NBFCs are graded only on ROE and profit growth, because debt and cash flow work differently for lenders.
 - **Peers:** the closest companies by market cap in the same sector, from the current run's stock list (use "All caps" for more), with size, P/E, EPS growth, ROE, debt/equity, cash conversion, quality grade and verdict. Click a peer to open it.
 - **Profit vs cash flow:** net profit, operating cash flow and free cash flow for 4 years.
 - **Balance sheet:** revenue, profit, assets, liabilities, equity, debt, cash, capital spending, debt/equity and current ratio by fiscal year (₹ Cr).
@@ -131,24 +131,24 @@ The **Positions** page shows each trade's price on a rail from stop to target, p
 
 | Alert | When | From |
 |-------|------|------|
-| In loss | 3% or more below the buy price | Lotappi |
-| Close to stop-loss | within 1% above the stop | Lotappi |
-| Stop-loss hit, exit now | at or below the stop | Lotappi |
-| First exit reached | at buy + 1× risk (stop moves to cost) | Mayavi |
-| Near the exit area | within 2% of the target | Mayavi |
-| Target reached, exit | at or above the target | Mayavi |
+| In loss | 3% or more below the buy price | Momentum Agent |
+| Close to stop-loss | within 1% above the stop | Momentum Agent |
+| Stop-loss hit, exit now | at or below the stop | Momentum Agent |
+| First exit reached | at buy + 1× risk (stop moves to cost) | Trend Agent |
+| Near the exit area | within 2% of the target | Trend Agent |
+| Target reached, exit | at or above the target | Trend Agent |
 
 Alerts appear in the app (bell, pop-ups, Positions page), as desktop notifications (press **Enable desktop alerts**), and on your phone if you set `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`. Each alert fires once per trade; "close to stop-loss" fires again after a recovery.
 
 Notes: live prices come from Yahoo's 5-minute bars, which are delayed, so a stop can be hit before the alert arrives. The checks run only while the server is running. Trades tracked from a demo run follow a simulated price that moves every minute. Positions are saved to `.data/positions.json`; the app has no login, so don't expose it to the internet.
 
-## The 9 AM Morning Session
+## The 9 AM news session
 
 With `MORNING_SESSION_ENABLED=true`, the server runs the whole team by itself at `MORNING_SESSION_TIME` (default 09:00 IST, before the 09:15 open) on NSE trading days. It skips weekends and the holidays in `calendar.ts`, and runs at most once a day. The run is saved to `.data/morning-session.json`; the Overview shows when it last ran and a **Replay 9 AM session** button plays its conversation back.
 
 The schedule lives in the Next.js server process, so it only fires while `npm start` (or `npm run dev`) is running. On a serverless host, call `POST /api/session` from an external cron at 09:00 IST with `Authorization: Bearer <SESSION_TRIGGER_TOKEN>`.
 
-News: demo mode uses fictional sample headlines, clearly labelled. With demo off, `NEWS_PROVIDER=google` reads Google News RSS and matches headlines to company names. Sentiment is a keyword score, good for sorting headlines but not a substitute for reading them. The IV Index agent's reasons are inferences from prices and headlines; results, RBI policy, expiry and global cues can also move VIX.
+News: demo mode uses fictional sample headlines, clearly labelled. With demo off, `NEWS_PROVIDER=google` reads Google News RSS and matches headlines to company names. Sentiment is a keyword score, good for sorting headlines but not a substitute for reading them. The Volatility Agent's reasons are inferences from prices and headlines; results, RBI policy, expiry and global cues can also move VIX.
 
 ## Run it
 
@@ -191,9 +191,9 @@ If both are set, `AI_PROVIDER` picks one. NVIDIA provides AI models only, not st
 ```
 Browser (Zustand store) ── POST /api/analysis ──> pipeline (server)
         ▲                                           │ load prices (provider)
-        │   Server-Sent Events:                     │ Lotappi + Mayavi scan
-        └── progress · message · result  <──────────┤ Mubashir analyses
-                                                    │ Final Decision decides
+        │   Server-Sent Events:                     │ Momentum + Trend Agents scan
+        └── progress · message · result  <──────────┤ Research Agent analyses
+                                                    │ Decision Agent decides
             store plays messages back one by one    └ dialogue -> message bus
 ```
 

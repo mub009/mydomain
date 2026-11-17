@@ -73,8 +73,8 @@ function Body({ d, isPick }: { d: Decision; isPick: boolean }) {
 
       <div className="space-y-2.5">
         <ScoreBar label="Combined score" value={d.combined} color="var(--primary)" />
-        <ScoreBar label="Lotappi · short-term" value={d.lotappi} color={TEAM.Lotappi.color} />
-        <ScoreBar label="Mayavi · 1-month" value={d.mayavi} color={TEAM.Mayavi.color} />
+        <ScoreBar label="Momentum Agent · short-term" value={d.lotappi} color={TEAM.Momentum.color} />
+        <ScoreBar label="Trend Agent · 1-month" value={d.mayavi} color={TEAM.Trend.color} />
       </div>
 
       <dl className="grid grid-cols-4 gap-2 text-center tnum">
@@ -86,16 +86,16 @@ function Body({ d, isPick }: { d: Decision; isPick: boolean }) {
       {sector ? <SectorCheck s={sector} total={sectors!.length} symbol={d.symbol} />
         : <p className="rounded-xl border border-dashed p-3 text-[12.5px] text-muted-foreground">{d.sector === "Other" ? "Sector unknown for this stock, so there's no sector check." : `Not enough ${d.sector} stocks in this run to judge the sector. Choose "All caps" for more.`}</p>}
       {d.macro && d.macro.length > 0 && <MacroExposureSection exposures={d.macro} factors={macroFactors} />}
-      <AgentView who="Lotappi" score={d.lotappi} reasons={d.lotReasons} warnings={d.lotWarnings} />
-      <AgentView who="Mayavi" score={d.mayavi} reasons={d.mayReasons} warnings={d.mayWarnings} />
+      <AgentView who="Momentum" score={d.lotappi} reasons={d.lotReasons} warnings={d.lotWarnings} />
+      <AgentView who="Trend" score={d.mayavi} reasons={d.mayReasons} warnings={d.mayWarnings} />
       {d.fundamentals && <FundamentalsCard f={d.fundamentals} />}
-      <AgentView who="Mubashir" score={d.combined}>
+      <AgentView who="Research" score={d.combined}>
         <p className="mt-2 text-[12.5px]">Holding plan: <b>{d.horizon}</b>. Risk <RiskTag risk={d.risk} /> (ATR {d.atrPct.toFixed(1)}% of price).</p>
         {d.notes.length > 0 && <ul className="mt-1 list-disc pl-4 text-[12.5px] text-muted-foreground">{d.notes.map((n) => <li key={n}>{n}</li>)}</ul>}
         {d.clarification && <p className="mt-2 rounded-lg bg-muted/60 p-2 text-[12.5px]">{d.clarification}</p>}
       </AgentView>
-      {d.chart ? <ChartCheck chart={d.chart} price={d.entry} /> : <p className="rounded-xl border border-dashed p-3 text-[12.5px] text-muted-foreground">Mubashir checks charts for the top candidates only; this stock ranked lower.</p>}
-      <AgentView who="FinalDecision">
+      {d.chart ? <ChartCheck chart={d.chart} price={d.entry} /> : <p className="rounded-xl border border-dashed p-3 text-[12.5px] text-muted-foreground">Research Agent checks charts for the top candidates only; this stock ranked lower.</p>}
+      <AgentView who="Decision">
         <div className="mt-2 flex flex-wrap items-center gap-2 text-[12.5px]">
           <VerdictBadge verdict={d.verdict} />
           <span>{isPick ? "Chosen as a final pick." : d.passedOver ? `Left out of the picks. ${d.passedOver}.` : d.verdict === "WATCH" ? "On watch, not a buy yet." : d.verdict === "AVOID" ? "Does not meet the buy rules." : "Buy-rated, but ranked below the final picks."}</span>

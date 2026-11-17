@@ -79,11 +79,11 @@ export function CompanyTab({ d }: { d: Decision }) {
     <div className="space-y-4 px-5 pb-6">
       {r.sample && <p className="rounded-lg border border-warn-border bg-warn-bg px-3 py-2 text-[12px] text-warn-fg"><b>Sample figures (demo).</b> Not real financials or holders.</p>}
 
-      {/* Mubashir's quality view */}
+      {/* Research Agent's quality view */}
       <Section title="Balance sheet & cash-flow quality" right={<GradeTag grade={r.quality.grade} className="h-6 min-w-7 text-sm" />}>
         <div className="flex gap-2.5 rounded-lg bg-muted/50 p-2.5">
-          <AgentAvatar who="Mubashir" size={28} />
-          <p className="text-[12.5px] leading-relaxed"><b className="text-[#14B8A6]">Mubashir:</b> {r.quality.summary}</p>
+          <AgentAvatar who="Research" size={28} />
+          <p className="text-[12.5px] leading-relaxed"><b className="text-[#14B8A6]">Research Agent:</b> {r.quality.summary}</p>
         </div>
         <ul className="divide-y text-[12.5px]">
           {r.quality.checks.map((c) => (

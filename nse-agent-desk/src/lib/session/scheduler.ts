@@ -1,5 +1,5 @@
 /**
- * Morning Session scheduler: runs the whole team automatically every trading
+ * News Agent scheduler: runs the whole team automatically every trading
  * day at 09:00 IST (before the 09:15 open), and keeps the latest run so the
  * app can replay it.
  *
@@ -18,7 +18,9 @@ import path from "node:path";
 import { NSE_HOLIDAYS } from "../market/calendar";
 import { UNIVERSES, type Universe } from "../market/universe";
 import { runAnalysis } from "../pipeline";
-import type { Message, RunResult } from "../types";
+import { threadOf } from "../bus";
+import { migrateAgent } from "../team";
+import type { AgentName, Message, RunResult } from "../types";
 
 export interface SessionRecord {
   ranAt: string;
@@ -53,10 +55,16 @@ export function isSessionDue(at: Date, lastRanAt: string | null, time = sessionT
 export async function getLatestSession(): Promise<SessionRecord | null> {
   if (latest) return latest;
   try { latest = JSON.parse(await readFile(FILE, "utf8")); } catch { /* none yet */ }
+  // Runs saved before the agents were renamed.
+  for (const m of latest?.messages ?? []) {
+    m.sender = migrateAgent(m.sender) as AgentName;
+    m.to = migrateAgent(m.to) as AgentName | "ALL";
+    m.thread = threadOf(m.sender, m.to);
+  }
   return latest;
 }
 
-/** Run the Morning Session now. Concurrent calls share one run. */
+/** Run the News Agent now. Concurrent calls share one run. */
 export function runMorningSession(trigger: SessionRecord["trigger"]): Promise<SessionRecord> {
   if (running) return running;
   running = (async () => {

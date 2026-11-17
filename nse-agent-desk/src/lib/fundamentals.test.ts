@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Mubashir } from "./agents/mubashir";
+import { ResearchAgent } from "./agents/research";
 import { classifyCap, epsGrowth, loadFundamentals } from "./fundamentals";
 import { ALL_CAPS, MIDCAPS } from "./market/universe";
 import { runAnalysis } from "./pipeline";
@@ -35,9 +35,9 @@ const row = (symbol: string): Analysis => ({
 });
 const f = (p: Partial<Fundamentals>): Fundamentals => ({ cap: "Large", epsHistory: [], source: "t", sample: true, ...p });
 
-describe("Mubashir's earnings and size rules", () => {
+describe("Research Agent's earnings and size rules", () => {
   it("rewards EPS growth, marks down falling EPS and losses", () => {
-    const out = new Mubashir().applyFundamentals(["A", "B", "C", "D", "E"].map(row), {
+    const out = new ResearchAgent().applyFundamentals(["A", "B", "C", "D", "E"].map(row), {
       A: f({ epsTTM: 12, epsGrowth1y: 25 }), B: f({ epsTTM: 11, epsGrowth1y: 12 }), C: f({ epsTTM: 10, epsGrowth1y: 3 }),
       D: f({ epsTTM: 8, epsGrowth1y: -15 }), E: f({ epsTTM: -2 }),
     });
@@ -46,7 +46,7 @@ describe("Mubashir's earnings and size rules", () => {
     expect(out.find((r) => r.symbol === "E")!.notes.some((n) => n.startsWith("Loss-making"))).toBe(true);
   });
   it("treats small caps as at least medium risk", () => {
-    const [r] = new Mubashir().applyFundamentals([row("S")], { S: f({ cap: "Small", epsTTM: 5, epsGrowth1y: 10 }) });
+    const [r] = new ResearchAgent().applyFundamentals([row("S")], { S: f({ cap: "Small", epsTTM: 5, epsGrowth1y: 10 }) });
     expect(r.risk).toBe("MEDIUM");
   });
 });
@@ -80,7 +80,7 @@ describe("in the full run", () => {
     for (const c of ["Large", "Mid", "Small"]) expect(caps).toContain(c);
     for (const d of r.all) expect(d.fundamentals?.epsHistory.length).toBeGreaterThan(0);
     const report = msgs.find((m) => m.table?.columns.includes("EPS growth"));
-    expect(report?.sender).toBe("Mubashir");
+    expect(report?.sender).toBe("Research");
     for (const m of msgs) expect(m.text).not.toMatch(/undefined|NaN/);
   });
 
@@ -96,8 +96,8 @@ describe("in the full run", () => {
   });
 });
 
-describe("Final Decision's earnings caps", async () => {
-  const { FinalDecision } = await import("./agents/finalDecision");
+describe("Decision Agent's earnings caps", async () => {
+  const { DecisionAgent: FinalDecision } = await import("./agents/decision");
   const strong = { ...row("Z"), combined: 85, agree: true };
   it("no strong buy with falling EPS, no buy while loss-making", () => {
     const fd = new FinalDecision();

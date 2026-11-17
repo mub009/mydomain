@@ -114,7 +114,7 @@ export default function PositionsPage() {
 
   return (
     <>
-      <PageHeader title="My Positions" subtitle="Trades you track. Lotappi and Mayavi follow them up and alert you.">
+      <PageHeader title="My Positions" subtitle="Trades you track. Momentum Agent and Trend Agent follow them up and alert you.">
         <Button variant="outline" size="sm" disabled={checking || !open.length} onClick={async () => { setChecking(true); await checkNow(); setChecking(false); }}>
           <RefreshCw className={cn(checking && "animate-spin")} />Check now
         </Button>

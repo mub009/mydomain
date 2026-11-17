@@ -35,7 +35,7 @@ function loadDemo(symbols: string[], fallbackReason?: string): Loaded {
 }
 
 /**
- * Intraday candles for the stocks Mubashir checks closely.
+ * Intraday candles for the stocks Research Agent checks closely.
  * Returns 30-minute bars (~60 days) and hourly bars (~6 months) per symbol;
  * a symbol is missing when its intraday data could not be loaded.
  */

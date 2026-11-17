@@ -1,5 +1,5 @@
 /**
- * Mubashir's diversification check for a set of holdings (your open positions,
+ * Research Agent's diversification check for a set of holdings (your open positions,
  * or the day's picks).
  *
  * Limits (adjustable with MAX_SECTOR_PCT / MAX_STOCK_PCT / MAX_SMALLCAP_PCT):
