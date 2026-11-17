@@ -1,6 +1,6 @@
 "use client";
 
-import { CandlestickChart, LayoutDashboard, MessagesSquare, Moon, SlidersHorizontal, Sun } from "lucide-react";
+import { Briefcase, CandlestickChart, LayoutDashboard, MessagesSquare, Moon, SlidersHorizontal, Sun } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
@@ -9,14 +9,17 @@ import { PEOPLE, TEAM } from "@/lib/team";
 import type { Person } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { type Presence, useDesk, usePresence } from "@/store/desk";
+import { usePositions, useUnreadAlerts } from "@/store/positions";
 import { AgentAvatar, PRESENCE_TEXT } from "./agent-avatar";
 import { MarketStatusBadge, TypingIndicator } from "./primitives";
+import { AlertsBell, AlertToasts } from "./positions-ui";
 import { StockDrawer } from "./stock-drawer";
 
 const NAV = [
   { href: "/", label: "Overview", Icon: LayoutDashboard },
   { href: "/chat", label: "Team Chat", Icon: MessagesSquare },
   { href: "/screener", label: "Screener", Icon: SlidersHorizontal },
+  { href: "/positions", label: "Positions", Icon: Briefcase },
 ];
 
 export function Logo() {
@@ -65,6 +68,7 @@ function useUnread() {
 
 function Sidebar() {
   const pathname = usePathname();
+  const alertsUnread = useUnreadAlerts();
   const presence = usePresence();
   const unread = useUnread();
   const messages = useDesk((s) => s.messages);
@@ -84,6 +88,7 @@ function Sidebar() {
               className={cn("flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13.5px] font-medium transition-colors",
                 on ? "bg-primary text-white shadow-sm" : "hover:bg-sidebar-hover hover:text-white")}>
               <Icon className="size-4" />{label}
+              {href === "/positions" && alertsUnread > 0 && <span className="ml-auto rounded-full bg-neg px-1.5 text-[11px] font-bold leading-[18px] text-white tnum">{alertsUnread}</span>}
               {href === "/chat" && unread > 0 && <span className="ml-auto rounded-full bg-white/20 px-1.5 text-[11px] font-bold leading-[18px] text-white tnum">{unread}</span>}
             </Link>
           );
@@ -103,21 +108,23 @@ function Sidebar() {
 
 function MobileBars() {
   const pathname = usePathname();
+  const alertsUnread = useUnreadAlerts();
   const unread = useUnread();
   return (
     <>
       <header className="sticky top-0 z-30 flex items-center gap-2 bg-sidebar px-3 py-2 text-white lg:hidden">
         <Logo />
         <b className="text-sm font-bold">NSE Agent Desk</b>
-        <div className="ml-auto flex items-center gap-2"><MarketStatusBadge className="h-7 border-sidebar-border bg-sidebar-hover px-2 text-[11px] text-white [&>span:last-child]:hidden min-[420px]:[&>span:last-child]:inline" /><ThemeToggle className="border-sidebar-border bg-sidebar-hover text-white" /></div>
+        <div className="ml-auto flex items-center gap-2"><MarketStatusBadge className="h-7 border-sidebar-border bg-sidebar-hover px-2 text-[11px] text-white [&>span:last-child]:hidden min-[420px]:[&>span:last-child]:inline" /><AlertsBell className="border-sidebar-border bg-sidebar-hover text-white" /><ThemeToggle className="border-sidebar-border bg-sidebar-hover text-white" /></div>
       </header>
-      <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-3 border-t bg-card pb-[env(safe-area-inset-bottom)] lg:hidden" aria-label="Main">
+      <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t bg-card pb-[env(safe-area-inset-bottom)] lg:hidden" aria-label="Main">
         {NAV.map(({ href, label, Icon }) => {
           const on = pathname === href;
           return (
             <Link key={href} href={href} aria-current={on ? "page" : undefined}
               className={cn("relative flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium", on ? "text-primary" : "text-muted-foreground")}>
               <Icon className="size-5" />{label}
+              {href === "/positions" && alertsUnread > 0 && <span className="absolute right-[calc(50%-22px)] top-1.5 rounded-full bg-neg px-1.5 text-[10px] font-bold leading-4 text-white">{alertsUnread}</span>}
               {href === "/chat" && unread > 0 && <span className="absolute right-[calc(50%-22px)] top-1.5 rounded-full bg-primary px-1.5 text-[10px] font-bold leading-4 text-white">{unread}</span>}
             </Link>
           );
@@ -129,7 +136,14 @@ function MobileBars() {
 
 export function Shell({ children }: { children: React.ReactNode }) {
   const loadConfig = useDesk((s) => s.loadConfig);
+  const loadPositions = usePositions((s) => s.load);
   useEffect(() => { loadConfig(); }, [loadConfig]);
+  // Poll positions and alerts so follow-ups appear without a reload.
+  useEffect(() => {
+    loadPositions();
+    const t = setInterval(loadPositions, 20000);
+    return () => clearInterval(t);
+  }, [loadPositions]);
   return (
     <div className="flex min-h-dvh">
       <Sidebar />
@@ -138,6 +152,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
         <main className="flex-1 px-4 pb-24 pt-4 lg:px-6 lg:pb-8 lg:pt-5">{children}</main>
       </div>
       <StockDrawer />
+      <AlertToasts />
     </div>
   );
 }
@@ -153,6 +168,7 @@ export function PageHeader({ title, subtitle, children }: { title: string; subti
       <div className="flex items-center gap-2">
         {children}
         <MarketStatusBadge className="hidden lg:inline-flex" />
+        <AlertsBell className="hidden lg:grid" />
         <ThemeToggle className="hidden lg:grid" />
       </div>
     </header>

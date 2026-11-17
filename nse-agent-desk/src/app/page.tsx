@@ -74,7 +74,7 @@ export default function OverviewPage() {
                 <div>
                   <h2 className="text-[15px] font-semibold">Final Picks</h2>
                   <p className="text-xs text-muted-foreground">
-                    {r ? (r.watchlist.length ? `Watchlist: ${r.watchlist.map((w) => w.symbol).join(", ")}` : "No watchlist in this run")
+                    {r ? (r.watchlist.length ? `Watchlist: ${r.watchlist.map((w) => w.symbol).join(", ")} · select a pick to track it` : "Select a pick to track it")
                       : "Announced by Final Decision at the end of the discussion"}
                   </p>
                 </div>

@@ -50,6 +50,29 @@ Each bullish timeframe adds 1.5 points to the combined score and each bearish on
 
 If intraday data can't be loaded, 4H, 1H and 30m are marked as not rated. In demo mode the intraday candles are generated to match the demo daily prices.
 
+## Follow-up on trades you take
+
+Open any stock (from Final Picks, the Screener, or a chip in the chat) and press **Track this trade**. Enter what you actually bought: buy price, quantity, stop-loss and target (pre-filled from the analysis). The exit plan is:
+
+- **Stop-loss:** exit if price falls to it
+- **First exit** (buy price + 1× risk): book half and move the stop-loss up to your buy price
+- **Target:** exit the rest
+
+The **Positions** page shows each trade's price on a rail from stop to target, profit and loss, and its alerts. The server checks open positions every `POSITION_CHECK_MINUTES` (default 5) during NSE hours and sends follow-up alerts:
+
+| Alert | When | From |
+|-------|------|------|
+| In loss | 3% or more below the buy price | Lotappi |
+| Close to stop-loss | within 1% above the stop | Lotappi |
+| Stop-loss hit, exit now | at or below the stop | Lotappi |
+| First exit reached | at buy + 1× risk (stop moves to cost) | Mayavi |
+| Near the exit area | within 2% of the target | Mayavi |
+| Target reached, exit | at or above the target | Mayavi |
+
+Alerts appear in the app (bell, pop-ups, Positions page), as desktop notifications (press **Enable desktop alerts**), and on your phone if you set `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`. Each alert fires once per trade; "close to stop-loss" fires again after a recovery.
+
+Notes: live prices come from Yahoo's 5-minute bars, which are delayed, so a stop can be hit before the alert arrives. The checks run only while the server is running. Trades tracked from a demo run follow a simulated price that moves every minute. Positions are saved to `.data/positions.json`; the app has no login, so don't expose it to the internet.
+
 ## The 9 AM Morning Session
 
 With `MORNING_SESSION_ENABLED=true`, the server runs the whole team by itself at `MORNING_SESSION_TIME` (default 09:00 IST, before the 09:15 open) on NSE trading days. It skips weekends and the holidays in `calendar.ts`, and runs at most once a day. The run is saved to `.data/morning-session.json`; the Overview shows when it last ran and a **Replay 9 AM session** button plays its conversation back.

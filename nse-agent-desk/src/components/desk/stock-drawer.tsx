@@ -10,6 +10,7 @@ import { findStock, useDesk } from "@/store/desk";
 import { AgentAvatar } from "./agent-avatar";
 import { ChartCheck } from "./chart-check";
 import { FundamentalsCard } from "./fundamentals";
+import { TrackTradeButton } from "./positions-ui";
 import { RiskTag, VerdictBadge } from "./primitives";
 
 function ScoreBar({ label, value, color }: { label: string; value: number; color: string }) {
@@ -111,6 +112,7 @@ export function StockDrawer() {
               <SheetDescription className="text-[13px] text-muted-foreground">
                 {d.sector} · NSE · {result?.source.kind === "demo" ? "demo data, not real prices" : "end-of-day data"}
               </SheetDescription>
+              <TrackTradeButton d={d} className="mt-3 w-full" />
             </div>
             <Body d={d} isPick={Boolean(result?.picks.some((p) => p.symbol === d.symbol))} />
           </>
