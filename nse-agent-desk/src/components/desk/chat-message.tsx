@@ -8,6 +8,7 @@ import { displayName, TEAM } from "@/lib/team";
 import type { Message, MessageTable } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { AgentAvatar } from "./agent-avatar";
+import { TrendTag } from "./chart-check";
 import { RiskTag, StockSymbolChip, VerdictBadge } from "./primitives";
 
 const VERDICTS = ["STRONG BUY", "BUY", "WATCH", "AVOID"];
@@ -41,7 +42,9 @@ export function MiniReportTable({ table, compact }: { table: MessageTable; compa
                   cols[i] === "Reason" && "whitespace-normal text-muted-foreground", cols[i] === "Holding plan" && "text-muted-foreground")}>
                   {i === 0 ? <StockSymbolChip symbol={cell} />
                     : VERDICTS.includes(cell) ? <VerdictBadge verdict={cell} />
-                    : RISKS.includes(cell) ? <RiskTag risk={cell} /> : cell}
+                    : RISKS.includes(cell) ? <RiskTag risk={cell} />
+                    : cell === "Bullish" || cell === "Bearish" || cell === "Neutral" ? <TrendTag trend={cell} compact={compact} />
+                    : cell}
                 </td>
               ))}
             </tr>

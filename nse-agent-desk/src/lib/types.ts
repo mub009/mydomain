@@ -42,6 +42,54 @@ export interface AgentReport {
 export type Risk = "LOW" | "MEDIUM" | "HIGH";
 export type Verdict = "STRONG BUY" | "BUY" | "WATCH" | "AVOID";
 
+export type Timeframe = "1M" | "1D" | "4H" | "1H" | "30m";
+export type Trend = "Bullish" | "Bearish" | "Neutral";
+
+export interface TimeframeView {
+  tf: Timeframe;
+  trend: Trend;
+  rsi: number;
+  /** Bars the reading is based on. */
+  bars: number;
+  note: string;
+}
+
+export interface HistoryWindow {
+  label: "1M" | "3M" | "6M" | "1Y";
+  low: number;
+  high: number;
+  /** Price where the most volume traded in this window. */
+  poc: number;
+  /** % change over the window. */
+  change: number;
+  /** Highest swing low below today's price, if any. */
+  support?: number;
+}
+
+export interface BuyZone {
+  low: number;
+  high: number;
+  /** How far today's price is above the zone (0 when inside it). */
+  distancePct: number;
+  plan: "In buy zone" | "Wait for dip" | "Extended";
+  /** Which history levels make up the zone. */
+  basis: string[];
+  /** Stop-loss for a buy inside the zone. */
+  stop: number;
+}
+
+export interface ChartAnalysis {
+  timeframes: TimeframeView[];
+  bullish: number;
+  bearish: number;
+  history: HistoryWindow[];
+  zone: BuyZone | null;
+  /** False when intraday candles were not available. */
+  intraday: boolean;
+  /** Last ~6 months of daily closes, for the zone chart. */
+  closes: number[];
+}
+
 export interface Analysis {
   symbol: string;
   sector: string;
@@ -65,6 +113,8 @@ export interface Analysis {
   mayReasons: string[];
   mayWarnings: string[];
   notes: string[];
+  /** Mubashir's multi-timeframe chart check (top candidates only). */
+  chart?: ChartAnalysis;
 }
 
 export interface Decision extends Analysis {

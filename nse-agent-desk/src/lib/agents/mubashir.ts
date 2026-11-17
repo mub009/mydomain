@@ -1,7 +1,7 @@
 /** Agent 3 - Mubashir: the analyst. Merges Lotappi's and Mayavi's reports,
  *  checks agreement, rates risk and prepares the trade scenario. */
 import { sectorOf } from "../market/universe";
-import type { AgentReport, Analysis, Risk, Snapshot } from "../types";
+import type { AgentReport, Analysis, ChartAnalysis, Risk, Snapshot } from "../types";
 import { clamp, round } from "./base";
 
 export class Mubashir {
@@ -40,6 +40,21 @@ export class Mubashir {
     const m = new Map(may.map((r) => [r.symbol, r]));
     return lot.map((l) => this.analyseOne(l.symbol, l, m.get(l.symbol)!, snaps[l.symbol]))
       .sort((a, b) => b.combined - a.combined);
+  }
+
+  /**
+   * Fold the chart check into the scores: each timeframe that is bullish adds
+   * 1.5 points and each bearish one takes 1.5 away (at most +/-7.5).
+   */
+  applyCharts(rows: Analysis[], charts: Record<string, ChartAnalysis>): Analysis[] {
+    return rows.map((r) => {
+      const c = charts[r.symbol];
+      if (!c) return r;
+      const adj = (c.bullish - c.bearish) * 1.5;
+      const notes = [...r.notes, `Charts: ${c.bullish} of 5 timeframes bullish, ${c.bearish} bearish`];
+      if (c.zone) notes.push(`Buy zone ₹${c.zone.low.toLocaleString("en-IN")}-₹${c.zone.high.toLocaleString("en-IN")} (${c.zone.plan.toLowerCase()})`);
+      return { ...r, chart: c, notes, combined: round(clamp(r.combined + adj)) };
+    }).sort((a, b) => b.combined - a.combined);
   }
 
   /** Mubashir's advice when Lotappi and Mayavi disagree on a stock: evidence, trade-off, uncertainty. */

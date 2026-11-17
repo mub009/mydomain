@@ -4,8 +4,9 @@ import type { MarketDataProvider } from "./provider";
 const yahooSymbol = (s: string) =>
   s.startsWith("^") || s.endsWith(".NS") || s.endsWith(".BO") ? s : `${s}.NS`;
 
-async function chart(symbol: string): Promise<Bar[]> {
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol(symbol))}?range=1y&interval=1d`;
+async function chart(symbol: string, range = "1y", interval = "1d"): Promise<Bar[]> {
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol(symbol))}?range=${range}&interval=${interval}`;
+  const intraday = interval !== "1d";
   const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" }, cache: "no-store", signal: AbortSignal.timeout(10000) });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const json = await res.json();
@@ -18,7 +19,7 @@ async function chart(symbol: string): Promise<Bar[]> {
     const [o, h, l, c, v] = [q.open[i], q.high[i], q.low[i], q.close[i], q.volume[i]];
     if ([o, h, l, c].some((x) => x == null)) return;
     const k = adj?.[i] ? adj[i] / c : 1;
-    bars.push({ date: new Date(t * 1000).toISOString().slice(0, 10), open: o * k, high: h * k, low: l * k, close: c * k, volume: v ?? 0 });
+    bars.push({ date: intraday ? new Date(t * 1000).toISOString() : new Date(t * 1000).toISOString().slice(0, 10), open: o * k, high: h * k, low: l * k, close: c * k, volume: v ?? 0 });
   });
   return bars;
 }
@@ -35,4 +36,5 @@ export const yahooProvider: MarketDataProvider = {
   getDailyBars: chart,
   getIndexBars: () => chart("^NSEI"),
   getVixBars: () => chart("^INDIAVIX"),
+  getIntradayBars: (symbol, interval) => chart(symbol, interval === "30m" ? "60d" : "6mo", interval),
 };

@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { DataBanner, RiskTag, VerdictBadge } from "@/components/desk/primitives";
 import { PageHeader } from "@/components/desk/shell";
 import { StockSparkline } from "@/components/desk/stock-sparkline";
+import { PlanTag, TimeframeDots } from "@/components/desk/chart-check";
 import { Button } from "@/components/ui/button";
 import { Field, inputClass } from "@/components/ui/segmented";
 import { inr, pct } from "@/lib/format";
@@ -31,6 +32,10 @@ const columns: ColumnDef<Decision>[] = [
   { accessorKey: "entry", header: "Entry", meta: { num: true }, cell: ({ getValue }) => inr(getValue() as number) },
   { accessorKey: "stopLoss", header: "Stop-loss", meta: { num: true }, cell: ({ getValue }) => inr(getValue() as number) },
   { accessorKey: "target", header: "Target", meta: { num: true }, cell: ({ getValue }) => inr(getValue() as number) },
+  { id: "charts", header: "Charts", accessorFn: (d) => (d.chart ? d.chart.bullish - d.chart.bearish : -99), meta: { num: false },
+    cell: ({ row: { original: d } }) => (d.chart ? <TimeframeDots chart={d.chart} /> : <span className="text-xs text-muted-foreground">–</span>) },
+  { id: "zone", header: "Buy zone", accessorFn: (d) => d.chart?.zone?.distancePct ?? 999,
+    cell: ({ row: { original: d } }) => (d.chart?.zone ? <div><div className="text-xs font-medium">{inr(d.chart.zone.low, 0)}–{inr(d.chart.zone.high, 0)}</div><PlanTag zone={d.chart.zone} /></div> : <span className="text-xs text-muted-foreground">–</span>) },
   { id: "notes", header: "Notes", enableSorting: false, cell: ({ row: { original: d } }) => <span className="block min-w-56 max-w-80 whitespace-normal text-xs text-muted-foreground">{[d.passedOver, ...d.notes, ...d.lotWarnings.slice(0, 1), ...d.mayWarnings.slice(0, 1)].filter(Boolean).join(" · ") || "–"}</span> },
 ];
 

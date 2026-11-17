@@ -1,5 +1,6 @@
+import { toHourly } from "../chart";
 import type { Bar, DataSource } from "../types";
-import { demoBars, demoIndex, demoVix } from "./demo";
+import { demoBars, demoIndex, demoIntraday, demoVix } from "./demo";
 import type { MarketDataProvider } from "./provider";
 import { yahooProvider } from "./yahoo";
 
@@ -28,6 +29,32 @@ function loadDemo(symbols: string[], fallbackReason?: string): Loaded {
     frames, indexClose, vixClose: demoVix(indexClose, seed), skipped: [],
     source: { kind: "demo", label: "Demo data (fictional prices)", seed, fallbackReason },
   };
+}
+
+/**
+ * Intraday candles for the stocks Mubashir checks closely.
+ * Returns 30-minute bars (~60 days) and hourly bars (~6 months) per symbol;
+ * a symbol is missing when its intraday data could not be loaded.
+ */
+export async function loadIntraday(symbols: string[], source: DataSource, frames: Record<string, Bar[]>) {
+  const out: Record<string, { m30: Bar[]; h1: Bar[] | null }> = {};
+  if (source.kind === "demo") {
+    for (const s of symbols) {
+      const m30 = demoIntraday(frames[s], s, source.seed ?? 0, 120);
+      // 30-minute bars for the last 60 days; hourly bars from all 120 days
+      out[s] = { m30: m30.slice(-60 * 13), h1: toHourly(m30) };
+    }
+    return out;
+  }
+  const provider = getProvider();
+  if (!provider) return out;
+  await Promise.all(symbols.map(async (s) => {
+    try {
+      const [m30, h1] = await Promise.all([provider.getIntradayBars(s, "30m"), provider.getIntradayBars(s, "60m").catch(() => null)]);
+      if (m30.length) out[s] = { m30, h1: h1?.length ? h1 : null };
+    } catch { /* this symbol is checked on daily data only */ }
+  }));
+  return out;
 }
 
 export async function loadMarket(

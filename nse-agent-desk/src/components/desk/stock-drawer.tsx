@@ -8,6 +8,7 @@ import { TEAM } from "@/lib/team";
 import type { Decision, Person } from "@/lib/types";
 import { findStock, useDesk } from "@/store/desk";
 import { AgentAvatar } from "./agent-avatar";
+import { ChartCheck } from "./chart-check";
 import { RiskTag, VerdictBadge } from "./primitives";
 
 function ScoreBar({ label, value, color }: { label: string; value: number; color: string }) {
@@ -78,6 +79,7 @@ function Body({ d, isPick }: { d: Decision; isPick: boolean }) {
         {d.notes.length > 0 && <ul className="mt-1 list-disc pl-4 text-[12.5px] text-muted-foreground">{d.notes.map((n) => <li key={n}>{n}</li>)}</ul>}
         {d.clarification && <p className="mt-2 rounded-lg bg-muted/60 p-2 text-[12.5px]">{d.clarification}</p>}
       </AgentView>
+      {d.chart ? <ChartCheck chart={d.chart} price={d.entry} /> : <p className="rounded-xl border border-dashed p-3 text-[12.5px] text-muted-foreground">Mubashir checks charts for the top candidates only; this stock ranked lower.</p>}
       <AgentView who="FinalDecision">
         <div className="mt-2 flex flex-wrap items-center gap-2 text-[12.5px]">
           <VerdictBadge verdict={d.verdict} />
