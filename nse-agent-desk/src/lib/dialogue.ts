@@ -14,11 +14,13 @@ import { inr, pct } from "./format";
 import type { LLM } from "./llm";
 import { NEWS_BOOST } from "./agents/morningSession";
 import { SECTOR_ADJ } from "./sectors";
-import type { AgentReport, Analysis, DataSource, Decision, MessageTable, NewsBrief, NewsItem, Person, SectorView, Snapshot, VixReport } from "./types";
+import { factorName } from "./macro";
+import type { AgentReport, Analysis, DataSource, Decision, MacroReport, MessageTable, NewsBrief, NewsItem, Person, SectorView, Snapshot, VixReport } from "./types";
 
 const ROLE: Record<Person, string> = {
   MorningSession: "news scout who collects the morning stock news",
   IVIndex: "volatility analyst who tracks India VIX",
+  Macro: "commodity and currency analyst who tracks gold, crude oil and USD/INR",
   Lotappi: "short-term (1-10 day) swing-trade scanner",
   Mayavi: "1-month positional trend scanner",
   Mubashir: "analyst who combines the short-term and 1-month reports and checks risk",
@@ -32,6 +34,7 @@ const lc = (s?: string) => (!s ? "" : /^[A-Z]{2}/.test(s) ? s : s.charAt(0).toLo
 const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
 
 export interface DialogueInput {
+  macro: MacroReport | null;
   sectors: SectorView[];
   excluded: { symbol: string; marketCapCr: number }[];
   minCapCr: number;
@@ -156,6 +159,31 @@ export async function runDialogue(bus: MessageBus, llm: LLM, d: DialogueInput) {
     kind: "report", table: reportTable(d.may.slice(0, 5)), tickers: names(d.may.slice(0, 5)),
     aiNote: await note("Mayavi", "In 3-4 short lines, explain your best 1-month picks and the main risk, speaking to your colleague Mubashir.", d.may.slice(0, 5)),
   });
+
+  // ---------- Macro Agent: gold, crude, USD/INR → Mubashir (before his analysis) ----------
+  if (d.macro && d.macro.factors.length) {
+    const mx = d.macro;
+    const scanned = new Set([...d.lot.slice(0, 10), ...d.may.slice(0, 10)].map((r) => r.symbol));
+    const active = mx.exposures.filter((e) => e.points !== 0);
+    const shown = [...active.filter((e) => scanned.has(e.symbol)), ...active.filter((e) => !scanned.has(e.symbol))].slice(0, 8);
+    bus.send("Macro", "Mubashir",
+      `Mubashir, before you combine the lists: ${mx.summary}${mx.sample ? " (Sample series in demo mode.)" : ""}` +
+      (shown.length ? " These stocks depend on those moves:" : " None of the scanned stocks is strongly exposed to these moves right now."),
+      { kind: "report", tickers: [...new Set(shown.map((e) => e.symbol))],
+        table: shown.length ? {
+          columns: ["Symbol", "Factor", "Effect", "Points", "Why"],
+          rows: shown.map((e) => [e.symbol, factorName(e.factor), e.effect, `${e.points > 0 ? "+" : ""}${e.points}`, e.reason + (e.corr !== undefined && e.basis === "known" ? ` (measured correlation ${e.corr.toFixed(2)})` : "")]),
+        } : undefined,
+        aiNote: await note("Macro", "In 3-4 short lines, tell Mubashir what the gold, crude and USD/INR moves mean for the listed Indian stocks. Use only the data given.", { factors: mx.factors.map(({ spark: _s, ...f }) => f), exposures: shown }),
+      });
+    const ups = [...new Set(active.filter((e) => e.effect === "Tailwind").map((e) => e.symbol))].slice(0, 4);
+    const downs = [...new Set(active.filter((e) => e.effect === "Headwind").map((e) => e.symbol))].slice(0, 4);
+    bus.send("Mubashir", "Macro",
+      active.length
+        ? `Thanks. I'll add your points to those scores (at most ±4 per stock)` + (ups.length ? `: a lift for ${list(ups)}` : "") + (downs.length ? `${ups.length ? "," : ":"} a cut for ${list(downs)}` : "") + "."
+        : "Understood. No macro adjustments today.",
+      { tickers: [...ups, ...downs] });
+  }
 
   // ---------- Step 3: follow-up research ----------
   bus.stage = "analyze";

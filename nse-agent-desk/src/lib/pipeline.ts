@@ -15,6 +15,7 @@ import { loadIntraday, loadMarket } from "./market";
 import { capThresholds, loadFundamentals } from "./fundamentals";
 import { loadNews } from "./news";
 import { analyseSectors, applySectors, enrichSectors } from "./sectors";
+import { analyseMacro, applyMacro, loadMacro } from "./macro";
 import { sectorOf } from "./market/universe";
 import type { RunRequest, RunResult, StreamEvent } from "./types";
 
@@ -50,7 +51,11 @@ export async function runAnalysis(o: RunRequest, emit: (e: StreamEvent) => void)
   // and finds each one's best buy area from 1M, 3M, 6M and 1Y history.
   // Mubashir's sector check: each sector against the Nifty; leading sectors lift their stocks.
   const sectors = analyseSectors(frames, snaps, sectorOf, indexClose, sectorIndex);
-  const first = applySectors(mubashir.applyFundamentals(mubashir.analyse(lot, may, snaps), funds), sectors);
+  // Macro Agent: gold, crude and USD/INR, and the stocks that depend on them — before Mubashir's analysis.
+  emit({ type: "progress", text: "Reading gold, crude and USD/INR…" });
+  const macroData = await loadMacro(source.kind === "demo", source.seed);
+  const macro = macroData ? analyseMacro(frames, macroData.series, macroData.sample) : null;
+  const first = applySectors(mubashir.applyFundamentals(applyMacro(mubashir.analyse(lot, may, snaps), macro), funds), sectors);
   const candidates = first.slice(0, Math.max(12, o.top * 2)).map((r) => r.symbol);
   emit({ type: "progress", text: "Checking charts…" });
   const intraday = await loadIntraday(candidates, source, frames);
@@ -67,14 +72,14 @@ export async function runAnalysis(o: RunRequest, emit: (e: StreamEvent) => void)
     source, stockCount: rows.length, skipped, indexRet21d,
     aiLabel: llm.enabled ? `on (${aiModel()})` : "off",
     capital: o.capital, riskPerTrade: o.riskPerTrade,
-    sectors: sectorViews, excluded, minCapCr, news, vix, positive: morning.positive(news), negative: morning.negative(news),
+    macro, sectors: sectorViews, excluded, minCapCr, news, vix, positive: morning.positive(news), negative: morning.negative(news),
     snaps, lot, may, rows, conflicted, clarifications, picks, passed, watchlist,
   });
 
   const result: RunResult = {
     source, generatedAt: new Date().toISOString(), simulatedAgents: !llm.enabled,
     capital: o.capital, riskPerTrade: o.riskPerTrade,
-    indexRet21d: Math.round(indexRet21d * 100) / 100, news, vix, excluded, minCapCr, sectors: sectorViews, picks, watchlist, all, skipped,
+    indexRet21d: Math.round(indexRet21d * 100) / 100, news, vix, excluded, minCapCr, sectors: sectorViews, macro, picks, watchlist, all, skipped,
   };
   emit({ type: "result", result });
   console.log(`[nse-agent-desk] run: ${rows.length} stocks, source=${source.kind}${source.seed !== undefined ? `#${source.seed}` : ""}, ` +

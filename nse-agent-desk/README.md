@@ -10,6 +10,7 @@ An AI stock research desk for the Indian market (NSE / Nifty 50). Four AI agents
 |-------|------|--------------|
 | **Morning Session** | News Scout | Collects stock news, sorts it into positive and negative, sends the positive stocks to Lotappi and Mayavi (+6 on their scores) and flags the negative ones |
 | **IV Index Agent** | Volatility Analyst | Tracks India VIX: level, 1-day and 5-day change, regime; lists the likely reasons for the move and the stocks expected to move next (high-beta "at risk" or "likely up", low-beta "holds up") |
+| **Macro Agent** | Commodity & Currency Analyst | Tracks Gold, Brent crude and USD/INR, finds which stocks depend on them, and tells Mubashir about tailwinds and headwinds before his analysis |
 | **Lotappi** | Short-term Trader (1-10 days) | EMA 9/21, RSI 14, MACD, 20-day breakout, relative volume, 5-day return |
 | **Mayavi** | Positional Trader (~1 month) | SMA 20/50/200, 1-month return, strength vs Nifty 50, distance from 52-week high |
 | **Mubashir** | Research Analyst | Combines both reports, finds agreement and conflict, rates risk, sets entry / stop-loss / target. Checks the charts of the top candidates on **1M, 1D, 4H, 1H and 30m** and finds each one's **best buy area** from 1-month, 3-month, 6-month and 1-year history |
@@ -49,6 +50,19 @@ Each bullish timeframe adds 1.5 points to the combined score and each bearish on
 **Best buy area:** for the 1M, 3M, 6M and 1Y windows he finds the highest swing low below today's price and the price where the most volume traded. Levels within one ATR of each other are grouped; the group confirmed by the most windows is the buy zone. The plan is **In buy zone** (price within 1% of it), **Wait for dip** (up to 6% above) or **Extended** (more than 6% above). Final Decision's announcement says how to enter each pick.
 
 If intraday data can't be loaded, 4H, 1H and 30m are marked as not rated. In demo mode the intraday candles are generated to match the demo daily prices.
+
+## Macro Agent: Gold, crude and USD/INR
+
+Before Mubashir combines the lists, the Macro Agent reports how **Gold**, **Brent crude** and **USD/INR** moved (1 day, 5 days, 1 month, trend) and which stocks that helps or hurts.
+
+- **Known links** (`src/lib/macro/exposure.ts`, edit to add stocks): a weaker rupee helps IT and pharma exporters and textile exporters; costlier crude hurts oil marketing companies (BPCL, HPCL), paint makers and tyre makers and helps ONGC; BPCL/HPCL also pay for crude in dollars. Reliance (crude) and Titan (gold) are marked mixed.
+- **Measured links:** each stock's daily-return correlation with the factor over ~120 days. It confirms (+1) or questions (−1) a known link; a stock with no known link but a correlation of 0.4+ is listed as a measured link.
+- **When a move matters:** 1-month move of at least 2% for gold, 3% for crude, 0.7% for USD/INR.
+- **Score effect:** tailwind or headwind of 2 points, +1 for a move twice the threshold, ±1 from the measured check; at most ±4 per stock. Mixed links get a note but no points.
+
+Shown in a Gold · Crude · USD/INR card on the Overview, a Macro exposure section in an affected stock's panel, and the Macro Agent & Mubashir chat thread.
+
+Data: live mode uses Yahoo daily bars for gold futures (GC=F, converted to ₹ per 10 g with USD/INR, without import duty or GST), Brent futures (BZ=F) and USD/INR (INR=X), untested from the build environment. Demo mode uses sample series, and demo stocks with a known link really move with their factor so the measured check has something to find.
 
 ## Sector check
 

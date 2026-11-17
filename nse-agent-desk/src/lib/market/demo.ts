@@ -1,3 +1,4 @@
+import { demoFactorTerm } from "../macro/exposure";
 import type { Bar } from "../types";
 
 function seeded(str: string) {
@@ -18,7 +19,7 @@ function seeded(str: string) {
 }
 
 /** The last `n` weekdays ending today (or the previous Friday). */
-function weekdays(n: number): string[] {
+export function weekdays(n: number): string[] {
   const out: string[] = [];
   const d = new Date();
   while (out.length < n) {
@@ -43,6 +44,9 @@ export function demoBars(symbol: string, seed: number, days = 260): Bar[] {
   const shift25 = r.normal(0, 0.0025), shift5 = r.normal(0, 0.004);
   for (let i = days - 25; i < days; i++) rets[i] += shift25;
   for (let i = days - 5; i < days; i++) rets[i] += shift5;
+  // Stocks with a known gold / crude / USD-INR link also move with that factor.
+  const factor = demoFactorTerm(symbol, seed, days);
+  if (factor) for (let i = 0; i < days; i++) rets[i] += factor[i];
 
   let price = r.uniform(150, 4000);
   const dates = weekdays(days);

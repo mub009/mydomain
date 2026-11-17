@@ -13,6 +13,7 @@ import { FundamentalsCard } from "./fundamentals";
 import { TrackTradeButton } from "./positions-ui";
 import { CompanyTab } from "./company-tab";
 import { SectorCheck } from "./sector-ui";
+import { MacroExposureSection } from "./macro-ui";
 import { Tabs } from "radix-ui";
 import { useState } from "react";
 import { RiskTag, VerdictBadge } from "./primitives";
@@ -48,6 +49,7 @@ function AgentView({ who, score, reasons, warnings, children }: { who: Person; s
 function Body({ d, isPick }: { d: Decision; isPick: boolean }) {
   const sectors = useDesk((s) => s.result?.sectors);
   const sector = sectors?.find((s) => s.sector === d.sector);
+  const macroFactors = useDesk((s) => s.result?.macro?.factors ?? []);
   const up = d.spark[d.spark.length - 1] >= d.spark[0];
   const stroke = up ? "var(--pos)" : "var(--neg)";
   return (
@@ -82,6 +84,7 @@ function Body({ d, isPick }: { d: Decision; isPick: boolean }) {
 
       {sector ? <SectorCheck s={sector} total={sectors!.length} symbol={d.symbol} />
         : <p className="rounded-xl border border-dashed p-3 text-[12.5px] text-muted-foreground">{d.sector === "Other" ? "Sector unknown for this stock, so there's no sector check." : `Not enough ${d.sector} stocks in this run to judge the sector. Choose "All caps" for more.`}</p>}
+      {d.macro && d.macro.length > 0 && <MacroExposureSection exposures={d.macro} factors={macroFactors} />}
       <AgentView who="Lotappi" score={d.lotappi} reasons={d.lotReasons} warnings={d.lotWarnings} />
       <AgentView who="Mayavi" score={d.mayavi} reasons={d.mayReasons} warnings={d.mayWarnings} />
       {d.fundamentals && <FundamentalsCard f={d.fundamentals} />}

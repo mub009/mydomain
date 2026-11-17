@@ -9,6 +9,7 @@ import { MessageFeed } from "@/components/desk/message-feed";
 import { MorningNewsCard, VixCard } from "@/components/desk/morning-cards";
 import { DiversificationCard } from "@/components/desk/diversification-card";
 import { SectorStrengthCard } from "@/components/desk/sector-ui";
+import { MacroCard } from "@/components/desk/macro-ui";
 import { diversify } from "@/lib/diversify";
 import { useMemo } from "react";
 import { DataBanner, KPICard, ResearchProgress } from "@/components/desk/primitives";
@@ -73,6 +74,8 @@ export default function OverviewPage() {
           <MorningNewsCard news={result?.news} revealed={Boolean(result) && said("MorningSession")} busy={busy && !said("MorningSession")} time={session?.time ?? "09:00"} />
           <VixCard vix={result?.vix} revealed={Boolean(result) && said("IVIndex")} busy={busy && !said("IVIndex")} />
         </div>
+
+        <MacroCard macro={result?.macro} revealed={Boolean(result) && said("Macro")} busy={busy && !said("Macro")} />
 
         {r && <SectorStrengthCard sectors={r.sectors} />}
 

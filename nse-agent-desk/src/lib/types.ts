@@ -135,6 +135,8 @@ export interface Analysis {
   notes: string[];
   /** Market cap and EPS check. */
   fundamentals?: Fundamentals;
+  /** Gold / crude / USD-INR links found by the Macro Agent. */
+  macro?: MacroExposure[];
   /** Mubashir's multi-timeframe chart check (top candidates only). */
   chart?: ChartAnalysis;
 }
@@ -149,7 +151,7 @@ export interface Decision extends Analysis {
   spark: number[]; // last ~60 closes
 }
 
-export type Person = "MorningSession" | "IVIndex" | "Lotappi" | "Mayavi" | "Mubashir" | "FinalDecision";
+export type Person = "MorningSession" | "IVIndex" | "Macro" | "Lotappi" | "Mayavi" | "Mubashir" | "FinalDecision";
 export type AgentName = Person | "System";
 export type Stage = "scan" | "analyze" | "debate" | "decide";
 
@@ -220,6 +222,43 @@ export interface DataSource {
   fallbackReason?: string;
 }
 
+export interface MacroFactor {
+  id: "gold" | "crude" | "usdinr";
+  name: string;
+  /** e.g. "₹/10g", "$/bbl", "₹ per $" */
+  unit: string;
+  level: number;
+  ret1d: number;
+  ret5d: number;
+  ret1m: number;
+  trend: "Up" | "Down" | "Flat";
+  /** True when the 1-month move is big enough to matter for stocks. */
+  significant: boolean;
+  spark: number[];
+  sample: boolean;
+}
+
+export interface MacroExposure {
+  symbol: string;
+  factor: MacroFactor["id"];
+  /** "known" = a documented business link; "measured" = found only in the price data. */
+  basis: "known" | "measured";
+  link: "benefits" | "hurts" | "mixed";
+  reason: string;
+  /** Correlation of daily returns with the factor over recent months, if measurable. */
+  corr?: number;
+  effect: "Tailwind" | "Headwind" | "Neutral";
+  points: number;
+}
+
+export interface MacroReport {
+  factors: MacroFactor[];
+  /** Exposures for the stocks in this run, strongest effect first. */
+  exposures: MacroExposure[];
+  summary: string;
+  sample: boolean;
+}
+
 export interface SectorView {
   sector: string;
   members: number;
@@ -257,6 +296,7 @@ export interface RunResult {
   excluded: { symbol: string; marketCapCr: number }[];
   minCapCr: number;
   sectors: SectorView[];
+  macro: MacroReport | null;
   picks: Decision[];
   watchlist: Decision[];
   all: Decision[];

@@ -2,7 +2,7 @@ import type { Bar } from "../types";
 import type { MarketDataProvider } from "./provider";
 
 const yahooSymbol = (s: string) =>
-  s.startsWith("^") || s.endsWith(".NS") || s.endsWith(".BO") ? s : `${s}.NS`;
+  s.includes("=") || s.startsWith("^") || s.endsWith(".NS") || s.endsWith(".BO") ? s : `${s}.NS`;
 
 async function chart(symbol: string, range = "1y", interval = "1d"): Promise<Bar[]> {
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol(symbol))}?range=${range}&interval=${interval}`;

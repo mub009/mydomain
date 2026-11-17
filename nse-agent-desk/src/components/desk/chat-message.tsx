@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { AgentAvatar } from "./agent-avatar";
 import { TrendTag } from "./chart-check";
 import { isSectorState, SectorStateTag } from "./sector-ui";
+import { EffectTag } from "./macro-ui";
 import { RiskTag, StockSymbolChip, VerdictBadge } from "./primitives";
 
 const VERDICTS = ["STRONG BUY", "BUY", "WATCH", "AVOID"];
@@ -46,6 +47,7 @@ export function MiniReportTable({ table, compact }: { table: MessageTable; compa
                     : RISKS.includes(cell) ? <RiskTag risk={cell} />
                     : cell === "Bullish" || cell === "Bearish" || cell === "Neutral" ? <TrendTag trend={cell} compact={compact} />
                     : isSectorState(cell) ? <SectorStateTag state={cell} />
+                    : cell === "Tailwind" || cell === "Headwind" ? <EffectTag effect={cell} />
                     : cell}
                 </td>
               ))}

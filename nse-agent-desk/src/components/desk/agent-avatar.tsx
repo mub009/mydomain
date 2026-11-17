@@ -5,7 +5,7 @@ import type { Presence } from "@/store/desk";
 
 /** Hand-drawn illustrated portraits, one per agent. */
 function Portrait({ who }: { who: Person }) {
-  const skin = { MorningSession: "#E0AC86", IVIndex: "#C99470", Lotappi: "#F2C29B", Mayavi: "#E8B48C", Mubashir: "#D9A27A", FinalDecision: "#EBC3A0" }[who];
+  const skin = { MorningSession: "#E0AC86", IVIndex: "#C99470", Macro: "#D8A47F", Lotappi: "#F2C29B", Mayavi: "#E8B48C", Mubashir: "#D9A27A", FinalDecision: "#EBC3A0" }[who];
   const c = TEAM[who].color;
   return (
     <svg viewBox="0 0 64 64" className="size-full" aria-hidden>
@@ -16,6 +16,7 @@ function Portrait({ who }: { who: Person }) {
       {who === "Mubashir" && <path d="M25 45l7 8 7-8" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" />}
       {who === "Lotappi" && <path d="M24 46h16" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" opacity=".7" />}
       {who === "MorningSession" && <><rect x="38" y="50" width="11" height="8" rx="1.5" fill="#fff" opacity=".9" /><path d="M40 53h7M40 55.5h5" stroke={c} strokeWidth="1.2" /></>}
+      {who === "Macro" && <><circle cx="44" cy="54" r="5" fill="#FACC15" stroke="#fff" strokeWidth="1.5" /><path d="M42.5 54h3M44 52.5v3" stroke="#92400E" strokeWidth="1.2" /></>}
       {who === "IVIndex" && <path d="M18 56l6-5 5 3 6-7 5 4 6-6" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />}
       {/* neck + head */}
       <rect x="27" y="36" width="10" height="10" rx="4" fill={skin} />
@@ -26,6 +27,7 @@ function Portrait({ who }: { who: Person }) {
       {who === "Mayavi" && <path d="M20 27c0-10 5-15 12-15s12 5 12 15c-4-2-7-6-9-9-3 5-9 8-15 9Z" fill="#3B2A4D" />}
       {who === "MorningSession" && <><path d="M19 30c-1-12 5-18 13-18s14 6 13 18c-2-6-5-9-13-9s-11 3-13 9Z" fill="#4A2B1F" /><path d="M18 22c2-6 8-9 14-9s12 3 14 9" fill="none" stroke={c} strokeWidth="3" strokeLinecap="round" /></>}
       {who === "IVIndex" && <path d="M20 25c0-9 5-14 12-14s12 5 12 14c-3-3-6-4-9-4-4 0-8 1-15 4Z" fill="#111827" />}
+      {who === "Macro" && <><path d="M20 26c0-10 5-15 12-15s12 5 12 15c-1-5-5-8-12-8s-11 3-12 8Z" fill="#3F2A1E" /><rect x="22.5" y="25.5" width="8" height="6" rx="2" fill="none" stroke="#1F2937" strokeWidth="1.3" /><rect x="33.5" y="25.5" width="8" height="6" rx="2" fill="none" stroke="#1F2937" strokeWidth="1.3" /><path d="M30.5 28h3" stroke="#1F2937" strokeWidth="1.3" /></>}
       {who === "Mubashir" && <><path d="M20 25c0-9 5-14 12-14s12 5 12 14c-2-4-5-6-12-6s-10 2-12 6Z" fill="#1F2937" /><path d="M21 31c1 9 5 12 11 12s10-3 11-12c-2 4-5 5-7 5h-8c-2 0-5-1-7-5Z" fill="#1F2937" /></>}
       {who === "FinalDecision" && <path d="M20 26c-1-9 5-15 12-15 8 0 13 6 12 15-1-4-3-7-6-8-5 1-12 2-18 8Z" fill="#B8BEC9" />}
       {/* face */}
