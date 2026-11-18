@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { IVIndex } from "./agents/ivIndex";
-import { MorningSession, NEWS_BOOST } from "./agents/morningSession";
+import { VolatilityAgent } from "./agents/volatility";
+import { NewsAgent, NEWS_BOOST } from "./agents/news";
 import { snapshot } from "./indicators";
 import { demoBars, demoIndex, demoVix } from "./market/demo";
 import { NIFTY50 } from "./market/universe";
@@ -9,7 +9,7 @@ import { runAnalysis } from "./pipeline";
 import { isSessionDue } from "./session/scheduler";
 import type { AgentReport, Message, NewsBrief } from "./types";
 
-describe("Morning Session agent", () => {
+describe("News Agent agent", () => {
   it("sorts headlines into positive and negative", () => {
     expect(sentimentOf("Tata Motors shares surge after record monthly sales")).toBe("positive");
     expect(sentimentOf("Infosys slips as brokerage downgrades the stock")).toBe("negative");
@@ -25,7 +25,7 @@ describe("Morning Session agent", () => {
       { symbol: "AAA", headline: "AAA wins order", source: "s", sentiment: "positive", sample: true },
       { symbol: "BBB", headline: "BBB misses estimates", source: "s", sentiment: "negative", sample: true },
     ] };
-    const out = new MorningSession().apply(reports, brief);
+    const out = new NewsAgent().apply(reports, brief);
     const a = out.find((r) => r.symbol === "AAA")!, b = out.find((r) => r.symbol === "BBB")!;
     expect(a.score).toBe(50 + NEWS_BOOST);
     expect(a.reasons.some((r) => r.startsWith("Positive news"))).toBe(true);
@@ -42,13 +42,13 @@ describe("Morning Session agent", () => {
   });
 });
 
-describe("IV Index agent", () => {
+describe("Volatility Agent", () => {
   const frames = Object.fromEntries(NIFTY50.map((s) => [s, demoBars(s, 11)]));
   const snaps = Object.fromEntries(Object.entries(frames).map(([k, v]) => [k, snapshot(v)]));
   const index = demoIndex(Object.values(frames));
 
   it("reports level, direction, reasons and next movers", () => {
-    const r = new IVIndex().analyse(demoVix(index, 11), index, frames, snaps, null, true)!;
+    const r = new VolatilityAgent().analyse(demoVix(index, 11), index, frames, snaps, null, true)!;
     expect(r.level).toBeGreaterThan(0);
     expect(["up", "down", "flat"]).toContain(r.direction);
     expect(r.reasons.length).toBeGreaterThan(0);
@@ -59,13 +59,13 @@ describe("IV Index agent", () => {
   it("explains a VIX spike on a falling market as fear", () => {
     const vix = [...Array(40).fill(13), 13, 13, 13, 13, 16]; // +23% on the last day
     const idx = [...Array(44).fill(100), 98]; // index -2%
-    const r = new IVIndex().analyse(vix, idx, frames, snaps, null, true)!;
+    const r = new VolatilityAgent().analyse(vix, idx, frames, snaps, null, true)!;
     expect(r.direction).toBe("up");
     expect(r.reasons[0]).toMatch(/Falling prices/);
   });
 
   it("returns nothing without enough VIX history", () => {
-    expect(new IVIndex().analyse([14, 15], index, frames, snaps, null, true)).toBeNull();
+    expect(new VolatilityAgent().analyse([14, 15], index, frames, snaps, null, true)).toBeNull();
   });
 });
 
@@ -84,17 +84,17 @@ describe("9 AM schedule (IST)", () => {
 });
 
 describe("full run with the new agents", () => {
-  it("Morning Session briefs Lotappi and Mayavi; IV Index reports to Mubashir", async () => {
+  it("News Agent briefs Momentum Agent and Trend Agent; Volatility Agent reports to Research Agent", async () => {
     const messages: Message[] = [];
     const res = await runAnalysis({ symbols: NIFTY50, top: 5, demo: true, aiNotes: false, riskPerTrade: 1 },
       (e) => { if (e.type === "message") messages.push(e.message); });
     expect(res.news?.sample).toBe(true);
     expect(res.vix).not.toBeNull();
     const threads = new Set(messages.map((m) => m.thread));
-    for (const t of ["Lotappi|MorningSession", "Mayavi|MorningSession", "IVIndex|Mubashir"]) expect(threads).toContain(t);
-    // news comes first, before Lotappi talks to Mayavi
-    const firstNews = messages.findIndex((m) => m.sender === "MorningSession");
-    const firstScan = messages.findIndex((m) => m.thread === "Lotappi|Mayavi");
+    for (const t of ["Momentum|News", "News|Trend", "Research|Volatility"]) expect(threads).toContain(t);
+    // news comes first, before Momentum Agent talks to Trend Agent
+    const firstNews = messages.findIndex((m) => m.sender === "News");
+    const firstScan = messages.findIndex((m) => m.thread === "Momentum|Trend");
     expect(firstNews).toBeGreaterThan(0);
     expect(firstNews).toBeLessThan(firstScan);
     for (const m of messages) expect(m.text).not.toMatch(/undefined|NaN/);

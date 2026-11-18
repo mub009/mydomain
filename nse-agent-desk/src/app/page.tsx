@@ -7,6 +7,11 @@ import { AnalysisToolbar } from "@/components/desk/analysis-toolbar";
 import { FinalPicksTable, PicksWaiting } from "@/components/desk/final-picks-table";
 import { MessageFeed } from "@/components/desk/message-feed";
 import { MorningNewsCard, VixCard } from "@/components/desk/morning-cards";
+import { DiversificationCard } from "@/components/desk/diversification-card";
+import { SectorStrengthCard } from "@/components/desk/sector-ui";
+import { MacroCard } from "@/components/desk/macro-ui";
+import { diversify } from "@/lib/diversify";
+import { useMemo } from "react";
 import { DataBanner, KPICard, ResearchProgress } from "@/components/desk/primitives";
 import { PageHeader } from "@/components/desk/shell";
 import { Button } from "@/components/ui/button";
@@ -32,12 +37,15 @@ export default function OverviewPage() {
   const said = (who: string) => messages.slice(0, shown).some((m) => m.sender === who);
   const idle = !busy && !messages.length;
 
+  const balance = useMemo(() => (r ? diversify(r.picks.map((p) => ({
+    symbol: p.symbol, sector: p.sector, cap: p.fundamentals?.cap ?? "Unknown", value: p.investment || p.entry * (p.quantity || 1), closes: p.spark,
+  })), r.all) : null), [r]);
   const buys = r?.all.filter((d) => d.verdict === "STRONG BUY" || d.verdict === "BUY").length;
   const agree = r?.all.filter((d) => d.agree).length;
 
   return (
     <>
-      <PageHeader title="Overview" subtitle="Four AI agents scan, analyse, debate and decide." />
+      <PageHeader title="Overview" subtitle="Thirteen AI agents scan, analyse, debate and decide." />
       <div className="space-y-4">
         {source ? <DataBanner source={source} /> : demo && <DataBanner source={{ kind: "demo", label: "Demo data" }} />}
         <AnalysisToolbar />
@@ -45,9 +53,9 @@ export default function OverviewPage() {
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border bg-card px-3.5 py-2.5 text-[13px]">
             <History className="size-4 text-[#EC4899]" aria-hidden />
             <span className="min-w-0 flex-1">
-              {replayOf ? <>Showing the Morning Session from <b className="font-semibold">{istDate(replayOf)}, {istTime(replayOf)} IST</b>.</>
-                : session.ranAt ? <>Morning Session last ran <b className="font-semibold">{istDate(session.ranAt)}, {istTime(session.ranAt)} IST</b>.</>
-                : <>Morning Session is scheduled for <b className="font-semibold">{session.time} IST</b> on trading days. No run yet.</>}
+              {replayOf ? <>Showing the News Agent from <b className="font-semibold">{istDate(replayOf)}, {istTime(replayOf)} IST</b>.</>
+                : session.ranAt ? <>The 9 AM session last ran <b className="font-semibold">{istDate(session.ranAt)}, {istTime(session.ranAt)} IST</b>.</>
+                : <>News Agent is scheduled for <b className="font-semibold">{session.time} IST</b> on trading days. No run yet.</>}
             </span>
             {session.ranAt && !replayOf && <Button variant="outline" size="sm" onClick={replaySession} disabled={busy}>Replay 9 AM session</Button>}
           </div>
@@ -57,15 +65,19 @@ export default function OverviewPage() {
         <section className="grid grid-cols-2 gap-3 xl:grid-cols-4" aria-label="Key figures">
           <KPICard label="Stocks Scanned" value={r ? String(r.all.length) : "–"} sub={r ? (r.source.kind === "demo" ? "Demo data" : "End-of-day data") : "Run an analysis"} icon={<ScanSearch />} />
           <KPICard label="Buy Signals" value={buys === undefined ? "–" : String(buys)} sub={r ? `${r.picks.length} chosen as final picks` : "After the final decision"} icon={<Trophy />} />
-          <KPICard label="Both Agents Agree" value={agree === undefined ? "–" : String(agree)} sub="Lotappi and Mayavi both ≥ 60" icon={<Handshake />} />
+          <KPICard label="Both Agents Agree" value={agree === undefined ? "–" : String(agree)} sub="Momentum Agent and Trend Agent both ≥ 60" icon={<Handshake />} />
           <KPICard label="Nifty 50 · 1-Month" value={r ? pct(r.indexRet21d, 2) : "–"} sub={r?.source.kind === "demo" ? "Demo index" : "Benchmark return"}
             tone={r ? (r.indexRet21d >= 0 ? "pos" : "neg") : undefined} icon={<TrendingUp />} />
         </section>
 
         <div className="grid gap-4 lg:grid-cols-2">
-          <MorningNewsCard news={result?.news} revealed={Boolean(result) && said("MorningSession")} busy={busy && !said("MorningSession")} time={session?.time ?? "09:00"} />
-          <VixCard vix={result?.vix} revealed={Boolean(result) && said("IVIndex")} busy={busy && !said("IVIndex")} />
+          <MorningNewsCard news={result?.news} revealed={Boolean(result) && said("News")} busy={busy && !said("News")} time={session?.time ?? "09:00"} />
+          <VixCard vix={result?.vix} revealed={Boolean(result) && said("Volatility")} busy={busy && !said("Volatility")} />
         </div>
+
+        <MacroCard macro={result?.macro} revealed={Boolean(result) && said("Macro")} busy={busy && !said("Macro")} />
+
+        {r && <SectorStrengthCard sectors={r.sectors} />}
 
         <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
           <div className="min-w-0 space-y-4">
@@ -74,8 +86,8 @@ export default function OverviewPage() {
                 <div>
                   <h2 className="text-[15px] font-semibold">Final Picks</h2>
                   <p className="text-xs text-muted-foreground">
-                    {r ? (r.watchlist.length ? `Watchlist: ${r.watchlist.map((w) => w.symbol).join(", ")}` : "No watchlist in this run")
-                      : "Announced by Final Decision at the end of the discussion"}
+                    {r ? (r.watchlist.length ? `Watchlist: ${r.watchlist.map((w) => w.symbol).join(", ")} · select a pick to track it` : "Select a pick to track it")
+                      : "Announced by Decision Agent at the end of the discussion"}
                   </p>
                 </div>
                 {r && <ResearchProgress stage={stage} done={done} className="hidden sm:flex" />}
@@ -83,9 +95,12 @@ export default function OverviewPage() {
               {r ? <FinalPicksTable picks={r.picks} onSelect={openStock} /> : <PicksWaiting stage={stage} idle={idle} />}
             </section>
 
+            {balance && <DiversificationCard d={balance} title="Portfolio balance of these picks"
+              subtitle={r?.picks.some((p) => p.investment) ? "Weighted by the suggested investment in each pick." : "Weighted by one share of each pick; enter your capital for real weights."} />}
+
             <section className="card p-4">
               <h2 className="text-[15px] font-semibold">Where the Agents Agree</h2>
-              <p className="mb-3 text-xs text-muted-foreground">Each point is a stock. Further right means Lotappi likes it more; higher means Mayavi does.</p>
+              <p className="mb-3 text-xs text-muted-foreground">Each point is a stock. Further right means Momentum Agent likes it more; higher means Trend Agent does.</p>
               {r ? <AgentAgreementScatter rows={r.all} picks={r.picks.map((p) => p.symbol)} watch={r.watchlist.map((w) => w.symbol)} onSelect={openStock} />
                 : <div className="grid h-56 place-items-center rounded-xl border border-dashed text-[13px] text-muted-foreground">The chart appears after the final decision.</div>}
             </section>

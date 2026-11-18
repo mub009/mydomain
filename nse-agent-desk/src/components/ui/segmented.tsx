@@ -11,14 +11,14 @@ export function Segmented<T extends string | number>({ value, onChange, options,
   className?: string;
 }) {
   return (
-    <div role="radiogroup" aria-label={label} className={cn("inline-flex h-9 items-center rounded-lg border bg-muted p-0.5", className)}>
+    <div role="radiogroup" aria-label={label} className={cn("well inline-flex h-10 items-center rounded-xl p-1", className)}>
       {options.map((o) => (
         <button
           key={String(o.value)} type="button" role="radio" aria-checked={o.value === value}
           onClick={() => onChange(o.value)}
           className={cn(
-            "h-full rounded-md px-2.5 text-[13px] font-medium tnum transition-colors",
-            o.value === value ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}
+            "h-full rounded-lg px-2.5 text-[13px] font-medium tnum transition-all",
+            o.value === value ? "raised -translate-y-px font-semibold text-foreground" : "text-muted-foreground hover:text-foreground")}
         >
           {o.label}
         </button>
@@ -37,4 +37,4 @@ export function Field({ label, children, className }: { label: string; children:
 }
 
 export const inputClass =
-  "h-9 rounded-lg border bg-card px-3 text-sm tnum placeholder:text-muted-foreground/70 focus-visible:outline-2 focus-visible:outline-primary";
+  "well h-10 rounded-xl border-0 px-3 text-sm tnum placeholder:text-muted-foreground/70 focus-visible:outline-2 focus-visible:outline-primary";

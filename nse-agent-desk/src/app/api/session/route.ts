@@ -2,7 +2,7 @@ import { getLatestSession, runMorningSession, sessionTime } from "@/lib/session/
 
 export const dynamic = "force-dynamic";
 
-/** The latest Morning Session run, for the app to replay. */
+/** The latest News Agent run, for the app to replay. */
 export async function GET() {
   const s = await getLatestSession();
   return Response.json({
@@ -13,7 +13,7 @@ export async function GET() {
 }
 
 /**
- * Run the Morning Session now (for an external cron on serverless hosts, or a
+ * Run the News Agent now (for an external cron on serverless hosts, or a
  * manual re-run). Requires the header `Authorization: Bearer <SESSION_TRIGGER_TOKEN>`.
  */
 export async function POST(req: Request) {

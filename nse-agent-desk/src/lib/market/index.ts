@@ -1,4 +1,5 @@
 import { toHourly } from "../chart";
+import { SECTOR_INDEX } from "../sectors";
 import type { Bar, DataSource } from "../types";
 import { demoBars, demoIndex, demoIntraday, demoVix } from "./demo";
 import type { MarketDataProvider } from "./provider";
@@ -17,6 +18,8 @@ export interface Loaded {
   indexClose: number[];
   /** India VIX closes; empty when unavailable. */
   vixClose: number[];
+  /** NSE sector index closes by sector name (live data only). */
+  sectorIndex: Record<string, number[]>;
   source: DataSource;
   skipped: string[];
 }
@@ -26,13 +29,13 @@ function loadDemo(symbols: string[], fallbackReason?: string): Loaded {
   const frames = Object.fromEntries(symbols.map((s) => [s, demoBars(s, seed)]));
   const indexClose = demoIndex(Object.values(frames));
   return {
-    frames, indexClose, vixClose: demoVix(indexClose, seed), skipped: [],
+    frames, indexClose, vixClose: demoVix(indexClose, seed), sectorIndex: {}, skipped: [],
     source: { kind: "demo", label: "Demo data (fictional prices)", seed, fallbackReason },
   };
 }
 
 /**
- * Intraday candles for the stocks Mubashir checks closely.
+ * Intraday candles for the stocks Research Agent checks closely.
  * Returns 30-minute bars (~60 days) and hourly bars (~6 months) per symbol;
  * a symbol is missing when its intraday data could not be loaded.
  */
@@ -86,5 +89,9 @@ export async function loadMarket(
   try { indexClose = (await provider.getIndexBars()).map((b) => b.close); } catch { /* index is optional */ }
   let vixClose: number[] = [];
   try { vixClose = (await provider.getVixBars()).map((b) => b.close); } catch { /* VIX is optional */ }
-  return { frames, indexClose, vixClose, skipped, source: { kind: "eod", label: provider.label } };
+  const sectorIndex: Record<string, number[]> = {};
+  await Promise.all(Object.entries(SECTOR_INDEX).map(async ([sector, { symbol }]) => {
+    try { sectorIndex[sector] = (await provider.getDailyBars(symbol)).map((b) => b.close); } catch { /* fall back to the stocks' average */ }
+  }));
+  return { frames, indexClose, vixClose, sectorIndex, skipped, source: { kind: "eod", label: provider.label } };
 }

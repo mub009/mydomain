@@ -90,6 +90,26 @@ export interface ChartAnalysis {
   closes: number[];
 }
 
+export type CapSize = "Large" | "Mid" | "Small" | "Too small" | "Unknown";
+
+export interface Fundamentals {
+  /** Market cap in ₹ crore (shares outstanding × last price). */
+  marketCapCr?: number;
+  cap: CapSize;
+  /** Earnings per share over the last 12 months, in ₹. */
+  epsTTM?: number;
+  /** EPS for the 12 months ending a year earlier. */
+  epsYearAgo?: number;
+  /** % change between the two; undefined when it can't be computed. */
+  epsGrowth1y?: number;
+  /** How the EPS figures were built: "TTM" (last 4 vs previous 4 quarters) or "FY" (latest vs previous fiscal year). */
+  epsBasis?: "TTM" | "FY";
+  /** Recent EPS by period, oldest first. */
+  epsHistory: { period: string; eps: number }[];
+  source: string;
+  sample: boolean;
+}
+
 export interface Analysis {
   symbol: string;
   sector: string;
@@ -113,8 +133,64 @@ export interface Analysis {
   mayReasons: string[];
   mayWarnings: string[];
   notes: string[];
-  /** Mubashir's multi-timeframe chart check (top candidates only). */
+  /** Market cap and EPS check. */
+  fundamentals?: Fundamentals;
+  /** Gold / crude / USD-INR links found by the Macro Agent. */
+  macro?: MacroExposure[];
+  /** Research Agent's multi-timeframe chart check (top candidates only). */
   chart?: ChartAnalysis;
+  /** Research desk: Performance, Valuation and Growth Agents (top candidates only). */
+  desk?: ResearchDesk;
+}
+
+export type DeskAgent = "Performance" | "Valuation" | "Growth" | "Profitability" | "Entry" | "RedFlag";
+export type DeskTone = "good" | "ok" | "weak" | "n/a";
+
+export interface DeskMetric {
+  label: string;
+  /** Percent for returns and growth, a multiple ("x") for valuation ratios. */
+  value?: number;
+  unit: "%" | "x" | "pts" | "";
+  /** Short context, e.g. "sector median 24.1x" or "analyst mean target". */
+  note?: string;
+}
+
+export interface DeskView {
+  agent: DeskAgent;
+  /** Score points this view adds to the combined score. */
+  points: number;
+  tone: DeskTone;
+  verdict: string;
+  metrics: DeskMetric[];
+  reasons: string[];
+  /** Red Flag Agent only: each check and what it found. */
+  flags?: RedFlag[];
+  /** Entry Agent only: the entry call and its price area. */
+  entry?: { plan: EntryPlan; low?: number; high?: number };
+}
+
+export type EntryPlan = "Buy now" | "Buy on dip" | "Wait" | "Avoid";
+
+export interface RedFlag {
+  check: "ASM" | "GSM" | "Promoter pledge" | "Unsolicited tips" | "Default risk";
+  status: "severe" | "warning" | "clear" | "unknown";
+  detail: string;
+}
+
+export interface ResearchDesk {
+  performance: DeskView;
+  valuation: DeskView;
+  growth: DeskView;
+  profitability: DeskView;
+  redFlags: DeskView;
+  /** Set after the chart check. */
+  entry?: DeskView;
+  /** Total points: performance + valuation + growth + profitability (capped at +/-10), plus red flags (down to -10) and entry (+/-2). */
+  points: number;
+  /** A severe red flag: the Decision Agent won't rate it above WATCH. */
+  severe: boolean;
+  sample: boolean;
+  source: string;
 }
 
 export interface Decision extends Analysis {
@@ -127,7 +203,7 @@ export interface Decision extends Analysis {
   spark: number[]; // last ~60 closes
 }
 
-export type Person = "MorningSession" | "IVIndex" | "Lotappi" | "Mayavi" | "Mubashir" | "FinalDecision";
+export type Person = "News" | "Volatility" | "Macro" | "Momentum" | "Trend" | "Research" | DeskAgent | "Decision";
 export type AgentName = Person | "System";
 export type Stage = "scan" | "analyze" | "debate" | "decide";
 
@@ -198,6 +274,67 @@ export interface DataSource {
   fallbackReason?: string;
 }
 
+export interface MacroFactor {
+  id: "gold" | "crude" | "usdinr";
+  name: string;
+  /** e.g. "₹/10g", "$/bbl", "₹ per $" */
+  unit: string;
+  level: number;
+  ret1d: number;
+  ret5d: number;
+  ret1m: number;
+  trend: "Up" | "Down" | "Flat";
+  /** True when the 1-month move is big enough to matter for stocks. */
+  significant: boolean;
+  spark: number[];
+  sample: boolean;
+}
+
+export interface MacroExposure {
+  symbol: string;
+  factor: MacroFactor["id"];
+  /** "known" = a documented business link; "measured" = found only in the price data. */
+  basis: "known" | "measured";
+  link: "benefits" | "hurts" | "mixed";
+  reason: string;
+  /** Correlation of daily returns with the factor over recent months, if measurable. */
+  corr?: number;
+  effect: "Tailwind" | "Headwind" | "Neutral";
+  points: number;
+}
+
+export interface MacroReport {
+  factors: MacroFactor[];
+  /** Exposures for the stocks in this run, strongest effect first. */
+  exposures: MacroExposure[];
+  summary: string;
+  sample: boolean;
+}
+
+export interface SectorView {
+  sector: string;
+  members: number;
+  /** "index" = an NSE sector index; "composite" = average of this run's stocks. */
+  source: "index" | "composite";
+  sourceLabel: string;
+  ret1m: number;
+  ret3m: number;
+  /** Sector 1-month return minus Nifty 50 1-month return. */
+  relStrength: number;
+  /** Change in relative strength over the last 10 trading days. */
+  rsMomentum: number;
+  /** % of the sector's stocks above their 50-day average. */
+  breadth: number;
+  state: "Leading" | "Improving" | "Weakening" | "Lagging";
+  rank: number;
+  /** Last 60 closes rebased to 100, and the Nifty over the same days. */
+  closes: number[];
+  niftyCloses: number[];
+  buyPct: number;
+  avgScore: number;
+  leaders: string[];
+}
+
 export interface RunResult {
   source: DataSource;
   generatedAt: string;
@@ -207,6 +344,11 @@ export interface RunResult {
   indexRet21d: number;
   news: NewsBrief | null;
   vix: VixReport | null;
+  /** Stocks left out for being below the minimum market cap. */
+  excluded: { symbol: string; marketCapCr: number }[];
+  minCapCr: number;
+  sectors: SectorView[];
+  macro: MacroReport | null;
   picks: Decision[];
   watchlist: Decision[];
   all: Decision[];

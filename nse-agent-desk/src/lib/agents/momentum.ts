@@ -1,8 +1,8 @@
-/** Agent 1 - Lotappi: short-term hunter (swing trades, 1-10 trading days). */
+/** Agent 1 - Momentum: short-term hunter (swing trades, 1-10 trading days). */
 import type { AgentReport, Snapshot } from "../types";
 import { byScore, clamp, round, signalFor } from "./base";
 
-export class Lotappi {
+export class MomentumAgent {
 
   score(symbol: string, s: Snapshot): AgentReport {
     let pts = 30;

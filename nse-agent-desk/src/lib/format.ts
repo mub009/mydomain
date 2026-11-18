@@ -1,6 +1,6 @@
 /** ₹ with Indian digit grouping, e.g. ₹2,75,000.00 */
 export const inr = (n: number, digits = 2) =>
-  "₹" + n.toLocaleString("en-IN", { minimumFractionDigits: digits, maximumFractionDigits: digits });
+  (n < 0 ? "-₹" : "₹") + Math.abs(n).toLocaleString("en-IN", { minimumFractionDigits: digits, maximumFractionDigits: digits });
 
 export const pct = (n: number, digits = 1) => `${n >= 0 ? "+" : ""}${n.toFixed(digits)}%`;
 

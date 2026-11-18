@@ -7,11 +7,13 @@ import { DataBanner, RiskTag, VerdictBadge } from "@/components/desk/primitives"
 import { PageHeader } from "@/components/desk/shell";
 import { StockSparkline } from "@/components/desk/stock-sparkline";
 import { PlanTag, TimeframeDots } from "@/components/desk/chart-check";
+import { CapTag, EpsGrowth } from "@/components/desk/fundamentals";
 import { Button } from "@/components/ui/button";
 import { Field, inputClass } from "@/components/ui/segmented";
 import { inr, pct } from "@/lib/format";
 import type { Decision, Verdict } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { deskValue } from "@/components/desk/desk-ui";
 import { useDecided, useDesk } from "@/store/desk";
 
 const VERDICTS: ("ALL" | Verdict)[] = ["ALL", "STRONG BUY", "BUY", "WATCH", "AVOID"];
@@ -22,8 +24,8 @@ const columns: ColumnDef<Decision>[] = [
   { accessorKey: "symbol", header: "Stock", cell: ({ row: { original: d } }) => <div><div className="font-semibold">{d.symbol}</div><div className="text-[11px] text-muted-foreground">{d.sector}</div></div> },
   { accessorKey: "verdict", header: "Verdict", enableSorting: false, cell: ({ row }) => <VerdictBadge verdict={row.original.verdict} /> },
   { accessorKey: "combined", header: "Combined", meta: { num: true }, cell: ({ getValue }) => <b>{(getValue() as number).toFixed(1)}</b> },
-  { accessorKey: "lotappi", header: "Lotappi", meta: { num: true }, cell: ({ getValue }) => (getValue() as number).toFixed(1) },
-  { accessorKey: "mayavi", header: "Mayavi", meta: { num: true }, cell: ({ getValue }) => (getValue() as number).toFixed(1) },
+  { accessorKey: "lotappi", header: "Momentum", meta: { num: true }, cell: ({ getValue }) => (getValue() as number).toFixed(1) },
+  { accessorKey: "mayavi", header: "Trend", meta: { num: true }, cell: ({ getValue }) => (getValue() as number).toFixed(1) },
   { id: "risk", accessorFn: (d) => RISK_ORDER[d.risk], header: "Risk", cell: ({ row }) => <RiskTag risk={row.original.risk} /> },
   { id: "spark", header: "60-day", enableSorting: false, cell: ({ row }) => <StockSparkline data={row.original.spark} width={76} height={24} showChange={false} /> },
   { accessorKey: "rsi", header: "RSI", meta: { num: true }, cell: ({ getValue }) => (getValue() as number).toFixed(0) },
@@ -32,6 +34,22 @@ const columns: ColumnDef<Decision>[] = [
   { accessorKey: "entry", header: "Entry", meta: { num: true }, cell: ({ getValue }) => inr(getValue() as number) },
   { accessorKey: "stopLoss", header: "Stop-loss", meta: { num: true }, cell: ({ getValue }) => inr(getValue() as number) },
   { accessorKey: "target", header: "Target", meta: { num: true }, cell: ({ getValue }) => inr(getValue() as number) },
+  { id: "size", header: "Size", accessorFn: (d) => d.fundamentals?.marketCapCr ?? -1,
+    cell: ({ row: { original: d } }) => (d.fundamentals ? <div><CapTag cap={d.fundamentals.cap} /><div className="mt-0.5 text-[11px] text-muted-foreground">{d.fundamentals.marketCapCr !== undefined ? `${inr(d.fundamentals.marketCapCr, 0)} Cr` : "–"}</div></div> : "–") },
+  { id: "eps", header: "EPS 1Y", meta: { num: true }, accessorFn: (d) => (d.fundamentals?.epsTTM !== undefined && d.fundamentals.epsTTM < 0 ? -999 : d.fundamentals?.epsGrowth1y ?? -998),
+    cell: ({ row: { original: d } }) => <EpsGrowth f={d.fundamentals} /> },
+  { id: "pe", header: "P/E", meta: { num: true }, accessorFn: (d) => d.desk?.valuation.metrics[0].value ?? 9999,
+    cell: ({ row: { original: d } }) => deskValue(d.desk?.valuation.metrics[0]) },
+  { id: "ret5y", header: "5Y a year", meta: { num: true }, accessorFn: (d) => d.desk?.performance.metrics[1].value ?? -999,
+    cell: ({ row: { original: d } }) => deskValue(d.desk?.performance.metrics[1]) },
+  { id: "rev3y", header: "Revenue 3Y", meta: { num: true }, accessorFn: (d) => d.desk?.growth.metrics[0].value ?? -999,
+    cell: ({ row: { original: d } }) => deskValue(d.desk?.growth.metrics[0]) },
+  { id: "flags", header: "Red flags", meta: { num: true }, accessorFn: (d) => d.desk?.redFlags.points ?? 1,
+    cell: ({ row: { original: d } }) => !d.desk ? "–" : d.desk.severe
+      ? <span className="rounded-md bg-[var(--avoid-bg)] px-1.5 py-px text-[10.5px] font-bold text-[var(--avoid-fg)]">{d.desk.redFlags.verdict}</span>
+      : <span className={cn("text-xs", d.desk.redFlags.points < 0 ? "text-[var(--watch-fg)]" : "text-muted-foreground")}>{d.desk.redFlags.verdict}</span> },
+  { id: "entryCall", header: "Entry", accessorFn: (d) => d.desk?.entry?.points ?? -9,
+    cell: ({ row: { original: d } }) => <span className="whitespace-nowrap text-xs font-medium">{d.desk?.entry?.verdict ?? "–"}</span> },
   { id: "charts", header: "Charts", accessorFn: (d) => (d.chart ? d.chart.bullish - d.chart.bearish : -99), meta: { num: false },
     cell: ({ row: { original: d } }) => (d.chart ? <TimeframeDots chart={d.chart} /> : <span className="text-xs text-muted-foreground">–</span>) },
   { id: "zone", header: "Buy zone", accessorFn: (d) => d.chart?.zone?.distancePct ?? 999,
@@ -46,6 +64,7 @@ export default function ScreenerPage() {
   const [verdict, setVerdict] = useState<(typeof VERDICTS)[number]>("ALL");
   const [sector, setSector] = useState("ALL");
   const [risk, setRisk] = useState("ALL");
+  const [size, setSize] = useState("ALL");
   const [rsiMin, setRsiMin] = useState("");
   const [rsiMax, setRsiMax] = useState("");
   const [minScore, setMinScore] = useState(0);
@@ -56,12 +75,12 @@ export default function ScreenerPage() {
   // everything except the verdict filter, so the chips can show live counts
   const base = useMemo(() => all.filter((d) =>
     (!q || d.symbol.includes(q.trim().toUpperCase())) &&
-    (sector === "ALL" || d.sector === sector) && (risk === "ALL" || d.risk === risk) &&
+    (sector === "ALL" || d.sector === sector) && (risk === "ALL" || d.risk === risk) && (size === "ALL" || d.fundamentals?.cap === size) &&
     (rsiMin === "" || d.rsi >= Number(rsiMin)) && (rsiMax === "" || d.rsi <= Number(rsiMax)) && d.combined >= minScore),
-  [all, q, sector, risk, rsiMin, rsiMax, minScore]);
+  [all, q, sector, risk, size, rsiMin, rsiMax, minScore]);
   const data = useMemo(() => (verdict === "ALL" ? base : base.filter((d) => d.verdict === verdict)), [base, verdict]);
-  const filtered = q || sector !== "ALL" || risk !== "ALL" || rsiMin || rsiMax || minScore > 0 || verdict !== "ALL";
-  const reset = () => { setQ(""); setSector("ALL"); setRisk("ALL"); setRsiMin(""); setRsiMax(""); setMinScore(0); setVerdict("ALL"); };
+  const filtered = q || sector !== "ALL" || risk !== "ALL" || size !== "ALL" || rsiMin || rsiMax || minScore > 0 || verdict !== "ALL";
+  const reset = () => { setQ(""); setSector("ALL"); setRisk("ALL"); setSize("ALL"); setRsiMin(""); setRsiMax(""); setMinScore(0); setVerdict("ALL"); };
 
   const table = useReactTable({ data, columns, state: { sorting }, onSortingChange: setSorting, getCoreRowModel: getCoreRowModel(), getSortedRowModel: getSortedRowModel() });
 
@@ -70,7 +89,7 @@ export default function ScreenerPage() {
       <PageHeader title="Screener" subtitle="Every stock the agents scored. Select a row for the full research." />
       {!r ? (
         <div className="card grid h-72 place-items-center p-6 text-center text-sm text-muted-foreground">
-          The screener fills in once Final Decision has announced the picks. Run an analysis from the Overview.
+          The screener fills in once Decision Agent has announced the picks. Run an analysis from the Overview.
         </div>
       ) : (
         <div className="space-y-4">
@@ -82,6 +101,8 @@ export default function ScreenerPage() {
             </Field>
             <Field label="Sector"><select className={inputClass} value={sector} onChange={(e) => setSector(e.target.value)} aria-label="Sector">
               <option value="ALL">All sectors</option>{sectors.map((s) => <option key={s}>{s}</option>)}</select></Field>
+            <Field label="Size"><select className={inputClass} value={size} onChange={(e) => setSize(e.target.value)} aria-label="Company size">
+              <option value="ALL">Any size</option><option value="Large">Large cap</option><option value="Mid">Mid cap</option><option value="Small">Small cap</option><option value="Unknown">Unknown</option></select></Field>
             <Field label="Risk"><select className={inputClass} value={risk} onChange={(e) => setRisk(e.target.value)} aria-label="Risk">
               <option value="ALL">Any risk</option><option value="LOW">Low</option><option value="MEDIUM">Medium</option><option value="HIGH">High</option></select></Field>
             <Field label="RSI range">

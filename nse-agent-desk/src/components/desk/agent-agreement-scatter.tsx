@@ -16,8 +16,8 @@ function Tip({ active, payload }: { active?: boolean; payload?: { payload: Point
         <b className="text-sm">{d.symbol}</b><VerdictBadge verdict={d.verdict} />
       </div>
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 tnum text-muted-foreground">
-        <dt>Lotappi</dt><dd className="text-right font-semibold text-foreground">{d.lotappi.toFixed(1)}</dd>
-        <dt>Mayavi</dt><dd className="text-right font-semibold text-foreground">{d.mayavi.toFixed(1)}</dd>
+        <dt>Momentum Agent</dt><dd className="text-right font-semibold text-foreground">{d.lotappi.toFixed(1)}</dd>
+        <dt>Trend Agent</dt><dd className="text-right font-semibold text-foreground">{d.mayavi.toFixed(1)}</dd>
         <dt>Combined</dt><dd className="text-right font-semibold text-foreground">{d.combined.toFixed(1)}</dd>
         <dt>Risk</dt><dd className="text-right"><RiskTag risk={d.risk} /></dd>
         <dt>Sector</dt><dd className="text-right text-foreground">{d.sector}</dd>
@@ -28,7 +28,7 @@ function Tip({ active, payload }: { active?: boolean; payload?: { payload: Point
   );
 }
 
-/** AgentAgreementScatter: Lotappi score (x) against Mayavi score (y). */
+/** AgentAgreementScatter: Momentum Agent score (x) against Trend Agent score (y). */
 export function AgentAgreementScatter({ rows, picks, watch, onSelect, height = 340 }: {
   rows: Decision[]; picks: string[]; watch: string[]; onSelect?: (symbol: string) => void; height?: number;
 }) {
@@ -51,10 +51,10 @@ export function AgentAgreementScatter({ rows, picks, watch, onSelect, height = 3
           <CartesianGrid stroke="var(--border)" strokeDasharray="0" />
           <ReferenceArea x1={60} x2={100} y1={60} y2={100} fill="var(--agree-zone)" fillOpacity={0.1} stroke="var(--agree-zone)" strokeOpacity={0.35} strokeDasharray="4 4"
             label={{ value: "Both Agree Zone", position: "insideBottomRight", fill: "var(--pos)", fontSize: 11, fontWeight: 600, offset: 8 }} />
-          <XAxis dataKey="lotappi" name="Lotappi score" {...axis}
-            label={{ value: "Lotappi Score · short-term", position: "insideBottom", offset: -12, fill: "var(--muted-foreground)", fontSize: 11.5, fontWeight: 500 }} />
-          <YAxis dataKey="mayavi" name="Mayavi score" width={44} {...axis}
-            label={{ value: "Mayavi Score · 1-month", angle: -90, position: "insideLeft", offset: 12, fill: "var(--muted-foreground)", fontSize: 11.5, fontWeight: 500, style: { textAnchor: "middle" } }} />
+          <XAxis dataKey="lotappi" name="Momentum Agent score" {...axis}
+            label={{ value: "Momentum Agent Score · short-term", position: "insideBottom", offset: -12, fill: "var(--muted-foreground)", fontSize: 11.5, fontWeight: 500 }} />
+          <YAxis dataKey="mayavi" name="Trend Agent score" width={44} {...axis}
+            label={{ value: "Trend Agent Score · 1-month", angle: -90, position: "insideLeft", offset: 12, fill: "var(--muted-foreground)", fontSize: 11.5, fontWeight: 500, style: { textAnchor: "middle" } }} />
           <Tooltip content={<Tip />} cursor={{ stroke: "var(--muted-foreground)", strokeDasharray: "3 3" }} isAnimationActive={false} />
           <Scatter name="Other stocks" data={by("other")} fill="var(--other-dot)" stroke="var(--card)" strokeWidth={1.5} onClick={click} isAnimationActive={false} className="cursor-pointer" />
           <Scatter name="Watchlist" data={by("watch")} fill="var(--watch-dot)" stroke="var(--card)" strokeWidth={1.5} onClick={click} isAnimationActive={false} className="cursor-pointer" />

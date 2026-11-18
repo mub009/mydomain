@@ -9,7 +9,7 @@ function validate(body: unknown): RunRequest | string {
   const b = body as Partial<RunRequest>;
   if (!b || !Array.isArray(b.symbols)) return "symbols must be a list";
   const symbols = [...new Set(b.symbols.map((s) => String(s).trim().toUpperCase()))].filter(Boolean);
-  if (symbols.length < 3 || symbols.length > 60) return "Choose between 3 and 60 stocks";
+  if (symbols.length < 3 || symbols.length > 150) return "Choose between 3 and 150 stocks";
   const bad = symbols.find((s) => !SYMBOL.test(s));
   if (bad) return `"${bad.slice(0, 20)}" is not a valid NSE symbol`;
   const top = Number(b.top);

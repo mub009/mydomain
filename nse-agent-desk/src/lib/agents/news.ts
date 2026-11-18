@@ -1,11 +1,11 @@
-/** Morning Session agent: reads the news brief and passes the positive
- *  stories to Lotappi and Mayavi, who give those stocks a score boost. */
+/** News Agent agent: reads the news brief and passes the positive
+ *  stories to Momentum Agent and Trend Agent, who give those stocks a score boost. */
 import type { AgentReport, NewsBrief, NewsItem } from "../types";
 import { byScore, clamp, round, signalFor } from "./base";
 
 export const NEWS_BOOST = 6;
 
-export class MorningSession {
+export class NewsAgent {
   positive(brief: NewsBrief | null): NewsItem[] {
     return first(brief?.items.filter((i) => i.sentiment === "positive") ?? []);
   }

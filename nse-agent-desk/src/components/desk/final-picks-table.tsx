@@ -5,6 +5,7 @@ import { inr, pct } from "@/lib/format";
 import type { Decision, Stage } from "@/lib/types";
 import { ResearchProgress, RiskTag, TypingIndicator, VerdictBadge } from "./primitives";
 import { PlanTag } from "./chart-check";
+import { CapTag, EpsGrowth } from "./fundamentals";
 import { StockSparkline } from "./stock-sparkline";
 
 /** Small line illustration: four desks around a chart, for the waiting state. */
@@ -31,11 +32,11 @@ export function PicksWaiting({ stage, idle }: { stage: Stage | null; idle: boole
     <div className="flex flex-col items-center gap-3 px-4 py-9 text-center">
       <WaitingArt />
       <div className="flex items-center gap-2 text-sm font-semibold">
-        {idle ? "Run an analysis to start the team" : <>Waiting for Final Decision <TypingIndicator className="text-muted-foreground" /></>}
+        {idle ? "Run an analysis to start the team" : <>Waiting for Decision Agent <TypingIndicator className="text-muted-foreground" /></>}
       </div>
       <p className="max-w-sm text-xs text-muted-foreground">
-        {idle ? "Lotappi and Mayavi scan the market, Mubashir analyses, and Final Decision announces the picks here."
-          : "The picks stay hidden until Final Decision announces them in the team chat."}
+        {idle ? "Momentum Agent and Trend Agent scan the market, Research Agent analyses, and Decision Agent announces the picks here."
+          : "The picks stay hidden until Decision Agent announces them in the team chat."}
       </p>
       <ResearchProgress stage={stage} className="mt-1" />
     </div>
@@ -54,7 +55,7 @@ export function FinalPicksTable({ picks, onSelect }: { picks: Decision[]; onSele
     <>
       {/* desktop */}
       <div className="hidden overflow-x-auto scroll-thin md:block">
-        <table className="w-full min-w-[660px] text-left text-[12.5px] tnum">
+        <table className="w-full min-w-[640px] text-left text-[12.5px] tnum">
           <thead>
             <tr className="border-y bg-muted/50 text-[10.5px] uppercase tracking-wider text-muted-foreground">
               {["Stock", "Risk", "Verdict · plan", "60-day trend"].map((h) => <th key={h} className="whitespace-nowrap px-1.5 py-2 font-semibold first:pl-4">{h}</th>)}
@@ -66,7 +67,7 @@ export function FinalPicksTable({ picks, onSelect }: { picks: Decision[]; onSele
               <motion.tr key={d.symbol} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }}
                 onClick={() => onSelect?.(d.symbol)} tabIndex={0} onKeyDown={(e) => e.key === "Enter" && onSelect?.(d.symbol)}
                 className="cursor-pointer border-b last:border-0 hover:bg-muted/50">
-                <td className="px-1.5 py-2.5 pl-4"><div className="font-semibold">{d.symbol}</div><div className="text-[11.5px] text-muted-foreground">{d.sector}</div></td>
+                <td className="px-1.5 py-2.5 pl-4"><div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 font-semibold">{d.symbol}{d.fundamentals && <CapTag cap={d.fundamentals.cap} />}</div><div className="text-[11.5px] leading-snug text-muted-foreground">{d.sector} · EPS <EpsGrowth f={d.fundamentals} /></div></td>
                 <td className="px-1.5 py-2.5"><RiskTag risk={d.risk} /></td>
                 <td className="px-1.5 py-2.5"><VerdictBadge verdict={d.verdict} /><div className="mt-0.5 text-[11px] text-muted-foreground">{d.horizon}</div></td>
                 <td className="px-1.5 py-2.5"><StockSparkline data={d.spark} width={64} showChange={false} /></td>
@@ -89,7 +90,7 @@ export function FinalPicksTable({ picks, onSelect }: { picks: Decision[]; onSele
           <button key={d.symbol} type="button" onClick={() => onSelect?.(d.symbol)}
             className="w-[250px] shrink-0 snap-start rounded-xl border bg-card p-3 text-left tnum">
             <div className="flex items-start justify-between gap-2">
-              <div><div className="font-semibold">{d.symbol}</div><div className="text-[11.5px] text-muted-foreground">{d.sector} · <RiskTag risk={d.risk} /> risk</div></div>
+              <div><div className="flex items-center gap-1.5 font-semibold">{d.symbol}{d.fundamentals && <CapTag cap={d.fundamentals.cap} />}</div><div className="text-[11.5px] text-muted-foreground">{d.sector} · <RiskTag risk={d.risk} /> risk · EPS <EpsGrowth f={d.fundamentals} /></div></div>
               <VerdictBadge verdict={d.verdict} />
             </div>
             <div className="my-2"><StockSparkline data={d.spark} width={150} height={34} /></div>

@@ -79,7 +79,7 @@ describe("best buy area", () => {
 });
 
 describe("in the full run", () => {
-  it("top candidates carry a chart check and Mubashir reports it", async () => {
+  it("top candidates carry a chart check and Research Agent reports it", async () => {
     const msgs: Message[] = [];
     const r = await runAnalysis({ symbols: NIFTY50, top: 5, demo: true, aiNotes: false, riskPerTrade: 1 }, (e) => { if (e.type === "message") msgs.push(e.message); });
     for (const p of r.picks) {
@@ -88,7 +88,7 @@ describe("in the full run", () => {
       expect(p.chart!.intraday).toBe(true);
     }
     const report = msgs.find((m) => m.table?.columns.includes("Buy zone"));
-    expect(report?.sender).toBe("Mubashir");
+    expect(report?.sender).toBe("Research");
     expect(report?.table?.columns).toEqual(["Symbol", "1M", "1D", "4H", "1H", "30m", "Buy zone", "Plan"]);
     for (const m of msgs) expect(m.text).not.toMatch(/undefined|NaN|Infinity/);
   });

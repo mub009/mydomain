@@ -58,7 +58,7 @@ describe("four agents", () => {
     }
     for (const p of res.picks) expect(["STRONG BUY", "BUY"]).toContain(p.verdict);
     const threads = new Set(messages.map((m) => m.thread));
-    for (const t of ["Lotappi|Mayavi", "Lotappi|Mubashir", "Mayavi|Mubashir", "FinalDecision|Mubashir", "team"]) expect(threads).toContain(t);
+    for (const t of ["Momentum|Trend", "Momentum|Research", "Research|Trend", "Decision|Research", "team"]) expect(threads).toContain(t);
     expect(messages.some((m) => m.kind === "decision" && m.to === "ALL")).toBe(true);
     expect(messages.map((m) => m.stage)).toEqual([...messages.map((m) => m.stage)].sort(
       (a, b) => ["scan", "analyze", "debate", "decide"].indexOf(a) - ["scan", "analyze", "debate", "decide"].indexOf(b)));

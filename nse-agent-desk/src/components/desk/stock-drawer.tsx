@@ -9,6 +9,15 @@ import type { Decision, Person } from "@/lib/types";
 import { findStock, useDesk } from "@/store/desk";
 import { AgentAvatar } from "./agent-avatar";
 import { ChartCheck } from "./chart-check";
+import { ResearchDeskSection } from "./desk-ui";
+import { FundamentalsCard } from "./fundamentals";
+import { TrackTradeButton } from "./positions-ui";
+import { CompanyTab } from "./company-tab";
+import { ForecastTab } from "./forecast-tab";
+import { SectorCheck } from "./sector-ui";
+import { MacroExposureSection } from "./macro-ui";
+import { Tabs } from "radix-ui";
+import { useState } from "react";
 import { RiskTag, VerdictBadge } from "./primitives";
 
 function ScoreBar({ label, value, color }: { label: string; value: number; color: string }) {
@@ -40,6 +49,9 @@ function AgentView({ who, score, reasons, warnings, children }: { who: Person; s
 }
 
 function Body({ d, isPick }: { d: Decision; isPick: boolean }) {
+  const sectors = useDesk((s) => s.result?.sectors);
+  const sector = sectors?.find((s) => s.sector === d.sector);
+  const macroFactors = useDesk((s) => s.result?.macro?.factors ?? []);
   const up = d.spark[d.spark.length - 1] >= d.spark[0];
   const stroke = up ? "var(--pos)" : "var(--neg)";
   return (
@@ -62,8 +74,8 @@ function Body({ d, isPick }: { d: Decision; isPick: boolean }) {
 
       <div className="space-y-2.5">
         <ScoreBar label="Combined score" value={d.combined} color="var(--primary)" />
-        <ScoreBar label="Lotappi · short-term" value={d.lotappi} color={TEAM.Lotappi.color} />
-        <ScoreBar label="Mayavi · 1-month" value={d.mayavi} color={TEAM.Mayavi.color} />
+        <ScoreBar label="Momentum Agent · short-term" value={d.lotappi} color={TEAM.Momentum.color} />
+        <ScoreBar label="Trend Agent · 1-month" value={d.mayavi} color={TEAM.Trend.color} />
       </div>
 
       <dl className="grid grid-cols-4 gap-2 text-center tnum">
@@ -72,15 +84,20 @@ function Body({ d, isPick }: { d: Decision; isPick: boolean }) {
         ))}
       </dl>
 
-      <AgentView who="Lotappi" score={d.lotappi} reasons={d.lotReasons} warnings={d.lotWarnings} />
-      <AgentView who="Mayavi" score={d.mayavi} reasons={d.mayReasons} warnings={d.mayWarnings} />
-      <AgentView who="Mubashir" score={d.combined}>
+      {sector ? <SectorCheck s={sector} total={sectors!.length} symbol={d.symbol} />
+        : <p className="rounded-xl border border-dashed p-3 text-[12.5px] text-muted-foreground">{d.sector === "Other" ? "Sector unknown for this stock, so there's no sector check." : `Not enough ${d.sector} stocks in this run to judge the sector. Choose "All caps" for more.`}</p>}
+      {d.macro && d.macro.length > 0 && <MacroExposureSection exposures={d.macro} factors={macroFactors} />}
+      <AgentView who="Momentum" score={d.lotappi} reasons={d.lotReasons} warnings={d.lotWarnings} />
+      <AgentView who="Trend" score={d.mayavi} reasons={d.mayReasons} warnings={d.mayWarnings} />
+      {d.fundamentals && <FundamentalsCard f={d.fundamentals} />}
+      {d.desk ? <ResearchDeskSection desk={d.desk} /> : <p className="rounded-xl border border-dashed p-3 text-[12.5px] text-muted-foreground">The research desk (performance, valuation, growth, profitability, red flags, entry) checks the top candidates only; this stock ranked lower.</p>}
+      <AgentView who="Research" score={d.combined}>
         <p className="mt-2 text-[12.5px]">Holding plan: <b>{d.horizon}</b>. Risk <RiskTag risk={d.risk} /> (ATR {d.atrPct.toFixed(1)}% of price).</p>
         {d.notes.length > 0 && <ul className="mt-1 list-disc pl-4 text-[12.5px] text-muted-foreground">{d.notes.map((n) => <li key={n}>{n}</li>)}</ul>}
         {d.clarification && <p className="mt-2 rounded-lg bg-muted/60 p-2 text-[12.5px]">{d.clarification}</p>}
       </AgentView>
-      {d.chart ? <ChartCheck chart={d.chart} price={d.entry} /> : <p className="rounded-xl border border-dashed p-3 text-[12.5px] text-muted-foreground">Mubashir checks charts for the top candidates only; this stock ranked lower.</p>}
-      <AgentView who="FinalDecision">
+      {d.chart ? <ChartCheck chart={d.chart} price={d.entry} /> : <p className="rounded-xl border border-dashed p-3 text-[12.5px] text-muted-foreground">Research Agent checks charts for the top candidates only; this stock ranked lower.</p>}
+      <AgentView who="Decision">
         <div className="mt-2 flex flex-wrap items-center gap-2 text-[12.5px]">
           <VerdictBadge verdict={d.verdict} />
           <span>{isPick ? "Chosen as a final pick." : d.passedOver ? `Left out of the picks. ${d.passedOver}.` : d.verdict === "WATCH" ? "On watch, not a buy yet." : d.verdict === "AVOID" ? "Does not meet the buy rules." : "Buy-rated, but ranked below the final picks."}</span>
@@ -96,6 +113,7 @@ export function StockDrawer() {
   const result = useDesk((s) => s.result);
   const openStock = useDesk((s) => s.openStock);
   const d = findStock(result, symbol);
+  const [tab, setTab] = useState("research");
   return (
     <Sheet open={Boolean(d)} onOpenChange={(o) => !o && openStock(null)}>
       <SheetContent>
@@ -109,8 +127,24 @@ export function StockDrawer() {
               <SheetDescription className="text-[13px] text-muted-foreground">
                 {d.sector} · NSE · {result?.source.kind === "demo" ? "demo data, not real prices" : "end-of-day data"}
               </SheetDescription>
+              <TrackTradeButton d={d} className="mt-3 w-full" />
             </div>
-            <Body d={d} isPick={Boolean(result?.picks.some((p) => p.symbol === d.symbol))} />
+            <Tabs.Root value={tab} onValueChange={setTab} className="flex min-h-0 flex-1 flex-col">
+              <Tabs.List className="mx-5 mb-3 grid grid-cols-3 rounded-lg bg-muted p-0.5" aria-label="Stock details">
+                {[["research", "Research"], ["forecast", "Forecast"], ["company", "Company"]].map(([v, l]) => (
+                  <Tabs.Trigger key={v} value={v} className="truncate rounded-md px-2 py-1.5 text-[13px] font-medium text-muted-foreground data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm">{l}</Tabs.Trigger>
+                ))}
+              </Tabs.List>
+              <Tabs.Content value="research" className="flex min-h-0 flex-1 flex-col outline-none">
+                <Body d={d} isPick={Boolean(result?.picks.some((p) => p.symbol === d.symbol))} />
+              </Tabs.Content>
+              <Tabs.Content value="forecast" className="min-h-0 flex-1 overflow-y-auto outline-none scroll-thin">
+                <ForecastTab d={d} />
+              </Tabs.Content>
+              <Tabs.Content value="company" className="min-h-0 flex-1 overflow-y-auto outline-none scroll-thin">
+                <CompanyTab d={d} />
+              </Tabs.Content>
+            </Tabs.Root>
           </>
         )}
       </SheetContent>

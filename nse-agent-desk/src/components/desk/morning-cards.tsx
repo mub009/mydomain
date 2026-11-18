@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { AgentAvatar } from "./agent-avatar";
 import { StockSymbolChip, TypingIndicator } from "./primitives";
 
-function CardHead({ who, title, sub, right }: { who: "MorningSession" | "IVIndex"; title: string; sub: string; right?: React.ReactNode }) {
+function CardHead({ who, title, sub, right }: { who: "News" | "Volatility"; title: string; sub: string; right?: React.ReactNode }) {
   return (
     <header className="flex items-start gap-3 px-4 pb-3 pt-4">
       <AgentAvatar who={who} size={34} />
@@ -37,19 +37,19 @@ function Headline({ n }: { n: NewsItem }) {
       <div className="min-w-0 flex-1 text-[13px] leading-snug">
         <StockSymbolChip symbol={n.symbol} className="mr-1" />
         {n.url ? <a href={n.url} target="_blank" rel="noreferrer noopener" className="hover:underline">{n.headline}<ExternalLink className="ml-1 inline size-3 opacity-60" /></a> : n.headline}
-        <div className="text-[11px] text-muted-foreground">{n.source}{n.sample && " · sample"}{pos ? " · sent to Lotappi & Mayavi" : " · flagged as a risk"}</div>
+        <div className="text-[11px] text-muted-foreground">{n.source}{n.sample && " · sample"}{pos ? " · sent to Momentum Agent & Trend Agent" : " · flagged as a risk"}</div>
       </div>
     </li>
   );
 }
 
-/** Morning Session: the news it collected, positive first. */
+/** News Agent: the news it collected, positive first. */
 export function MorningNewsCard({ news, revealed, busy, time }: { news: NewsBrief | null | undefined; revealed: boolean; busy: boolean; time: string }) {
   const pos = news?.items.filter((i) => i.sentiment === "positive") ?? [];
   const neg = news?.items.filter((i) => i.sentiment === "negative") ?? [];
   return (
     <section className="card flex flex-col overflow-hidden" aria-label="Morning news">
-      <CardHead who="MorningSession" title="Morning News" sub={`runs daily at ${time} IST`}
+      <CardHead who="News" title="Morning News" sub={`runs daily at ${time} IST`}
         right={revealed && news && <span className="flex items-center gap-1 whitespace-nowrap rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground"><Newspaper className="size-3" />{news.label}</span>} />
       {!revealed ? <Waiting busy={busy} text={busy ? "Collecting news" : "Run an analysis, or wait for the 9 AM session."} />
         : !news ? <p className="px-4 pb-5 text-[13px] text-muted-foreground">News could not be collected for this run. The agents scored the stocks on prices alone.</p>
@@ -69,15 +69,15 @@ const EXPECT_STYLE: Record<string, string> = {
   "Bigger swings": "bg-[var(--watch-bg)] text-[var(--watch-fg)]", "At risk": "bg-[var(--avoid-bg)] text-[var(--avoid-fg)]",
 };
 
-/** IV Index agent: India VIX level, why it moved, and the stocks to watch next. */
+/** Volatility Agent: India VIX level, why it moved, and the stocks to watch next. */
 export function VixCard({ vix, revealed, busy }: { vix: VixReport | null | undefined; revealed: boolean; busy: boolean }) {
   const Dir = vix?.direction === "up" ? ArrowUpRight : ArrowDownRight;
   // For VIX, up means more fear: show it in red.
   const tone = vix?.direction === "up" ? "text-neg" : vix?.direction === "down" ? "text-pos" : "text-muted-foreground";
   return (
     <section className="card flex flex-col overflow-hidden" aria-label="India VIX">
-      <CardHead who="IVIndex" title="India VIX" sub="volatility index tracker" />
-      {!revealed ? <Waiting busy={busy} text={busy ? "Reading India VIX" : "Appears when the IV Index agent reports."} />
+      <CardHead who="Volatility" title="India VIX" sub="volatility index tracker" />
+      {!revealed ? <Waiting busy={busy} text={busy ? "Reading India VIX" : "Appears when the Volatility Agent reports."} />
         : !vix ? <p className="px-4 pb-5 text-[13px] text-muted-foreground">India VIX data was not available for this run.</p>
         : (
           <div className="space-y-3 px-4 pb-4">
@@ -90,7 +90,7 @@ export function VixCard({ vix, revealed, busy }: { vix: VixReport | null | undef
               <div className="ml-auto" role="img" aria-label="India VIX, last 60 days">
                 <LineChart width={130} height={44} data={vix.spark.map((v, i) => ({ i, v }))} margin={{ top: 4, right: 2, bottom: 4, left: 2 }} accessibilityLayer={false}>
                   <YAxis hide domain={["dataMin", "dataMax"]} />
-                  <Line type="monotone" dataKey="v" stroke={TEAM.IVIndex.color} strokeWidth={1.75} dot={false} isAnimationActive={false} />
+                  <Line type="monotone" dataKey="v" stroke={TEAM.Volatility.color} strokeWidth={1.75} dot={false} isAnimationActive={false} />
                 </LineChart>
               </div>
             </div>

@@ -1,3 +1,4 @@
+import { demoFactorTerm } from "../macro/exposure";
 import type { Bar } from "../types";
 
 function seeded(str: string) {
@@ -18,7 +19,7 @@ function seeded(str: string) {
 }
 
 /** The last `n` weekdays ending today (or the previous Friday). */
-function weekdays(n: number): string[] {
+export function weekdays(n: number): string[] {
   const out: string[] = [];
   const d = new Date();
   while (out.length < n) {
@@ -43,6 +44,9 @@ export function demoBars(symbol: string, seed: number, days = 260): Bar[] {
   const shift25 = r.normal(0, 0.0025), shift5 = r.normal(0, 0.004);
   for (let i = days - 25; i < days; i++) rets[i] += shift25;
   for (let i = days - 5; i < days; i++) rets[i] += shift5;
+  // Stocks with a known gold / crude / USD-INR link also move with that factor.
+  const factor = demoFactorTerm(symbol, seed, days);
+  if (factor) for (let i = 0; i < days; i++) rets[i] += factor[i];
 
   let price = r.uniform(150, 4000);
   const dates = weekdays(days);
@@ -109,4 +113,25 @@ export function demoIndex(all: Bar[][]): number[] {
   const n = Math.min(...all.map((b) => b.length));
   return Array.from({ length: n }, (_, i) =>
     all.reduce((s, bars) => s + (bars[i].close / bars[0].close) * 100, 0) / all.length);
+}
+
+/**
+ * Fictional ~5 years of weekly bars that end with this run's daily history:
+ * the last year is the daily bars sampled weekly, the four years before are
+ * generated backwards from the first daily close. Sample data only.
+ */
+export function demoLongBars(daily: Bar[], symbol: string, seed: number): Bar[] {
+  const r = seeded(`long:${symbol}:${seed}`);
+  const weekly = daily.filter((_, i) => (daily.length - 1 - i) % 5 === 0);
+  const yearly = r.uniform(-0.06, 0.32); // this stock's long-run return per year
+  const wVol = r.uniform(0.025, 0.05);
+  const out: Bar[] = [];
+  let price = daily[0].close;
+  const d = new Date(`${daily[0].date}T00:00:00Z`);
+  for (let w = 0; w < 4 * 52; w++) {
+    d.setUTCDate(d.getUTCDate() - 7);
+    price /= Math.exp(r.normal(Math.log(1 + yearly) / 52, wVol)); // step back one week
+    out.unshift({ date: d.toISOString().slice(0, 10), open: price, high: price * (1 + wVol / 2), low: price * (1 - wVol / 2), close: price, volume: 0 });
+  }
+  return [...out, ...weekly];
 }

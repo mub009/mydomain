@@ -9,6 +9,8 @@ import type { Message, MessageTable } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { AgentAvatar } from "./agent-avatar";
 import { TrendTag } from "./chart-check";
+import { isSectorState, SectorStateTag } from "./sector-ui";
+import { EffectTag } from "./macro-ui";
 import { RiskTag, StockSymbolChip, VerdictBadge } from "./primitives";
 
 const VERDICTS = ["STRONG BUY", "BUY", "WATCH", "AVOID"];
@@ -40,10 +42,12 @@ export function MiniReportTable({ table, compact }: { table: MessageTable; compa
               {row.slice(0, cols.length).map((cell, i) => (
                 <td key={i} className={cn("whitespace-nowrap px-2.5 py-1.5", /^[₹\d.+-]/.test(cell) && i > 0 && "text-right",
                   cols[i] === "Reason" && "whitespace-normal text-muted-foreground", cols[i] === "Holding plan" && "text-muted-foreground")}>
-                  {i === 0 ? <StockSymbolChip symbol={cell} />
+                  {i === 0 ? (cols[0] === "Sector" ? <b className="font-semibold">{cell}</b> : <StockSymbolChip symbol={cell} />)
                     : VERDICTS.includes(cell) ? <VerdictBadge verdict={cell} />
                     : RISKS.includes(cell) ? <RiskTag risk={cell} />
                     : cell === "Bullish" || cell === "Bearish" || cell === "Neutral" ? <TrendTag trend={cell} compact={compact} />
+                    : isSectorState(cell) ? <SectorStateTag state={cell} />
+                    : cell === "Tailwind" || cell === "Headwind" ? <EffectTag effect={cell} />
                     : cell}
                 </td>
               ))}

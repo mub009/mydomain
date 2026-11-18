@@ -14,7 +14,7 @@ describe("AI notes provider", () => {
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({ choices: [{ message: { content: " RELIANCE looks strong. " } }] })));
     vi.stubGlobal("fetch", fetchMock);
     expect(aiModel()).toBe("meta/llama-3.3-70b-instruct");
-    const out = await new LLM(true).comment("Lotappi", "Explain", { a: 1 });
+    const out = await new LLM(true).comment("Momentum", "Explain", { a: 1 });
     expect(out).toBe("RELIANCE looks strong.");
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe("https://integrate.api.nvidia.com/v1/chat/completions");
@@ -28,7 +28,7 @@ describe("AI notes provider", () => {
     vi.stubEnv("NVIDIA_API_KEY", "nvapi-test");
     vi.stubGlobal("fetch", vi.fn(async () => new Response("rate limited", { status: 429 })));
     vi.spyOn(console, "warn").mockImplementation(() => {});
-    expect(await new LLM(true).comment("Mayavi", "Explain", {})).toBeUndefined();
+    expect(await new LLM(true).comment("Trend", "Explain", {})).toBeUndefined();
   });
 
   it("AI_PROVIDER chooses when both keys are set", () => {
