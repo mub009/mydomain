@@ -362,6 +362,8 @@ export interface RunRequest {
   aiNotes: boolean;
   capital?: number;
   riskPerTrade: number;
+  /** Sectors for searched stocks outside the built-in lists. */
+  sectors?: Record<string, string>;
 }
 
 export type StreamEvent =

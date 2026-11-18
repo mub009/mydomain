@@ -22,7 +22,15 @@ function validate(body: unknown): RunRequest | string {
     if (!Number.isFinite(capital) || capital < 0 || capital > 1e11) return "capital is out of range";
     if (capital === 0) capital = undefined;
   }
-  return { symbols, top, riskPerTrade, capital, demo: Boolean(b.demo), aiNotes: Boolean(b.aiNotes) };
+  // Sectors for searched stocks: only for symbols in this run, plain names only.
+  const sectors: Record<string, string> = {};
+  if (b.sectors && typeof b.sectors === "object") {
+    for (const [k, v] of Object.entries(b.sectors)) {
+      const sym = k.toUpperCase();
+      if (symbols.includes(sym) && typeof v === "string" && /^[A-Za-z &]{2,30}$/.test(v)) sectors[sym] = v;
+    }
+  }
+  return { symbols, top, riskPerTrade, capital, demo: Boolean(b.demo), aiNotes: Boolean(b.aiNotes), sectors };
 }
 
 /** Runs one analysis and streams progress, agent messages and the result as Server-Sent Events. */

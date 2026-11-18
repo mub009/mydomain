@@ -57,6 +57,16 @@ Six sub-agents report to the Research Agent on the top candidates (at least 12) 
 
 Anything that couldn't be checked is shown as "not checked", never as clear.
 
+## My Stocks: search and groups
+
+Choose **My Stocks** in the Universe control to analyse your own group (3 to 150 stocks):
+
+- **Search** by company name or symbol: suggestions are NSE listings from Yahoo Finance's search, with each company's sector and industry. Old names of renamed companies still work (Zomato finds ETERNAL, Tata Motors finds TMPV and TMCV).
+- **Sectors:** type a sector (bank, pharma, IT…) to add all of its stocks from the built-in lists at once.
+- **Paste a list:** `tcs, infosys, hdfc bank, tata steel` adds the first NSE match for each name and lists any it couldn't find.
+- **Saved groups:** "Save as group" names the list; saved groups appear as buttons to load again. My Stocks and the groups are kept in this browser.
+- Stocks outside the built-in lists get their sector from the search, so the sector check and sector cap still work for them.
+
 ## Stock view: full chart
 
 Click any stock (table row, chip or chart point) to open it in a centred, nearly full-screen window with a close button:

@@ -63,5 +63,11 @@ export const UNIVERSES: Record<Exclude<Universe, "custom">, { label: string; sym
 export const listOf = (symbol: string): "large" | "mid" | "small" | null =>
   symbol in NIFTY50_SECTORS ? "large" : symbol in MIDCAP_SECTORS ? "mid" : symbol in SMALLCAP_SECTORS ? "small" : null;
 
+/** Sectors for stocks outside the built-in lists (from the stock search), set per run. */
+const EXTRA_SECTORS: Record<string, string> = {};
+export function registerSectors(map: Record<string, string> | undefined) {
+  for (const [k, v] of Object.entries(map ?? {})) if (!(k in NIFTY50_SECTORS || k in MIDCAP_SECTORS || k in SMALLCAP_SECTORS)) EXTRA_SECTORS[k] = v;
+}
+
 export const sectorOf = (symbol: string) =>
-  NIFTY50_SECTORS[symbol] ?? MIDCAP_SECTORS[symbol] ?? SMALLCAP_SECTORS[symbol] ?? "Other";
+  NIFTY50_SECTORS[symbol] ?? MIDCAP_SECTORS[symbol] ?? SMALLCAP_SECTORS[symbol] ?? EXTRA_SECTORS[symbol] ?? "Other";

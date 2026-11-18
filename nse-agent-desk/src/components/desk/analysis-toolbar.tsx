@@ -3,6 +3,7 @@
 import { Download, FastForward, Loader2, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Field, inputClass, Segmented } from "@/components/ui/segmented";
+import { StockGroupPicker } from "./stock-group-picker";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { type Speed, symbolsOf, useBusy, useDesk } from "@/store/desk";
@@ -28,14 +29,9 @@ export function AnalysisToolbar() {
     <section className="card flex flex-wrap items-end gap-x-4 gap-y-3 p-3.5" aria-label="Analysis controls">
       <Field label="Universe">
         <Segmented label="Stock universe" value={s.universe} onChange={(universe) => s.set({ universe })}
-          options={[{ value: "large", label: "Large" }, { value: "mid", label: "Mid" }, { value: "small", label: "Small" }, { value: "all", label: "All caps" }, { value: "custom", label: "My List" }]} />
+          options={[{ value: "large", label: "Large" }, { value: "mid", label: "Mid" }, { value: "small", label: "Small" }, { value: "all", label: "All caps" }, { value: "custom", label: "My Stocks" }]} />
       </Field>
-      {s.universe === "custom" && (
-        <Field label={`Symbols (${symbols.length})`} className="min-w-52 flex-1">
-          <input className={cn(inputClass, !valid && "border-neg")} value={s.custom} onChange={(e) => s.set({ custom: e.target.value })}
-            placeholder="RELIANCE, TCS, INFY…" aria-label="Custom NSE symbols, comma separated" aria-invalid={!valid} />
-        </Field>
-      )}
+
       <Field label="Top picks">
         <Segmented label="Top N selections" value={s.top} onChange={(top) => s.set({ top })} options={[3, 5, 10, 15].map((v) => ({ value: v, label: String(v) }))} />
       </Field>
@@ -65,7 +61,8 @@ export function AnalysisToolbar() {
           {s.running ? s.progress ?? "Working…" : playing ? "Agents talking…" : "Run Analysis"}
         </Button>
       </div>
-      {!valid && <p className="w-full text-xs text-neg">Enter between 3 and 150 NSE symbols.</p>}
+      {s.universe === "custom" && <div className="w-full border-t border-[var(--edge)] pt-3"><StockGroupPicker /></div>}
+      {!valid && s.universe !== "custom" && <p className="w-full text-xs text-neg">Enter between 3 and 150 NSE symbols.</p>}
     </section>
   );
 }
