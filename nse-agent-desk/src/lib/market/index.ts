@@ -65,7 +65,7 @@ export async function loadMarket(
 ): Promise<Loaded> {
   if (demo) return loadDemo(symbols);
   const provider = getProvider();
-  if (!provider) return loadDemo(symbols, "No market-data provider is configured.");
+  if (!provider) throw new Error("No market-data provider is configured (MARKET_DATA_PROVIDER). Switch on Demo data to try the app with sample prices.");
 
   const frames: Record<string, Bar[]> = {};
   const skipped: string[] = [];
@@ -83,7 +83,10 @@ export async function loadMarket(
     }
   };
   await Promise.all(Array.from({ length: 6 }, worker));
-  if (!Object.keys(frames).length) return loadDemo(symbols, `${provider.label} could not be reached.`);
+  // Live data only: never swap in sample prices without the user asking for them.
+  if (!Object.keys(frames).length) {
+    throw new Error(`Couldn't load live prices from ${provider.label}${skipped[0] ? ` (${skipped[0]})` : ""}. Check the internet connection and try again, or switch on Demo data to use sample prices.`);
+  }
 
   let indexClose: number[] = [];
   try { indexClose = (await provider.getIndexBars()).map((b) => b.close); } catch { /* index is optional */ }

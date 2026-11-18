@@ -117,8 +117,16 @@ async function yahooFinancials(symbol: string): Promise<YearFinancials[]> {
 
 /** Yahoo's quoteSummary needs a session cookie and "crumb". */
 let crumb: { cookie: string; crumb: string; at: number } | null = null;
-async function yahooCrumb() {
-  if (crumb && Date.now() - crumb.at < 3600_000) return crumb;
+let crumbPending: Promise<{ cookie: string; crumb: string; at: number }> | null = null;
+/** One shared session for all requests (parallel callers wait for the same one). */
+function yahooCrumb(fresh = false) {
+  if (fresh) crumb = null;
+  if (crumb && Date.now() - crumb.at < 3600_000) return Promise.resolve(crumb);
+  crumbPending ??= newCrumb().finally(() => { crumbPending = null; });
+  return crumbPending;
+}
+
+async function newCrumb() {
   const r1 = await fetch("https://fc.yahoo.com", { headers: { "User-Agent": "Mozilla/5.0" }, redirect: "manual", signal: AbortSignal.timeout(10000) });
   const cookie = (r1.headers.get("set-cookie") ?? "").split(";")[0];
   const r2 = await fetch("https://query2.finance.yahoo.com/v1/test/getcrumb", { headers: { "User-Agent": "Mozilla/5.0", cookie }, signal: AbortSignal.timeout(10000) });
@@ -127,13 +135,20 @@ async function yahooCrumb() {
   return crumb;
 }
 
+/** Yahoo quoteSummary with the shared session; retries once with a fresh session if it was rejected. */
+async function quoteSummary(symbol: string, modules: string) {
+  for (const fresh of [false, true]) {
+    const c = await yahooCrumb(fresh);
+    const url = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(yahooSymbol(symbol))}?modules=${modules}&crumb=${encodeURIComponent(c.crumb)}`;
+    const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0", cookie: c.cookie }, signal: AbortSignal.timeout(10000) });
+    if (res.ok) return (await res.json())?.quoteSummary?.result?.[0];
+    if (res.status !== 401 && res.status !== 403) throw new Error(`HTTP ${res.status}`);
+  }
+  throw new Error("Yahoo session rejected");
+}
+
 async function yahooShareholding(symbol: string): Promise<Shareholding> {
-  const c = await yahooCrumb();
-  const url = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(yahooSymbol(symbol))}` +
-    `?modules=majorHoldersBreakdown,institutionOwnership,fundOwnership&crumb=${encodeURIComponent(c.crumb)}`;
-  const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0", cookie: c.cookie }, signal: AbortSignal.timeout(10000) });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const q = (await res.json())?.quoteSummary?.result?.[0];
+  const q = await quoteSummary(symbol, "majorHoldersBreakdown,institutionOwnership,fundOwnership");
   if (!q) throw new Error("no holders data");
   const pct = (v?: { raw?: number }) => (v?.raw === undefined ? undefined : Math.round(v.raw * 10000) / 100);
   const ins = pct(q.majorHoldersBreakdown?.insidersPercentHeld), inst = pct(q.majorHoldersBreakdown?.institutionsPercentHeld);
@@ -164,11 +179,7 @@ async function cached<T>(key: string, fn: () => Promise<T>): Promise<T> {
 /** Analysts' mean 12-month price target (live only). */
 export async function yahooAnalystTarget(symbol: string): Promise<{ mean: number; analysts: number } | null> {
   return cached(`tgt:${symbol}`, async () => {
-    const c = await yahooCrumb();
-    const url = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(yahooSymbol(symbol))}?modules=financialData&crumb=${encodeURIComponent(c.crumb)}`;
-    const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0", cookie: c.cookie }, signal: AbortSignal.timeout(10000) });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const fd = (await res.json())?.quoteSummary?.result?.[0]?.financialData;
+    const fd = (await quoteSummary(symbol, "financialData"))?.financialData;
     const mean = fd?.targetMeanPrice?.raw, analysts = fd?.numberOfAnalystOpinions?.raw ?? 0;
     return typeof mean === "number" && mean > 0 && analysts > 0 ? { mean, analysts } : null;
   }).catch(() => null);

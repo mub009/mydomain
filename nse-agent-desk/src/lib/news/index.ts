@@ -14,7 +14,7 @@ export const COMPANY_NAMES: Record<string, string[]> = {
   LT: ["Larsen & Toubro", "L&T"], HINDUNILVR: ["Hindustan Unilever", "HUL"], BAJFINANCE: ["Bajaj Finance"], KOTAKBANK: ["Kotak Mahindra Bank", "Kotak Bank"],
   AXISBANK: ["Axis Bank"], MARUTI: ["Maruti Suzuki", "Maruti"], SUNPHARMA: ["Sun Pharma"], HCLTECH: ["HCL Tech", "HCLTech"],
   TITAN: ["Titan"], ULTRACEMCO: ["UltraTech Cement", "UltraTech"], NTPC: ["NTPC"], ASIANPAINT: ["Asian Paints"],
-  "M&M": ["Mahindra & Mahindra", "M&M"], POWERGRID: ["Power Grid"], TATAMOTORS: ["Tata Motors"], WIPRO: ["Wipro"], ONGC: ["ONGC"],
+  "M&M": ["Mahindra & Mahindra", "M&M"], POWERGRID: ["Power Grid"], TMPV: ["Tata Motors Passenger", "Tata Motors"], WIPRO: ["Wipro"], ONGC: ["ONGC"],
   NESTLEIND: ["Nestle India"], JSWSTEEL: ["JSW Steel"], TATASTEEL: ["Tata Steel"], ADANIPORTS: ["Adani Ports"], COALINDIA: ["Coal India"],
   BAJAJFINSV: ["Bajaj Finserv"], TECHM: ["Tech Mahindra"], GRASIM: ["Grasim"], HINDALCO: ["Hindalco"], CIPLA: ["Cipla"],
   DRREDDY: ["Dr Reddy", "Dr. Reddy"], BRITANNIA: ["Britannia"], EICHERMOT: ["Eicher Motors", "Royal Enfield"], APOLLOHOSP: ["Apollo Hospitals"],

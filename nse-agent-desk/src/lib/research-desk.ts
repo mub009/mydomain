@@ -32,6 +32,16 @@ import { demoLongBars } from "./market/demo";
 import type { Analysis, Bar, DataSource, DeskMetric, DeskTone, DeskView, EntryPlan, Fundamentals, RedFlag, ResearchDesk } from "./types";
 
 const FINANCIAL = new Set(["Banks", "Financials"]);
+
+/** Run fn over items with at most n requests in flight; keeps the order. */
+async function inBatches<T, R>(items: T[], n: number, fn: (x: T) => Promise<R>): Promise<R[]> {
+  const out: R[] = new Array(items.length);
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(n, items.length) }, async () => {
+    for (let i = next++; i < items.length; i = next++) out[i] = await fn(items[i]);
+  }));
+  return out;
+}
 const r1 = (n: number) => Math.round(n * 10) / 10;
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
 
@@ -388,7 +398,7 @@ export async function runResearchDesk(symbols: string[], ctx: DeskContext): Prom
   const [fin, longs, targets, surv] = await Promise.all([
     loadFinancials(Object.fromEntries(symbols.map((s) => [s, price(s)])), { demo, seed }),
     Promise.all(symbols.map(async (s) => (demo ? demoLongBars(ctx.frames[s], s, seed) : await provider?.getLongBars(s).catch(() => []) ?? []))),
-    Promise.all(symbols.map((s) => (demo ? Promise.resolve(null) : yahooAnalystTarget(s)))),
+    demo ? Promise.resolve(symbols.map(() => null)) : inBatches(symbols, 3, yahooAnalystTarget),
     loadSurveillance(symbols, { demo, seed, demoPledge }),
   ]);
   const out: Record<string, ResearchDesk> = {};
