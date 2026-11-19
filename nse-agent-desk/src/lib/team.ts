@@ -11,6 +11,7 @@ export const TEAM: Record<Person, { name: string; title: string; focus: string; 
   Valuation: { name: "Valuation Agent", title: "P/E, P/B, P/CFO", focus: "Reports to Research Agent", color: "#6366F1", lead: "Research" },
   Growth: { name: "Growth Agent", title: "3-year revenue, cash flow, profit", focus: "Reports to Research Agent", color: "#22C55E", lead: "Research" },
   Profitability: { name: "Profitability Agent", title: "ROE, profit margin, cash flow", focus: "Reports to Research Agent", color: "#D946EF", lead: "Research" },
+  Seasonal: { name: "Seasonality Agent", title: "Seasonal trends & dividends", focus: "Reports to Research Agent", color: "#EAB308", lead: "Research" },
   RedFlag: { name: "Red Flag Agent", title: "ASM, GSM, pledge, tips, default risk", focus: "Reports to Research Agent", color: "#EF4444", lead: "Research" },
   Entry: { name: "Entry Point Agent", title: "Fundamentals + technicals entry", focus: "Reports to Research Agent", color: "#0EA5E9", lead: "Research" },
   Decision: { name: "Decision Agent", title: "Final picks & portfolio rules", focus: "Verdicts, sector cap, sizing", color: "#F59E0B" },
@@ -23,7 +24,7 @@ export const LEGACY_AGENT: Record<string, Person> = {
 export const migrateAgent = <T extends string>(n: T): T | Person => LEGACY_AGENT[n] ?? n;
 
 export const PEOPLE = Object.keys(TEAM) as Person[];
-export const DESK_AGENTS = ["Performance", "Valuation", "Growth", "Profitability", "RedFlag", "Entry"] as const;
+export const DESK_AGENTS = ["Performance", "Valuation", "Growth", "Profitability", "Seasonal", "RedFlag", "Entry"] as const;
 export const isDeskAgent = (n: string) => (DESK_AGENTS as readonly string[]).includes(n);
 
 export const displayName = (n: AgentName | "ALL") =>
@@ -39,6 +40,6 @@ export const THREADS: { id: string; title: string; members: Person[] }[] = [
   { id: "Research|Trend", title: "Trend Agent & Research Agent", members: ["Trend", "Research"] },
   { id: "Macro|Research", title: "Macro Agent & Research Agent", members: ["Macro", "Research"] },
   { id: "Research|Volatility", title: "Volatility Agent & Research Agent", members: ["Volatility", "Research"] },
-  { id: "desk", title: "Research desk", members: ["Research", "Performance", "Valuation", "Growth", "Profitability", "RedFlag", "Entry"] },
+  { id: "desk", title: "Research desk", members: ["Research", "Performance", "Valuation", "Growth", "Profitability", "Seasonal", "RedFlag", "Entry"] },
   { id: "Decision|Research", title: "Research Agent & Decision Agent", members: ["Research", "Decision"] },
 ];

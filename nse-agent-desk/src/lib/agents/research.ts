@@ -76,7 +76,7 @@ export class ResearchAgent {
     return rows.map((r) => {
       const d = desk[r.symbol];
       if (!d) return r;
-      const notes = [...r.notes, `Desk: ${d.performance.verdict.toLowerCase()}, ${d.valuation.verdict.toLowerCase()} valuation, ${d.growth.verdict.toLowerCase()}, ${d.profitability.verdict.toLowerCase()} (${d.points >= 0 ? "+" : ""}${d.points})`];
+      const notes = [...r.notes, `Desk: ${d.performance.verdict.toLowerCase()}, ${d.valuation.verdict.toLowerCase()} valuation, ${d.growth.verdict.toLowerCase()}, ${d.profitability.verdict.toLowerCase()}${d.seasonal ? `, ${d.seasonal.verdict.toLowerCase()}` : ""} (${d.points >= 0 ? "+" : ""}${d.points})`];
       if (d.redFlags.points < 0) notes.push(`Red flags: ${d.redFlags.reasons.join("; ")}`);
       return { ...r, desk: d, notes, combined: round(clamp(r.combined + d.points)) };
     }).sort((a, b) => b.combined - a.combined);

@@ -28,6 +28,7 @@ const ROLE: Record<Person, string> = {
   Valuation: "valuation analyst on the research desk who checks P/E, P/B and P/CFO",
   Growth: "growth analyst on the research desk who checks 3-year revenue, cash-flow and profit growth",
   Profitability: "profitability analyst on the research desk who checks ROE, profit margins and cash flow",
+  Seasonal: "seasonality analyst on the research desk who checks which months a stock usually rises, its strong quarters and its dividends",
   RedFlag: "risk analyst on the research desk who checks ASM/GSM surveillance, promoter pledges, tip alerts and default risk",
   Entry: "entry-point analyst on the research desk who combines fundamentals and technicals into an entry call",
   Decision: "final decision maker who picks the stocks to act on",
@@ -199,7 +200,7 @@ export async function runDialogue(bus: MessageBus, llm: LLM, d: DialogueInput) {
     const best = (pick: (r: Analysis) => number | undefined, n = 3) =>
       deskRows.filter((r) => pick(r) !== undefined).sort((a, b) => pick(b)! - pick(a)!).slice(0, n).map((r) => r.symbol);
     bus.send("Research", "Performance",
-      `Research desk, before I rank the top ${plural(deskRows.length, "candidate")}: Performance Agent, check the returns; Valuation Agent, the price against earnings, book and cash flow; Growth Agent, the 3-year growth; Profitability Agent, ROE, margins and cash flow; Red Flag Agent, surveillance, pledges, tips and default risk; Entry Point Agent, where to get in.`,
+      `Research desk, before I rank the top ${plural(deskRows.length, "candidate")}: Performance Agent, check the returns; Valuation Agent, the price against earnings, book and cash flow; Growth Agent, the 3-year growth; Profitability Agent, ROE, margins and cash flow; Seasonality Agent, the seasonal pattern and dividends; Red Flag Agent, surveillance, pledges, tips and default risk; Entry Point Agent, where to get in.`,
       { tickers: names(deskRows) });
 
     const perf = (r: Analysis) => r.desk!.performance;
@@ -249,6 +250,32 @@ export async function runDialogue(bus: MessageBus, llm: LLM, d: DialogueInput) {
         columns: ["Symbol", "ROE", "Net margin", "Cash / profit", "View", "Points"],
         rows: deskRows.map((r) => { const v = pr(r); return [r.symbol, fmt(v.metrics[0].value, "%"), fmt(v.metrics[1].value, "%"), fmt(v.metrics[2].value, "x"), v.verdict, `${v.points >= 0 ? "+" : ""}${v.points}`]; }),
       } });
+
+    const withSeason = deskRows.filter((r) => r.desk!.seasonal?.seasonalDetail);
+    if (withSeason.length) {
+      const sv = (r: Analysis) => r.desk!.seasonal!;
+      const sd = (r: Analysis) => sv(r).seasonalDetail!;
+      const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      const win = sd(withSeason[0]).window.map((m) => MON[m - 1]).join("-");
+      const tail = withSeason.filter((r) => sv(r).points >= 2).map((r) => r.symbol);
+      const head = withSeason.filter((r) => sv(r).points < 0).map((r) => r.symbol);
+      const exSoon = withSeason.filter((r) => sd(r).nextEx && sd(r).window.some((m) => sd(r).nextEx!.month.startsWith(MON[m - 1])));
+      bus.send("Seasonal", "Research",
+        `Seasonal check for ${win}, from up to ${Math.max(...withSeason.map((r) => sd(r).years))} years of monthly prices, the last quarters' results and the dividend history.` +
+        `${tail.length ? ` Usually strong in ${win}: ${list(tail)}.` : ` None has a strong ${win} record.`}${head.length ? ` Usually weak now: ${list(head)}.` : ""}` +
+        `${exSoon.length ? ` Ex-dividend likely soon for ${list(exSoon.map((r) => r.symbol))}: the price normally drops by about the dividend on that day, so don't read it as a fall in value.` : ""}` +
+        `${withSeason[0].desk!.sample ? " (Sample history in demo mode.)" : ""}`,
+        { kind: "report", tickers: [...tail, ...head, ...names(exSoon)], table: {
+          columns: ["Symbol", `${win} up years`, "Best month", "Strong quarter", "Div. yield", "Next ex-date", "Points"],
+          rows: withSeason.map((r) => {
+            const d = sd(r), best = [...d.months].sort((a, b) => b.avg - a.avg)[0];
+            const q = [...d.quarters].filter((x) => x.revenueVsAvg !== undefined).sort((a, b) => b.revenueVsAvg! - a.revenueVsAvg!)[0];
+            return [r.symbol, d.years ? `${sv(r).metrics[0].value}% (avg ${sv(r).metrics[0].note?.split(" ")[1] ?? "–"})` : "–", d.years ? `${MON[best.month - 1]} ${best.avg >= 0 ? "+" : ""}${best.avg}%` : "–",
+              q ? q.label.split(" ")[0] + ` (${q.revenueVsAvg! >= 0 ? "+" : ""}${q.revenueVsAvg}%)` : "–", d.yieldPct !== undefined ? `${d.yieldPct}%` : "none",
+              d.nextEx ? `~${d.nextEx.month} ₹${d.nextEx.amount}` : "–", `${sv(r).points >= 0 ? "+" : ""}${sv(r).points}`];
+          }),
+        } });
+    }
 
     const rf = (r: Analysis) => r.desk!.redFlags;
     // Severe flags from every stock the desk checked, not only the top eight shown.

@@ -44,6 +44,10 @@ const columns: ColumnDef<Decision>[] = [
     cell: ({ row: { original: d } }) => deskValue(d.desk?.performance.metrics[1]) },
   { id: "rev3y", header: "Revenue 3Y", meta: { num: true }, accessorFn: (d) => d.desk?.growth.metrics[0].value ?? -999,
     cell: ({ row: { original: d } }) => deskValue(d.desk?.growth.metrics[0]) },
+  { id: "season", header: "Season", accessorFn: (d) => d.desk?.seasonal?.points ?? -9,
+    cell: ({ row: { original: d } }) => <span className={cn("whitespace-nowrap text-xs", (d.desk?.seasonal?.points ?? 0) >= 2 ? "font-semibold text-pos" : (d.desk?.seasonal?.points ?? 0) < 0 ? "text-neg" : "text-muted-foreground")}>{d.desk?.seasonal?.verdict ?? "–"}</span> },
+  { id: "divYield", header: "Div. yield", meta: { num: true }, accessorFn: (d) => d.desk?.seasonal?.seasonalDetail?.yieldPct ?? -1,
+    cell: ({ row: { original: d } }) => { const y = d.desk?.seasonal?.seasonalDetail?.yieldPct; return y === undefined ? "–" : `${y}%`; } },
   { id: "flags", header: "Red flags", meta: { num: true }, accessorFn: (d) => d.desk?.redFlags.points ?? 1,
     cell: ({ row: { original: d } }) => !d.desk ? "–" : d.desk.severe
       ? <span className="rounded-md bg-[var(--avoid-bg)] px-1.5 py-px text-[10.5px] font-bold text-[var(--avoid-fg)]">{d.desk.redFlags.verdict}</span>

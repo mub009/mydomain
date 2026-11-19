@@ -143,7 +143,7 @@ export interface Analysis {
   desk?: ResearchDesk;
 }
 
-export type DeskAgent = "Performance" | "Valuation" | "Growth" | "Profitability" | "Entry" | "RedFlag";
+export type DeskAgent = "Performance" | "Valuation" | "Growth" | "Profitability" | "Seasonal" | "Entry" | "RedFlag";
 export type DeskTone = "good" | "ok" | "weak" | "n/a";
 
 export interface DeskMetric {
@@ -165,6 +165,8 @@ export interface DeskView {
   reasons: string[];
   /** Red Flag Agent only: each check and what it found. */
   flags?: RedFlag[];
+  /** Seasonality Agent only: month-by-month returns, quarters and dividends. */
+  seasonalDetail?: import("./seasonal").SeasonalDetail;
   /** Entry Agent only: the entry call and its price area. */
   entry?: { plan: EntryPlan; low?: number; high?: number };
 }
@@ -182,10 +184,12 @@ export interface ResearchDesk {
   valuation: DeskView;
   growth: DeskView;
   profitability: DeskView;
+  /** Missing when the history couldn't be loaded. */
+  seasonal?: DeskView;
   redFlags: DeskView;
   /** Set after the chart check. */
   entry?: DeskView;
-  /** Total points: performance + valuation + growth + profitability (capped at +/-10), plus red flags (down to -10) and entry (+/-2). */
+  /** Total points: performance + valuation + growth + profitability + seasonality (capped at +/-10), plus red flags (down to -10) and entry (+/-2). */
   points: number;
   /** A severe red flag: the Decision Agent won't rate it above WATCH. */
   severe: boolean;

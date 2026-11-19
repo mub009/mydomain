@@ -33,9 +33,9 @@ Rules worth knowing:
 
 With demo data off, market cap and EPS come from Yahoo Finance's fundamentals data (unofficial). If a stock's data can't be loaded it's marked "Unknown" and kept, with a note that its size wasn't verified.
 
-## Research desk: six sub-agents
+## Research desk: seven sub-agents
 
-Six sub-agents report to the Research Agent on the top candidates (at least 12) before it ranks them. Performance, Valuation, Growth and Profitability together move the score by at most ±10; red flags take up to 10 more off; the entry call adds ±2. They talk in the **Research desk** chat thread, and each stock's panel shows their figures.
+Seven sub-agents report to the Research Agent on the top candidates (at least 12) before it ranks them. Performance, Valuation, Growth, Profitability and Seasonality together move the score by at most ±10; red flags take up to 10 more off; the entry call adds ±2. They talk in the **Research desk** chat thread, and each stock's panel shows their figures.
 
 | Agent | Checks | Points |
 |---|---|---|
@@ -44,6 +44,7 @@ Six sub-agents report to the Research Agent on the top candidates (at least 12) 
 | **Growth Agent** | **3-year CAGR** of revenue, operating cash flow and net profit, from the last four annual reports | Average ≥ 15%: +3, ≥ 10%: +2, ≥ 5%: +1, below 0: −2; loss-making now: −2 |
 | **Profitability Agent** | **ROE** (latest year), **net margin** and profit in how many of the last years, **cash conversion** (3-year operating cash flow ÷ net profit) | ROE ≥ 20%: +2, ≥ 15%: +1, below 8%: −1; loss-making now: −2; a loss in an earlier year: −1; cash conversion ≥ 1: +1, below 0.7: −1 |
 | **Red Flag Agent** | **ASM** and **GSM** surveillance lists, **promoter pledge**, **unsolicited tips** (exchange alert list, or a pump-like pattern: up 25% in 10 days on 3× volume in a non-large-cap), **default probability** (1-year, naive Merton distance-to-default from market cap, debt, share-price volatility and last year's return) | Each severe flag −4, each caution −1 (at most −10). Severe: GSM, ASM long-term stage II or later, pledge above 50%, named in a tip alert, default probability above 5%. **A severe flag stops a BUY: the Decision Agent caps the stock at WATCH.** |
+| **Seasonality Agent** | **Seasonal price trend:** each calendar month's return over up to 10 years (average and share of years it rose), for this month and next. **Seasonal results:** revenue and profit by fiscal quarter (Q1 Apr–Jun) against the average quarter; Yahoo gives only the last ~5 quarters, so this is a light check. **Dividends:** every ex-date with amount, yield, the price move on the ex-date (the price normally drops by about the dividend) and the trading days to get back to the pre-dividend price; the next ex-date is estimated from last year's months | +2 when this month and next rose in 70%+ of years by 2%+ on average, +1 at 60%+, −1 at 45% or less, −2 at 35% or less and negative (needs 5+ years); ±1 when the coming results quarter is usually 5% above/below average; +1 for a dividend yield of 2% or more (at most ±3) |
 | **Entry Point Agent** | Fundamentals (valuation + growth + profitability points) and technicals (5-timeframe chart check, RSI, buy zone) | **Buy now** (+2) when the price is in the buy zone, fundamentals are not weak and the chart is not falling; **Buy on dip** (+1) with the zone price; **Wait** (0); **Avoid** (−2) on a severe red flag or weak business with a falling chart |
 
 **Expected return:** with live data, the analysts' mean 12-month price target from Yahoo when it exists. Otherwise an estimate: 3-year EPS growth (capped −10% to +25%) plus up to ±8 for the P/E against its sector. It's a rough guide, not a forecast. Banks and NBFCs skip P/CFO, cash-flow growth, cash conversion and the default model, because cash flow and debt work differently for lenders. In demo mode every figure is a sample.

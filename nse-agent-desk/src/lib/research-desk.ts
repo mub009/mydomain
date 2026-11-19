@@ -25,6 +25,7 @@
  */
 import { demoShareholding, loadFinancials, yahooAnalystTarget } from "./company";
 import { computeRatios } from "./company/quality";
+import { loadSeasonal, seasonalView } from "./seasonal";
 import { loadSurveillance, type Surveillance } from "./surveillance";
 import type { YearFinancials } from "./company/types";
 import { getProvider } from "./market";
@@ -395,11 +396,12 @@ export async function runResearchDesk(symbols: string[], ctx: DeskContext): Prom
   const nifty = niftyYtd(ctx.indexClose, ctx.frames[symbols[0]]);
   const provider = demo ? null : getProvider();
   const demoPledge = demo ? Object.fromEntries(symbols.map((s) => [s, demoShareholding(s, seed).pledgedPct ?? 0])) : undefined;
-  const [fin, longs, targets, surv] = await Promise.all([
+  const [fin, longs, targets, surv, seasons] = await Promise.all([
     loadFinancials(Object.fromEntries(symbols.map((s) => [s, price(s)])), { demo, seed }),
     Promise.all(symbols.map(async (s) => (demo ? demoLongBars(ctx.frames[s], s, seed) : await provider?.getLongBars(s).catch(() => []) ?? []))),
     demo ? Promise.resolve(symbols.map(() => null)) : inBatches(symbols, 3, yahooAnalystTarget),
     loadSurveillance(symbols, { demo, seed, demoPledge }),
+    loadSeasonal(symbols, { demo, seed, frames: ctx.frames }),
   ]);
   const out: Record<string, ResearchDesk> = {};
   symbols.forEach((s, i) => {
@@ -423,9 +425,11 @@ export async function runResearchDesk(symbols: string[], ctx: DeskContext): Prom
     const pd = !financial && f?.marketCapCr && latest?.debt !== undefined
       ? defaultProbability({ marketCapCr: f.marketCapCr, debtCr: latest.debt, equityVol: vol, ret1y: bars[bars.length - 1].close / bars[0].close - 1 }) : undefined;
     const redFlags = redFlagView({ symbol: s, surv, pledgePct: surv.pledge[s], pd, financial, pump: pumpPattern(bars, f?.cap) });
-    const core = clamp(performance.points + valuation.points + growth.points + profitability.points, -10, 10);
+    const season = seasons[s];
+    const seasonal = season && season.daily.length > 60 ? seasonalView(season, price(s)) : undefined;
+    const core = clamp(performance.points + valuation.points + growth.points + profitability.points + (seasonal?.points ?? 0), -10, 10);
     out[s] = {
-      performance, valuation, growth, profitability, redFlags,
+      performance, valuation, growth, profitability, seasonal, redFlags,
       points: core + redFlags.points,
       severe: redFlags.flags!.some((x) => x.status === "severe"),
       sample: demo, source: demo ? "Sample figures (demo)" : `Yahoo Finance (unofficial); surveillance: ${surv.source}`,
