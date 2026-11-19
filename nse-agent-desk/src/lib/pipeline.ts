@@ -16,7 +16,7 @@ import { capThresholds, loadFundamentals } from "./fundamentals";
 import { loadNews } from "./news";
 import { analyseSectors, applySectors, enrichSectors } from "./sectors";
 import { analyseMacro, applyMacro, loadMacro } from "./macro";
-import { sectorOf } from "./market/universe";
+import { registerSectors, sectorOf } from "./market/universe";
 import { runResearchDesk } from "./research-desk";
 import type { RunRequest, RunResult, StreamEvent } from "./types";
 
@@ -24,6 +24,7 @@ export async function runAnalysis(o: RunRequest, emit: (e: StreamEvent) => void)
   const started = Date.now();
   const bus = new MessageBus((message) => emit({ type: "message", message }));
   const llm = new LLM(o.aiNotes);
+  registerSectors(o.sectors);
 
   emit({ type: "progress", text: "Loading prices…" });
   const { frames, indexClose, vixClose, sectorIndex, source, skipped } = await loadMarket(o.symbols, o.demo,

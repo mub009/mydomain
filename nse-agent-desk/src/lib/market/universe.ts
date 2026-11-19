@@ -6,7 +6,7 @@ export const NIFTY50_SECTORS: Record<string, string> = {
   HDFCBANK: "Banks", ICICIBANK: "Banks", SBIN: "Banks", KOTAKBANK: "Banks", AXISBANK: "Banks", INDUSINDBK: "Banks",
   BAJFINANCE: "Financials", BAJAJFINSV: "Financials", SHRIRAMFIN: "Financials", SBILIFE: "Financials", HDFCLIFE: "Financials",
   ITC: "FMCG", HINDUNILVR: "FMCG", NESTLEIND: "FMCG", BRITANNIA: "FMCG", TATACONSUM: "FMCG",
-  MARUTI: "Auto", "M&M": "Auto", TATAMOTORS: "Auto", EICHERMOT: "Auto", HEROMOTOCO: "Auto", "BAJAJ-AUTO": "Auto",
+  MARUTI: "Auto", "M&M": "Auto", TMPV: "Auto", EICHERMOT: "Auto", HEROMOTOCO: "Auto", "BAJAJ-AUTO": "Auto",
   SUNPHARMA: "Pharma", CIPLA: "Pharma", DRREDDY: "Pharma", DIVISLAB: "Pharma", APOLLOHOSP: "Healthcare",
   JSWSTEEL: "Metals", TATASTEEL: "Metals", HINDALCO: "Metals",
   ULTRACEMCO: "Cement", GRASIM: "Cement",
@@ -63,5 +63,11 @@ export const UNIVERSES: Record<Exclude<Universe, "custom">, { label: string; sym
 export const listOf = (symbol: string): "large" | "mid" | "small" | null =>
   symbol in NIFTY50_SECTORS ? "large" : symbol in MIDCAP_SECTORS ? "mid" : symbol in SMALLCAP_SECTORS ? "small" : null;
 
+/** Sectors for stocks outside the built-in lists (from the stock search), set per run. */
+const EXTRA_SECTORS: Record<string, string> = {};
+export function registerSectors(map: Record<string, string> | undefined) {
+  for (const [k, v] of Object.entries(map ?? {})) if (!(k in NIFTY50_SECTORS || k in MIDCAP_SECTORS || k in SMALLCAP_SECTORS)) EXTRA_SECTORS[k] = v;
+}
+
 export const sectorOf = (symbol: string) =>
-  NIFTY50_SECTORS[symbol] ?? MIDCAP_SECTORS[symbol] ?? SMALLCAP_SECTORS[symbol] ?? "Other";
+  NIFTY50_SECTORS[symbol] ?? MIDCAP_SECTORS[symbol] ?? SMALLCAP_SECTORS[symbol] ?? EXTRA_SECTORS[symbol] ?? "Other";

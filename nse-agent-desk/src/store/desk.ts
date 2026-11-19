@@ -22,9 +22,16 @@ export interface ServerConfig {
   provider: { id: string; label: string; realtime: boolean } | null;
 }
 
+export interface StockInfo { name: string; sector?: string }
+export interface StockGroup { name: string; symbols: string[] }
+
 interface Settings {
   universe: Universe;
   custom: string;
+  /** Names and sectors of stocks picked with the search. */
+  stockInfo: Record<string, StockInfo>;
+  /** Saved groups of stocks. */
+  groups: StockGroup[];
   top: number;
   capital: string;
   risk: number;
@@ -62,6 +69,19 @@ let timer: ReturnType<typeof setTimeout> | undefined;
 let skipping = false;
 let abort: AbortController | undefined;
 
+const SAVED = "nse-desk:my-stocks";
+/** My List, its stock names and the saved groups live in this browser. */
+function saveLocal(s: Pick<Settings, "custom" | "stockInfo" | "groups">) {
+  try { localStorage.setItem(SAVED, JSON.stringify({ custom: s.custom, stockInfo: s.stockInfo, groups: s.groups })); } catch { /* storage unavailable */ }
+}
+function loadLocal(): Partial<Settings> {
+  try {
+    const v = JSON.parse(localStorage.getItem(SAVED) ?? "null");
+    if (!v || typeof v.custom !== "string") return {};
+    return { custom: v.custom, stockInfo: v.stockInfo ?? {}, groups: Array.isArray(v.groups) ? v.groups : [] };
+  } catch { return {}; }
+}
+
 export const symbolsOf = (s: Pick<Settings, "universe" | "custom">) =>
   s.universe !== "custom" ? UNIVERSES[s.universe].symbols
     : [...new Set(s.custom.split(/[\s,]+/).map((x) => x.trim().toUpperCase()).filter(Boolean))];
@@ -84,13 +104,14 @@ export const useDesk = create<DeskState>((set, get) => {
   }
 
   return {
-    universe: "large", custom: "RELIANCE, TCS, INFY, HDFCBANK, ICICIBANK, SBIN, LT, ITC, MARUTI, TITAN",
-    top: 5, capital: "500000", risk: 1, demo: true, aiNotes: false, speed: "normal",
+    universe: "large", custom: "RELIANCE, TCS, INFY, HDFCBANK, ICICIBANK, SBIN, LT, ITC, MARUTI, TITAN", stockInfo: {}, groups: [],
+    top: 5, capital: "500000", risk: 1, demo: false, aiNotes: false, speed: "normal",
     config: null, session: null, replayOf: null, running: false, progress: null, error: null,
     messages: [], shown: 0, typing: null, times: {}, result: null, seen: {}, drawerSymbol: null,
 
     set: (patch) => {
       set(patch);
+      if ("custom" in patch || "stockInfo" in patch || "groups" in patch) saveLocal(get());
       if (patch.speed && get().shown < get().messages.length) play(); // re-time the pending message
     },
 
@@ -112,6 +133,7 @@ export const useDesk = create<DeskState>((set, get) => {
     },
 
     loadConfig: async () => {
+      set(loadLocal()); // My List and saved groups from this browser
       fetch("/api/session").then((r) => r.json())
         .then((r) => set({ session: { enabled: r.enabled, time: r.time, ranAt: r.session?.ranAt ?? null } }))
         .catch(() => { /* optional */ });
@@ -131,6 +153,7 @@ export const useDesk = create<DeskState>((set, get) => {
           body: JSON.stringify({
             symbols: symbolsOf(s), top: s.top, demo: s.demo, aiNotes: s.aiNotes && Boolean(s.config?.aiAvailable),
             capital: Number(s.capital) > 0 ? Number(s.capital) : undefined, riskPerTrade: s.risk,
+            sectors: s.universe === "custom" ? Object.fromEntries(symbolsOf(s).flatMap((k) => (s.stockInfo[k]?.sector ? [[k, s.stockInfo[k].sector]] : []))) : undefined,
           }),
         });
         if (!res.ok || !res.body) throw new Error((await res.json().catch(() => null))?.error ?? `Server error ${res.status}`);

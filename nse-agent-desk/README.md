@@ -31,7 +31,7 @@ Rules worth knowing:
 
 **EPS over one year:** EPS for the last 12 months (sum of the last 4 quarters) against the 12 months before; if fewer than 8 quarters are available, the latest fiscal year against the one before. Score: +5 for growth of 20% or more, +3 for 10-20%, +1 for 0-10%, -4 if EPS fell, -6 if loss-making. Decision Agent never gives STRONG BUY with falling EPS, and never BUY while loss-making.
 
-With demo data off, market cap and EPS come from Yahoo Finance's fundamentals data (unofficial, untested from the build environment). If a stock's data can't be loaded it's marked "Unknown" and kept, with a note that its size wasn't verified.
+With demo data off, market cap and EPS come from Yahoo Finance's fundamentals data (unofficial). If a stock's data can't be loaded it's marked "Unknown" and kept, with a note that its size wasn't verified.
 
 ## Research desk: six sub-agents
 
@@ -56,6 +56,24 @@ Six sub-agents report to the Research Agent on the top candidates (at least 12) 
 ```
 
 Anything that couldn't be checked is shown as "not checked", never as clear.
+
+## My Stocks: search and groups
+
+Choose **My Stocks** in the Universe control to analyse your own group (3 to 150 stocks):
+
+- **Search** by company name or symbol: suggestions are NSE listings from Yahoo Finance's search, with each company's sector and industry. Old names of renamed companies still work (Zomato finds ETERNAL, Tata Motors finds TMPV and TMCV).
+- **Sectors:** type a sector (bank, pharma, IT…) to add all of its stocks from the built-in lists at once.
+- **Paste a list:** `tcs, infosys, hdfc bank, tata steel` adds the first NSE match for each name and lists any it couldn't find.
+- **Saved groups:** "Save as group" names the list; saved groups appear as buttons to load again. My Stocks and the groups are kept in this browser.
+- Stocks outside the built-in lists get their sector from the search, so the sector check and sector cap still work for them.
+
+## Stock view: full chart
+
+Click any stock (table row, chip or chart point) to open it in a centred, nearly full-screen window with a close button:
+
+- **Full price chart** (TradingView lightweight-charts) with real Yahoo prices: **daily candles over 1 year by default**. Change the **range** (1D, 5D, 1M, 3M, 6M, YTD, 1Y, 2Y, 5Y, Max) and the **bar size** (1m, 2m, 5m, 15m, 30m, 1H, 1D, 1W, 1M). Yahoo's limits apply: 1-minute bars cover 7 days, 2- to 30-minute bars 60 days, hourly bars 1 year; picking one adjusts the other. Candles, bars or line; volume; 20/50 moving averages; the entry, stop-loss, target and buy zone as lines; OHLC and volume for the bar under the pointer; scroll to zoom, drag to pan. Times are IST.
+- **Header:** latest price and today's change, with the analysis entry price.
+- **Research, Forecast and Company** tabs beside the chart; **Full chart** hides them.
 
 ## Research Agent's chart check
 
@@ -97,7 +115,7 @@ Before Research Agent combines the lists, the Macro Agent reports how **Gold**, 
 
 Shown in a Gold · Crude · USD/INR card on the Overview, a Macro exposure section in an affected stock's panel, and the Macro Agent & Research Agent chat thread.
 
-Data: live mode uses Yahoo daily bars for gold futures (GC=F, converted to ₹ per 10 g with USD/INR, without import duty or GST), Brent futures (BZ=F) and USD/INR (INR=X), untested from the build environment. Demo mode uses sample series, and demo stocks with a known link really move with their factor so the measured check has something to find.
+Data: live mode uses Yahoo daily bars for gold futures (GC=F, converted to ₹ per 10 g with USD/INR, without import duty or GST), Brent futures (BZ=F) and USD/INR (INR=X). Demo mode uses sample series, and demo stocks with a known link really move with their factor so the measured check has something to find.
 
 ## Sector check
 
@@ -141,7 +159,7 @@ Open any stock and choose the **Company** tab:
 - **Balance sheet:** revenue, profit, assets, liabilities, equity, debt, cash, capital spending, debt/equity and current ratio by fiscal year (₹ Cr).
 - **Who owns it:** holder groups, largest holders, promoter trend and pledges where available.
 
-Data: with demo data off, statements come from Yahoo Finance's annual fundamentals and holders from Yahoo's holders data (both unofficial, untested from the build environment). Yahoo groups FIIs and DIIs together as "institutions" and doesn't show the official promoter split or pledges; each stock links to its NSE page for the official quarterly shareholding pattern. In demo mode all figures are samples and holder names are generic placeholders.
+Data: with demo data off, statements come from Yahoo Finance's annual fundamentals and holders from Yahoo's holders data (both unofficial). Yahoo groups FIIs and DIIs together as "institutions" and doesn't show the official promoter split or pledges; each stock links to its NSE page for the official quarterly shareholding pattern. In demo mode all figures are samples and holder names are generic placeholders.
 
 ## Follow-up on trades you take
 
@@ -195,8 +213,10 @@ Light and dark themes, and a mobile layout with a bottom navigation bar.
 
 ## Data: demo, end-of-day, and what is *not* claimed
 
-- **Demo data (default):** fictional sample prices for all 50 Nifty stocks, clearly labelled. Every run uses a new random market, so each run reaches its own conclusion.
-- **Demo data off:** the server uses the market-data provider chosen by `MARKET_DATA_PROVIDER`. The bundled `yahoo` provider is unofficial end-of-day data, labelled as such in the UI. It is **not** real-time NSE data. If it cannot be reached, the app falls back to demo data and says so.
+- **Live data (default):** prices, financials, holders and analyst targets from Yahoo Finance; headlines from Google News; India VIX, gold, crude and USD/INR from Yahoo. Yahoo is unofficial and delayed, labelled as such in the UI; it is **not** real-time NSE data. Yahoo leaves today's daily close empty, so the latest price is used for today's bar. If live prices can't be loaded, the run stops with an error: it never switches to sample prices on its own.
+- **Demo data (switch on to use):** fictional sample prices, clearly labelled, for trying the app offline.
+- **Behind an HTTPS proxy** (for example a cloud sandbox), start the server with `NODE_USE_ENV_PROXY=1` so Node's `fetch` uses `HTTPS_PROXY`.
+- **ASM/GSM and pledges:** NSE's website blocks automated requests, so save the lists to `.data/surveillance.json` (see the research desk section) for a reliable check.
 - **Real-time NSE prices need a licensed source.** Implement `MarketDataProvider` (`src/lib/market/provider.ts`) for your data vendor or broker API and register it in `src/lib/market/index.ts`.
 
 ## Agents: simulated vs real model calls

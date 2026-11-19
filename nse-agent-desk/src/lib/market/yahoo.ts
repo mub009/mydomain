@@ -15,8 +15,12 @@ async function chart(symbol: string, range = "1y", interval = "1d"): Promise<Bar
   const q = r.indicators.quote[0];
   const adj: number[] | undefined = r.indicators.adjclose?.[0]?.adjclose;
   const bars: Bar[] = [];
+  const lastIdx = (r.timestamp as number[]).length - 1;
   (r.timestamp as number[]).forEach((t, i) => {
-    const [o, h, l, c, v] = [q.open[i], q.high[i], q.low[i], q.close[i], q.volume[i]];
+    let c = q.close[i];
+    // Yahoo leaves today's daily close empty (even after the close); the live price is in meta.
+    if (c == null && i === lastIdx && !intraday && r.meta?.regularMarketPrice) c = r.meta.regularMarketPrice;
+    const [o, h, l, v] = [q.open[i], q.high[i], q.low[i], q.volume[i]];
     if ([o, h, l, c].some((x) => x == null)) return;
     const k = adj?.[i] ? adj[i] / c : 1;
     bars.push({ date: intraday ? new Date(t * 1000).toISOString() : new Date(t * 1000).toISOString().slice(0, 10), open: o * k, high: h * k, low: l * k, close: c * k, volume: v ?? 0 });
