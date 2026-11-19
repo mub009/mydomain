@@ -1,7 +1,7 @@
 "use client";
 
 import { type ColumnDef, flexRender, getCoreRowModel, getSortedRowModel, type SortingState, useReactTable } from "@tanstack/react-table";
-import { ArrowDown, ArrowUp, ChevronsUpDown, Search, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronsUpDown, Search, X, ShieldAlert } from "lucide-react";
 import { useMemo, useState } from "react";
 import { DataBanner, RiskTag, VerdictBadge } from "@/components/desk/primitives";
 import { PageHeader } from "@/components/desk/shell";
@@ -14,6 +14,7 @@ import { inr, pct } from "@/lib/format";
 import type { Decision, Verdict } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { deskValue } from "@/components/desk/desk-ui";
+import { BPStatusChip, bpOverall, FlaggedStocks } from "@/components/desk/black-points-ui";
 import { useDecided, useDesk } from "@/store/desk";
 
 const VERDICTS: ("ALL" | Verdict)[] = ["ALL", "STRONG BUY", "BUY", "WATCH", "AVOID"];
@@ -44,6 +45,8 @@ const columns: ColumnDef<Decision>[] = [
     cell: ({ row: { original: d } }) => deskValue(d.desk?.performance.metrics[1]) },
   { id: "rev3y", header: "Revenue 3Y", meta: { num: true }, accessorFn: (d) => d.desk?.growth.metrics[0].value ?? -999,
     cell: ({ row: { original: d } }) => deskValue(d.desk?.growth.metrics[0]) },
+  { id: "blackPoints", header: "Black Points", accessorFn: (d) => ({ Excluded: 0, "Needs Review": 1, Eligible: 2 } as Record<string, number>)[bpOverall(d.blackPoints) ?? ""] ?? 3,
+    cell: ({ row: { original: d } }) => { const s = bpOverall(d.blackPoints); return s ? <BPStatusChip status={s} /> : <span className="text-xs text-muted-foreground">not scanned</span>; } },
   { id: "season", header: "Season", accessorFn: (d) => d.desk?.seasonal?.points ?? -9,
     cell: ({ row: { original: d } }) => <span className={cn("whitespace-nowrap text-xs", (d.desk?.seasonal?.points ?? 0) >= 2 ? "font-semibold text-pos" : (d.desk?.seasonal?.points ?? 0) < 0 ? "text-neg" : "text-muted-foreground")}>{d.desk?.seasonal?.verdict ?? "–"}</span> },
   { id: "divYield", header: "Div. yield", meta: { num: true }, accessorFn: (d) => d.desk?.seasonal?.seasonalDetail?.yieldPct ?? -1,
@@ -73,8 +76,10 @@ export default function ScreenerPage() {
   const [rsiMax, setRsiMax] = useState("");
   const [minScore, setMinScore] = useState(0);
   const [sorting, setSorting] = useState<SortingState>([{ id: "combined", desc: true }]);
+  const [view, setView] = useState<"all" | "flagged">("all");
 
   const all = useMemo(() => r?.all ?? [], [r]);
+  const flaggedCount = all.filter((d) => d.blackPoints && Object.values(d.blackPoints.status).some((s) => s !== "Eligible")).length;
   const sectors = useMemo(() => [...new Set(all.map((d) => d.sector))].sort(), [all]);
   // everything except the verdict filter, so the chips can show live counts
   const base = useMemo(() => all.filter((d) =>
@@ -98,6 +103,15 @@ export default function ScreenerPage() {
       ) : (
         <div className="space-y-4">
           <DataBanner source={r.source} />
+          <div role="tablist" aria-label="Screener view" className="well inline-flex h-10 items-center gap-0.5 rounded-xl p-1">
+            {([["all", `All stocks ${all.length}`], ["flagged", `Flagged Stocks ${flaggedCount}`]] as const).map(([v, l]) => (
+              <button key={v} type="button" role="tab" aria-selected={view === v} onClick={() => setView(v)}
+                className={cn("flex h-full items-center gap-1.5 rounded-lg px-3 text-[13px] font-medium", view === v ? "raised -translate-y-px font-semibold text-foreground" : "text-muted-foreground hover:text-foreground")}>
+                {v === "flagged" && <ShieldAlert className="size-4" />}{l}
+              </button>
+            ))}
+          </div>
+          {view === "flagged" ? <FlaggedStocks all={all} /> : (<>
           <section className="card flex flex-wrap items-end gap-x-4 gap-y-3 p-3.5" aria-label="Filters">
             <Field label="Search" className="min-w-44 flex-1">
               <span className="relative"><Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
@@ -175,6 +189,7 @@ export default function ScreenerPage() {
               {!data.length && <p className="px-4 py-12 text-center text-sm text-muted-foreground">No stocks match these filters.</p>}
             </div>
           </section>
+          </>)}
         </div>
       )}
     </>

@@ -31,6 +31,7 @@ const ROLE: Record<Person, string> = {
   Seasonal: "seasonality analyst on the research desk who checks which months a stock usually rises, its strong quarters and its dividends",
   RedFlag: "risk analyst on the research desk who checks ASM/GSM surveillance, promoter pledges, tip alerts and default risk",
   Entry: "entry-point analyst on the research desk who combines fundamentals and technicals into an entry call",
+  BlackPoints: "downside-risk analyst who checks filings, regulator orders, financial health and sector conditions before a stock can be shortlisted",
   Decision: "final decision maker who picks the stocks to act on",
 };
 
@@ -63,6 +64,10 @@ export interface DialogueInput {
   conflicted: Analysis[];
   clarifications: Record<string, string>;
   picks: Decision[];
+  /** Every stock with its final verdict (includes the Black Points rulings). */
+  all: Decision[];
+  /** What the Black Points Analyst could check this run. */
+  bpCoverage?: string[];
   passed: Decision[];
   watchlist: Decision[];
 }
@@ -438,6 +443,48 @@ export async function runDialogue(bus: MessageBus, llm: LLM, d: DialogueInput) {
       },
       aiNote: await note("Research", "In 4-5 short lines, tell Decision Agent where the short-term and 1-month views agree or conflict, and which stocks look strongest after risk.", top8),
     });
+
+  // ---------- Black Points Analyst: downside risks before anything is shortlisted ----------
+  const checked = d.all.filter((x) => x.blackPoints);
+  if (checked.length) {
+    const PL: Record<string, string> = { swing: "Swing", positional: "Positional" };
+    const st = (x: Decision, p: "swing" | "positional") => x.blackPoints!.status[p] ?? "–";
+    const blocked = checked.filter((x) => Object.values(x.blackPoints!.status).some((s) => s !== "Eligible"));
+    const excluded = checked.filter((x) => Object.values(x.blackPoints!.status).includes("Excluded"));
+    const review = checked.filter((x) => Object.values(x.blackPoints!.status).includes("Needs Review"));
+    bus.send("Research", "BlackPoints",
+      `Black Points Analyst, ${plural(checked.length, "stock")} passed the Momentum or Trend scan. Before Decision Agent shortlists any of them, check each for structural decline, sector pressure, company weakness, governance problems and events inside the holding period.`,
+      { tickers: names(checked).slice(0, 12) });
+    bus.send("BlackPoints", "Research",
+      `On it. What I can check this run:\n${(d.bpCoverage ?? []).map((c) => `• ${c}`).join("\n")}\nA finding counts as verified only when a primary source backs it; headlines alone put a stock in Needs Review.`);
+    const top = (x: Decision) => x.blackPoints!.findings.filter((f) => f.materiality === "material").sort((a, b) => (a.verification === "verified" ? -1 : 1) - (b.verification === "verified" ? -1 : 1))[0];
+    bus.send("BlackPoints", "Decision",
+      `Risk report for ${plural(checked.length, "stock")}: ${checked.length - blocked.length} eligible, ${excluded.length} excluded on verified evidence, ${review.length} need review.` +
+      (blocked.length ? " Details for the flagged ones follow." : " No material red flags in this group."),
+      { kind: "report", tickers: names(blocked), table: {
+        columns: ["Symbol", "Sector · subsector", "Passed scan", "Red flag", "Scope", "Swing", "Positional", "Evidence"],
+        rows: [...blocked, ...checked.filter((x) => !blocked.includes(x))].slice(0, 14).map((x) => {
+          const f = top(x), e = f?.evidence[0];
+          return [x.symbol, `${x.blackPoints!.sector}${x.blackPoints!.subsector ? ` · ${x.blackPoints!.subsector}` : ""}`,
+            Object.keys(x.blackPoints!.passed).map((p) => PL[p]).join(" + "), f ? `${f.flag} (${f.verification})` : "None material", f?.scope ?? "–",
+            st(x, "swing"), st(x, "positional"), e ? `${e.source}${e.date ? `, ${e.date}` : ""}` : "–"];
+        }),
+      } });
+    for (const x of blocked.slice(0, 4)) {
+      const bp = x.blackPoints!;
+      const fs = bp.findings.filter((f) => f.materiality === "material" && Object.values(f.impact).some((s) => s !== "Eligible"));
+      bus.send("BlackPoints", "Decision",
+        `${x.symbol} (${bp.sector}${bp.subsector ? `, ${bp.subsector}` : ""}). Passed the scan: ${Object.values(bp.passed).join(" | ")}.\n` +
+        fs.map((f) => `• ${f.flag}: ${f.scope === "Sector" ? "affects the whole sector" : "affects the company"}, ${f.verification}. ${f.note}\n  Evidence: ${f.evidence.slice(0, 2).map((e) => `${e.summary} (${e.source}${e.date ? `, ${e.date}` : ""})`).join("; ")}`).join("\n") +
+        `\nSuggested: ${Object.entries(bp.status).map(([p, s]) => `${PL[p]} ${s}`).join(", ")}. Source links are in the Flagged Stocks tab.`,
+        { tickers: [x.symbol] });
+    }
+    bus.send("Decision", "BlackPoints",
+      blocked.length
+        ? `Applied. ${excluded.length ? `${list(names(excluded))} ${excluded.length === 1 ? "is" : "are"} excluded from the affected shortlists. ` : ""}${review.length ? `${list(names(review))} ${review.length === 1 ? "is" : "are"} held out pending review. ` : ""}A strong technical score or a vote from the scanners can't override this. They stay visible in the Flagged Stocks tab with your evidence.`
+        : "Thanks. Everything you checked is eligible; I'll shortlist on the scores.",
+      { tickers: names(blocked) });
+  }
 
   // ---------- Step 5: portfolio review ----------
   bus.stage = "debate";

@@ -141,6 +141,8 @@ export interface Analysis {
   chart?: ChartAnalysis;
   /** Research desk: Performance, Valuation and Growth Agents (top candidates only). */
   desk?: ResearchDesk;
+  /** Black Points Analyst's downside-risk report (stocks that passed a scan). */
+  blackPoints?: BPReport;
 }
 
 export type DeskAgent = "Performance" | "Valuation" | "Growth" | "Profitability" | "Seasonal" | "Entry" | "RedFlag";
@@ -197,6 +199,57 @@ export interface ResearchDesk {
   source: string;
 }
 
+// ---------- Black Points Analyst ----------
+
+export type HoldingPeriod = "swing" | "positional";
+export type BPStatus = "Eligible" | "Excluded" | "Needs Review";
+export type BPCategory = "Structural decline" | "Sector pressure" | "Company weakness" | "Governance & events" | "Evidence coverage";
+
+export interface BPEvidence {
+  summary: string;
+  /** Publication or period date (YYYY-MM-DD). */
+  date?: string;
+  source: string;
+  url?: string;
+  kind: "exchange filing" | "regulator" | "company financials" | "industry data" | "news" | "market data";
+}
+
+export interface BPFinding {
+  category: BPCategory;
+  flag: string;
+  scope: "Company" | "Sector";
+  /** Material findings decide the status; "watch" findings are reported only. */
+  materiality: "material" | "watch";
+  /** Verified needs a primary source (filing, regulator, company financials, industry data). */
+  verification: "verified" | "unverified" | "stale" | "conflicting" | "missing";
+  evidence: BPEvidence[];
+  /** Status this finding implies for each holding period it affects. */
+  impact: Partial<Record<HoldingPeriod, BPStatus>>;
+  note: string;
+}
+
+export interface BPReport {
+  symbol: string;
+  sector: string;
+  subsector?: string;
+  company?: string;
+  /** Why it passed the technical scan, per holding period. */
+  passed: Partial<Record<HoldingPeriod, string>>;
+  findings: BPFinding[];
+  status: Partial<Record<HoldingPeriod, BPStatus>>;
+  /** What the Decision Agent did with it. */
+  finalDecision?: string;
+  checkedAt: string;
+  sample: boolean;
+}
+
+export interface BPSummary {
+  coverage: string[];
+  /** Earliest SEBI order date read this run. */
+  sebiFrom?: string;
+  sample: boolean;
+}
+
 export interface Decision extends Analysis {
   verdict: Verdict;
   /** Set when a buy-rated stock was left out of the final picks (e.g. sector cap). */
@@ -207,7 +260,7 @@ export interface Decision extends Analysis {
   spark: number[]; // last ~60 closes
 }
 
-export type Person = "News" | "Volatility" | "Macro" | "Momentum" | "Trend" | "Research" | DeskAgent | "Decision";
+export type Person = "News" | "Volatility" | "Macro" | "Momentum" | "Trend" | "Research" | DeskAgent | "BlackPoints" | "Decision";
 export type AgentName = Person | "System";
 export type Stage = "scan" | "analyze" | "debate" | "decide";
 
@@ -357,6 +410,8 @@ export interface RunResult {
   watchlist: Decision[];
   all: Decision[];
   skipped: string[];
+  /** Black Points Analyst: what was checked this run. */
+  blackPoints?: BPSummary;
 }
 
 export interface RunRequest {

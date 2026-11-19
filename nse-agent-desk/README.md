@@ -76,6 +76,34 @@ Click any stock (table row, chip or chart point) to open it in a centred, nearly
 - **Header:** latest price and today's change, with the analysis entry price.
 - **Research, Forecast and Company** tabs beside the chart; **Full chart** hides them.
 
+## Black Points Analyst (downside risks)
+
+Reports to the Research Agent. Every stock that passed the Momentum Agent's scan (swing, 1-10 days) or the Trend Agent's scan (positional, ~1 month) is checked before the Decision Agent can shortlist it:
+
+1. The Research Agent sends the candidates to the Black Points Analyst.
+2. The analyst checks business outlook, sector conditions, financial health and near-term events.
+3. It sends the Decision Agent a structured report per stock and holding period.
+4. The Decision Agent applies it. A **verified material red flag** excludes the stock from the affected shortlist. **Missing, stale, conflicting or news-only evidence** puts it in **Needs Review** and holds it out of that shortlist. No technical score or agent vote can override either. A stock cleared for only one holding period is re-planned for that period.
+
+| Check | What counts |
+|---|---|
+| Structural decline | Revenue falling two years in a row (company statements); headlines about the product being replaced or demand shrinking |
+| Sector pressure | Sector-wide only when industry data (sector index lagging and down 5%+ over 3 months, or median peer revenue down 5%+) **and** at least two companies' disclosures (falling revenue or margins in their results, or pressure headlines) agree |
+| Company weakness | Debt repayment stress (debt/equity above 1.5 with interest cover below 2), poor cash flow (material only with interest cover below 3, since group accounts with a lending arm depress cash flow), revenue far below sector peers, customer losses, repeated project delays |
+| Governance & events | Auditor resignation, adverse audit opinion, regulatory orders or probes (SEBI orders read directly), exchange surveillance and heavy pledges (from the Red Flag Agent), results and ex-dividend dates inside the holding period (reported, don't change the status) |
+
+Each finding lists the stock's sector and subsector, why it passed the scan, the red flag and whether it hits the company or the whole sector, the evidence with its date, source and link, and the impact on each holding period (Eligible, Excluded or Needs Review).
+
+**Verification:** a finding is *verified* only with a primary source: an exchange filing, a SEBI order, the company's financial statements, the exchange surveillance list or sector index data. Headlines alone are *unverified*; headlines contradicted by the company's figures are *conflicting*; financials older than 18 months are *stale*. Banks, NBFCs and insurers skip the revenue and cash-flow tests.
+
+**Sources (live):** company statements and calendar from Yahoo Finance; the newest SEBI orders (Chairperson/Members, adjudication, settlement) from sebi.gov.in; Google News headlines from the last 180 days. **NSE and BSE block automated access**, so exchange filings are read from `.data/filings.json` if you add them:
+
+```json
+[{ "symbol": "ACME", "date": "2026-11-02", "title": "Resignation of Statutory Auditor", "url": "https://www.bseindia.com/..." }]
+```
+
+Set `BLACK_POINTS_STRICT=1` to also hold a stock for review when its news check could not run. Excluded and held stocks stay visible in the Screener's **Flagged Stocks** tab with the evidence and the final decision; the stock window shows the same report.
+
 ## Research Agent's chart check
 
 For the top candidates (at least 12), Research Agent reads five timeframes:

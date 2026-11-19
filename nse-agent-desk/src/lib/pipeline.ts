@@ -18,6 +18,7 @@ import { analyseSectors, applySectors, enrichSectors } from "./sectors";
 import { analyseMacro, applyMacro, loadMacro } from "./macro";
 import { registerSectors, sectorOf } from "./market/universe";
 import { runResearchDesk } from "./research-desk";
+import { runBlackPoints } from "./black-points";
 import type { RunRequest, RunResult, StreamEvent } from "./types";
 
 export async function runAnalysis(o: RunRequest, emit: (e: StreamEvent) => void): Promise<RunResult> {
@@ -62,10 +63,19 @@ export async function runAnalysis(o: RunRequest, emit: (e: StreamEvent) => void)
   // Research desk: Performance, Valuation and Growth Agents check the candidates for Research Agent.
   emit({ type: "progress", text: "Research desk: performance, valuation, growth, profitability, red flags…" });
   const desk = await runResearchDesk(candidates, { frames, funds, source, indexClose, sectorOf });
+  const withDesk = mubashir.applyDesk(first, desk);
+  // Black Points Analyst: downside risks for every stock that passed the Momentum or Trend scan.
+  emit({ type: "progress", text: "Black Points Analyst: checking filings, regulator orders and financial health…" });
+  const bp = await runBlackPoints(withDesk, { demo: source.kind === "demo", seed: source.seed ?? 0, frames, sectorOf, sectors });
+  const checked = withDesk.map((r) => (bp.reports[r.symbol] ? { ...r, blackPoints: bp.reports[r.symbol] } : r));
+  // Chart check: the original candidates plus the top stocks still eligible for a holding period,
+  // so stocks held out by the Black Points Analyst don't crowd out the ones that can be picked.
+  const eligible = checked.filter((r) => !r.blackPoints || Object.values(r.blackPoints.status).includes("Eligible"));
+  const chartSyms = [...new Set([...candidates, ...eligible.slice(0, Math.max(12, o.top * 2)).map((r) => r.symbol)])];
   emit({ type: "progress", text: "Checking charts…" });
-  const intraday = await loadIntraday(candidates, source, frames);
-  const charts = Object.fromEntries(candidates.map((s) => [s, analyseChart(frames[s], intraday[s]?.m30 ?? null, intraday[s]?.h1 ?? null)]));
-  const rows = mubashir.applyEntry(mubashir.applyCharts(mubashir.applyDesk(first, desk), charts));
+  const intraday = await loadIntraday(chartSyms, source, frames);
+  const charts = Object.fromEntries(chartSyms.map((s) => [s, analyseChart(frames[s], intraday[s]?.m30 ?? null, intraday[s]?.h1 ?? null)]));
+  const rows = mubashir.applyEntry(mubashir.applyCharts(checked, charts));
   const fd = new DecisionAgent();
   const conflicted = fd.conflicted(rows, o.top);
   const clarifications = Object.fromEntries(conflicted.map((r) => [r.symbol, mubashir.adviseOnConflict(r)]));
@@ -78,13 +88,13 @@ export async function runAnalysis(o: RunRequest, emit: (e: StreamEvent) => void)
     aiLabel: llm.enabled ? `on (${aiModel()})` : "off",
     capital: o.capital, riskPerTrade: o.riskPerTrade,
     macro, sectors: sectorViews, excluded, minCapCr, news, vix, positive: morning.positive(news), negative: morning.negative(news),
-    snaps, lot, may, rows, conflicted, clarifications, picks, passed, watchlist,
+    snaps, lot, may, rows, conflicted, clarifications, picks, passed, watchlist, all, bpCoverage: bp.summary.coverage,
   });
 
   const result: RunResult = {
     source, generatedAt: new Date().toISOString(), simulatedAgents: !llm.enabled,
     capital: o.capital, riskPerTrade: o.riskPerTrade,
-    indexRet21d: Math.round(indexRet21d * 100) / 100, news, vix, excluded, minCapCr, sectors: sectorViews, macro, picks, watchlist, all, skipped,
+    indexRet21d: Math.round(indexRet21d * 100) / 100, news, vix, blackPoints: bp.summary, excluded, minCapCr, sectors: sectorViews, macro, picks, watchlist, all, skipped,
   };
   emit({ type: "result", result });
   console.log(`[nse-agent-desk] run: ${rows.length} stocks, source=${source.kind}${source.seed !== undefined ? `#${source.seed}` : ""}, ` +

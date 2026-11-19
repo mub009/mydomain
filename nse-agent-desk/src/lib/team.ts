@@ -14,6 +14,7 @@ export const TEAM: Record<Person, { name: string; title: string; focus: string; 
   Seasonal: { name: "Seasonality Agent", title: "Seasonal trends & dividends", focus: "Reports to Research Agent", color: "#EAB308", lead: "Research" },
   RedFlag: { name: "Red Flag Agent", title: "ASM, GSM, pledge, tips, default risk", focus: "Reports to Research Agent", color: "#EF4444", lead: "Research" },
   Entry: { name: "Entry Point Agent", title: "Fundamentals + technicals entry", focus: "Reports to Research Agent", color: "#0EA5E9", lead: "Research" },
+  BlackPoints: { name: "Black Points Analyst", title: "Downside risks · filings & evidence", focus: "Reports to Research Agent", color: "#52525B", lead: "Research" },
   Decision: { name: "Decision Agent", title: "Final picks & portfolio rules", focus: "Verdicts, sector cap, sizing", color: "#F59E0B" },
 };
 
@@ -41,5 +42,7 @@ export const THREADS: { id: string; title: string; members: Person[] }[] = [
   { id: "Macro|Research", title: "Macro Agent & Research Agent", members: ["Macro", "Research"] },
   { id: "Research|Volatility", title: "Volatility Agent & Research Agent", members: ["Volatility", "Research"] },
   { id: "desk", title: "Research desk", members: ["Research", "Performance", "Valuation", "Growth", "Profitability", "Seasonal", "RedFlag", "Entry"] },
+  { id: "BlackPoints|Research", title: "Research Agent & Black Points Analyst", members: ["Research", "BlackPoints"] },
+  { id: "BlackPoints|Decision", title: "Black Points Analyst & Decision Agent", members: ["BlackPoints", "Decision"] },
   { id: "Decision|Research", title: "Research Agent & Decision Agent", members: ["Research", "Decision"] },
 ];

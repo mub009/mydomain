@@ -1,4 +1,4 @@
-import { Activity, CalendarRange, Crosshair, Flag, Gauge, PiggyBank, Globe2, IndianRupee, Microscope, Newspaper, Scale, Sprout, TrendingUp, Zap, type LucideIcon } from "lucide-react";
+import { Activity, CalendarRange, ShieldAlert, Crosshair, Flag, Gauge, PiggyBank, Globe2, IndianRupee, Microscope, Newspaper, Scale, Sprout, TrendingUp, Zap, type LucideIcon } from "lucide-react";
 import { TEAM } from "@/lib/team";
 import type { AgentName, Person } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -19,6 +19,7 @@ export const AGENT_ICON: Record<Person, LucideIcon> = {
   Seasonal: CalendarRange, // seasonal months, quarters, dividends
   RedFlag: Flag,         // ASM / GSM, pledge, tips, default risk
   Entry: Crosshair,      // where to enter
+  BlackPoints: ShieldAlert, // downside risks
   Decision: Scale,       // weighs and decides
 };
 

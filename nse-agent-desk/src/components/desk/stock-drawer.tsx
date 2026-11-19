@@ -10,6 +10,7 @@ import { findStock, useDesk } from "@/store/desk";
 import { AgentAvatar } from "./agent-avatar";
 import { ChartCheck } from "./chart-check";
 import { ResearchDeskSection } from "./desk-ui";
+import { BlackPointsSection } from "./black-points-ui";
 import { FundamentalsCard } from "./fundamentals";
 import { TrackTradeButton } from "./positions-ui";
 import { CompanyTab } from "./company-tab";
@@ -84,6 +85,7 @@ function Body({ d, isPick }: { d: Decision; isPick: boolean }) {
       </dl>
       <p className="text-[11.5px] leading-snug text-muted-foreground">Research scenario, not guaranteed prices. Target = entry + 2 × (entry − stop-loss), a {pct((d.target / d.entry - 1) * 100)} move.{d.quantity !== undefined && ` Sized at ${d.quantity} shares (${inr(d.investment ?? 0, 0)}).`}</p>
 
+      {d.blackPoints && <BlackPointsSection bp={d.blackPoints} />}
       <div className="space-y-2.5">
         <ScoreBar label="Combined score" value={d.combined} color="var(--primary)" />
         <ScoreBar label="Momentum Agent · short-term" value={d.lotappi} color={TEAM.Momentum.color} />

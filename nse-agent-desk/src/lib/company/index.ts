@@ -136,7 +136,7 @@ async function newCrumb() {
 }
 
 /** Yahoo quoteSummary with the shared session; retries once with a fresh session if it was rejected. */
-async function quoteSummary(symbol: string, modules: string) {
+export async function quoteSummary(symbol: string, modules: string) {
   for (const fresh of [false, true]) {
     const c = await yahooCrumb(fresh);
     const url = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(yahooSymbol(symbol))}?modules=${modules}&crumb=${encodeURIComponent(c.crumb)}`;
