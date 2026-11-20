@@ -136,10 +136,11 @@ async function newCrumb() {
 }
 
 /** Yahoo quoteSummary with the shared session; retries once with a fresh session if it was rejected. */
-export async function quoteSummary(symbol: string, modules: string) {
+/** Yahoo quoteSummary. NSE symbols get ".NS" added; pass `raw` for any other Yahoo symbol (AAPL, 7203.T). */
+export async function quoteSummary(symbol: string, modules: string, raw = false) {
   for (const fresh of [false, true]) {
     const c = await yahooCrumb(fresh);
-    const url = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(yahooSymbol(symbol))}?modules=${modules}&crumb=${encodeURIComponent(c.crumb)}`;
+    const url = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(raw ? symbol : yahooSymbol(symbol))}?modules=${modules}&crumb=${encodeURIComponent(c.crumb)}`;
     const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0", cookie: c.cookie }, signal: AbortSignal.timeout(10000) });
     if (res.ok) return (await res.json())?.quoteSummary?.result?.[0];
     if (res.status !== 401 && res.status !== 403) throw new Error(`HTTP ${res.status}`);

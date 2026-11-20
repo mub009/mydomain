@@ -1,6 +1,6 @@
 "use client";
 
-import { Briefcase, CandlestickChart, LayoutDashboard, MessagesSquare, Moon, SlidersHorizontal, Sun } from "lucide-react";
+import { Briefcase, CandlestickChart, Globe2, LayoutDashboard, MessagesSquare, Moon, SlidersHorizontal, Sun } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
@@ -21,6 +21,7 @@ const NAV = [
   { href: "/chat", label: "Team Chat", Icon: MessagesSquare },
   { href: "/screener", label: "Screener", Icon: SlidersHorizontal },
   { href: "/positions", label: "Positions", Icon: Briefcase },
+  { href: "/markets", label: "Markets", Icon: Globe2 },
 ];
 
 export function Logo() {
@@ -120,7 +121,7 @@ function MobileBars() {
         <b className="text-sm font-bold">NSE Agent Desk</b>
         <div className="ml-auto flex items-center gap-2"><MarketStatusBadge className="h-7 border-sidebar-border bg-sidebar-hover px-2 text-[11px] text-white [&>span:last-child]:hidden min-[420px]:[&>span:last-child]:inline" /><AlertsBell className="border-sidebar-border bg-sidebar-hover text-white" /><ThemeToggle className="border-sidebar-border bg-sidebar-hover text-white" /></div>
       </header>
-      <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t bg-card pb-[env(safe-area-inset-bottom)] lg:hidden" aria-label="Main">
+      <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t bg-card pb-[env(safe-area-inset-bottom)] lg:hidden" aria-label="Main">
         {NAV.map(({ href, label, Icon }) => {
           const on = pathname === href;
           return (

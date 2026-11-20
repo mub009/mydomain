@@ -19,6 +19,7 @@ import { analyseMacro, applyMacro, loadMacro } from "./macro";
 import { registerSectors, sectorOf } from "./market/universe";
 import { runResearchDesk } from "./research-desk";
 import { runBlackPoints } from "./black-points";
+import { globalCues, worldQuotes } from "./world";
 import { nseMarketMood, nseMcpEnabled } from "./nse-mcp/client";
 import type { RunRequest, RunResult, StreamEvent } from "./types";
 
@@ -80,6 +81,8 @@ export async function runAnalysis(o: RunRequest, emit: (e: StreamEvent) => void)
   const intraday = await loadIntraday(chartSyms, source, frames);
   const charts = Object.fromEntries(chartSyms.map((s) => [s, analyseChart(frames[s], intraday[s]?.m30 ?? null, intraday[s]?.h1 ?? null)]));
   const rows = mubashir.applyEntry(mubashir.applyCharts(checked, charts));
+  // Macro Agent's global cues: the main world indices (live runs only).
+  const cues = source.kind !== "demo" ? await worldQuotes().then(globalCues).catch(() => null) : null;
   const fd = new DecisionAgent();
   const conflicted = fd.conflicted(rows, o.top);
   const clarifications = Object.fromEntries(conflicted.map((r) => [r.symbol, mubashir.adviseOnConflict(r)]));
@@ -92,7 +95,7 @@ export async function runAnalysis(o: RunRequest, emit: (e: StreamEvent) => void)
     aiLabel: llm.enabled ? `on (${aiModel()})` : "off",
     capital: o.capital, riskPerTrade: o.riskPerTrade,
     macro, sectors: sectorViews, excluded, minCapCr, news, vix, positive: morning.positive(news), negative: morning.negative(news),
-    snaps, lot, may, rows, conflicted, clarifications, picks, passed, watchlist, all, bpCoverage: bp.summary.coverage,
+    snaps, lot, may, rows, conflicted, clarifications, picks, passed, watchlist, all, bpCoverage: bp.summary.coverage, globalCues: cues,
   });
 
   const result: RunResult = {

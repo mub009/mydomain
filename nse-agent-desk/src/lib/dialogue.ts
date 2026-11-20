@@ -68,6 +68,8 @@ export interface DialogueInput {
   all: Decision[];
   /** What the Black Points Analyst could check this run. */
   bpCoverage?: string[];
+  /** Latest moves of the main world indices (live runs). */
+  globalCues?: string | null;
   passed: Decision[];
   watchlist: Decision[];
 }
@@ -171,6 +173,11 @@ export async function runDialogue(bus: MessageBus, llm: LLM, d: DialogueInput) {
     kind: "report", table: reportTable(d.may.slice(0, 5)), tickers: names(d.may.slice(0, 5)),
     aiNote: await note("Trend", "In 3-4 short lines, explain your best 1-month picks and the main risk, speaking to your colleague Research Agent.", d.may.slice(0, 5)),
   });
+
+  // ---------- Macro Agent: global markets ----------
+  if (d.globalCues) {
+    bus.send("Macro", "Research", `Global cues first: ${d.globalCues} in their latest sessions. Large overnight moves abroad often show up in the Nifty's opening; the Markets page has every country's index.`);
+  }
 
   // ---------- Macro Agent: gold, crude, USD/INR → Research Agent (before his analysis) ----------
   if (d.macro && d.macro.factors.length) {

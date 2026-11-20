@@ -58,6 +58,17 @@ Seven sub-agents report to the Research Agent on the top candidates (at least 12
 
 Anything that couldn't be checked is shown as "not checked", never as clear.
 
+## Markets: world indices and upcoming events
+
+The **Markets** page has two tabs:
+
+- **World indices:** the main stock index of 35 markets across India, Asia-Pacific, Europe, the Americas and the Middle East & Africa. Each shows the level, today's and 1-month change, a 1-month line, and whether that market is open now with its local time. Delayed quotes from Yahoo Finance, refreshed every 2 minutes. (Saudi Arabia's TASI and Pakistan's KSE 100 aren't available from Yahoo.)
+- **Upcoming events (next 4 months):** results dates, ex-dividend dates and dividend payment dates, for Indian stocks (your current run, or the built-in lists) and 25 of the world's largest companies. **Confirmed** dates are ones the company has announced (Yahoo Finance company calendar). **Expected** dates are projected: Indian dividends from last year's ex-dates in NSE's official corporate actions, global ones from Yahoo's dividend history, and results from the quarterly cycle when the next date isn't announced. Filter by India/Global, results/dividends, or confirmed only; click an Indian stock to open it with the agents' research.
+
+The Macro Agent also opens its report with the latest moves of the S&P 500, Nasdaq, Nikkei, Hang Seng and DAX.
+
+Central-bank meetings (Fed, RBI, ECB) aren't included: their websites aren't reachable from the cloud sandbox this was built in.
+
 ## Search any NSE stock
 
 The search box at the top of every page (press **/** to jump to it) finds any NSE-listed company by name or symbol. Pick one and it opens in the stock window with the agents' full research on live data, even if it isn't in your current run and you haven't run an analysis:
