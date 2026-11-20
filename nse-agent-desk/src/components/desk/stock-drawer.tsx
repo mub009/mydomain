@@ -1,12 +1,12 @@
 "use client";
 
-import { AlertTriangle, Check, Maximize2, Minimize2, X } from "lucide-react";
+import { AlertTriangle, Check, Loader2, Maximize2, Minimize2, X } from "lucide-react";
 import { Dialog } from "radix-ui";
 import { inr, pct } from "@/lib/format";
 import { TEAM } from "@/lib/team";
 import type { Decision, Person } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { findStock, useDesk } from "@/store/desk";
+import { findStock, useDesk, useStockResult } from "@/store/desk";
 import { AgentAvatar } from "./agent-avatar";
 import { ChartCheck } from "./chart-check";
 import { ResearchDeskSection } from "./desk-ui";
@@ -72,9 +72,9 @@ function AgentView({ who, score, reasons, warnings, children }: { who: Person; s
 }
 
 function Body({ d, isPick }: { d: Decision; isPick: boolean }) {
-  const sectors = useDesk((s) => s.result?.sectors);
+  const sectors = useStockResult()?.sectors;
   const sector = sectors?.find((s) => s.sector === d.sector);
-  const macroFactors = useDesk((s) => s.result?.macro?.factors ?? []);
+  const macroFactors = useStockResult()?.macro?.factors ?? [];
   return (
     <div className="flex-1 space-y-4 overflow-y-auto px-5 pb-6 pt-1 scroll-thin">
 
@@ -128,7 +128,10 @@ function Body({ d, isPick }: { d: Decision; isPick: boolean }) {
  */
 export function StockDrawer() {
   const symbol = useDesk((s) => s.drawerSymbol);
-  const result = useDesk((s) => s.result);
+  const result = useStockResult();
+  const currentRun = useDesk((s) => s.result);
+  const lookup = useDesk((s) => s.lookup);
+  const searchStock = useDesk((s) => s.searchStock);
   const openStock = useDesk((s) => s.openStock);
   const d = findStock(result, symbol);
   const [tab, setTab] = useState("research");
@@ -137,9 +140,32 @@ export function StockDrawer() {
   const demo = result?.source.kind === "demo";
   const quote = useQuote(d?.symbol);
   return (
-    <Dialog.Root open={Boolean(d)} onOpenChange={(o) => { if (!o) { openStock(null); setWide(false); } }}>
+    <Dialog.Root open={Boolean(d) || Boolean(lookup && lookup.symbol === symbol)} onOpenChange={(o) => { if (!o) { openStock(null); setWide(false); } }}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-[rgb(8_12_28/0.62)] backdrop-blur-sm" />
+        {!d && lookup && (
+          <Dialog.Content className="card fixed left-1/2 top-1/2 z-50 w-[min(520px,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 p-6 outline-none">
+            <div className="flex items-start gap-3">
+              <div className="min-w-0 flex-1">
+                <Dialog.Title className="text-xl font-extrabold tracking-tight">{lookup.symbol}</Dialog.Title>
+                <Dialog.Description className="text-[13px] text-muted-foreground">{lookup.name ?? "NSE stock"}</Dialog.Description>
+              </div>
+              <Dialog.Close aria-label="Close" className="btn-3d grid size-9 place-items-center rounded-full text-muted-foreground hover:text-foreground"><X className="size-4" /></Dialog.Close>
+            </div>
+            {lookup.loading ? (
+              <div className="mt-5 space-y-3" aria-live="polite">
+                <p className="flex items-center gap-2 text-[14px] font-semibold"><Loader2 className="size-4 animate-spin text-primary" />The agents are researching {lookup.symbol}…</p>
+                <p className="text-[12.5px] leading-relaxed text-muted-foreground">Loading live prices, financials, news, SEBI orders and its sector peers, then running the scanners, the research desk, the chart check and the Black Points Analyst. This takes about 15 seconds.</p>
+                <div className="h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full w-1/3 animate-[lookup-bar_1.4s_ease-in-out_infinite] rounded-full bg-primary" /></div>
+              </div>
+            ) : (
+              <div className="mt-5 space-y-3" role="alert">
+                <p className="text-[13.5px] font-semibold text-neg">{lookup.error}</p>
+                <button type="button" onClick={() => searchStock(lookup.symbol, { name: lookup.name })} className="btn-3d inline-flex h-9 items-center gap-1.5 rounded-xl px-3 text-[13px] font-semibold">Try again</button>
+              </div>
+            )}
+          </Dialog.Content>
+        )}
         {d && (
           <Dialog.Content
             className="card fixed inset-0 z-50 flex flex-col overflow-hidden rounded-none outline-none sm:inset-[2.5vh_2vw] sm:rounded-[22px]"
@@ -153,6 +179,7 @@ export function StockDrawer() {
                 <Dialog.Description className="text-[12.5px] text-muted-foreground">
                   {d.sector} · NSE{d.fundamentals?.marketCapCr ? ` · ${d.fundamentals.cap} cap ₹${d.fundamentals.marketCapCr.toLocaleString("en-IN")} Cr` : ""}
                   {demo ? " · analysis on demo prices; the chart shows real prices" : " · live data, end of day"}
+                  {result && result !== currentRun ? " · analysed on its own with its sector peers" : ""}
                 </Dialog.Description>
               </div>
               <div className="tnum">

@@ -101,11 +101,17 @@ function finding(f: Omit<BPFinding, "impact">, periods: HoldingPeriod[]): BPFind
   return { ...f, impact: Object.fromEntries(periods.map((p) => [p, s])) };
 }
 
-export function investigate(row: Analysis, ev: StockEvidence, ctx: BPContext): BPReport {
+export function investigate(row: Analysis, ev: StockEvidence, ctx: BPContext, onRequest = false): BPReport {
   const periods: HoldingPeriod[] = [];
   const passed: BPReport["passed"] = {};
   if (row.lotappi >= 60) { periods.push("swing"); passed.swing = `Momentum Agent scored it ${row.lotappi.toFixed(0)}: ${row.lotReasons.slice(0, 2).join("; ") || "short-term momentum"}`; }
   if (row.mayavi >= 60) { periods.push("positional"); passed.positional = `Trend Agent scored it ${row.mayavi.toFixed(0)}: ${row.mayReasons.slice(0, 2).join("; ") || "1-month trend"}`; }
+  // Searched stock that passed neither scan: checked on request for both periods.
+  if (onRequest && !periods.length) {
+    periods.push("swing", "positional");
+    passed.swing = `Did not pass the Momentum scan (score ${row.lotappi.toFixed(0)}); checked because you searched for it`;
+    passed.positional = `Did not pass the Trend scan (score ${row.mayavi.toFixed(0)}); checked because you searched for it`;
+  }
   const sector = ctx.sectorOf(row.symbol);
   const financial = FINANCIAL.has(sector);
   const findings: BPFinding[] = [];

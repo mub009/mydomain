@@ -12,7 +12,7 @@ import type { PositionAlert, Severity } from "@/lib/positions/types";
 import { TEAM } from "@/lib/team";
 import type { Decision } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { useDesk } from "@/store/desk";
+import { useDesk, useStockResult } from "@/store/desk";
 import { usePositions } from "@/store/positions";
 import { AgentAvatar } from "./agent-avatar";
 
@@ -78,7 +78,7 @@ export function AlertsBell({ className }: { className?: string }) {
 
 /** "Track this trade": record what you bought so the agents can follow it up. */
 export function TrackTradeButton({ d, size = "sm", className }: { d: Decision; size?: "sm" | "default"; className?: string }) {
-  const source = useDesk((s) => s.result?.source.kind);
+  const source = useStockResult()?.source.kind;
   const add = usePositions((s) => s.add);
   const tracked = usePositions((s) => s.positions.some((p) => p.status === "open" && p.symbol === d.symbol));
   const [open, setOpen] = useState(false);

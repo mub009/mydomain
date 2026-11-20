@@ -141,3 +141,17 @@ describe("Black Points in a run", () => {
     expect(bp.at(-1)).toMatchObject({ sender: "Decision", to: "BlackPoints" });
   });
 });
+
+describe("single-stock search", () => {
+  it("researches the searched stock in full even when it ranks low", async () => {
+    const symbols = ALL_CAPS.slice(0, 30);
+    const first = await runAnalysis({ symbols, top: 5, demo: true, aiNotes: false, riskPerTrade: 1 }, () => {});
+    const low = [...first.all].sort((a, b) => a.combined - b.combined)[0].symbol;
+    const r = await runAnalysis({ symbols, top: 5, demo: true, aiNotes: false, riskPerTrade: 1, focus: [low] }, () => {});
+    const d = r.all.find((x) => x.symbol === low)!;
+    expect(d.desk).toBeDefined();
+    expect(d.chart).toBeDefined();
+    expect(d.blackPoints).toBeDefined();
+    expect(Object.keys(d.blackPoints!.status).length).toBeGreaterThan(0);
+  });
+});

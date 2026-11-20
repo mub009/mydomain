@@ -59,14 +59,15 @@ export async function runAnalysis(o: RunRequest, emit: (e: StreamEvent) => void)
   const macroData = await loadMacro(source.kind === "demo", source.seed);
   const macro = macroData ? analyseMacro(frames, macroData.series, macroData.sample) : null;
   const first = applySectors(mubashir.applyFundamentals(applyMacro(mubashir.analyse(lot, may, snaps), macro), funds), sectors);
-  const candidates = first.slice(0, Math.max(12, o.top * 2)).map((r) => r.symbol);
+  const focus = (o.focus ?? []).filter((s) => frames[s]);
+  const candidates = [...new Set([...focus, ...first.slice(0, Math.max(12, o.top * 2)).map((r) => r.symbol)])];
   // Research desk: Performance, Valuation and Growth Agents check the candidates for Research Agent.
   emit({ type: "progress", text: "Research desk: performance, valuation, growth, profitability, red flags…" });
   const desk = await runResearchDesk(candidates, { frames, funds, source, indexClose, sectorOf });
   const withDesk = mubashir.applyDesk(first, desk);
   // Black Points Analyst: downside risks for every stock that passed the Momentum or Trend scan.
   emit({ type: "progress", text: "Black Points Analyst: checking filings, regulator orders and financial health…" });
-  const bp = await runBlackPoints(withDesk, { demo: source.kind === "demo", seed: source.seed ?? 0, frames, sectorOf, sectors });
+  const bp = await runBlackPoints(withDesk, { demo: source.kind === "demo", seed: source.seed ?? 0, frames, sectorOf, sectors, focus });
   const checked = withDesk.map((r) => (bp.reports[r.symbol] ? { ...r, blackPoints: bp.reports[r.symbol] } : r));
   // Chart check: the original candidates plus the top stocks still eligible for a holding period,
   // so stocks held out by the Black Points Analyst don't crowd out the ones that can be picked.

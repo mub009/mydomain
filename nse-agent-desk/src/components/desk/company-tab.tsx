@@ -7,7 +7,7 @@ import type { CompanyReport, PeerRow, Quality, QualityCheck, Ratios } from "@/li
 import { inr } from "@/lib/format";
 import type { Decision } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { useDesk } from "@/store/desk";
+import { useDesk, useStockResult } from "@/store/desk";
 import { AgentAvatar } from "./agent-avatar";
 import { CapTag, EpsGrowth } from "./fundamentals";
 import { VerdictBadge } from "./primitives";
@@ -35,7 +35,7 @@ function Section({ title, children, right }: { title: string; children: React.Re
 const cache = new Map<string, { report: CompanyReport; peers: PeerRow[] }>();
 
 export function CompanyTab({ d }: { d: Decision }) {
-  const result = useDesk((s) => s.result);
+  const result = useStockResult();
   const openStock = useDesk((s) => s.openStock);
   const demo = result?.source.kind === "demo";
   const seed = result?.source.seed ?? 0;

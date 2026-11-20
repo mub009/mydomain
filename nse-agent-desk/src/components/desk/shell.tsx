@@ -14,6 +14,7 @@ import { AgentAvatar, PRESENCE_TEXT } from "./agent-avatar";
 import { MarketStatusBadge, TypingIndicator } from "./primitives";
 import { AlertsBell, AlertToasts } from "./positions-ui";
 import { StockDrawer } from "./stock-drawer";
+import { StockFinder } from "./stock-finder";
 
 const NAV = [
   { href: "/", label: "Overview", Icon: LayoutDashboard },
@@ -167,6 +168,7 @@ export function PageHeader({ title, subtitle, children }: { title: string; subti
         <h1 className="title-3d text-2xl font-extrabold tracking-tight">{title}</h1>
         <p className="hidden text-[13px] text-muted-foreground sm:block">{subtitle}</p>
       </div>
+      <StockFinder className="order-last w-full md:order-none md:ml-auto md:w-72 xl:w-80" />
       <div className="flex items-center gap-2">
         {children}
         <MarketStatusBadge className="hidden lg:inline-flex" />

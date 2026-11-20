@@ -8,7 +8,7 @@ import type { Forecast } from "@/lib/forecast";
 import { inr, pct } from "@/lib/format";
 import type { Decision } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { useDesk } from "@/store/desk";
+import { useDesk, useStockResult } from "@/store/desk";
 import { AgentAvatar } from "./agent-avatar";
 
 const cache = new Map<string, Forecast>();
@@ -30,7 +30,7 @@ function Tip({ active, payload }: { active?: boolean; payload?: { payload: Forec
 }
 
 export function ForecastTab({ d }: { d: Decision }) {
-  const result = useDesk((s) => s.result);
+  const result = useStockResult();
   const demo = result?.source.kind === "demo", seed = result?.source.seed ?? 0;
   const [horizon, setHorizon] = useState<10 | 21>(d.horizon.startsWith("Swing ·") ? 10 : 21);
   const key = `${d.symbol}:${horizon}:${demo}:${seed}:${d.stopLoss}:${d.target}`;

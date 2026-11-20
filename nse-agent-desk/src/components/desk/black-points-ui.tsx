@@ -80,7 +80,7 @@ export function BlackPointsSection({ bp }: { bp: BPReport }) {
       </div>
       <dl className="space-y-0.5 text-[12px]">
         {(Object.entries(bp.passed) as [HoldingPeriod, string][]).map(([p, why]) => (
-          <div key={p}><dt className="inline font-semibold">Passed for {PERIOD[p]}: </dt><dd className="inline text-muted-foreground">{why}</dd></div>
+          <div key={p}><dt className="inline font-semibold">{why.startsWith("Did not pass") ? "Checked" : "Passed"} for {PERIOD[p]}: </dt><dd className="inline text-muted-foreground">{why}</dd></div>
         ))}
       </dl>
       {material.length ? <ul className="space-y-2">{material.map((f, i) => <Finding key={i} f={f} />)}</ul>

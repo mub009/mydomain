@@ -58,6 +58,15 @@ Seven sub-agents report to the Research Agent on the top candidates (at least 12
 
 Anything that couldn't be checked is shown as "not checked", never as clear.
 
+## Search any NSE stock
+
+The search box at the top of every page (press **/** to jump to it) finds any NSE-listed company by name or symbol. Pick one and it opens in the stock window with the agents' full research on live data, even if it isn't in your current run and you haven't run an analysis:
+
+- The stock is analysed together with up to 9 peers from its sector (topped up with Nifty 50 leaders), so the sector check, valuation medians and relative strength have something to compare with. This takes a few seconds; a stock you've already opened reopens instantly.
+- It always gets the research desk, the 5-timeframe chart check and the Black Points Analyst, even if it didn't pass a scan (the report says it was checked on request).
+- If it can't be analysed, the window says why: market cap below the ₹300 Cr minimum, too little price history (new listings), or a symbol Yahoo Finance doesn't know.
+- A stock that is in your current run opens from that run instead.
+
 ## My Stocks: search and groups
 
 Choose **My Stocks** in the Universe control to analyse your own group (3 to 150 stocks):

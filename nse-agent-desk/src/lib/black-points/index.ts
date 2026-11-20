@@ -30,8 +30,10 @@ function demoEvidence(symbol: string, seed: number, today: string): { news: News
 export async function runBlackPoints(rows: Analysis[], o: {
   demo: boolean; seed: number; frames: Record<string, Bar[]>; sectorOf: (s: string) => string;
   sectors: { sector: string; state: string; ret3m: number; sourceLabel?: string }[];
+  /** Also check these (single-stock search), even if they didn't pass a scan. */
+  focus?: string[];
 }): Promise<{ reports: Record<string, BPReport>; summary: BPSummary }> {
-  const candidates = rows.filter(passedScan);
+  const candidates = rows.filter((r) => passedScan(r) || o.focus?.includes(r.symbol));
   const anyBars = Object.values(o.frames)[0];
   const today = anyBars?.[anyBars.length - 1]?.date ?? new Date().toISOString().slice(0, 10);
   const strict = process.env.BLACK_POINTS_STRICT === "1";
@@ -79,7 +81,7 @@ export async function runBlackPoints(rows: Analysis[], o: {
       // SEBI orders naming the company (names under 6 letters are too ambiguous to match)
       sebi: name.length >= 6 ? sebi.orders.filter((x) => x.date >= yearAgo && x.title.toLowerCase().includes(name)) : [],
     };
-    reports[r.symbol] = investigate(r, ev, ctx);
+    reports[r.symbol] = investigate(r, ev, ctx, o.focus?.includes(r.symbol));
   });
 
   const coverage = o.demo ? ["Demo mode: financials, headlines and filings are samples."] : [

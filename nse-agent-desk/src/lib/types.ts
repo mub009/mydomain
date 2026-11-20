@@ -423,6 +423,8 @@ export interface RunRequest {
   riskPerTrade: number;
   /** Sectors for searched stocks outside the built-in lists. */
   sectors?: Record<string, string>;
+  /** Stocks to research in full whatever their rank (single-stock search). */
+  focus?: string[];
 }
 
 export type StreamEvent =
