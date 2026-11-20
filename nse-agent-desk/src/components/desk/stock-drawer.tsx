@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, Check, Loader2, Maximize2, Minimize2, X } from "lucide-react";
+import { AlertTriangle, Check, Loader2, Maximize2, Minimize2, Search, X } from "lucide-react";
 import { Dialog } from "radix-ui";
 import { inr, pct } from "@/lib/format";
 import { TEAM } from "@/lib/team";
@@ -17,6 +17,7 @@ import { CompanyTab } from "./company-tab";
 import { ForecastTab } from "./forecast-tab";
 import { SectorCheck } from "./sector-ui";
 import { MacroExposureSection } from "./macro-ui";
+import { StockFinder } from "./stock-finder";
 import { Tabs } from "radix-ui";
 import { useEffect, useMemo } from "react";
 import type { ChartResponse } from "@/lib/market/chart-data";
@@ -127,6 +128,18 @@ function Body({ d, isPick }: { d: Decision; isPick: boolean }) {
  * nearly full screen: the full price chart on the left, the agents' research
  * on the right. "Full chart" hides the research column.
  */
+/** True on screens 1024px and wider (chart and research side by side). */
+function useWide() {
+  const [w, setW] = useState(true);
+  useEffect(() => {
+    const m = window.matchMedia("(min-width: 1024px)");
+    const on = () => setW(m.matches);
+    on(); m.addEventListener("change", on);
+    return () => m.removeEventListener("change", on);
+  }, []);
+  return w;
+}
+
 export function StockDrawer() {
   const symbol = useDesk((s) => s.drawerSymbol);
   const result = useStockResult();
@@ -135,13 +148,16 @@ export function StockDrawer() {
   const searchStock = useDesk((s) => s.searchStock);
   const openStock = useDesk((s) => s.openStock);
   const d = findStock(result, symbol);
+  const desktop = useWide();
   const [tab, setTab] = useState("agents");
+  const [mtab, setMtab] = useState("chart"); // phones: one section at a time
   const [wide, setWide] = useState(false);
+  const [finding, setFinding] = useState(false);
   const levels = useMemo(() => (d ? { entry: d.entry, stop: d.stopLoss, target: d.target, zoneLow: d.chart?.zone?.low, zoneHigh: d.chart?.zone?.high } : undefined), [d]);
   const demo = result?.source.kind === "demo";
   const quote = useQuote(d?.symbol);
   return (
-    <Dialog.Root open={Boolean(d) || Boolean(lookup && lookup.symbol === symbol)} onOpenChange={(o) => { if (!o) { openStock(null); setWide(false); setTab("agents"); } }}>
+    <Dialog.Root open={Boolean(d) || Boolean(lookup && lookup.symbol === symbol)} onOpenChange={(o) => { if (!o) { openStock(null); setWide(false); setTab("agents"); setMtab("chart"); setFinding(false); } }}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-[rgb(8_12_28/0.62)] backdrop-blur-sm" />
         {!d && lookup && (
@@ -195,23 +211,52 @@ export function StockDrawer() {
                   className="btn-3d hidden h-9 items-center gap-1.5 rounded-xl px-3 text-[13px] font-semibold lg:inline-flex">
                   {wide ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}{wide ? "Show research" : "Full chart"}
                 </button>
+                <button type="button" onClick={() => setFinding((f) => !f)} aria-pressed={finding} aria-label="Search another stock" title="Search another stock"
+                  className={cn("btn-3d grid size-9 place-items-center rounded-full text-muted-foreground hover:text-foreground", finding && "text-primary")}>
+                  <Search className="size-4" />
+                </button>
                 <TrackTradeButton d={d} className="h-9" />
                 <Dialog.Close aria-label="Close" className="btn-3d grid size-9 place-items-center sm:size-10 rounded-full text-muted-foreground hover:text-foreground">
                   <X className="size-5" />
                 </Dialog.Close>
               </div>
+              {finding && <StockFinder className="w-full lg:w-96" hotkey={false} autoFocus onPicked={() => { setFinding(false); setMtab("chart"); }} />}
             </header>
 
+            {!desktop ? (
+              <Tabs.Root value={mtab} onValueChange={setMtab} className="flex min-h-0 flex-1 flex-col">
+                <Tabs.List className="well mx-3 mt-2.5 grid shrink-0 grid-cols-5 rounded-xl p-1" aria-label="Stock details">
+                  {[["chart", "Chart"], ["agents", "Agents"], ["research", "Research"], ["forecast", "Forecast"], ["company", "Company"]].map(([v, l]) => (
+                    <Tabs.Trigger key={v} value={v} className="truncate rounded-lg px-1 py-1.5 text-[12px] font-medium text-muted-foreground data-[state=active]:raised data-[state=active]:font-semibold data-[state=active]:text-foreground">{l}</Tabs.Trigger>
+                  ))}
+                </Tabs.List>
+                <Tabs.Content value="chart" className="flex min-h-0 flex-1 flex-col overflow-y-auto outline-none">
+                  <StockChart symbol={d.symbol} levels={levels} fill className="min-h-[420px] flex-1 p-3" />
+                </Tabs.Content>
+                <Tabs.Content value="agents" className="flex min-h-0 flex-1 flex-col pt-2 outline-none">
+                  {result && <StockAgentsTab key={d.symbol} d={d} result={result} />}
+                </Tabs.Content>
+                <Tabs.Content value="research" className="flex min-h-0 flex-1 flex-col pt-2 outline-none">
+                  <Body d={d} isPick={Boolean(result?.picks.some((p) => p.symbol === d.symbol))} />
+                </Tabs.Content>
+                <Tabs.Content value="forecast" className="min-h-0 flex-1 overflow-y-auto pt-2 outline-none scroll-thin">
+                  <ForecastTab d={d} />
+                </Tabs.Content>
+                <Tabs.Content value="company" className="min-h-0 flex-1 overflow-y-auto pt-2 outline-none scroll-thin">
+                  <CompanyTab d={d} />
+                </Tabs.Content>
+              </Tabs.Root>
+            ) : (
             <div className={cn("min-h-0 flex-1 overflow-y-auto lg:grid lg:overflow-hidden", wide ? "lg:grid-cols-1" : "lg:grid-cols-[minmax(0,1fr)_440px]")}>
               <StockChart symbol={d.symbol} levels={levels} className="p-3 sm:p-4" />
               {!wide && (
                 <Tabs.Root value={tab} onValueChange={setTab} className="flex min-h-0 flex-col border-[var(--edge)] lg:border-l">
-                  <Tabs.List className="well mx-4 mb-3 mt-3 grid grid-cols-4 rounded-xl p-1 max-lg:sticky max-lg:top-0 max-lg:z-10" aria-label="Stock details">
+                  <Tabs.List className="well mx-4 mb-3 mt-3 grid grid-cols-4 rounded-xl p-1" aria-label="Stock details">
                     {[["agents", "Agents"], ["research", "Research"], ["forecast", "Forecast"], ["company", "Company"]].map(([v, l]) => (
                       <Tabs.Trigger key={v} value={v} className="truncate rounded-lg px-2 py-1.5 text-[13px] font-medium text-muted-foreground data-[state=active]:raised data-[state=active]:font-semibold data-[state=active]:text-foreground">{l}</Tabs.Trigger>
                     ))}
                   </Tabs.List>
-                  <Tabs.Content value="agents" className="flex min-h-0 flex-1 flex-col outline-none max-lg:h-[70vh]">
+                  <Tabs.Content value="agents" className="flex min-h-0 flex-1 flex-col outline-none">
                     {result && <StockAgentsTab key={d.symbol} d={d} result={result} />}
                   </Tabs.Content>
                   <Tabs.Content value="research" className="flex min-h-0 flex-1 flex-col outline-none">
@@ -226,6 +271,7 @@ export function StockDrawer() {
                 </Tabs.Root>
               )}
             </div>
+            )}
           </Dialog.Content>
         )}
       </Dialog.Portal>

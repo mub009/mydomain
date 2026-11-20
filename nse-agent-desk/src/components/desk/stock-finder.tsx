@@ -2,12 +2,13 @@
 
 /** Search any NSE stock by name or symbol and open it with the agents' full research. */
 import { Loader2, Search } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import type { StockHit } from "@/lib/market/search";
 import { cn } from "@/lib/utils";
 import { useDesk } from "@/store/desk";
 
-export function StockFinder({ className }: { className?: string }) {
+export function StockFinder({ className, hotkey = true, autoFocus = false, onPicked }: { className?: string; hotkey?: boolean; autoFocus?: boolean; onPicked?: () => void }) {
+  const listId = useId();
   const searchStock = useDesk((s) => s.searchStock);
   const [q, setQ] = useState("");
   const [hits, setHits] = useState<StockHit[]>([]);
@@ -17,14 +18,16 @@ export function StockFinder({ className }: { className?: string }) {
   const ref = useRef<HTMLInputElement>(null);
 
   // "/" focuses the search from anywhere (except while typing in a field)
+  useEffect(() => { if (autoFocus) ref.current?.focus(); }, [autoFocus]);
   useEffect(() => {
+    if (!hotkey) return;
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
       if (e.key === "/" && !/INPUT|TEXTAREA|SELECT/.test(t.tagName) && !t.isContentEditable) { e.preventDefault(); ref.current?.focus(); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [hotkey]);
 
   useEffect(() => {
     const text = q.trim();
@@ -45,6 +48,7 @@ export function StockFinder({ className }: { className?: string }) {
     searchStock(h.symbol, { name: h.name, sector: h.sector });
     setQ(""); setHits([]); setOpen(false);
     ref.current?.blur();
+    onPicked?.();
   }
 
   function onKey(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -63,17 +67,17 @@ export function StockFinder({ className }: { className?: string }) {
       <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
       <input ref={ref} value={q} onChange={(e) => { setQ(e.target.value); setOpen(true); }} onKeyDown={onKey}
         onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 150)}
-        role="combobox" aria-expanded={open && hits.length > 0} aria-controls="stock-finder-list" aria-autocomplete="list"
-        aria-activedescendant={open && hits[active] ? `finder-opt-${active}` : undefined}
+        role="combobox" aria-expanded={open && hits.length > 0} aria-controls={listId} aria-autocomplete="list"
+        aria-activedescendant={open && hits[active] ? `${listId}-${active}` : undefined}
         aria-label="Search any NSE stock" placeholder="Search any NSE stock…"
         className="well h-10 w-full rounded-xl border-0 pl-9 pr-9 text-[13.5px] placeholder:text-muted-foreground/70 focus-visible:outline-2 focus-visible:outline-primary" />
       {loading ? <Loader2 className="absolute right-3 top-1/2 size-4 -translate-y-1/2 animate-spin text-muted-foreground" aria-label="Searching" />
         : !q && <kbd className="absolute right-2.5 top-1/2 hidden -translate-y-1/2 rounded border border-[var(--edge)] px-1.5 text-[10.5px] text-muted-foreground sm:block">/</kbd>}
       {open && hits.length > 0 && (
-        <ul id="stock-finder-list" role="listbox" aria-label="Matching NSE stocks"
-          className="card absolute inset-x-0 top-[calc(100%+6px)] z-50 max-h-96 min-w-80 overflow-y-auto p-1.5 scroll-thin">
+        <ul id={listId} data-finder-list role="listbox" aria-label="Matching NSE stocks"
+          className="card absolute inset-x-0 top-[calc(100%+6px)] z-50 max-h-96 overflow-y-auto sm:min-w-80 p-1.5 scroll-thin">
           {hits.map((h, i) => (
-            <li key={h.symbol} id={`finder-opt-${i}`} role="option" aria-selected={i === active}
+            <li key={h.symbol} id={`${listId}-${i}`} role="option" aria-selected={i === active}
               onMouseDown={(e) => { e.preventDefault(); pick(h); }} onMouseEnter={() => setActive(i)}
               className={cn("flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px]", i === active && "bg-muted")}>
               <span className="min-w-0 flex-1">

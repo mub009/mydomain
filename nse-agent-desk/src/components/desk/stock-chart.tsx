@@ -55,7 +55,7 @@ function Pills<T extends string>({ items, value, label, onPick, isOff, labelOf }
   );
 }
 
-export function StockChart({ symbol, levels, className }: { symbol: string; levels?: ChartLevels; className?: string }) {
+export function StockChart({ symbol, levels, className, fill }: { symbol: string; levels?: ChartLevels; className?: string; /** grow to the parent's height (phone tab) */ fill?: boolean }) {
   const [interval, setInterval_] = useState<ChartInterval>("1d");
   const [range, setRange] = useState<ChartRange>("1y");
   const [style, setStyle] = useState<Style>("candles");
@@ -174,7 +174,7 @@ export function StockChart({ symbol, levels, className }: { symbol: string; leve
         ) : <span className="text-muted-foreground">{loading ? "Loading chart…" : " "}</span>}
       </div>
 
-      <div className="relative h-[42vh] min-h-[260px] sm:h-[52vh] sm:min-h-[300px] overflow-hidden rounded-xl border border-[var(--edge)] bg-card/40 lg:h-auto lg:min-h-[320px] lg:flex-1">
+      <div className={cn("relative overflow-hidden rounded-xl border border-[var(--edge)] bg-card/40", fill ? "min-h-[240px] flex-1" : "h-[42vh] min-h-[260px] sm:h-[52vh] sm:min-h-[300px] lg:h-auto lg:min-h-[320px] lg:flex-1")}>
         <div ref={box} className="absolute inset-0" />
         {loading && <div className="absolute right-3 top-3 flex items-center gap-1.5 rounded-lg bg-card/90 px-2 py-1 text-[12px] text-muted-foreground shadow"><Loader2 className="size-3.5 animate-spin" />Loading</div>}
         {error && (
