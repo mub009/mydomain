@@ -57,29 +57,29 @@ function WorldIndices() {
         return (
           <section key={region} aria-label={region}>
             <h2 className="mb-2 text-[12px] font-bold uppercase tracking-[0.12em] text-muted-foreground">{region}</h2>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+            <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-3 2xl:grid-cols-4">
               {rows.map((x) => {
                 const upDay = (x.change1d ?? 0) >= 0;
                 return (
-                  <article key={x.symbol} className="card lift p-3.5">
+                  <article key={x.symbol} className="card lift min-w-0 p-3 sm:p-3.5">
                     <div className="flex items-start gap-2">
-                      <span className="text-xl leading-none" aria-hidden>{x.flag}</span>
+                      <span className="text-lg leading-none sm:text-xl" aria-hidden>{x.flag}</span>
                       <div className="min-w-0 flex-1">
-                        <div className="truncate text-[14px] font-bold">{x.name}</div>
+                        <div className="truncate text-[13px] font-bold sm:text-[14px]">{x.name}</div>
                         <div className="truncate text-[11.5px] text-muted-foreground">{x.country}</div>
                       </div>
-                      <span className={cn("flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-semibold", x.open ? "bg-[var(--buy-bg)] text-[var(--buy-fg)]" : "bg-muted text-muted-foreground")}>
-                        <i className={cn("size-1.5 rounded-full", x.open ? "animate-pulse bg-pos" : "bg-[var(--other-dot)]")} />{x.open ? "Open" : "Closed"} · {localTime(x.timezone)}
+                      <span title={`${x.open ? "Open" : "Closed"} · local time ${localTime(x.timezone)}`} className={cn("flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-[10.5px] font-semibold sm:px-2", x.open ? "bg-[var(--buy-bg)] text-[var(--buy-fg)]" : "bg-muted text-muted-foreground")}>
+                        <i className={cn("size-1.5 rounded-full", x.open ? "animate-pulse bg-pos" : "bg-[var(--other-dot)]")} /><span className="max-sm:hidden">{x.open ? "Open" : "Closed"} · {localTime(x.timezone)}</span>
                       </span>
                     </div>
                     {x.error ? <p className="mt-3 text-[12px] text-muted-foreground">Not available right now.</p> : (
                       <>
                         <div className="mt-2 flex items-baseline justify-between gap-2 tnum">
-                          <span className="text-[20px] font-bold">{num(x.price)}</span>
-                          <span className={cn("text-[13px] font-bold", upDay ? "text-pos" : "text-neg")}>{pct(x.change1d)}</span>
+                          <span className="truncate text-[16px] font-bold sm:text-[20px]">{num(x.price)}</span>
+                          <span className={cn("shrink-0 text-[12px] font-bold sm:text-[13px]", upDay ? "text-pos" : "text-neg")}>{pct(x.change1d)}</span>
                         </div>
                         <Spark data={x.spark} up={(x.change1m ?? 0) >= 0} />
-                        <div className="flex justify-between text-[11px] text-muted-foreground tnum"><span>1 month {pct(x.change1m)}</span><span>{x.currency ?? ""}</span></div>
+                        <div className="flex justify-between text-[11px] text-muted-foreground tnum"><span>1M {pct(x.change1m)}</span><span>{x.currency ?? ""}</span></div>
                       </>
                     )}
                   </article>

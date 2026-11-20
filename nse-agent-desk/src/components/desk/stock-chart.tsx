@@ -98,6 +98,8 @@ export function StockChart({ symbol, levels, className }: { symbol: string; leve
       rightPriceScale: { borderColor: v("--border"), scaleMargins: { top: 0.08, bottom: 0.24 } },
       timeScale: { borderColor: v("--border"), timeVisible: isIntraday(interval), secondsVisible: false, rightOffset: 4 },
       crosshair: { mode: CrosshairMode.Normal },
+      // Phones: a vertical swipe scrolls the window instead of panning the chart.
+      handleScroll: { mouseWheel: true, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: false },
       localization: { priceFormatter: (p: number) => `₹${p.toLocaleString("en-IN", { maximumFractionDigits: 2 })}` },
     });
     chartRef.current = chart;
@@ -172,7 +174,7 @@ export function StockChart({ symbol, levels, className }: { symbol: string; leve
         ) : <span className="text-muted-foreground">{loading ? "Loading chart…" : " "}</span>}
       </div>
 
-      <div className="relative h-[52vh] min-h-[300px] overflow-hidden rounded-xl border border-[var(--edge)] bg-card/40 lg:h-auto lg:min-h-[320px] lg:flex-1">
+      <div className="relative h-[42vh] min-h-[260px] sm:h-[52vh] sm:min-h-[300px] overflow-hidden rounded-xl border border-[var(--edge)] bg-card/40 lg:h-auto lg:min-h-[320px] lg:flex-1">
         <div ref={box} className="absolute inset-0" />
         {loading && <div className="absolute right-3 top-3 flex items-center gap-1.5 rounded-lg bg-card/90 px-2 py-1 text-[12px] text-muted-foreground shadow"><Loader2 className="size-3.5 animate-spin" />Loading</div>}
         {error && (

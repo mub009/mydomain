@@ -45,7 +45,7 @@ export default function ChatPage() {
       <PageHeader title="Team Chat" subtitle="Watch the agents talk one-to-one. The feed is read-only." />
       <div className="space-y-4">
         <div className="hidden md:block"><AnalysisToolbar /></div>
-        <div className="card grid h-[calc(100dvh-13.25rem)] min-h-[360px] overflow-hidden md:h-[calc(100dvh-17.5rem)] md:grid-cols-[280px_1fr]">
+        <div className="card grid h-[calc(100dvh-12.5rem)] min-h-[380px] overflow-hidden md:h-[calc(100dvh-17.5rem)] md:grid-cols-[280px_1fr]">
           {/* conversations */}
           <aside className="flex gap-2 overflow-x-auto border-b bg-muted/40 p-2 scroll-thin md:flex-col md:gap-0.5 md:overflow-y-auto md:border-b-0 md:border-r" aria-label="Conversations">
             <div className="hidden px-2 pb-1.5 pt-1 text-[10.5px] font-semibold uppercase tracking-widest text-muted-foreground md:block">Conversations</div>
@@ -56,7 +56,7 @@ export default function ChatPage() {
               const isTyping = typing && pending && inThread(pending, t.id);
               return (
                 <button key={t.id} type="button" onClick={() => setThread(t.id)} aria-current={on ? "true" : undefined}
-                  className={cn("flex shrink-0 items-center gap-2.5 rounded-xl px-2.5 py-2 text-left transition-colors md:w-full",
+                  className={cn("flex shrink-0 items-center gap-2 rounded-xl px-2 py-1.5 text-left md:gap-2.5 md:px-2.5 md:py-2 transition-colors md:w-full",
                     on ? "bg-card shadow-card ring-1 ring-border" : "hover:bg-muted")}>
                   <span className="flex w-9 shrink-0 justify-center">
                     {t.members.length >= 2 && t.id !== "team"
@@ -81,7 +81,7 @@ export default function ChatPage() {
 
           {/* messages */}
           <section className="flex min-h-0 min-w-0 flex-col">
-            <header className="flex items-center gap-3 border-b px-5 py-3">
+            <header className="hidden items-center gap-3 border-b px-5 py-3 md:flex">
               {current.members.length >= 2 && current.id !== "team" && <span className="flex">{current.members.map((p, i) => <AgentAvatar key={p} who={p} size={32} className={i ? "-ml-3 rounded-full ring-2 ring-card" : ""} />)}</span>}
               <div className="min-w-0">
                 <h2 className="truncate text-[15px] font-semibold">{current.title}</h2>
@@ -94,7 +94,7 @@ export default function ChatPage() {
             </header>
             <MessageFeed key={thread} messages={list} times={times} typing={typingHere}
               empty={messages.length ? "No messages in this conversation yet." : "Run an analysis to start the conversation."} />
-            <footer className="flex items-center justify-center gap-1.5 border-t bg-muted/40 px-4 py-2 text-[11.5px] text-muted-foreground">
+            <footer className="hidden items-center justify-center gap-1.5 border-t md:flex bg-muted/40 px-4 py-2 text-[11.5px] text-muted-foreground">
               <Lock className="size-3 shrink-0" /><span>Read-only feed<span className="hidden sm:inline">. Agent messages are simulated from the analysis results.</span></span>
             </footer>
           </section>

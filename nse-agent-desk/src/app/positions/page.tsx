@@ -135,7 +135,7 @@ export default function PositionsPage() {
         </section>
 
         <section className="card flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 text-[13px]">
-          <span className="flex-1">
+          <span className="min-w-0 flex-1 basis-64">
             {monitor?.enabled
               ? <>Live positions are checked every <b>{monitor.minutes} min</b> during NSE hours (09:15–15:30 IST); demo positions every minute. Prices from Yahoo are delayed.</>
               : <>The position monitor is off (POSITION_MONITOR_ENABLED=false). Use “Check now”.</>}

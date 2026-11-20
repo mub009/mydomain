@@ -118,7 +118,7 @@ function MobileBars() {
     <>
       <header className="sticky top-0 z-30 flex items-center gap-2 bg-sidebar px-3 py-2 text-white lg:hidden">
         <Logo />
-        <b className="text-sm font-bold">NSE Agent Desk</b>
+        <b className="min-w-0 truncate whitespace-nowrap text-sm font-bold">NSE Agent Desk</b>
         <div className="ml-auto flex items-center gap-2"><MarketStatusBadge className="h-7 border-sidebar-border bg-sidebar-hover px-2 text-[11px] text-white [&>span:last-child]:hidden min-[420px]:[&>span:last-child]:inline" /><AlertsBell className="border-sidebar-border bg-sidebar-hover text-white" /><ThemeToggle className="border-sidebar-border bg-sidebar-hover text-white" /></div>
       </header>
       <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t bg-card pb-[env(safe-area-inset-bottom)] lg:hidden" aria-label="Main">

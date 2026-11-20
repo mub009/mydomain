@@ -88,11 +88,12 @@ export function FinalPicksTable({ picks, onSelect }: { picks: Decision[]; onSele
       <div className="flex snap-x gap-3 overflow-x-auto px-4 pb-4 scroll-thin md:hidden">
         {picks.map((d) => (
           <button key={d.symbol} type="button" onClick={() => onSelect?.(d.symbol)}
-            className="w-[250px] shrink-0 snap-start rounded-xl border bg-card p-3 text-left tnum">
-            <div className="flex items-start justify-between gap-2">
-              <div><div className="flex items-center gap-1.5 font-semibold">{d.symbol}{d.fundamentals && <CapTag cap={d.fundamentals.cap} />}</div><div className="text-[11.5px] text-muted-foreground">{d.sector} · <RiskTag risk={d.risk} /> risk · EPS <EpsGrowth f={d.fundamentals} /></div></div>
+            className="w-[78vw] max-w-[290px] shrink-0 snap-start rounded-xl border bg-card p-3 text-left tnum">
+            <div className="flex flex-wrap items-center justify-between gap-1.5">
+              <div className="flex min-w-0 items-center gap-1.5 font-semibold">{d.symbol}{d.fundamentals && <CapTag cap={d.fundamentals.cap} />}</div>
               <VerdictBadge verdict={d.verdict} />
             </div>
+            <div className="mt-0.5 text-[11.5px] text-muted-foreground">{d.sector} · <RiskTag risk={d.risk} /> risk · EPS <EpsGrowth f={d.fundamentals} /></div>
             <div className="my-2"><StockSparkline data={d.spark} width={150} height={34} /></div>
             <dl className="grid grid-cols-3 gap-1 text-[11px] text-muted-foreground">
               <div><dt>Entry</dt><dd className="text-[12.5px] font-semibold text-foreground">{inr(d.entry, 0)}</dd></div>

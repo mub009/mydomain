@@ -1,7 +1,7 @@
 "use client";
 
 import { type ColumnDef, flexRender, getCoreRowModel, getSortedRowModel, type SortingState, useReactTable } from "@tanstack/react-table";
-import { ArrowDown, ArrowUp, ChevronsUpDown, Search, X, ShieldAlert } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronsUpDown, Search, SlidersHorizontal, X, ShieldAlert } from "lucide-react";
 import { useMemo, useState } from "react";
 import { DataBanner, RiskTag, VerdictBadge } from "@/components/desk/primitives";
 import { PageHeader } from "@/components/desk/shell";
@@ -61,13 +61,14 @@ const columns: ColumnDef<Decision>[] = [
     cell: ({ row: { original: d } }) => (d.chart ? <TimeframeDots chart={d.chart} /> : <span className="text-xs text-muted-foreground">–</span>) },
   { id: "zone", header: "Buy zone", accessorFn: (d) => d.chart?.zone?.distancePct ?? 999,
     cell: ({ row: { original: d } }) => (d.chart?.zone ? <div><div className="text-xs font-medium">{inr(d.chart.zone.low, 0)}–{inr(d.chart.zone.high, 0)}</div><PlanTag zone={d.chart.zone} /></div> : <span className="text-xs text-muted-foreground">–</span>) },
-  { id: "notes", header: "Notes", enableSorting: false, cell: ({ row: { original: d } }) => <span className="block min-w-56 max-w-80 whitespace-normal text-xs text-muted-foreground">{[d.passedOver, ...d.notes, ...d.lotWarnings.slice(0, 1), ...d.mayWarnings.slice(0, 1)].filter(Boolean).join(" · ") || "–"}</span> },
+  { id: "notes", header: "Notes", enableSorting: false, cell: ({ row: { original: d } }) => <span className="line-clamp-2 w-96 whitespace-normal text-xs text-muted-foreground" title={[d.passedOver, ...d.notes, ...d.lotWarnings.slice(0, 1), ...d.mayWarnings.slice(0, 1)].filter(Boolean).join(" · ") || undefined}>{[d.passedOver, ...d.notes, ...d.lotWarnings.slice(0, 1), ...d.mayWarnings.slice(0, 1)].filter(Boolean).join(" · ") || "–"}</span> },
 ];
 
 export default function ScreenerPage() {
   const r = useDecided();
   const openStock = useDesk((s) => s.openStock);
   const [q, setQ] = useState("");
+  const [more, setMore] = useState(false); // phones: extra filters folded away
   const [verdict, setVerdict] = useState<(typeof VERDICTS)[number]>("ALL");
   const [sector, setSector] = useState("ALL");
   const [risk, setRisk] = useState("ALL");
@@ -117,6 +118,11 @@ export default function ScreenerPage() {
               <span className="relative"><Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
                 <input className={cn(inputClass, "w-full pl-8")} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Symbol, e.g. TCS" aria-label="Search by symbol" /></span>
             </Field>
+            <button type="button" onClick={() => setMore(!more)} aria-expanded={more}
+              className={cn("btn-3d inline-flex h-9 items-center gap-1.5 rounded-xl px-3 text-[13px] font-semibold md:hidden", more && "text-primary")}>
+              <SlidersHorizontal className="size-4" />Filters{filtered ? " •" : ""}
+            </button>
+            <div className={cn("contents", !more && "max-md:hidden")}>
             <Field label="Sector"><select className={inputClass} value={sector} onChange={(e) => setSector(e.target.value)} aria-label="Sector">
               <option value="ALL">All sectors</option>{sectors.map((s) => <option key={s}>{s}</option>)}</select></Field>
             <Field label="Size"><select className={inputClass} value={size} onChange={(e) => setSize(e.target.value)} aria-label="Company size">
@@ -133,6 +139,7 @@ export default function ScreenerPage() {
             <Field label={`Combined score ≥ ${minScore}`}>
               <input type="range" min={0} max={90} step={5} value={minScore} onChange={(e) => setMinScore(Number(e.target.value))} className="h-9 w-40 accent-[var(--primary)]" aria-label="Minimum combined score" />
             </Field>
+            </div>
             {filtered && <Button variant="ghost" size="sm" onClick={reset} className="mb-0.5"><X />Clear filters</Button>}
           </section>
 

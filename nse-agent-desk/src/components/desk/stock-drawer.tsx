@@ -171,13 +171,13 @@ export function StockDrawer() {
           <Dialog.Content
             className="card fixed inset-0 z-50 flex flex-col overflow-hidden rounded-none outline-none sm:inset-[2.5vh_2vw] sm:rounded-[22px]"
             onOpenAutoFocus={(e) => e.preventDefault()}>
-            <header className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-[var(--edge)] px-4 py-3 sm:px-5">
+            <header className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-b border-[var(--edge)] px-4 py-2.5 sm:gap-y-2 sm:px-5 sm:py-3">
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <Dialog.Title className="text-xl font-extrabold tracking-tight">{d.symbol}</Dialog.Title>
                   <VerdictBadge verdict={d.verdict} />
                 </div>
-                <Dialog.Description className="text-[12.5px] text-muted-foreground">
+                <Dialog.Description className="text-[12.5px] text-muted-foreground max-sm:line-clamp-1">
                   {d.sector} · NSE{d.fundamentals?.marketCapCr ? ` · ${d.fundamentals.cap} cap ₹${d.fundamentals.marketCapCr.toLocaleString("en-IN")} Cr` : ""}
                   {demo ? " · analysis on demo prices; the chart shows real prices" : " · live data, end of day"}
                   {result && result !== currentRun ? " · analysed on its own with its sector peers" : ""}
@@ -185,10 +185,10 @@ export function StockDrawer() {
               </div>
               <div className="tnum">
                 <div className="flex items-baseline gap-2">
-                  <span className="text-2xl font-bold">{inr(quote?.last ?? d.entry)}</span>
+                  <span className="text-xl font-bold sm:text-2xl">{inr(quote?.last ?? d.entry)}</span>
                   {quote && <span className={cn("text-[13px] font-semibold", quote.change >= 0 ? "text-pos" : "text-neg")}>{pct(quote.change)} today</span>}
                 </div>
-                <div className="text-[11.5px] text-muted-foreground">{quote ? `Last price, ${quote.date} · analysis entry ${inr(d.entry)}` : "Analysis entry price"}</div>
+                <div className="text-[11.5px] text-muted-foreground max-sm:hidden">{quote ? `Last price, ${quote.date} · analysis entry ${inr(d.entry)}` : "Analysis entry price"}</div>
               </div>
               <div className="ml-auto flex items-center gap-2">
                 <button type="button" onClick={() => setWide((w) => !w)} aria-pressed={wide}
@@ -196,7 +196,7 @@ export function StockDrawer() {
                   {wide ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}{wide ? "Show research" : "Full chart"}
                 </button>
                 <TrackTradeButton d={d} className="h-9" />
-                <Dialog.Close aria-label="Close" className="btn-3d grid size-10 place-items-center rounded-full text-muted-foreground hover:text-foreground">
+                <Dialog.Close aria-label="Close" className="btn-3d grid size-9 place-items-center sm:size-10 rounded-full text-muted-foreground hover:text-foreground">
                   <X className="size-5" />
                 </Dialog.Close>
               </div>
@@ -206,7 +206,7 @@ export function StockDrawer() {
               <StockChart symbol={d.symbol} levels={levels} className="p-3 sm:p-4" />
               {!wide && (
                 <Tabs.Root value={tab} onValueChange={setTab} className="flex min-h-0 flex-col border-[var(--edge)] lg:border-l">
-                  <Tabs.List className="well mx-4 mb-3 mt-3 grid grid-cols-4 rounded-xl p-1" aria-label="Stock details">
+                  <Tabs.List className="well mx-4 mb-3 mt-3 grid grid-cols-4 rounded-xl p-1 max-lg:sticky max-lg:top-0 max-lg:z-10" aria-label="Stock details">
                     {[["agents", "Agents"], ["research", "Research"], ["forecast", "Forecast"], ["company", "Company"]].map(([v, l]) => (
                       <Tabs.Trigger key={v} value={v} className="truncate rounded-lg px-2 py-1.5 text-[13px] font-medium text-muted-foreground data-[state=active]:raised data-[state=active]:font-semibold data-[state=active]:text-foreground">{l}</Tabs.Trigger>
                     ))}

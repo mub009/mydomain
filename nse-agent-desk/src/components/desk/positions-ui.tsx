@@ -101,7 +101,7 @@ export function TrackTradeButton({ d, size = "sm", className }: { d: Decision; s
     <Dialog.Root open={open} onOpenChange={setOpen}>
       <Dialog.Trigger asChild>
         <Button size={size} variant={tracked ? "outline" : "default"} className={className} disabled={tracked} onClick={(e) => e.stopPropagation()}>
-          <LineChart />{tracked ? "Tracking" : "Track this trade"}
+          <LineChart />{tracked ? "Tracking" : <>Track<span className="max-sm:hidden"> this trade</span></>}
         </Button>
       </Dialog.Trigger>
       <Dialog.Portal>
