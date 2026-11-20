@@ -326,4 +326,6 @@ src/components/ui/     shadcn-style primitives (button, switch, sheet, segmented
 3. **Environment variable:** `NSE_DESK_DATA_DIR` = `/tmp` (Vercel's only writable folder; tracked trades and alerts are kept there and reset when the server restarts).
 4. Deploy, then under **Settings → Git** set the production branch to the branch you want, or merge into `main`.
 
+Positions on Vercel are kept in your browser (Vercel has no lasting disk): the app sends them with each request and checks them every 5 minutes while it's open. Locally they are saved in `.data/positions.json` and the server checks them in the background. Set `POSITIONS_STORAGE=browser` to use browser storage anywhere.
+
 Some sources (NSE, RBI, SEBI) may refuse requests from cloud servers; those sections then show an error while the rest works. Running locally avoids this.

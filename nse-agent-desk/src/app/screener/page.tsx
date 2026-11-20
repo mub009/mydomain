@@ -10,6 +10,7 @@ import { PlanTag, TimeframeDots } from "@/components/desk/chart-check";
 import { CapTag, EpsGrowth } from "@/components/desk/fundamentals";
 import { Button } from "@/components/ui/button";
 import { Field, inputClass } from "@/components/ui/segmented";
+import { BulkTrackButton } from "@/components/desk/positions-ui";
 import { inr, pct } from "@/lib/format";
 import type { Decision, Verdict } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -78,6 +79,7 @@ export default function ScreenerPage() {
   const [minScore, setMinScore] = useState(0);
   const [sorting, setSorting] = useState<SortingState>([{ id: "combined", desc: true }]);
   const [view, setView] = useState<"all" | "flagged">("all");
+  const [sel, setSel] = useState<Record<string, boolean>>({}); // rows ticked for "Track"
 
   const all = useMemo(() => r?.all ?? [], [r]);
   const flaggedCount = all.filter((d) => d.blackPoints && Object.values(d.blackPoints.status).some((s) => s !== "Eligible")).length;
@@ -92,6 +94,8 @@ export default function ScreenerPage() {
   const filtered = q || sector !== "ALL" || risk !== "ALL" || size !== "ALL" || rsiMin || rsiMax || minScore > 0 || verdict !== "ALL";
   const reset = () => { setQ(""); setSector("ALL"); setRisk("ALL"); setSize("ALL"); setRsiMin(""); setRsiMax(""); setMinScore(0); setVerdict("ALL"); };
 
+  const picked = data.filter((d) => sel[d.symbol]);
+  const allTicked = data.length > 0 && picked.length === data.length;
   const table = useReactTable({ data, columns, state: { sorting }, onSortingChange: setSorting, getCoreRowModel: getCoreRowModel(), getSortedRowModel: getSortedRowModel() });
 
   return (
@@ -157,17 +161,27 @@ export default function ScreenerPage() {
               })}
               <span className="ml-auto text-xs text-muted-foreground tnum">{data.length} of {all.length} stocks</span>
             </div>
+            <div className="flex flex-wrap items-center gap-2 border-t border-[var(--edge)] px-4 py-2.5">
+              <span className="text-xs text-muted-foreground">{picked.length ? `${picked.length} selected` : "Tick stocks to track them, or track every stock shown"}</span>
+              {picked.length > 0 && <Button variant="ghost" size="sm" onClick={() => setSel({})}><X />Clear</Button>}
+              <BulkTrackButton className="ml-auto" items={picked.length ? picked : data}
+                label={picked.length ? `Track ${picked.length} selected` : `Track all ${data.length} shown`} onDone={() => setSel({})} />
+            </div>
             <div className="max-h-[calc(100dvh-22rem)] min-h-64 overflow-auto scroll-thin">
               <table className="w-full text-left text-[13px] tnum">
                 <thead className="sticky top-0 z-10 bg-muted">
                   {table.getHeaderGroups().map((hg) => (
                     <tr key={hg.id}>
+                      <th className="w-10 border-b py-2 pl-4 pr-1">
+                        <input type="checkbox" className="size-4 align-middle accent-[var(--primary)]" aria-label="Select every stock shown" checked={allTicked}
+                          onChange={(e) => setSel(e.target.checked ? Object.fromEntries(data.map((d) => [d.symbol, true])) : {})} />
+                      </th>
                       {hg.headers.map((h) => {
                         const num = (h.column.columnDef.meta as { num?: boolean } | undefined)?.num;
                         const sort = h.column.getIsSorted();
                         return (
                           <th key={h.id} aria-sort={sort === "asc" ? "ascending" : sort === "desc" ? "descending" : undefined}
-                            className={cn("whitespace-nowrap border-b px-3 py-2 text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground first:pl-4", num && "text-right")}>
+                            className={cn("whitespace-nowrap border-b px-3 py-2 text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground ", num && "text-right")}>
                             {h.column.getCanSort() ? (
                               <button type="button" onClick={h.column.getToggleSortingHandler()} className={cn("inline-flex items-center gap-1 uppercase tracking-wider hover:text-foreground", sort && "text-foreground")}>
                                 {flexRender(h.column.columnDef.header, h.getContext())}
@@ -183,9 +197,13 @@ export default function ScreenerPage() {
                 <tbody>
                   {table.getRowModel().rows.map((row) => (
                     <tr key={row.id} tabIndex={0} onClick={() => openStock(row.original.symbol)} onKeyDown={(e) => e.key === "Enter" && openStock(row.original.symbol)}
-                      className="cursor-pointer border-b last:border-0 hover:bg-muted/50">
+                      className={cn("cursor-pointer border-b last:border-0 hover:bg-muted/50", sel[row.original.symbol] && "bg-primary-soft/60")}>
+                      <td className="w-10 py-2 pl-4 pr-1" onClick={(e) => e.stopPropagation()}>
+                        <input type="checkbox" className="size-4 align-middle accent-[var(--primary)]" aria-label={`Select ${row.original.symbol}`}
+                          checked={Boolean(sel[row.original.symbol])} onChange={(e) => setSel((x) => ({ ...x, [row.original.symbol]: e.target.checked }))} />
+                      </td>
                       {row.getVisibleCells().map((c) => (
-                        <td key={c.id} className={cn("whitespace-nowrap px-3 py-2 first:pl-4", (c.column.columnDef.meta as { num?: boolean } | undefined)?.num && "text-right")}>
+                        <td key={c.id} className={cn("whitespace-nowrap px-3 py-2 ", (c.column.columnDef.meta as { num?: boolean } | undefined)?.num && "text-right")}>
                           {flexRender(c.column.columnDef.cell, c.getContext())}
                         </td>
                       ))}

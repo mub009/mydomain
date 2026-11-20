@@ -136,7 +136,9 @@ export default function PositionsPage() {
 
         <section className="card flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 text-[13px]">
           <span className="min-w-0 flex-1 basis-64">
-            {monitor?.enabled
+            {monitor?.inApp
+              ? <>Positions are saved in this browser. While the app is open, live positions are checked every <b>{monitor.minutes} min</b> during NSE hours (09:15–15:30 IST) and demo positions every minute; press Check now any time. Prices from Yahoo are delayed.</>
+              : monitor?.enabled
               ? <>Live positions are checked every <b>{monitor.minutes} min</b> during NSE hours (09:15–15:30 IST); demo positions every minute. Prices from Yahoo are delayed.</>
               : <>The position monitor is off (POSITION_MONITOR_ENABLED=false). Use “Check now”.</>}
             {" "}Telegram alerts: <b>{monitor?.telegram ? "on" : "off"}</b>.

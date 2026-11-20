@@ -1,4 +1,4 @@
-import { update } from "@/lib/positions/store";
+import { change } from "@/lib/positions/store";
 
 export const dynamic = "force-dynamic";
 
@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
   const b = await req.json().catch(() => ({}));
-  const res = await update((s) => {
+  const { out: res, state } = await change(b.state, (s) => {
     const p = s.positions.find((x) => x.id === id);
     if (!p) return { error: "Not found", status: 404 };
     if (b.action === "close") {
@@ -20,14 +20,15 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     }
     return { position: p, status: 200 };
   });
-  return Response.json(res, { status: res.status });
+  return Response.json({ ...res, state }, { status: res.status });
 }
 
-export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string }> }) {
+export async function DELETE(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
-  await update((s) => {
+  const b = await req.json().catch(() => ({}));
+  const { state } = await change(b?.state, (s) => {
     s.positions = s.positions.filter((p) => p.id !== id);
     s.alerts = s.alerts.filter((a) => a.positionId !== id);
   });
-  return new Response(null, { status: 204 });
+  return state ? Response.json({ state }) : new Response(null, { status: 204 });
 }

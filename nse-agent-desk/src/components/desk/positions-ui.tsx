@@ -136,3 +136,83 @@ export function TrackTradeButton({ d, size = "sm", className }: { d: Decision; s
     </Dialog.Root>
   );
 }
+
+/**
+ * Track several stocks at once (all final picks, or rows picked in the Screener).
+ * Each row uses the agents' entry, stop-loss and target; the quantity can be changed.
+ */
+export function BulkTrackButton({ items, label, size = "sm", className, onDone }: {
+  items: Decision[]; label: string; size?: "sm" | "default"; className?: string; onDone?: () => void;
+}) {
+  const source = useDesk((s) => s.result)?.source.kind;
+  const addMany = usePositions((s) => s.addMany);
+  // A string, not a new Set, so the store sees an unchanged value between renders.
+  const trackedKey = usePositions((s) => s.positions.filter((p) => p.status === "open").map((p) => p.symbol).join(","));
+  const tracked = new Set(trackedKey.split(","));
+  const [open, setOpen] = useState(false);
+  const [qty, setQty] = useState<Record<string, string>>({});
+  const [skip, setSkip] = useState<Record<string, boolean>>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false);
+
+  const valid = (d: Decision) => d.stopLoss > 0 && d.stopLoss < d.entry && d.entry < d.target;
+  const rows = items.map((d) => ({ d, already: tracked.has(d.symbol), ok: valid(d) }));
+  const chosen = rows.filter((r) => !r.already && r.ok && !skip[r.d.symbol]);
+  const q = (d: Decision) => qty[d.symbol] ?? String(Math.max(1, d.quantity || 1));
+  const total = chosen.reduce((s, r) => s + r.d.entry * (Number(q(r.d)) || 0), 0);
+
+  async function save() {
+    setBusy(true);
+    const errs = await addMany(chosen.map(({ d }) => ({
+      symbol: d.symbol, qty: Number(q(d)) || 1, buyPrice: d.entry, stop: d.stopLoss, target: d.target,
+      feed: source === "demo" ? "demo" : "live", sector: d.sector, cap: d.fundamentals?.cap,
+    })));
+    setBusy(false); setErrors(errs);
+    if (!Object.keys(errs).length) { setOpen(false); onDone?.(); }
+  }
+
+  return (
+    <Dialog.Root open={open} onOpenChange={(o) => { setOpen(o); if (o) { setErrors({}); setSkip({}); } }}>
+      <Dialog.Trigger asChild>
+        <Button size={size} className={className} disabled={!items.length}><LineChart />{label}</Button>
+      </Dialog.Trigger>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-[70] bg-black/40" />
+        <Dialog.Content className="card fixed left-1/2 top-1/2 z-[71] flex max-h-[88dvh] w-[min(560px,calc(100vw-1.5rem))] -translate-x-1/2 -translate-y-1/2 flex-col p-5 shadow-2xl">
+          <Dialog.Title className="text-lg font-bold">Track {items.length} stock{items.length === 1 ? "" : "s"}</Dialog.Title>
+          <Dialog.Description className="mt-0.5 text-[13px] text-muted-foreground">
+            Each uses the agents&apos; entry, stop-loss and target. Set the quantity you bought; untick any you didn&apos;t buy. They appear under Positions, where Momentum Agent and Trend Agent follow them up.
+          </Dialog.Description>
+          <ul className="mt-3 min-h-0 flex-1 divide-y overflow-y-auto rounded-xl border scroll-thin">
+            {rows.map(({ d, already, ok }) => (
+              <li key={d.symbol} className={cn("flex items-center gap-3 px-3 py-2.5 text-[13px] tnum", (already || !ok || skip[d.symbol]) && "opacity-60")}>
+                <input type="checkbox" className="size-4 accent-[var(--primary)]" aria-label={`Track ${d.symbol}`}
+                  checked={!already && ok && !skip[d.symbol]} disabled={already || !ok}
+                  onChange={(e) => setSkip((s) => ({ ...s, [d.symbol]: !e.target.checked }))} />
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-x-2 font-semibold">{d.symbol}<span className="text-[11px] font-medium text-muted-foreground">{d.verdict}</span></div>
+                  <div className="text-[11.5px] text-muted-foreground">
+                    {already ? "Already tracked" : !ok ? "No valid stop-loss and target" : `Buy ${inr(d.entry, d.entry < 100 ? 2 : 0)} · stop ${inr(d.stopLoss, d.entry < 100 ? 2 : 0)} · target ${inr(d.target, d.entry < 100 ? 2 : 0)}`}
+                  </div>
+                  {errors[d.symbol] && <div className="text-[11.5px] font-medium text-neg">{errors[d.symbol]}</div>}
+                </div>
+                {!already && ok && (
+                  <label className="flex shrink-0 items-center gap-1.5 text-[11.5px] text-muted-foreground">Qty
+                    <input className={cn(inputClass, "h-8 w-20 px-2")} inputMode="numeric" value={q(d)} disabled={skip[d.symbol]}
+                      onChange={(e) => setQty((s) => ({ ...s, [d.symbol]: e.target.value.replace(/\D/g, "") }))} />
+                  </label>
+                )}
+              </li>
+            ))}
+          </ul>
+          {source === "demo" && <p className="mt-2 text-[11.5px] text-warn-fg">Demo run: these positions follow simulated prices that move every minute.</p>}
+          <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
+            <span className="mr-auto text-[12.5px] text-muted-foreground tnum">{chosen.length} to track · {inr(total, 0)}</span>
+            <Dialog.Close asChild><Button variant="outline">Cancel</Button></Dialog.Close>
+            <Button onClick={save} disabled={busy || !chosen.length}>{busy ? "Saving…" : `Track ${chosen.length}`}</Button>
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+}
