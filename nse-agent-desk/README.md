@@ -318,3 +318,12 @@ src/components/ui/     shadcn-style primitives (button, switch, sheet, segmented
 
 - **NSE holidays:** `src/lib/market/calendar.ts` holds the 2026 holiday list. Check it against the NSE circular and add each new year; unknown years fall back to weekends only. Special sessions such as Muhurat trading are not modelled.
 - **Sector labels** in `universe.ts` are broad groupings for the sector cap, and index membership changes over time.
+
+## Deploy on Vercel (public link)
+
+1. Sign in at vercel.com with GitHub, then **Add New → Project** and import `mub009/mydomain`.
+2. **Root Directory:** `nse-agent-desk`. Framework: Next.js (detected).
+3. **Environment variable:** `NSE_DESK_DATA_DIR` = `/tmp` (Vercel's only writable folder; tracked trades and alerts are kept there and reset when the server restarts).
+4. Deploy, then under **Settings → Git** set the production branch to the branch you want, or merge into `main`.
+
+Some sources (NSE, RBI, SEBI) may refuse requests from cloud servers; those sections then show an error while the rest works. Running locally avoids this.

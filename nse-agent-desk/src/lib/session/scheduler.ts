@@ -29,7 +29,7 @@ export interface SessionRecord {
   messages: Message[];
 }
 
-const FILE = path.join(process.cwd(), ".data", "morning-session.json");
+const FILE = path.join(process.env.NSE_DESK_DATA_DIR ?? path.join(process.cwd(), ".data"), "morning-session.json");
 let latest: SessionRecord | null = null;
 let running: Promise<SessionRecord> | null = null;
 
