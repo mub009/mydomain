@@ -41,6 +41,13 @@ export async function POST(req: Request) {
         : "its data could not be loaded";
       return NextResponse.json({ error: `${symbol} could not be analysed: ${why}.` }, { status: 422 });
     }
+    // The peers are only there for comparison: the searched stock isn't competing with them for
+    // a place in a top-5 list, so drop "left out" reasons that come from that list.
+    if (found.passedOver) {
+      found.passedOver = undefined;
+      if (found.blackPoints?.finalDecision) found.blackPoints.finalDecision = found.blackPoints.finalDecision.replace(/ Not chosen: .*$/, ` Rated ${found.verdict} on its own (peers were only used for comparison).`);
+    }
+    result.picks = result.picks.filter((d) => d.symbol === symbol);
     return NextResponse.json({ result });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 502 });

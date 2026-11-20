@@ -40,6 +40,7 @@ function useQuote(symbol: string | undefined) {
   return q;
 }
 import { StockChart } from "./stock-chart";
+import { StockAgentsTab } from "./stock-agents-tab";
 import { useState } from "react";
 import { RiskTag, VerdictBadge } from "./primitives";
 
@@ -134,13 +135,13 @@ export function StockDrawer() {
   const searchStock = useDesk((s) => s.searchStock);
   const openStock = useDesk((s) => s.openStock);
   const d = findStock(result, symbol);
-  const [tab, setTab] = useState("research");
+  const [tab, setTab] = useState("agents");
   const [wide, setWide] = useState(false);
   const levels = useMemo(() => (d ? { entry: d.entry, stop: d.stopLoss, target: d.target, zoneLow: d.chart?.zone?.low, zoneHigh: d.chart?.zone?.high } : undefined), [d]);
   const demo = result?.source.kind === "demo";
   const quote = useQuote(d?.symbol);
   return (
-    <Dialog.Root open={Boolean(d) || Boolean(lookup && lookup.symbol === symbol)} onOpenChange={(o) => { if (!o) { openStock(null); setWide(false); } }}>
+    <Dialog.Root open={Boolean(d) || Boolean(lookup && lookup.symbol === symbol)} onOpenChange={(o) => { if (!o) { openStock(null); setWide(false); setTab("agents"); } }}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-[rgb(8_12_28/0.62)] backdrop-blur-sm" />
         {!d && lookup && (
@@ -205,11 +206,14 @@ export function StockDrawer() {
               <StockChart symbol={d.symbol} levels={levels} className="p-3 sm:p-4" />
               {!wide && (
                 <Tabs.Root value={tab} onValueChange={setTab} className="flex min-h-0 flex-col border-[var(--edge)] lg:border-l">
-                  <Tabs.List className="well mx-4 mb-3 mt-3 grid grid-cols-3 rounded-xl p-1" aria-label="Stock details">
-                    {[["research", "Research"], ["forecast", "Forecast"], ["company", "Company"]].map(([v, l]) => (
+                  <Tabs.List className="well mx-4 mb-3 mt-3 grid grid-cols-4 rounded-xl p-1" aria-label="Stock details">
+                    {[["agents", "Agents"], ["research", "Research"], ["forecast", "Forecast"], ["company", "Company"]].map(([v, l]) => (
                       <Tabs.Trigger key={v} value={v} className="truncate rounded-lg px-2 py-1.5 text-[13px] font-medium text-muted-foreground data-[state=active]:raised data-[state=active]:font-semibold data-[state=active]:text-foreground">{l}</Tabs.Trigger>
                     ))}
                   </Tabs.List>
+                  <Tabs.Content value="agents" className="flex min-h-0 flex-1 flex-col outline-none max-lg:h-[70vh]">
+                    {result && <StockAgentsTab key={d.symbol} d={d} result={result} />}
+                  </Tabs.Content>
                   <Tabs.Content value="research" className="flex min-h-0 flex-1 flex-col outline-none">
                     <Body d={d} isPick={Boolean(result?.picks.some((p) => p.symbol === d.symbol))} />
                   </Tabs.Content>

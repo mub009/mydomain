@@ -77,6 +77,8 @@ The search box at the top of every page (press **/** to jump to it) finds any NS
 - It always gets the research desk, the 5-timeframe chart check and the Black Points Analyst, even if it didn't pass a scan (the report says it was checked on request).
 - If it can't be analysed, the window says why: market cap below the ₹300 Cr minimum, too little price history (new listings), or a symbol Yahoo Finance doesn't know.
 - A stock that is in your current run opens from that run instead.
+- The stock window opens on the **Agents** tab: every agent discusses that one stock, played back like the live chat (Show all / Replay). The Research Agent opens; the News, Volatility and Macro Agents give the context; the Momentum and Trend Agents give their scores and reasons and argue if they disagree; each research-desk agent reports; the Research Agent sums up for the Decision Agent; the Black Points Analyst reports risks; and the Decision Agent gives the verdict and why. It's built from the stock's analysis, so every number is from the data. Works for stocks from a run and for searched stocks.
+- For a searched stock, the peers only provide comparison: the stock isn't left out because peers took the top picks or the sector cap.
 
 ## My Stocks: search and groups
 
