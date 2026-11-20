@@ -15,11 +15,13 @@ import type { LLM } from "./llm";
 import { NEWS_BOOST } from "./agents/news";
 import { SECTOR_ADJ } from "./sectors";
 import { factorName } from "./macro";
+import type { PolicyReport } from "./policy";
 import type { AgentReport, Analysis, DataSource, Decision, MacroReport, MessageTable, NewsBrief, NewsItem, Person, SectorView, Snapshot, VixReport } from "./types";
 
 const ROLE: Record<Person, string> = {
   News: "news scout who collects the morning stock news",
   Volatility: "volatility analyst who tracks India VIX",
+  CentralBank: "central bank analyst who tracks RBI and US Federal Reserve policy and what it means for rate-sensitive sectors",
   Macro: "commodity and currency analyst who tracks gold, crude oil and USD/INR",
   Momentum: "short-term (1-10 day) swing-trade scanner",
   Trend: "1-month positional trend scanner",
@@ -70,6 +72,8 @@ export interface DialogueInput {
   bpCoverage?: string[];
   /** Latest moves of the main world indices (live runs). */
   globalCues?: string | null;
+  /** Central Bank Agent's RBI and Fed report. */
+  policy?: PolicyReport | null;
   passed: Decision[];
   watchlist: Decision[];
 }
@@ -173,6 +177,29 @@ export async function runDialogue(bus: MessageBus, llm: LLM, d: DialogueInput) {
     kind: "report", table: reportTable(d.may.slice(0, 5)), tickers: names(d.may.slice(0, 5)),
     aiNote: await note("Trend", "In 3-4 short lines, explain your best 1-month picks and the main risk, speaking to your colleague Research Agent.", d.may.slice(0, 5)),
   });
+
+  // ---------- Central Bank Agent: RBI and Fed ----------
+  if (d.policy) {
+    const p = d.policy;
+    const days = (iso: string) => Math.round((Date.parse(iso) - Date.parse(new Date(Date.now() + 19800_000).toISOString().slice(0, 10))) / 86400_000);
+    const mpc = p.lastMpc;
+    const affected = d.rows.filter((r) => r.policy && r.policy.points !== 0);
+    const ups = affected.filter((r) => r.policy!.points > 0).map((r) => r.symbol), downs = affected.filter((r) => r.policy!.points < 0).map((r) => r.symbol);
+    bus.send("CentralBank", "Research",
+      `Research Agent, the rate picture first.${p.sample ? " (Sample figures in demo mode.)" : ""}\n` +
+      (p.rbi ? `• RBI: repo rate ${p.rbi.repo}%${p.rbi.crr !== undefined ? `, CRR ${p.rbi.crr}%` : ""}${p.rbi.slr !== undefined ? `, SLR ${p.rbi.slr}%` : ""}.` : "• RBI rates not available.") +
+      (mpc ? ` Last MPC (${mpc.meeting ?? "latest"}): ${mpc.decision === "hike" ? `raised the repo rate by ${mpc.bps} bps` : mpc.decision === "cut" ? `cut the repo rate by ${mpc.bps} bps` : "kept the repo rate unchanged"}${mpc.stance ? `, stance ${mpc.stance}` : ""}${mpc.inflation ? `, CPI inflation projected at ${mpc.inflation}` : ""}.` : "") +
+      (p.nextMpc ? `\n• Next RBI decision: ${p.nextMpc.decisionDate} (${p.nextMpc.label}), in ${days(p.nextMpc.decisionDate)} days.` : "") +
+      (p.fed ? `\n• US Fed: ${p.fed.range}%${p.fed.lastChange ? `, last move a ${p.fed.lastChange.bps} bps ${p.fed.lastChange.dir} on ${p.fed.lastChange.date}` : ""}${p.fed.nextMeeting ? `; next decision ${p.fed.nextMeeting.decisionDate}` : ""}.` : "") +
+      `\nThe RBI is ${p.direction}.` +
+      (p.direction === "neutral" ? " No adjustment for rate-sensitive sectors." : ` I've moved rate-sensitive sectors (NBFCs, realty, autos, capital goods, infrastructure, cement) by ${p.direction === "tightening" ? "-2" : "+2"}; banks are mixed.`) +
+      (downs.length ? ` Marked down: ${downs.length > 8 ? `${downs.slice(0, 8).join(", ")} and ${downs.length - 8} more` : list(downs)}.` : "") + (ups.length ? ` Lifted: ${list(ups.slice(0, 8))}.` : ""),
+      { kind: "report", tickers: [...downs, ...ups].slice(0, 12) });
+    bus.send("Research", "CentralBank",
+      p.nextMpc && days(p.nextMpc.decisionDate) <= 35
+        ? `Noted. The RBI decision on ${p.nextMpc.decisionDate} falls inside our holding periods, so the Black Points Analyst will flag it for rate-sensitive stocks.`
+        : "Noted, I'll fold the policy effect into the scores.");
+  }
 
   // ---------- Macro Agent: global markets ----------
   if (d.globalCues) {

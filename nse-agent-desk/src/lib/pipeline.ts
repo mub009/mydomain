@@ -19,6 +19,7 @@ import { analyseMacro, applyMacro, loadMacro } from "./macro";
 import { registerSectors, sectorOf } from "./market/universe";
 import { runResearchDesk } from "./research-desk";
 import { runBlackPoints } from "./black-points";
+import { loadPolicy, policyEffect, type PolicyReport } from "./policy";
 import { globalCues, worldQuotes } from "./world";
 import { nseMarketMood, nseMcpEnabled } from "./nse-mcp/client";
 import type { RunRequest, RunResult, StreamEvent } from "./types";
@@ -60,9 +61,13 @@ export async function runAnalysis(o: RunRequest, emit: (e: StreamEvent) => void)
   const sectors = analyseSectors(frames, snaps, sectorOf, indexClose, sectorIndex);
   // Macro Agent: gold, crude and USD/INR, and the stocks that depend on them — before Research Agent's analysis.
   emit({ type: "progress", text: "Reading gold, crude and USD/INR…" });
-  const macroData = await loadMacro(source.kind === "demo", source.seed);
+  const [macroData, policy] = await Promise.all([
+    loadMacro(source.kind === "demo", source.seed),
+    // Central Bank Agent: RBI and Fed policy from their own websites.
+    loadPolicy(source.kind === "demo").catch(() => null),
+  ]);
   const macro = macroData ? analyseMacro(frames, macroData.series, macroData.sample) : null;
-  const first = applySectors(mubashir.applyFundamentals(applyMacro(mubashir.analyse(lot, may, snaps), macro), funds), sectors);
+  const first = applyPolicy(policy, applySectors(mubashir.applyFundamentals(applyMacro(mubashir.analyse(lot, may, snaps), macro), funds), sectors));
   const focus = (o.focus ?? []).filter((s) => frames[s]);
   const candidates = [...new Set([...focus, ...first.slice(0, Math.max(12, o.top * 2)).map((r) => r.symbol)])];
   // Research desk: Performance, Valuation and Growth Agents check the candidates for Research Agent.
@@ -71,7 +76,7 @@ export async function runAnalysis(o: RunRequest, emit: (e: StreamEvent) => void)
   const withDesk = mubashir.applyDesk(first, desk);
   // Black Points Analyst: downside risks for every stock that passed the Momentum or Trend scan.
   emit({ type: "progress", text: "Black Points Analyst: checking filings, regulator orders and financial health…" });
-  const bp = await runBlackPoints(withDesk, { demo: source.kind === "demo", seed: source.seed ?? 0, frames, sectorOf, sectors, focus });
+  const bp = await runBlackPoints(withDesk, { demo: source.kind === "demo", seed: source.seed ?? 0, frames, sectorOf, sectors, focus, policy });
   const checked = withDesk.map((r) => (bp.reports[r.symbol] ? { ...r, blackPoints: bp.reports[r.symbol] } : r));
   // Chart check: the original candidates plus the top stocks still eligible for a holding period,
   // so stocks held out by the Black Points Analyst don't crowd out the ones that can be picked.
@@ -95,16 +100,25 @@ export async function runAnalysis(o: RunRequest, emit: (e: StreamEvent) => void)
     aiLabel: llm.enabled ? `on (${aiModel()})` : "off",
     capital: o.capital, riskPerTrade: o.riskPerTrade,
     macro, sectors: sectorViews, excluded, minCapCr, news, vix, positive: morning.positive(news), negative: morning.negative(news),
-    snaps, lot, may, rows, conflicted, clarifications, picks, passed, watchlist, all, bpCoverage: bp.summary.coverage, globalCues: cues,
+    snaps, lot, may, rows, conflicted, clarifications, picks, passed, watchlist, all, bpCoverage: bp.summary.coverage, globalCues: cues, policy,
   });
 
   const result: RunResult = {
     source, generatedAt: new Date().toISOString(), simulatedAgents: !llm.enabled,
     capital: o.capital, riskPerTrade: o.riskPerTrade,
-    indexRet21d: Math.round(indexRet21d * 100) / 100, news, vix, blackPoints: bp.summary, excluded, minCapCr, sectors: sectorViews, macro, picks, watchlist, all, skipped,
+    indexRet21d: Math.round(indexRet21d * 100) / 100, news, vix, blackPoints: bp.summary, policy, excluded, minCapCr, sectors: sectorViews, macro, picks, watchlist, all, skipped,
   };
   emit({ type: "result", result });
   console.log(`[nse-agent-desk] run: ${rows.length} stocks, source=${source.kind}${source.seed !== undefined ? `#${source.seed}` : ""}, ` +
     `picks=${picks.map((p) => p.symbol).join(",") || "none"}, messages=${bus.log.length}, ai=${llm.enabled}, ${Date.now() - started}ms`);
   return result;
+}
+
+/** Central Bank Agent: move rate-sensitive sectors by the RBI's direction (+/-2). */
+function applyPolicy<T extends { sector: string; combined: number; notes: string[] }>(p: PolicyReport | null, rows: T[]): T[] {
+  return rows.map((r) => {
+    const e = policyEffect(p, r.sector);
+    if (!e) return r;
+    return { ...r, policy: e, combined: Math.max(0, Math.min(100, Math.round((r.combined + e.points) * 10) / 10)), notes: [...r.notes, `Policy: ${e.effect.toLowerCase()}${e.points ? ` (${e.points > 0 ? "+" : ""}${e.points})` : ""}, ${e.reason}`] };
+  }).sort((a, b) => b.combined - a.combined);
 }

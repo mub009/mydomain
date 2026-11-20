@@ -141,6 +141,8 @@ export interface Analysis {
   chart?: ChartAnalysis;
   /** Research desk: Performance, Valuation and Growth Agents (top candidates only). */
   desk?: ResearchDesk;
+  /** Central Bank Agent: effect of RBI policy on this stock's sector. */
+  policy?: { points: number; effect: "Tailwind" | "Headwind" | "Mixed" | "Neutral"; reason: string };
   /** Black Points Analyst's downside-risk report (stocks that passed a scan). */
   blackPoints?: BPReport;
 }
@@ -260,7 +262,7 @@ export interface Decision extends Analysis {
   spark: number[]; // last ~60 closes
 }
 
-export type Person = "News" | "Volatility" | "Macro" | "Momentum" | "Trend" | "Research" | DeskAgent | "BlackPoints" | "Decision";
+export type Person = "News" | "Volatility" | "Macro" | "CentralBank" | "Momentum" | "Trend" | "Research" | DeskAgent | "BlackPoints" | "Decision";
 export type AgentName = Person | "System";
 export type Stage = "scan" | "analyze" | "debate" | "decide";
 
@@ -412,6 +414,8 @@ export interface RunResult {
   skipped: string[];
   /** Black Points Analyst: what was checked this run. */
   blackPoints?: BPSummary;
+  /** Central Bank Agent: RBI and Fed policy. */
+  policy?: import("./policy").PolicyReport | null;
 }
 
 export interface RunRequest {

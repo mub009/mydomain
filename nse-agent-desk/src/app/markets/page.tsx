@@ -97,13 +97,14 @@ const TYPE_STYLE: Record<MarketEvent["type"], string> = {
   Results: "bg-primary-soft text-primary",
   "Ex-dividend": "bg-[var(--watch-bg)] text-[var(--watch-fg)]",
   "Dividend payment": "bg-[var(--buy-bg)] text-[var(--buy-fg)]",
+  "Policy decision": "bg-[var(--avoid-bg)] text-[var(--avoid-fg)]",
 };
 
 function Events() {
   const result = useDesk((s) => s.result);
   const searchStock = useDesk((s) => s.searchStock);
   const [scope, setScope] = useState<"India" | "Global" | "Both">("Both");
-  const [type, setType] = useState<"All" | "Results" | "Dividends">("All");
+  const [type, setType] = useState<"All" | "Results" | "Dividends" | "Central banks">("All");
   const [confirmedOnly, setConfirmedOnly] = useState(false);
   const [india, setIndia] = useState<MarketEvent[] | null>(null);
   const [global, setGlobal] = useState<MarketEvent[] | null>(null);
@@ -117,7 +118,7 @@ function Events() {
 
   const loading = (scope !== "Global" && india === null) || (scope !== "India" && global === null);
   const list = useMemo(() => [...(scope !== "Global" ? india ?? [] : []), ...(scope !== "India" ? global ?? [] : [])]
-    .filter((e) => type === "All" || (type === "Results" ? e.type === "Results" : e.type !== "Results"))
+    .filter((e) => type === "All" || (type === "Results" ? e.type === "Results" : type === "Central banks" ? e.type === "Policy decision" : e.type === "Ex-dividend" || e.type === "Dividend payment"))
     .filter((e) => !confirmedOnly || e.status === "Confirmed")
     .sort((a, b) => a.date.localeCompare(b.date)), [india, global, scope, type, confirmedOnly]);
   const byDate = useMemo(() => {
@@ -141,7 +142,7 @@ function Events() {
     <div className="space-y-4">
       <div className="card flex flex-wrap items-center gap-3 p-3.5">
         <Seg label="Markets" value={scope} set={setScope} opts={["Both", "India", "Global"]} />
-        <Seg label="Event type" value={type} set={setType} opts={["All", "Results", "Dividends"]} />
+        <Seg label="Event type" value={type} set={setType} opts={["All", "Results", "Dividends", "Central banks"]} />
         <label className="flex items-center gap-2 text-[13px] font-medium">
           <input type="checkbox" checked={confirmedOnly} onChange={(e) => setConfirmedOnly(e.target.checked)} className="accent-[var(--primary)]" />Confirmed only
         </label>
@@ -165,7 +166,7 @@ function Events() {
               <li key={`${e.symbol}-${e.type}-${i}`} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 text-[13px]">
                 <span className="text-lg leading-none" aria-hidden>{e.flag}</span>
                 <span className="min-w-0 flex-1 basis-56">
-                  {e.scope === "India"
+                  {e.scope === "India" && e.type !== "Policy decision"
                     ? <button type="button" onClick={() => searchStock(e.symbol, { name: e.name })} className="font-bold text-primary hover:underline">{e.symbol}</button>
                     : <b>{e.name}</b>}
                   <span className="ml-1.5 text-[12px] text-muted-foreground">{e.scope === "India" ? e.name : `${e.symbol} · ${e.country}`}</span>

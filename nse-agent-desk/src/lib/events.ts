@@ -11,6 +11,7 @@ import { quoteSummary } from "./company";
 import { COMPANY_NAMES } from "./news";
 import { ALL_CAPS } from "./market/universe";
 import { dividendAmount, nseCorporateActions, nseMcpEnabled } from "./nse-mcp/client";
+import { loadPolicy } from "./policy";
 
 export interface GlobalCompany { symbol: string; name: string; country: string; flag: string }
 export const GLOBAL_COMPANIES: GlobalCompany[] = [
@@ -41,7 +42,7 @@ export const GLOBAL_COMPANIES: GlobalCompany[] = [
   { symbol: "2222.SR", name: "Saudi Aramco", country: "Saudi Arabia", flag: "🇸🇦" },
 ];
 
-export type EventType = "Results" | "Ex-dividend" | "Dividend payment";
+export type EventType = "Results" | "Ex-dividend" | "Dividend payment" | "Policy decision";
 export interface MarketEvent {
   date: string; symbol: string; name: string; country: string; flag: string; scope: "India" | "Global";
   type: EventType; status: "Confirmed" | "Expected"; amount?: number; currency?: string; note?: string; source: string;
@@ -127,7 +128,19 @@ export async function upcomingEvents(scope: "India" | "Global", symbols?: string
   await Promise.all(Array.from({ length: 6 }, async () => {
     for (let i = next++; i < list.length; i = next++) all[i] = await eventsFor(list[i], scope, horizonDays);
   }));
-  const v = all.flat().sort((a, b) => a.date.localeCompare(b.date) || a.name.localeCompare(b.name));
+  // Central-bank decisions: RBI (India) and the US Fed (global), from their own websites.
+  const policy = await loadPolicy(false).catch(() => null);
+  const pe: MarketEvent[] = [];
+  const end = iso(Date.parse(todayIST()) + horizonDays * DAY);
+  if (scope === "India" && policy?.nextMpc && policy.nextMpc.decisionDate <= end) {
+    pe.push({ date: policy.nextMpc.decisionDate, symbol: "RBI", name: "Reserve Bank of India: MPC decision", country: "India", flag: "🇮🇳", scope, type: "Policy decision", status: "Confirmed",
+      note: `Meeting ${policy.nextMpc.label}; repo rate now ${policy.rbi?.repo ?? "?"}%, RBI is ${policy.direction}`, source: "RBI MPC schedule (rbi.org.in)" });
+  }
+  if (scope === "Global") for (const m of (policy?.fed?.upcoming ?? []).filter((x) => x.decisionDate <= end)) {
+    pe.push({ date: m.decisionDate, symbol: "FOMC", name: "US Federal Reserve: FOMC decision", country: "United States", flag: "🇺🇸", scope, type: "Policy decision", status: "Confirmed",
+      note: `Meeting ${m.label}; federal funds rate now ${policy?.fed?.range}%`, source: "FOMC calendar (federalreserve.gov)" });
+  }
+  const v = [...pe, ...all.flat()].sort((a, b) => a.date.localeCompare(b.date) || a.name.localeCompare(b.name));
   cache.set(key, { at: Date.now(), v });
   return v;
 }

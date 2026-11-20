@@ -29,6 +29,7 @@
  * otherwise Eligible. "Watch" findings are reported but don't change status.
  */
 import { computeRatios } from "../company/quality";
+import { MIXED, RATE_SENSITIVE } from "../policy";
 import type { YearFinancials } from "../company/types";
 import type { Analysis, BPCategory, BPEvidence, BPFinding, BPReport, BPStatus, HoldingPeriod } from "../types";
 import { cleanName, type Filing, type NewsHit, type Profile, type SebiOrder } from "./sources";
@@ -71,6 +72,8 @@ export interface BPContext {
   peers: Record<string, { revYoY?: number; marginChange?: number; date?: string }>;
   /** Sector-pressure headlines by sector: which companies they came from. */
   sectorNews: Record<string, { symbol: string; hit: NewsHit }[]>;
+  /** Central-bank decisions coming up (RBI MPC, US Fed). */
+  policyEvents?: { what: string; date: string; source: string }[];
 }
 
 const fyEnd = (label: string) => { const m = /FY(\d{2})/.exec(label); return m ? `20${m[1]}-03-31` : undefined; };
@@ -233,6 +236,18 @@ export function investigate(row: Analysis, ev: StockEvidence, ctx: BPContext, on
       verification: e.estimate ? "unverified" : "verified",
       evidence: [{ summary: `${e.what} expected ${e.date}, ${Math.round(d)} days from now.`, date: e.date, source: "Company calendar (via Yahoo Finance)", kind: "market data" }],
       note: e.what === "Quarterly results" ? "The price can gap on results; size the position for that." : "The price drops by about the dividend on the ex-date." }, hit);
+  }
+
+  // ---------- central-bank decisions inside the holding period (rate-sensitive sectors and banks) ----------
+  if (RATE_SENSITIVE.has(sector) || MIXED.has(sector)) {
+    for (const e of ctx.policyEvents ?? []) {
+      const d = daysBetween(ctx.today, e.date);
+      const hit = periods.filter((p) => d >= 0 && d <= WINDOW_DAYS[p]);
+      if (!hit.length) continue;
+      add({ category: "Governance & events", flag: `${e.what} on ${e.date}`, scope: "Sector", materiality: "watch", verification: "verified",
+        evidence: [{ summary: `${e.what} expected ${e.date}, ${Math.round(d)} days from now. ${sector} is sensitive to interest rates.`, date: e.date, source: e.source, kind: "regulator" }],
+        note: "A rate decision can move rate-sensitive stocks sharply on the day." }, hit);
+    }
   }
 
   // ---------- sector pressure (sector-wide only with industry data AND several companies) ----------

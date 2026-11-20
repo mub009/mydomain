@@ -1,4 +1,4 @@
-import { Activity, CalendarRange, ShieldAlert, Crosshair, Flag, Gauge, PiggyBank, Globe2, IndianRupee, Microscope, Newspaper, Scale, Sprout, TrendingUp, Zap, type LucideIcon } from "lucide-react";
+import { Activity, CalendarRange, Landmark, ShieldAlert, Crosshair, Flag, Gauge, PiggyBank, Globe2, IndianRupee, Microscope, Newspaper, Scale, Sprout, TrendingUp, Zap, type LucideIcon } from "lucide-react";
 import { TEAM } from "@/lib/team";
 import type { AgentName, Person } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -8,6 +8,7 @@ import type { Presence } from "@/store/desk";
 export const AGENT_ICON: Record<Person, LucideIcon> = {
   News: Newspaper,       // pre-market news
   Volatility: Activity,  // India VIX
+  CentralBank: Landmark, // RBI and Fed policy
   Macro: Globe2,         // gold, crude, USD/INR
   Momentum: Zap,         // short-term momentum
   Trend: TrendingUp,     // 1-month trend

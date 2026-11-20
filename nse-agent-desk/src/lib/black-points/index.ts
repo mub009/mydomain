@@ -32,6 +32,7 @@ export async function runBlackPoints(rows: Analysis[], o: {
   sectors: { sector: string; state: string; ret3m: number; sourceLabel?: string }[];
   /** Also check these (single-stock search), even if they didn't pass a scan. */
   focus?: string[];
+  policy?: import("../policy").PolicyReport | null;
 }): Promise<{ reports: Record<string, BPReport>; summary: BPSummary }> {
   const candidates = rows.filter((r) => passedScan(r) || o.focus?.includes(r.symbol));
   const anyBars = Object.values(o.frames)[0];
@@ -69,7 +70,11 @@ export async function runBlackPoints(rows: Analysis[], o: {
   candidates.forEach((r, i) => {
     for (const hit of (news[i] ?? []).filter((n) => sectorRule.re.test(n.title))) (sectorNews[o.sectorOf(r.symbol)] ??= []).push({ symbol: r.symbol, hit });
   });
-  const ctx: BPContext = { today, sample: o.demo, sebiOk: sebi.ok, filingsOk, strict, sectorOf: o.sectorOf, sectors: o.sectors, peers, sectorNews };
+  const policyEvents = [
+    o.policy?.nextMpc && { what: "RBI policy decision", date: o.policy.nextMpc.decisionDate, source: o.policy.sample ? "Sample (demo)" : "RBI MPC schedule (rbi.org.in)" },
+    o.policy?.fed?.nextMeeting && { what: "US Fed policy decision", date: o.policy.fed.nextMeeting.decisionDate, source: "FOMC calendar (federalreserve.gov)" },
+  ].filter(Boolean) as { what: string; date: string; source: string }[];
+  const ctx: BPContext = { today, sample: o.demo, sebiOk: sebi.ok, filingsOk, strict, sectorOf: o.sectorOf, sectors: o.sectors, peers, sectorNews, policyEvents };
   const yearAgo = new Date(Date.parse(today) - 365 * 86400_000).toISOString().slice(0, 10);
 
   const reports: Record<string, BPReport> = {};

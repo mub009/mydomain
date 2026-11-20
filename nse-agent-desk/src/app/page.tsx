@@ -10,6 +10,7 @@ import { MorningNewsCard, VixCard } from "@/components/desk/morning-cards";
 import { DiversificationCard } from "@/components/desk/diversification-card";
 import { SectorStrengthCard } from "@/components/desk/sector-ui";
 import { MacroCard } from "@/components/desk/macro-ui";
+import { PolicyCard } from "@/components/desk/policy-ui";
 import { diversify } from "@/lib/diversify";
 import { useMemo } from "react";
 import { DataBanner, KPICard, ResearchProgress } from "@/components/desk/primitives";
@@ -45,7 +46,7 @@ export default function OverviewPage() {
 
   return (
     <>
-      <PageHeader title="Overview" subtitle="Thirteen AI agents scan, analyse, debate and decide." />
+      <PageHeader title="Overview" subtitle="Sixteen AI agents scan, analyse, debate and decide." />
       <div className="space-y-4">
         {source ? <DataBanner source={source} /> : demo && <DataBanner source={{ kind: "demo", label: "Demo data" }} />}
         <AnalysisToolbar />
@@ -75,6 +76,7 @@ export default function OverviewPage() {
           <VixCard vix={result?.vix} revealed={Boolean(result) && said("Volatility")} busy={busy && !said("Volatility")} />
         </div>
 
+        <PolicyCard policy={result?.policy} revealed={Boolean(result) && said("CentralBank")} busy={busy && !said("CentralBank")} />
         <MacroCard macro={result?.macro} revealed={Boolean(result) && said("Macro")} busy={busy && !said("Macro")} />
 
         {r && <SectorStrengthCard sectors={r.sectors} />}

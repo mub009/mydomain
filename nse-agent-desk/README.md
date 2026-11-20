@@ -33,6 +33,16 @@ Rules worth knowing:
 
 With demo data off, market cap and EPS come from Yahoo Finance's fundamentals data (unofficial). If a stock's data can't be loaded it's marked "Unknown" and kept, with a note that its size wasn't verified.
 
+## Central Bank Agent (RBI and Fed policy)
+
+Reports to the Research Agent, read from the central banks' own websites:
+
+- **RBI:** current policy rates from rbi.org.in (repo, standing deposit facility, marginal standing facility, bank rate, CRR, SLR), and the latest Monetary Policy Committee decision (hike, cut or hold, by how much), stance, CPI projection and next meeting date from RBI's MPC release.
+- **US Fed:** the federal funds target range and its last change, and the FOMC meeting calendar, from federalreserve.gov.
+- **Effect on scores:** when the RBI is tightening (a hike or a tightening stance), rate-sensitive sectors (NBFCs, realty, autos, capital goods, infrastructure, cement, building materials, consumer durables) lose 2 points; when it is easing they gain 2. Banks are mixed (wider margins, slower loan growth) and get no points.
+- **Events:** an RBI or Fed decision inside a stock's holding period is reported by the Black Points Analyst for rate-sensitive stocks and banks, and both banks' decisions appear in the Markets page's events calendar ("Central banks" filter).
+- Shown in a Central banks card on the Overview, in its chat with the Research Agent, and in each stock's Agents tab.
+
 ## Research desk: seven sub-agents
 
 Seven sub-agents report to the Research Agent on the top candidates (at least 12) before it ranks them. Performance, Valuation, Growth, Profitability and Seasonality together move the score by at most ±10; red flags take up to 10 more off; the entry call adds ±2. They talk in the **Research desk** chat thread, and each stock's panel shows their figures.

@@ -44,6 +44,12 @@ export function stockConversation(d: Decision, r: RunResult): Message[] {
       `India VIX is ${r.vix.level.toFixed(2)} (${r.vix.regime.toLowerCase()}, ${pct(r.vix.change1d)} today). ` +
       (mv ? `${s} is on my list: ${mv.expect.toLowerCase()}. ${mv.why}.` : `${s} isn't among the stocks I expect to move most on volatility. Its daily range (ATR) is ${d.atrPct.toFixed(1)}% of the price.`), { tickers: t });
   }
+  if (r.policy) {
+    const p = r.policy, e = d.policy;
+    bus.send("CentralBank", "Research",
+      `RBI repo rate ${p.rbi?.repo ?? "?"}%, the RBI is ${p.direction}${p.lastMpc?.stance ? ` (stance: ${p.lastMpc.stance})` : ""}${p.nextMpc ? `; next decision ${p.nextMpc.decisionDate}` : ""}. ` +
+      (e ? `${e.reason.charAt(0).toUpperCase()}${e.reason.slice(1)}${e.points ? `: ${e.points > 0 ? "+" : ""}${e.points} points` : ", no points"}.` : `${d.sector} isn't especially rate-sensitive, so no adjustment.`), { tickers: t });
+  }
   if (r.macro) {
     const ex = (d.macro ?? []).filter((e) => e.points !== 0);
     bus.send("Macro", "Research", ex.length
