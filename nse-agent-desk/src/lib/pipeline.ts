@@ -19,6 +19,7 @@ import { analyseMacro, applyMacro, loadMacro } from "./macro";
 import { registerSectors, sectorOf } from "./market/universe";
 import { runResearchDesk } from "./research-desk";
 import { runBlackPoints } from "./black-points";
+import { nseMarketMood, nseMcpEnabled } from "./nse-mcp/client";
 import type { RunRequest, RunResult, StreamEvent } from "./types";
 
 export async function runAnalysis(o: RunRequest, emit: (e: StreamEvent) => void): Promise<RunResult> {
@@ -46,7 +47,9 @@ export async function runAnalysis(o: RunRequest, emit: (e: StreamEvent) => void)
   emit({ type: "progress", text: "Collecting news…" });
   const news = await loadNews(Object.keys(snaps), source.kind === "demo", snaps, source.seed);
   const morning = new NewsAgent();
-  const vix = new VolatilityAgent().analyse(vixClose, indexClose, frames, snaps, news, source.kind === "demo");
+  // NSE's market mood (breadth, VIX range) from the NSE MCP server, live runs only.
+  const mood = source.kind !== "demo" && nseMcpEnabled() ? await nseMarketMood().catch(() => null) : null;
+  const vix = new VolatilityAgent().analyse(vixClose, indexClose, frames, snaps, news, source.kind === "demo", mood);
   const lot = morning.apply(new MomentumAgent().scan(snaps), news);
   const may = morning.apply(new TrendAgent().scan(snaps, indexRet21d), news);
   const mubashir = new ResearchAgent();

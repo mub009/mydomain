@@ -13,6 +13,7 @@
  *   Improving  RS ≤ 0, gap closing (> 0.1 pts)     (+1)
  *   Lagging    RS ≤ 0, gap not closing             (−3)
  */
+import { NSE_SECTOR_INDEX } from "./market/nse-sectors";
 import type { Analysis, Bar, Decision, SectorView, Snapshot } from "./types";
 
 /** NSE sector indices on Yahoo, for the sectors that have a clear match. */
@@ -71,7 +72,7 @@ export function analyseSectors(
     const tail = (c: number[]) => { const t = c.slice(-60); return t.map((v) => r1((v / t[0]) * 100)); };
     views.push({
       sector, members: members.length, source: useIndex ? "index" : "composite",
-      sourceLabel: useIndex ? `the ${SECTOR_INDEX[sector].name} index` : `the average of ${members.length} stocks in this run`,
+      sourceLabel: useIndex ? `the ${NSE_SECTOR_INDEX[sector] ?? SECTOR_INDEX[sector]?.name ?? sector} index` : `the average of ${members.length} stocks in this run`,
       ret1m: r1(ret(line, 21)), ret3m: r1(ret(line, Math.min(63, line.length - 1))),
       relStrength: r1(rs), rsMomentum: r1(rsMomentum), breadth: Math.round(breadth), state, rank: 0,
       closes: tail(line), niftyCloses: nifty.length ? tail(nifty) : [],

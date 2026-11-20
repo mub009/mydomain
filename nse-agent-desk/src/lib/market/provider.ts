@@ -24,6 +24,8 @@ export interface MarketDataProvider {
   getIntradayBars(symbol: string, interval: "30m" | "60m"): Promise<Bar[]>;
   /** About five years of weekly bars, oldest first, for long-term returns. */
   getLongBars(symbol: string): Promise<Bar[]>;
+  /** A sector's NSE index (when the provider has sector indices by sector name). */
+  getSectorIndexBars?(sector: string): Promise<Bar[]>;
   /** Latest traded price (may be delayed). */
   getLastPrice(symbol: string): Promise<number>;
 }

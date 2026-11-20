@@ -110,7 +110,7 @@ function Seasonal({ d }: { d: NonNullable<DeskView["seasonalDetail"]> }) {
             </tbody>
           </table>
           <p className="mt-1 text-[10.5px] text-muted-foreground">
-            On the ex-date the price usually drops by about the dividend, because new buyers no longer get it. That drop isn&apos;t a loss in value.
+            {d.dividendSource && <>Dividends: {d.dividendSource}. </>}On the ex-date the price usually drops by about the dividend, because new buyers no longer get it. That drop isn&apos;t a loss in value.
             {d.nextEx && <> Next ex-date expected around <b>{d.nextEx.month}</b> (₹{d.nextEx.amount} last year, {d.nextEx.basedOn}).</>}
           </p>
         </div>

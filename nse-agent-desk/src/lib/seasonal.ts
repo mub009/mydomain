@@ -21,11 +21,12 @@
  * dividend yield of 2% or more.
  */
 import { yahooTimeseries } from "./market/yahoo-timeseries";
+import { dividendAmount, nseCorporateActions, nseMcpEnabled } from "./nse-mcp/client";
 import type { Bar, DeskView } from "./types";
 
 export interface Dividend { date: string; amount: number }
 export interface QuarterResult { date: string; revenue?: number; profit?: number }
-export interface SeasonalData { daily: Bar[]; dividends: Dividend[]; quarters: QuarterResult[]; sample: boolean }
+export interface SeasonalData { daily: Bar[]; dividends: Dividend[]; quarters: QuarterResult[]; sample: boolean; dividendSource?: string }
 
 export interface MonthStat { month: number; avg: number; hit: number; years: number }
 export interface QuarterStat { q: 1 | 2 | 3 | 4; label: string; revenueVsAvg?: number; profitVsAvg?: number; count: number }
@@ -41,6 +42,7 @@ export interface SeasonalDetail {
   avgRecoveryDays?: number;
   nextEx?: { month: string; amount: number; basedOn: string };
   years: number;
+  dividendSource?: string;
 }
 
 export const MONTH = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -154,7 +156,7 @@ export function seasonalView(data: SeasonalData, price: number): DeskView & { se
   const detail: SeasonalDetail = {
     months, window, quarters, dividends: events.slice(0, 10), annualDividend, yieldPct,
     avgExDayChangePct: recent.length ? r1(avg(recent.map((e) => e.exDayChangePct))) : undefined,
-    avgRecoveryDays: rec.length ? Math.round(avg(rec)) : undefined, nextEx, years,
+    avgRecoveryDays: rec.length ? Math.round(avg(rec)) : undefined, nextEx, years, dividendSource: data.dividendSource,
   };
   const any = years >= 3 || events.length > 0;
   return {
@@ -194,7 +196,16 @@ async function yahooSeasonal(symbol: string): Promise<SeasonalData> {
   const byDate = new Map<string, QuarterResult>();
   for (const p of ts.quarterlyTotalRevenue ?? []) byDate.set(p.date, { ...byDate.get(p.date), date: p.date, revenue: p.v / 1e7 });
   for (const p of ts.quarterlyNetIncome ?? []) byDate.set(p.date, { ...byDate.get(p.date), date: p.date, profit: p.v / 1e7 });
-  return { daily, dividends, quarters: [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date)), sample: false };
+  // Official ex-dates and amounts from NSE's corporate actions when available.
+  let divs = dividends, dividendSource = "Yahoo Finance";
+  if (nseMcpEnabled() && daily.length) {
+    try {
+      const acts = await nseCorporateActions(symbol, daily[0].date);
+      divs = acts.filter((a) => a.actionType === "DIVIDEND").map((a) => ({ date: a.exDate, amount: Math.round(dividendAmount(a.purpose) * 100) / 100 })).filter((d) => d.amount > 0).sort((a, b) => a.date.localeCompare(b.date));
+      dividendSource = "NSE corporate actions (official)";
+    } catch { /* keep Yahoo's */ }
+  }
+  return { daily, dividends: divs, quarters: [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date)), sample: false, dividendSource };
 }
 
 function seeded(str: string) {

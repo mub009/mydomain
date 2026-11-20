@@ -6,6 +6,7 @@
  * The "why" is an inference from prices and headlines. Events that are not in
  * the data (results, RBI policy, expiry, global cues) can also move VIX.
  */
+import type { NseMood } from "../nse-mcp/client";
 import type { Bar, NewsBrief, Snapshot, VixMover, VixReport } from "../types";
 
 const pctChange = (v: number[], back: number) => (v.length > back ? (v[v.length - 1] / v[v.length - 1 - back] - 1) * 100 : 0);
@@ -24,7 +25,7 @@ function beta(stock: number[], index: number[]): number {
 
 export class VolatilityAgent {
   analyse(vix: number[], index: number[], frames: Record<string, Bar[]>, snaps: Record<string, Snapshot>,
-    news: NewsBrief | null, sample: boolean): VixReport | null {
+    news: NewsBrief | null, sample: boolean, mood?: NseMood | null): VixReport | null {
     if (vix.length < 25) return null;
     const level = vix[vix.length - 1];
     const change1d = pctChange(vix, 1), change5d = pctChange(vix, 5);
@@ -56,6 +57,15 @@ export class VolatilityAgent {
       const pos = news.items.filter((i) => i.sentiment === "positive").length, neg = news.items.filter((i) => i.sentiment === "negative").length;
       if (direction === "up" && neg > pos) reasons.push(`News flow is negative: ${neg} negative against ${pos} positive stock headlines.`);
       if (direction === "down" && pos > neg) reasons.push(`News flow is supportive: ${pos} positive against ${neg} negative stock headlines.`);
+    }
+
+    if (mood?.stock_breadth) {
+      const b = mood.stock_breadth;
+      reasons.push(`NSE market breadth (${mood.date}): ${b.up.toLocaleString("en-IN")} stocks advanced and ${b.down.toLocaleString("en-IN")} declined, ${b.up_pct}% up, a ${b.reading} day.`);
+    }
+    if (mood?.india_vix?.range) {
+      const r = mood.india_vix.range;
+      reasons.push(`VIX sits at the ${Math.round(r.percentile)}th percentile of its range since ${r.window_from} (${r.min}–${r.max}); ${r.percentile >= 70 ? "fear is higher than usual" : r.percentile <= 30 ? "fear is lower than usual" : "a middling level"}.`);
     }
 
     // ---- which stocks move next ----
