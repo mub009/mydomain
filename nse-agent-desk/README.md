@@ -329,3 +329,15 @@ src/components/ui/     shadcn-style primitives (button, switch, sheet, segmented
 Positions on Vercel are kept in your browser (Vercel has no lasting disk): the app sends them with each request and checks them every 5 minutes while it's open. Locally they are saved in `.data/positions.json` and the server checks them in the background. Set `POSITIONS_STORAGE=browser` to use browser storage anywhere.
 
 Some sources (NSE, RBI, SEBI) may refuse requests from cloud servers; those sections then show an error while the rest works. Running locally avoids this.
+
+## Zerodha (read-only holdings and positions)
+
+The Positions page has a Zerodha card that shows your holdings and today's positions with live P&L, through Zerodha's official Kite Connect API. It is read-only: it never places orders.
+
+1. Create an app at developers.kite.trade (signed in with your Zerodha account).
+2. Set its Redirect URL to `https://<your-site>/api/broker/zerodha/callback` (locally `http://localhost:3000/api/broker/zerodha/callback`). The card shows the exact URL to copy.
+3. Put the app's key and secret on the server as `KITE_API_KEY` and `KITE_API_SECRET` (Vercel: Project → Settings → Environment Variables, then redeploy; locally `.env.local`).
+4. Press **Connect Zerodha** on the Positions page and log in on Zerodha's own page.
+
+The access token Zerodha returns is kept only in an encrypted, http-only cookie in your browser and ends at 06:00 IST each day, when Kite sessions end; press Connect again after that. Tap any holding to open the agents' analysis of it.
+
