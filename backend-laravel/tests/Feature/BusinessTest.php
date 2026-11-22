@@ -517,4 +517,27 @@ class BusinessTest extends TestCase
             ],
         ], ['Authorization' => "Bearer {$dealerToken}"])->assertStatus(400);
     }
+
+    public function test_photos_show_in_the_order_they_were_uploaded(): void
+    {
+        [, $token] = $this->actingToken(['role' => 'BUSINESS_OWNER']);
+        $category = $this->category();
+        $auth = ['Authorization' => "Bearer {$token}"];
+
+        $business = $this->postJson('/api/v1/businesses', [
+            'name' => 'Paint Shop', 'slug' => 'paint-shop', 'categoryId' => $category->id,
+            'phone' => '9998887777', 'addressLine1' => '1 Main St', 'city' => 'Pune', 'state' => 'MH',
+            'postalCode' => '411001', 'latitude' => 18.5, 'longitude' => 73.8,
+        ], $auth)->json('data');
+
+        $first = $this->postJson("/api/v1/businesses/{$business['id']}/photos", ['url' => 'https://cdn.example.com/esdee.jpg', 'caption' => 'Esdee paints'], $auth)->json('data');
+        $second = $this->postJson("/api/v1/businesses/{$business['id']}/photos", ['url' => 'https://cdn.example.com/asian.jpg', 'caption' => 'Asian paints'], $auth)->json('data');
+        $third = $this->postJson("/api/v1/businesses/{$business['id']}/photos", ['url' => 'https://cdn.example.com/berger.jpg', 'caption' => 'Berger paints'], $auth)->json('data');
+
+        $this->assertTrue($first['sortOrder'] < $second['sortOrder']);
+        $this->assertTrue($second['sortOrder'] < $third['sortOrder']);
+
+        $photos = $this->getJson("/api/v1/businesses/{$business['id']}/manage", $auth)->json('data.photos');
+        $this->assertSame(['Esdee paints', 'Asian paints', 'Berger paints'], array_column($photos, 'caption'));
+    }
 }

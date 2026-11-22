@@ -603,7 +603,9 @@ class BusinessController extends Controller
             'caption' => ['nullable', 'string', 'max:200'],
             'sortOrder' => ['sometimes', 'integer', 'min:0'],
         ]);
-        $data['sortOrder'] = $data['sortOrder'] ?? 0;
+        // Appended after whatever is already there, so photos show in the
+        // order they were uploaded — not every one of them tied at 0.
+        $data['sortOrder'] = $data['sortOrder'] ?? ((int) BusinessPhoto::where('businessId', $id)->max('sortOrder') + 1);
 
         $photo = BusinessPhoto::create([...$data, 'businessId' => $id]);
 
