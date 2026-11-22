@@ -444,7 +444,7 @@ class StandardTemplate
         .service-gallery .container{padding:0}
         .our_gallery .g-item{padding:8px}
         .our_gallery img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:4px;display:block}
-        .image{margin-bottom:8px}
+        .image{margin-bottom:4px}
         /* A row's columns stretch to equal height; without height:100% here a
            short caption left extra room under its box while a long one ate
            into it, so the gap looked different card to card. */
