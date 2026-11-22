@@ -10,6 +10,7 @@
  */
 import { MAX_PER_SECTOR } from "./agents/decision";
 import type { MessageBus } from "./bus";
+import { holdSentence, holdShort, shortDate } from "./hold";
 import { inr, pct } from "./format";
 import type { LLM } from "./llm";
 import { NEWS_BOOST } from "./agents/news";
@@ -562,13 +563,22 @@ export async function runDialogue(bus: MessageBus, llm: LLM, d: DialogueInput) {
     {
       kind: "decision", tickers: [...names(d.picks), ...names(d.watchlist)],
       table: d.picks.length ? {
-        columns: ["Symbol", "Verdict", "Entry", "Stop-loss", "Target", "Buy zone"],
+        columns: ["Symbol", "Verdict", "Entry", "Stop-loss", "Target", "Hold", "Exit by", "Expected", "Buy zone"],
         rows: d.picks.map((p) => [p.symbol, p.verdict, inr(p.entry), inr(p.stopLoss), inr(p.target),
+          holdShort(p.hold), shortDate(p.hold?.exitBy) || "-", p.hold ? `${p.hold.expectedReturnPct >= 0 ? "+" : ""}${p.hold.expectedReturnPct.toFixed(1)}%` : "-",
           p.chart?.zone ? `${inr(p.chart.zone.low, 0)}-${inr(p.chart.zone.high, 0)}` : "-"]),
       } : undefined,
       aiNote: await note("Decision", "In 4-6 short lines, tell the team why these picks and how to manage them (stop-loss, target). End with one sentence saying this is not financial advice.",
         { picks: d.picks.map(({ spark: _s, ...p }) => p), watchlist: names(d.watchlist) }),
     });
+
+  // How long to hold each pick, from 1,000 simulated price paths per stock.
+  const planned = d.picks.filter((p) => p.hold);
+  if (planned.length) {
+    bus.send("Decision", "ALL",
+      `How long to hold, from 1,000 simulated price paths per stock:\n${planned.map((p) => `• ${p.symbol}: ${holdSentence(p.hold!)}`).join("\n")}`,
+      { kind: "report", tickers: names(planned) });
+  }
 
   if (d.picks.length) {
     const swing = d.picks.filter((p) => p.horizon.startsWith("Swing")).slice(0, 3);

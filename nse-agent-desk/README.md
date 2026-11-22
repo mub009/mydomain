@@ -347,3 +347,14 @@ The access token Zerodha returns is kept only in an encrypted, http-only cookie 
 
 `../nse-desk-api` is a separate, API-only Laravel app for user logins and each user's Zerodha accounts (stored in its database, so they follow the user to any device). Set `NEXT_PUBLIC_DESK_API` to its address (e.g. `https://nse-api.example.com`) and rebuild: the app then shows **Log in** / **Sign up**, and the Zerodha card connects accounts through that API instead of this site's own routes. Without it, nothing changes. Deployment steps are in `../nse-desk-api/README.md`.
 
+## How long to hold (Decision Agent)
+
+For every stock the Decision Agent runs 1,000 simulated price paths (the stock's own daily moves from the past year, scaled to its recent volatility) over the holding period, 10 trading days for swing trades and 21 for positional ones. It reports:
+
+- **Expected hold:** the median number of trading days to reach the target, among paths that reach it, with the date (weekends and NSE holidays skipped) and the usual range.
+- **Exit by:** the last day of the holding period; if neither the target nor the stop-loss is hit by then, exit at the market price.
+- **Odds:** how often the target, the stop-loss, or neither comes first.
+- **Expected return:** the average exit across all paths, from the entry price.
+
+It appears in the Decision Agent's chat message after the picks, the Final Picks table and cards, the Screener (Hold and Expected columns), each stock's Agents tab and a "How long to hold" card in its Research tab. These are estimates, not guarantees.
+

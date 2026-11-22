@@ -17,6 +17,7 @@ import { CompanyTab } from "./company-tab";
 import { ForecastTab } from "./forecast-tab";
 import { SectorCheck } from "./sector-ui";
 import { MacroExposureSection } from "./macro-ui";
+import { holdShort, shortDate } from "@/lib/hold";
 import { StockFinder } from "./stock-finder";
 import { Tabs } from "radix-ui";
 import { useEffect, useMemo } from "react";
@@ -73,6 +74,30 @@ function AgentView({ who, score, reasons, warnings, children }: { who: Person; s
   );
 }
 
+/** Decision Agent's holding plan: how long, until when, the odds and the expected return. */
+function HoldCard({ d }: { d: Decision }) {
+  const h = d.hold!;
+  return (
+    <section className="rounded-xl border p-3" aria-label="How long to hold">
+      <div className="flex items-center gap-2">
+        <AgentAvatar who="Decision" size={22} />
+        <h3 className="text-[13px] font-semibold">How long to hold</h3>
+        <span className="ml-auto text-[11px] text-muted-foreground">{d.horizon}</span>
+      </div>
+      <dl className="mt-2.5 grid grid-cols-3 gap-2 text-center tnum">
+        <div className="rounded-lg bg-muted/60 px-1 py-1.5"><dt className="text-[10.5px] text-muted-foreground">Expected hold</dt><dd className="text-[14px] font-bold">{holdShort(h)}</dd>{h.expectedBy && <dd className="text-[10.5px] text-muted-foreground">around {shortDate(h.expectedBy)}</dd>}</div>
+        <div className="rounded-lg bg-muted/60 px-1 py-1.5"><dt className="text-[10.5px] text-muted-foreground">Exit by</dt><dd className="text-[14px] font-bold">{shortDate(h.exitBy)}</dd><dd className="text-[10.5px] text-muted-foreground">{h.maxDays} trading days</dd></div>
+        <div className="rounded-lg bg-muted/60 px-1 py-1.5"><dt className="text-[10.5px] text-muted-foreground">Expected return</dt><dd className={cn("text-[14px] font-bold", h.expectedReturnPct >= 0 ? "text-pos" : "text-neg")}>{pct(h.expectedReturnPct)}</dd><dd className="text-[10.5px] text-muted-foreground">target {pct(h.targetPct)}</dd></div>
+      </dl>
+      <div className="mt-2.5 flex h-2 overflow-hidden rounded-full" aria-hidden>
+        <span className="bg-pos" style={{ width: `${h.probTarget}%` }} /><span className="bg-muted-foreground/30" style={{ width: `${h.probOpen}%` }} /><span className="bg-neg" style={{ width: `${h.probStop}%` }} />
+      </div>
+      <p className="mt-1.5 flex justify-between text-[11px] tnum"><span className="text-pos">{h.probTarget}% target first</span><span className="text-muted-foreground">{h.probOpen}% neither</span><span className="text-neg">{h.probStop}% stop-loss first</span></p>
+      <p className="mt-1.5 text-[11.5px] leading-snug text-muted-foreground">From 1,000 simulated price paths using this stock&apos;s own daily moves. If neither the target nor the stop-loss is hit by {shortDate(h.exitBy)}, exit at the market price. Estimates, not guarantees.</p>
+    </section>
+  );
+}
+
 function Body({ d, isPick }: { d: Decision; isPick: boolean }) {
   const sectors = useStockResult()?.sectors;
   const sector = sectors?.find((s) => s.sector === d.sector);
@@ -87,6 +112,7 @@ function Body({ d, isPick }: { d: Decision; isPick: boolean }) {
       </dl>
       <p className="text-[11.5px] leading-snug text-muted-foreground">Research scenario, not guaranteed prices. Target = entry + 2 × (entry − stop-loss), a {pct((d.target / d.entry - 1) * 100)} move.{d.quantity !== undefined && ` Sized at ${d.quantity} shares (${inr(d.investment ?? 0, 0)}).`}</p>
 
+      {d.hold && <HoldCard d={d} />}
       {d.blackPoints && <BlackPointsSection bp={d.blackPoints} />}
       <div className="space-y-2.5">
         <ScoreBar label="Combined score" value={d.combined} color="var(--primary)" />

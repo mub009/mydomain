@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "motion/react";
+import { holdSentence, holdShort, shortDate } from "@/lib/hold";
 import { inr, pct } from "@/lib/format";
 import type { Decision, Stage } from "@/lib/types";
 import { ResearchProgress, RiskTag, TypingIndicator, VerdictBadge } from "./primitives";
@@ -59,7 +60,7 @@ export function FinalPicksTable({ picks, onSelect }: { picks: Decision[]; onSele
           <thead>
             <tr className="border-y bg-muted/50 text-[10.5px] uppercase tracking-wider text-muted-foreground">
               {["Stock", "Risk", "Verdict · plan", "60-day trend"].map((h) => <th key={h} className="whitespace-nowrap px-1.5 py-2 font-semibold first:pl-4">{h}</th>)}
-              {["Entry", "Stop-loss", "Target", "Buy zone", ...(sized ? ["Qty"] : [])].map((h) => <th key={h} className="whitespace-nowrap px-1.5 py-2 text-right font-semibold last:pr-4">{h}</th>)}
+              {["Entry", "Stop-loss", "Target", "Hold", "Buy zone", ...(sized ? ["Qty"] : [])].map((h) => <th key={h} className="whitespace-nowrap px-1.5 py-2 text-right font-semibold last:pr-4">{h}</th>)}
             </tr>
           </thead>
           <tbody>
@@ -74,6 +75,9 @@ export function FinalPicksTable({ picks, onSelect }: { picks: Decision[]; onSele
                 <td className="whitespace-nowrap px-1.5 py-2.5 text-right font-medium">{inr(d.entry)}</td>
                 <td className="whitespace-nowrap px-1.5 py-2.5 text-right text-neg">{inr(d.stopLoss)}</td>
                 <td className="whitespace-nowrap px-1.5 py-2.5 text-right text-pos">{inr(d.target)}</td>
+                <td className="whitespace-nowrap px-1.5 py-2.5 text-right" title={d.hold ? holdSentence(d.hold) : undefined}>
+                  {d.hold ? <><div className="text-xs font-semibold">{holdShort(d.hold)}</div><div className="text-[11px] text-muted-foreground">by {shortDate(d.hold.exitBy)} · <span className={d.hold.expectedReturnPct >= 0 ? "text-pos" : "text-neg"}>{pct(d.hold.expectedReturnPct)}</span></div></> : <span className="text-xs text-muted-foreground">–</span>}
+                </td>
                 <td className="whitespace-nowrap px-1.5 py-2.5 text-right">
                   {d.chart?.zone ? <><div className="text-xs font-medium">{inr(d.chart.zone.low, 0)}–{inr(d.chart.zone.high, 0)}</div><PlanTag zone={d.chart.zone} /></> : <span className="text-xs text-muted-foreground">–</span>}
                 </td>
@@ -102,6 +106,7 @@ export function FinalPicksTable({ picks, onSelect }: { picks: Decision[]; onSele
             </dl>
             <div className="mt-2 flex flex-wrap justify-between gap-x-3 border-t pt-2 text-[11.5px] text-muted-foreground">
               <span>{d.horizon}</span>
+              {d.hold && <span className="w-full">Hold <b className="text-foreground">{holdShort(d.hold)}</b>, exit by <b className="text-foreground">{shortDate(d.hold.exitBy)}</b> · {d.hold.probTarget}% reach target · expected <b className={d.hold.expectedReturnPct >= 0 ? "text-pos" : "text-neg"}>{pct(d.hold.expectedReturnPct)}</b></span>}
               {d.chart?.zone && <span className="w-full">Buy zone <b className="text-foreground">{inr(d.chart.zone.low, 0)}–{inr(d.chart.zone.high, 0)}</b> · <PlanTag zone={d.chart.zone} /></span>}
               <span className="font-semibold text-foreground">Upside {pct(upside(d))}{d.quantity !== undefined ? ` · ${d.quantity} sh` : ""}</span>
             </div>

@@ -5,6 +5,7 @@
  */
 import { MessageBus } from "./bus";
 import { inr, pct } from "./format";
+import { holdSentence } from "./hold";
 import type { BPStatus, Decision, DeskView, HoldingPeriod, Message, RunResult } from "./types";
 
 const list = (xs: string[]) => (xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`);
@@ -125,7 +126,8 @@ export function stockConversation(d: Decision, r: RunResult): Message[] {
     (isPick ? ` It's one of this run's final picks${d.quantity ? `: ${d.quantity} shares (${inr(d.investment ?? 0, 0)}) at ${r.riskPerTrade}% risk of your capital` : ""}.`
       : d.passedOver ? ` Buy-rated but left out: ${lc(d.passedOver)}.` : "") +
     (d.clarification ? `\nOn the scanners' disagreement: ${d.clarification}` : "") +
-    (bp?.finalDecision ? `\nShortlists: ${bp.finalDecision}` : ""), { kind: "decision", tickers: t });
+    (bp?.finalDecision ? `\nShortlists: ${bp.finalDecision}` : "") +
+    (d.hold ? `\nHow long to hold: ${holdSentence(d.hold)}` : ""), { kind: "decision", tickers: t });
   if (d.verdict === "STRONG BUY" || d.verdict === "BUY") {
     bus.send("Momentum", "ALL", `If you take it, track the trade and I'll alert you on a 3% loss, near the stop-loss (${inr(d.stopLoss)}) or if it's hit.`, { tickers: t });
     bus.send("Trend", "ALL", `And I'll tell you when it reaches the first exit and the target (${inr(d.target)}).`, { tickers: t });

@@ -11,6 +11,7 @@ import { CapTag, EpsGrowth } from "@/components/desk/fundamentals";
 import { Button } from "@/components/ui/button";
 import { Field, inputClass } from "@/components/ui/segmented";
 import { BulkTrackButton } from "@/components/desk/positions-ui";
+import { holdSentence, holdShort, shortDate } from "@/lib/hold";
 import { inr, pct } from "@/lib/format";
 import type { Decision, Verdict } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -36,6 +37,10 @@ const columns: ColumnDef<Decision>[] = [
   { accessorKey: "entry", header: "Entry", meta: { num: true }, cell: ({ getValue }) => inr(getValue() as number) },
   { accessorKey: "stopLoss", header: "Stop-loss", meta: { num: true }, cell: ({ getValue }) => inr(getValue() as number) },
   { accessorKey: "target", header: "Target", meta: { num: true }, cell: ({ getValue }) => inr(getValue() as number) },
+  { id: "hold", header: "Hold", meta: { num: true }, accessorFn: (d) => d.hold?.expectedDays ?? 99,
+    cell: ({ row: { original: d } }) => d.hold ? <span title={holdSentence(d.hold)}>{holdShort(d.hold)}<span className="block text-[11px] text-muted-foreground">by {shortDate(d.hold.exitBy)}</span></span> : "–" },
+  { id: "expected", header: "Expected", meta: { num: true }, accessorFn: (d) => d.hold?.expectedReturnPct ?? -99,
+    cell: ({ row: { original: d } }) => d.hold ? <span title={`${d.hold.probTarget}% reach the target first, ${d.hold.probStop}% the stop-loss`}>{signed(d.hold.expectedReturnPct)}<span className="block text-[11px] text-muted-foreground">{d.hold.probTarget}% target</span></span> : "–" },
   { id: "size", header: "Size", accessorFn: (d) => d.fundamentals?.marketCapCr ?? -1,
     cell: ({ row: { original: d } }) => (d.fundamentals ? <div><CapTag cap={d.fundamentals.cap} /><div className="mt-0.5 text-[11px] text-muted-foreground">{d.fundamentals.marketCapCr !== undefined ? `${inr(d.fundamentals.marketCapCr, 0)} Cr` : "–"}</div></div> : "–") },
   { id: "eps", header: "EPS 1Y", meta: { num: true }, accessorFn: (d) => (d.fundamentals?.epsTTM !== undefined && d.fundamentals.epsTTM < 0 ? -999 : d.fundamentals?.epsGrowth1y ?? -998),

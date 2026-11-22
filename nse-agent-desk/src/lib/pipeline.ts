@@ -22,7 +22,9 @@ import { runBlackPoints } from "./black-points";
 import { loadPolicy, policyEffect, type PolicyReport } from "./policy";
 import { globalCues, worldQuotes } from "./world";
 import { nseMarketMood, nseMcpEnabled } from "./nse-mcp/client";
-import type { RunRequest, RunResult, StreamEvent } from "./types";
+import { holdPlan, type HoldPlan } from "./forecast";
+import { addTradingDays } from "./market/calendar";
+import type { Bar, RunRequest, RunResult, StreamEvent } from "./types";
 
 export async function runAnalysis(o: RunRequest, emit: (e: StreamEvent) => void): Promise<RunResult> {
   const started = Date.now();
@@ -91,7 +93,12 @@ export async function runAnalysis(o: RunRequest, emit: (e: StreamEvent) => void)
   const fd = new DecisionAgent();
   const conflicted = fd.conflicted(rows, o.top);
   const clarifications = Object.fromEntries(conflicted.map((r) => [r.symbol, mubashir.adviseOnConflict(r)]));
-  const { all, picks, watchlist, passed } = fd.decide(rows, sparks, o.top, clarifications, o.capital, o.riskPerTrade);
+  const decided = fd.decide(rows, sparks, o.top, clarifications, o.capital, o.riskPerTrade);
+  // Decision Agent's holding plan for every stock: how long to hold, by when, the odds and the expected return.
+  emit({ type: "progress", text: "Decision Agent: working out how long to hold…" });
+  const plans = Object.fromEntries(decided.all.map((d) => [d.symbol, planHold(d, frames[d.symbol], source.seed)]));
+  const withHold = <T extends { symbol: string }>(xs: T[]) => xs.map((d) => (plans[d.symbol] ? { ...d, hold: plans[d.symbol] } : d));
+  const { all, picks, watchlist, passed } = { ...decided, all: withHold(decided.all), picks: withHold(decided.picks), watchlist: withHold(decided.watchlist) };
 
   const sectorViews = enrichSectors(sectors, all);
 
@@ -112,6 +119,16 @@ export async function runAnalysis(o: RunRequest, emit: (e: StreamEvent) => void)
   console.log(`[nse-agent-desk] run: ${rows.length} stocks, source=${source.kind}${source.seed !== undefined ? `#${source.seed}` : ""}, ` +
     `picks=${picks.map((p) => p.symbol).join(",") || "none"}, messages=${bus.log.length}, ai=${llm.enabled}, ${Date.now() - started}ms`);
   return result;
+}
+
+/** Swing trades are held up to 10 trading days, positional (or swing-then-hold) up to 21. */
+export const holdDays = (horizon: string) => (horizon.startsWith("Swing ·") ? 10 : 21);
+
+function planHold(d: { symbol: string; entry: number; stopLoss: number; target: number; horizon: string }, bars: Bar[] | undefined, seed?: number): HoldPlan | undefined {
+  if (!bars || bars.length < 60 || !(d.stopLoss < d.entry && d.entry < d.target)) return undefined;
+  const plan = holdPlan(bars, { entry: d.entry, stop: d.stopLoss, target: d.target, maxDays: holdDays(d.horizon), seed: `${d.symbol}:${seed ?? "live"}:hold` });
+  const from = bars[bars.length - 1].date.slice(0, 10);
+  return { ...plan, exitBy: addTradingDays(from, plan.maxDays), expectedBy: plan.expectedDays ? addTradingDays(from, plan.expectedDays) : undefined };
 }
 
 /** Central Bank Agent: move rate-sensitive sectors by the RBI's direction (+/-2). */

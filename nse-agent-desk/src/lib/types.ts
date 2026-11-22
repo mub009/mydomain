@@ -260,6 +260,8 @@ export interface Decision extends Analysis {
   quantity?: number;
   investment?: number;
   spark: number[]; // last ~60 closes
+  /** Decision Agent's holding plan: expected days to the target, hold-until date, odds and expected return. */
+  hold?: import("./forecast").HoldPlan;
 }
 
 export type Person = "News" | "Volatility" | "Macro" | "CentralBank" | "Momentum" | "Trend" | "Research" | DeskAgent | "BlackPoints" | "Decision";
