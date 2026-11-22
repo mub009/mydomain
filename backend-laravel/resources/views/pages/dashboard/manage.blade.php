@@ -115,7 +115,7 @@
       ]) @break
       @case('Our Gallery') @include('pages.dashboard.sections.image-set', [
           'title' => 'Our Gallery',
-          'blurb' => 'These photos make up the “Our Gallery” section of your website, in this order.',
+          'blurb' => 'These photos make up the “Our Gallery” section of your website, in this order. Give one a caption and it shows under the photo there.',
           'empty' => 'No gallery photos yet. Upload some below to add an Our Gallery section to your website.',
           'hint' => 'Square or landscape photos look best.',
       ]) @break

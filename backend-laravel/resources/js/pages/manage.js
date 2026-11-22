@@ -276,7 +276,8 @@ if (imageSet) {
     for (const [i, file] of files.entries()) {
       label.textContent = `Uploading ${i + 1} of ${files.length}…`;
       try {
-        images.push(await uploadImage(file, `site-${kind}`));
+        const url = await uploadImage(file, `site-${kind}`);
+        images.push(kind === "gallery" ? { url, caption: "" } : url);
         added += 1;
       } catch (err) {
         showError(errorBox, `${file.name}: ${errorMessage(err)}`);
@@ -300,6 +301,12 @@ if (imageSet) {
     button.addEventListener("click", () => {
       images.splice(Number(button.dataset.imageRemove), 1);
       save(`Photo removed from ${where}.`);
+    }),
+  );
+  $$("[data-image-caption]").forEach((input) =>
+    input.addEventListener("change", () => {
+      images[Number(input.dataset.imageCaption)].caption = input.value;
+      save("Caption saved.");
     }),
   );
 }

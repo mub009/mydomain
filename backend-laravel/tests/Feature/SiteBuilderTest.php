@@ -197,10 +197,22 @@ class SiteBuilderTest extends TestCase
         $this->putJson($url, ['images' => ['javascript:alert(1)']], $auth)->assertStatus(400);
         $this->putJson($url, ['images' => array_fill(0, 9, 'https://cdn.example.com/x.jpg')], $auth)->assertStatus(400);
 
-        $this->putJson("/api/v1/businesses/{$business->id}/site/gallery", ['images' => ['https://cdn.example.com/g.jpg']], $auth)->assertOk();
+        // A gallery photo can carry a caption, shown under it on the website.
+        $this->putJson("/api/v1/businesses/{$business->id}/site/gallery", ['images' => [['url' => 'https://cdn.example.com/g.jpg', 'caption' => 'Our dining hall']]], $auth)->assertOk();
         $this->getJson($url, $auth)->assertJsonPath('data.images', []);
-        $this->getJson("/api/v1/businesses/{$business->id}/site/gallery", $auth)->assertJsonPath('data.images', ['https://cdn.example.com/g.jpg'])->assertJsonPath('data.max', 24);
+        $this->getJson("/api/v1/businesses/{$business->id}/site/gallery", $auth)
+            ->assertJsonPath('data.images', [['url' => 'https://cdn.example.com/g.jpg', 'caption' => 'Our dining hall']])
+            ->assertJsonPath('data.max', 24);
         $this->getJson("/api/v1/businesses/{$business->id}/site/other", $auth)->assertStatus(404);
+        // A caption-less entry (how it was saved before captions existed) still works.
+        $this->putJson("/api/v1/businesses/{$business->id}/site/gallery", ['images' => ['https://cdn.example.com/plain.jpg']], $auth)->assertOk();
+        $this->getJson("/api/v1/businesses/{$business->id}/site/gallery", $auth)
+            ->assertJsonPath('data.images', [['url' => 'https://cdn.example.com/plain.jpg', 'caption' => '']]);
+
+        // The caption shows under the photo on the website itself.
+        $this->putJson("/api/v1/businesses/{$business->id}/site/gallery", ['images' => [['url' => 'https://cdn.example.com/g.jpg', 'caption' => 'Our dining hall']]], $auth)->assertOk();
+        $html = $this->getJson("/api/v1/businesses/{$business->id}/site/templates/standard", $auth)->json('data.html');
+        $this->assertStringContainsString('Our dining hall', $html);
 
         $stranger = $this->user(['role' => 'BUSINESS_OWNER']);
         $this->putJson($url, ['images' => $picked], ['Authorization' => "Bearer {$this->token($stranger)}"])->assertStatus(403);

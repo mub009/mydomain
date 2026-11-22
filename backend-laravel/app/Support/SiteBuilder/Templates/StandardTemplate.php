@@ -70,6 +70,12 @@ class StandardTemplate
         $logoImg = $ctx['logoSrc'] ? "<img src=\"{$ctx['logoSrc']}\" alt=\"\">" : '';
         $banner = self::banner($ctx);
 
+        // About us sits beside a photo when there's one to show — the first
+        // listing photo, or the logo as a fallback — else it stays centred.
+        $aboutPhotoUrl = $ctx['photos']->first()['url'] ?? ($ctx['logoSrc'] ?: '');
+        $aboutPhoto = $aboutPhotoUrl ? "<div class=\"col-md-6\"><div class=\"about_photo\"><img src=\"{$aboutPhotoUrl}\" alt=\"{$ctx['name']}\" loading=\"lazy\"></div></div>" : '';
+        $aboutTextClass = $aboutPhotoUrl ? 'col-md-6 about_text' : 'col-md-12 text-center';
+
         // The photos double as the services showcase, each captioned with
         // what it shows — the way these pages are filled in. Services with
         // no photo still get a box.
@@ -203,7 +209,8 @@ class StandardTemplate
         <div class="about_section" id="about">
           <div class="container">
             <div class="row">
-              <div class="col-md-12 text-center">
+              {$aboutPhoto}
+              <div class="{$aboutTextClass}">
                 <div class="content">
                   <div class="ab">
                     <h2>About us</h2>
@@ -432,7 +439,11 @@ class StandardTemplate
         {$bannerCss}
 
         .about_section{padding:100px 0}
+        .about_section .row{align-items:center}
         .about_section .content p{line-height:26px}
+        .about_photo{border-radius:10px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.12)}
+        .about_photo img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block}
+        @media (max-width:767.98px){.about_photo{margin-bottom:25px}}
         .ab h2{text-transform:uppercase}
 
         .title{text-transform:uppercase}

@@ -88,7 +88,7 @@
     ]
   },
   "resources/css/app.css": {
-    "file": "assets/app-CJUy2ycY.css",
+    "file": "assets/app-9JgWkBuf.css",
     "src": "resources/css/app.css",
     "isEntry": true
   },
@@ -275,7 +275,7 @@
     ]
   },
   "resources/js/pages/manage.js": {
-    "file": "assets/manage-LtZXzO2o.js",
+    "file": "assets/manage-CarJkNX-.js",
     "name": "manage",
     "src": "resources/js/pages/manage.js",
     "isEntry": true,

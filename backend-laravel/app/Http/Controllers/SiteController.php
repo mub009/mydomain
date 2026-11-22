@@ -187,8 +187,15 @@ class SiteController extends Controller
         $actor = $request->attributes->get('auth');
         $this->ownedBusiness($actor, $id);
         $set = self::IMAGE_SETS[$kind];
+        $images = BusinessSite::where('businessId', $id)->value($set['column']) ?? [];
 
-        return ApiResponse::ok(['images' => BusinessSite::where('businessId', $id)->value($set['column']) ?? [], 'max' => $set['max']]);
+        // Each gallery photo can carry a caption, shown under it on the
+        // website; normalize older, caption-less entries saved as a plain URL.
+        if ($kind === 'gallery') {
+            $images = collect($images)->map(fn ($img) => is_array($img) ? ['url' => $img['url'] ?? '', 'caption' => $img['caption'] ?? ''] : ['url' => $img, 'caption' => ''])->all();
+        }
+
+        return ApiResponse::ok(['images' => $images, 'max' => $set['max']]);
     }
 
     // Replaces one set, in order. The website picks it up the next time it
@@ -199,12 +206,24 @@ class SiteController extends Controller
         $this->ownedBusiness($actor, $id);
         $set = self::IMAGE_SETS[$kind];
 
-        $data = $request->validate([
-            'images' => ['present', 'array', 'max:'.$set['max']],
-            'images.*' => ['required', 'string', 'url:http,https', 'max:2048'],
-        ]);
+        if ($kind === 'gallery') {
+            $request->merge(['images' => collect($request->input('images', []))
+                ->map(fn ($img) => is_array($img) ? $img : ['url' => $img, 'caption' => null])->all()]);
+            $data = $request->validate([
+                'images' => ['present', 'array', 'max:'.$set['max']],
+                'images.*.url' => ['required', 'string', 'url:http,https', 'max:2048'],
+                'images.*.caption' => ['nullable', 'string', 'max:200'],
+            ]);
+            $stored = collect($data['images'])->map(fn ($img) => ['url' => $img['url'], 'caption' => trim((string) ($img['caption'] ?? ''))])->values()->all();
+        } else {
+            $data = $request->validate([
+                'images' => ['present', 'array', 'max:'.$set['max']],
+                'images.*' => ['required', 'string', 'url:http,https', 'max:2048'],
+            ]);
+            $stored = array_values($data['images']);
+        }
 
-        $site = BusinessSite::updateOrCreate(['businessId' => $id], [$set['column'] => array_values($data['images']) ?: null]);
+        $site = BusinessSite::updateOrCreate(['businessId' => $id], [$set['column'] => $stored ?: null]);
 
         return ApiResponse::ok(['images' => $site->{$set['column']} ?? []]);
     }

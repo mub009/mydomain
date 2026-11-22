@@ -15,7 +15,11 @@
     <p class="mt-0.5 mb-3 text-xs text-ink-500">{{ $blurb }} Up to {{ $max }}, kept separate from your Photos. Changes show on your website straight away.</p>
     @if (count($images) > 0)
       <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        @foreach ($images as $i => $url)
+        @foreach ($images as $i => $img)
+          @php
+              $url = is_array($img) ? ($img['url'] ?? '') : $img;
+              $caption = is_array($img) ? ($img['caption'] ?? '') : '';
+          @endphp
           <div class="overflow-hidden rounded-lg border border-gray-200 bg-gray-100">
             <div class="relative aspect-video">
               <img src="{{ $url }}" alt="Photo {{ $i + 1 }}" class="h-full w-full object-cover" />
@@ -25,6 +29,10 @@
                 <button type="button" data-image-move="{{ $i }}" data-to="{{ $i + 1 }}" @disabled($i === count($images) - 1) class="h-7 w-7 flex items-center justify-center rounded-full bg-white/90 text-ink-700 shadow disabled:opacity-30" title="Move later"><x-icon name="chevron-right" :size="14" /></button>
               </div>
             </div>
+            @if ($kind === 'gallery')
+              {{-- Shown under the photo on your website, once set. --}}
+              <input type="text" value="{{ $caption }}" maxlength="200" placeholder="Caption shown on your website (optional)" data-image-caption="{{ $i }}" class="w-full border-t border-gray-200 bg-white px-2.5 py-1.5 text-xs text-ink-700 placeholder:text-ink-400 focus:outline-none focus:ring-1 focus:ring-inset focus:ring-brand-500" />
+            @endif
             <button type="button" data-image-remove="{{ $i }}" class="flex w-full items-center justify-center gap-1.5 border-t border-gray-200 bg-white py-2 text-xs font-semibold text-red-600 hover:bg-red-50">
               <x-icon name="trash-2" :size="13" /> Remove
             </button>

@@ -164,16 +164,25 @@ class Helpers
 
     private static function gallery(Business $business, string $name, bool $placeholders): \Illuminate\Support\Collection
     {
-        $urls = collect($business->site?->galleryImages ?? []);
-        if ($urls->isEmpty() && $placeholders) {
+        $raw = collect($business->site?->galleryImages ?? []);
+        if ($raw->isEmpty() && $placeholders) {
             return collect(array_fill(0, self::GALLERY_PLACEHOLDERS, [
                 // Relative, so it works on whichever host the builder is open on.
                 'url' => '/images/gallery-placeholder.svg',
                 'caption' => 'Upload photos in Our Gallery',
+                'alt' => 'Upload photos in Our Gallery',
             ]));
         }
 
-        return $urls->map(fn ($url) => ['url' => self::escapeHtml($url), 'caption' => $name])->values();
+        // Each photo can carry its own caption, shown under it on the
+        // website (set from the Our Gallery dashboard section); older
+        // entries saved before captions existed are just a plain URL.
+        return $raw->map(function ($img) use ($name) {
+            $url = is_array($img) ? ($img['url'] ?? '') : $img;
+            $caption = is_array($img) ? trim((string) ($img['caption'] ?? '')) : '';
+
+            return ['url' => self::escapeHtml($url), 'caption' => self::escapeHtml($caption), 'alt' => self::escapeHtml($caption !== '' ? $caption : $name)];
+        })->values();
     }
 
     /**
@@ -190,7 +199,11 @@ class Helpers
         if ($images->isEmpty()) {
             return '';
         }
-        $slides = $images->map(fn ($g) => "<div class=\"swiper-slide\"><a href=\"{$g['url']}\" class=\"glightbox2\" data-gallery=\"gallery2\"><img src=\"{$g['url']}\" alt=\"{$g['caption']}\" loading=\"lazy\"/></a></div>")->implode('');
+        $slides = $images->map(function ($g) {
+            $caption = $g['caption'] !== '' ? "<span class=\"mk-gallery-caption\">{$g['caption']}</span>" : '';
+
+            return "<div class=\"swiper-slide\"><a href=\"{$g['url']}\" class=\"glightbox2\" data-gallery=\"gallery2\"><img src=\"{$g['url']}\" alt=\"{$g['alt']}\" loading=\"lazy\"/></a>{$caption}</div>";
+        })->implode('');
 
         return "<div class=\"swiper gallery_slider\"><div class=\"swiper-wrapper\">{$slides}</div><div class=\"swiper-pagination\"></div></div>";
     }
