@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { cookieName, createSession, kiteApp, kiteConfigured, seal } from "@/lib/broker/zerodha";
+import { cookieName, createSession, kiteApp, kiteConfigured, sealAll, unsealAll } from "@/lib/broker/zerodha";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +20,10 @@ export async function GET(req: Request) {
     const s = await createSession(token, app);
     const res = back("connected");
     res.cookies.delete("kite_state");
-    res.cookies.set(cookieName(app.slot), seal(s, app.secret), { httpOnly: true, secure: u.protocol === "https:", sameSite: "lax", path: "/", expires: new Date(s.exp) });
+    // Keep the app's other accounts; replace this account's old session.
+    const jar = await cookies();
+    const list = [...unsealAll(jar.get(cookieName(app.slot))?.value, Date.now(), app.secret).filter((x) => x.userId !== s.userId), s];
+    res.cookies.set(cookieName(app.slot), sealAll(list, app.secret), { httpOnly: true, secure: u.protocol === "https:", sameSite: "lax", path: "/", expires: new Date(Math.max(...list.map((x) => x.exp))) });
     return res;
   } catch (e) {
     console.warn(`[nse-agent-desk] Zerodha login failed (account ${app.slot}):`, (e as Error).message);

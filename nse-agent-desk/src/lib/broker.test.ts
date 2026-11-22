@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { checksum, cookieName, kiteApps, normalizeHoldings, normalizePositions, seal, sessionExpiry, unseal } from "./broker/zerodha";
+import { checksum, cookieName, kiteApps, normalizeHoldings, normalizePositions, seal, sealAll, sessionExpiry, unseal, unsealAll } from "./broker/zerodha";
 
 describe("Zerodha", () => {
   afterEach(() => vi.unstubAllEnvs());
@@ -56,5 +56,13 @@ describe("Zerodha", () => {
     const v = seal({ token: "t", userId: "u", exp: Date.now() + 1000 }, "s3");
     expect(unseal(v, Date.now(), "s3")?.token).toBe("t");
     expect(unseal(v, Date.now(), "s1")).toBeNull(); // one account's cookie can't be read with another's key
+  });
+
+  it("keeps several accounts on one app, dropping ended sessions", () => {
+    const now = Date.now();
+    const v = sealAll([{ token: "a", userId: "ZX1", exp: now + 1000 }, { token: "b", userId: "ZY2", exp: now - 1 }, { token: "c", userId: "ZZ3", exp: now + 1000 }], "s");
+    expect(unsealAll(v, now, "s").map((x) => x.userId)).toEqual(["ZX1", "ZZ3"]);
+    expect(unsealAll(seal({ token: "old", userId: "ZX1", exp: now + 1000 }, "s"), now, "s").map((x) => x.token)).toEqual(["old"]); // earlier single-account cookie
+    expect(unsealAll(v, now, "other")).toEqual([]);
   });
 });

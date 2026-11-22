@@ -7,8 +7,9 @@
  * browser; it is never stored on the server or sent to any other site.
  *
  * Needs KITE_API_KEY and KITE_API_SECRET (from developers.kite.trade).
- * Zerodha licenses one Kite Connect app per client ID, so each further account
- * has its own app: KITE_API_KEY_2 / KITE_API_SECRET_2, up to _5.
+ * One app can hold several accounts: each login adds that account's session
+ * (if Zerodha allows that app for more than one client ID). Accounts on other
+ * apps go in KITE_API_KEY_2 / KITE_API_SECRET_2, up to _5.
  */
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 
@@ -52,6 +53,24 @@ export function seal(s: KiteSession, secret = process.env.KITE_API_SECRET ?? "")
   const body = Buffer.concat([c.update(JSON.stringify(s), "utf8"), c.final()]);
   return Buffer.concat([iv, c.getAuthTag(), body]).toString("base64url");
 }
+/** Sessions kept for one app: one per Zerodha account, live ones only. */
+export function unsealAll(v: string | undefined, now = Date.now(), secret = process.env.KITE_API_SECRET ?? ""): KiteSession[] {
+  if (!v) return [];
+  try {
+    const b = Buffer.from(v, "base64url");
+    const d = createDecipheriv("aes-256-gcm", key(secret), b.subarray(0, 12));
+    d.setAuthTag(b.subarray(12, 28));
+    const x = JSON.parse(Buffer.concat([d.update(b.subarray(28)), d.final()]).toString("utf8")) as KiteSession | KiteSession[];
+    return (Array.isArray(x) ? x : [x]).filter((s) => s?.token && s.exp > now).slice(0, 10);
+  } catch { return []; }
+}
+export function sealAll(list: KiteSession[], secret = process.env.KITE_API_SECRET ?? ""): string {
+  const iv = randomBytes(12);
+  const c = createCipheriv("aes-256-gcm", key(secret), iv);
+  const body = Buffer.concat([c.update(JSON.stringify(list), "utf8"), c.final()]);
+  return Buffer.concat([iv, c.getAuthTag(), body]).toString("base64url");
+}
+
 export function unseal(v: string | undefined, now = Date.now(), secret = process.env.KITE_API_SECRET ?? ""): KiteSession | null {
   if (!v) return null;
   try {

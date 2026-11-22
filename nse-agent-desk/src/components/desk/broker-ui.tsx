@@ -16,7 +16,7 @@ interface Account {
   user?: { id: string; name?: string };
   holdings?: BrokerHolding[]; positions?: BrokerPosition[]; totals?: Totals;
 }
-interface State { configured: boolean; accounts: Account[]; combined?: Totals; at?: string }
+interface State { configured: boolean; apps: number[]; accounts: Account[]; combined?: Totals; at?: string; expired?: boolean }
 
 const MSG: Record<string, [string, boolean]> = {
   connected: ["Zerodha account connected.", true],
@@ -122,7 +122,7 @@ export function ZerodhaCard() {
   const load = useCallback(async () => {
     setBusy(true);
     try { setS(await (await fetch("/api/broker/zerodha", { cache: "no-store" })).json()); }
-    catch { setS((x) => x ?? { configured: false, accounts: [] }); }
+    catch { setS((x) => x ?? { configured: false, apps: [], accounts: [] }); }
     setBusy(false);
   }, []);
 
@@ -141,9 +141,9 @@ export function ZerodhaCard() {
   }, [anyConnected, load]);
 
   const callback = typeof window !== "undefined" ? `${window.location.origin}/api/broker/zerodha/callback` : "/api/broker/zerodha/callback";
-  const connected = s?.accounts.filter((a) => a.connected) ?? [];
-  const waiting = s?.accounts.filter((a) => !a.connected) ?? [];
-  const label = (a: Account) => (a.user ? `${a.user.name ?? "Zerodha"} · ${a.user.id}` : `Account ${a.slot}`);
+  const connected = s?.accounts ?? [];
+  const apps = s?.apps ?? [];
+  const label = (a: Account) => (a.user ? `${a.user.name ?? "Zerodha"} · ${a.user.id}` : "Zerodha account");
   const end = connected.find((a) => a.expiresAt)?.expiresAt;
 
   return (
@@ -153,7 +153,7 @@ export function ZerodhaCard() {
         <div className="min-w-0 flex-1">
           <h2 className="text-[15px] font-semibold">Zerodha</h2>
           <p className="truncate text-xs text-muted-foreground">
-            {s?.configured ? `${connected.length} of ${s.accounts.length} account${s.accounts.length > 1 ? "s" : ""} connected · read-only${anyConnected && s.at ? ` · updated ${istTime(s.at)} IST` : ""}` : "Your holdings and today's positions, read-only"}
+            {s?.configured ? `${connected.length ? `${connected.length} account${connected.length > 1 ? "s" : ""} connected` : "Not connected"} · read-only${anyConnected && s.at ? ` · updated ${istTime(s.at)} IST` : ""}` : "Your holdings and today's positions, read-only"}
           </p>
         </div>
         {anyConnected && <Button size="sm" variant="outline" onClick={load} disabled={busy}><RefreshCw className={cn(busy && "animate-spin")} />Refresh</Button>}
@@ -190,34 +190,33 @@ export function ZerodhaCard() {
             </div>
           )}
           {connected.map((a) => (
-            <div key={a.slot} className="space-y-3 p-4">
+            <div key={`${a.slot}-${a.user?.id}`} className="space-y-3 p-4">
               <div className="flex flex-wrap items-center gap-2">
                 <h3 className="min-w-0 flex-1 truncate text-[14px] font-semibold">{label(a)}</h3>
-                <Button size="sm" variant="ghost" onClick={async () => { setNote(null); await fetch(`/api/broker/zerodha/logout?slot=${a.slot}`, { method: "POST" }); load(); }}><LogOut />Disconnect</Button>
+                <Button size="sm" variant="ghost" onClick={async () => { setNote(null); await fetch(`/api/broker/zerodha/logout?slot=${a.slot}&user=${encodeURIComponent(a.user?.id ?? "")}`, { method: "POST" }); load(); }}><LogOut />Disconnect</Button>
               </div>
               {a.error ? <p className="text-[13px] text-neg">Couldn&apos;t load from Zerodha: {a.error}</p> : <AccountView a={a} onOpen={(sym) => searchStock(sym)} />}
             </div>
           ))}
-          {waiting.length > 0 && (
-            <div className="space-y-3 px-4 py-4">
-              <p className="text-[13px] text-muted-foreground">
-                {waiting.some((a) => a.expired) ? "A Zerodha session ended (Kite sessions end at 6:00 AM IST every day). Connect again to refresh. " : ""}
-                You log in on Zerodha&apos;s own page; this app never sees your password. Access is read-only and ends at 6:00 AM IST each day.
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {waiting.map((a) => (
-                  <Button key={a.slot} asChild variant={a.slot === waiting[0].slot ? "default" : "outline"}>
-                    <a href={`/api/broker/zerodha/login?slot=${a.slot}`}><Link2 />{s.accounts.length > 1 ? `Connect account ${a.slot}` : "Connect Zerodha"}</a>
-                  </Button>
-                ))}
-              </div>
-              {s.accounts.length > 1 && <p className="text-[11.5px] text-muted-foreground">Log in to the Zerodha account that matches each app. If Kite logs you straight into the wrong one, log out on kite.zerodha.com first.</p>}
+          <div className="space-y-3 px-4 py-4">
+            <p className="text-[13px] text-muted-foreground">
+              {s.expired ? "A Zerodha session ended (Kite sessions end at 6:00 AM IST every day). Connect it again. " : ""}
+              {connected.length
+                ? "To add another Zerodha account (family or your second account), log out on kite.zerodha.com first, then connect and log in with that account's user ID."
+                : "You log in on Zerodha's own page; this app never sees your password. Access is read-only and ends at 6:00 AM IST each day."}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {apps.map((slot) => (
+                <Button key={slot} asChild variant={connected.length ? "outline" : "default"}>
+                  <a href={`/api/broker/zerodha/login?slot=${slot}`}><Link2 />{connected.length ? "Connect another account" : "Connect Zerodha"}{apps.length > 1 ? ` (app ${slot})` : ""}</a>
+                </Button>
+              ))}
             </div>
-          )}
+          </div>
           {anyConnected && (
             <p className="px-4 py-3 text-[11.5px] text-muted-foreground">
               From Zerodha, read-only. Tap a stock for the agents&apos; analysis. Refreshes every minute in market hours; sessions end at 6:00 AM IST{end ? ` (${new Date(end).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })})` : ""}.
-              {" "}More accounts: add one Kite Connect app per account as <code>KITE_API_KEY_2</code> / <code>KITE_API_SECRET_2</code> (up to _5), with the same redirect URL.
+
             </p>
           )}
         </div>
