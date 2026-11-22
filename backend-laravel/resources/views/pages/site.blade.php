@@ -24,7 +24,7 @@
          everywhere even though each template's own CSS gives it a different
          surrounding section. --}}
     #mk-site-root .gallery_slider{padding-bottom:34px}
-    #mk-site-root .gallery_slider .swiper-slide{width:220px;flex-shrink:0;aspect-ratio:4/3;border-radius:10px;overflow:hidden}
+    #mk-site-root .gallery_slider .swiper-slide{width:280px;flex-shrink:0;aspect-ratio:4/3;border-radius:10px;overflow:hidden;border:4px solid #fff;box-shadow:0 6px 18px rgba(0,0,0,.12)}
     #mk-site-root .gallery_slider .swiper-slide img{width:100%;height:100%;object-fit:cover;display:block}
     #mk-site-root .gallery_slider .swiper-pagination-bullet{background:#1a1a1a}
     {!! str_ireplace('</style', '<\/style', $site['css']) !!}

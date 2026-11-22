@@ -442,11 +442,15 @@ class StandardTemplate
         .service-gallery .container{padding:0}
         .our_gallery .g-item{padding:8px}
         .our_gallery img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:4px;display:block}
-        .image{margin-bottom:25px}
-        .w-box{background:#fff;width:100%;border-radius:5px;box-shadow:0 5px 15px rgba(0,0,0,.1);margin-bottom:5px;overflow:hidden}
+        .image{margin-bottom:32px}
+        /* A row's columns stretch to equal height; without height:100% here a
+           short caption left extra room under its box while a long one ate
+           into it, so the gap looked different card to card. */
+        .w-box{background:#fff;width:100%;height:100%;display:flex;flex-direction:column;border-radius:5px;box-shadow:0 5px 15px rgba(0,0,0,.1);overflow:hidden}
         .w-box p{margin-top:5px;margin-bottom:0;padding:5px}
         .w-box-text{padding:30px 10px;font-weight:600}
-        .img-wrapper{position:relative;height:260px}
+        .img-wrapper{position:relative;height:320px;flex:0 0 auto}
+        @media (min-width:992px){.img-wrapper{height:360px}}
         .img-wrapper img{width:100%;height:100%;object-fit:cover;display:block}
         .img-overlay{background:rgba(0,0,0,.7);width:100%;height:100%;position:absolute;top:0;left:0;display:flex;justify-content:center;align-items:center;opacity:0;pointer-events:none;transition:opacity .3s}
         .img-wrapper:hover .img-overlay{opacity:1}
@@ -508,7 +512,7 @@ class StandardTemplate
         @media (max-width:991.98px){.main_nav.navbar-nav a.nav-link{padding:1rem .8rem;border-bottom:1px solid #e1e1e1;font-size:14px}.main_banner{height:400px}}
         @media (max-width:767.98px){.navbar-collapse{background:#f4f4f4}.navbar-brand h1{font-size:18px;white-space:break-spaces}.socail_feeds .col-md-4{padding-top:15px}.banner .owl-dots{left:15px;bottom:15px}header .wrapper{display:flex}.contact_wrap .title h2,.popular_sec .title h2{font-size:26px;font-weight:600}.about_section{padding:30px 0}.popular_sec{padding-bottom:30px;padding-top:30px}}
         @media (max-width:575.98px){.main_banner{height:290px}.banner{height:300px;margin-bottom:0}.logo img{max-width:110px}.popular_sec .title{margin-top:0}}
-        @media only screen and (max-width:600px){#social-share{bottom:85px;right:20px}.img-wrapper{height:140px}.image{padding:5px}.w-box{padding:0}}
+        @media only screen and (max-width:600px){#social-share{bottom:85px;right:20px}.img-wrapper{height:180px}.image{padding:5px}.w-box{padding:0}}
         @media (prefers-reduced-motion:reduce){.owl-item,.owl-dot span{animation:none}.owl-item-1{opacity:1}}
         CSS;
     }
