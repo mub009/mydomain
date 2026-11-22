@@ -112,6 +112,10 @@ class StandardTemplate
             </div>
             HTML;
 
+        // The nav only links to a section once it actually has something —
+        // matching the other templates, which hide the same links when empty.
+        $navServices = $servicesSection === '' ? '' : '<li class="nav-item"><a class="nav-link" href="#services">Services</a></li>';
+
         $galleryItems = Helpers::gallerySlider(collect($ctx['gallery']));
         $gallerySection = $galleryItems === '' ? '' : <<<HTML
             <div class="popular_sec our_gallery" id="gallery">
@@ -123,6 +127,7 @@ class StandardTemplate
                 </div>
             </div>
             HTML;
+        $navGallery = $gallerySection === '' ? '' : '<li class="nav-item"><a class="nav-link" href="#gallery">Gallery</a></li>';
 
         $socialSection = $ctx['instagram'] ? <<<HTML
             <div class="socail_feeds">
@@ -179,6 +184,8 @@ class StandardTemplate
                   <ul class="navbar-nav ml-auto main_nav">
                     <li class="nav-item active"><a class="nav-link act-link" href="#home">Home<span class="sr-only">(current)</span></a></li>
                     <li class="nav-item"><a class="nav-link" href="#about">About Us</a></li>
+                    {$navServices}
+                    {$navGallery}
                     <li class="nav-item"><a class="nav-link" href="#contact">Contact Us</a></li>
                   </ul>
                 </div>
