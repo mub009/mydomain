@@ -8,15 +8,17 @@ import { inr, istTime, pct } from "@/lib/format";
 import type { BrokerHolding, BrokerPosition } from "@/lib/broker/zerodha";
 import { marketStatus } from "@/lib/market/calendar";
 import { cn } from "@/lib/utils";
+import { DESK_API, deskApi, useAuth } from "@/store/auth";
 import { useDesk } from "@/store/desk";
 
 type Totals = { invested: number; value: number; pnl: number; pnlPct: number; dayPnl: number; positionsPnl: number };
 interface Account {
+  id?: number; // set by the NSE Desk API
   slot: number; connected: boolean; expired?: boolean; error?: string; expiresAt?: string;
   user?: { id: string; name?: string };
   holdings?: BrokerHolding[]; positions?: BrokerPosition[]; totals?: Totals;
 }
-interface State { configured: boolean; apps: number[]; accounts: Account[]; combined?: Totals; at?: string; expired?: boolean }
+interface State { configured: boolean; apps: number[]; accounts: Account[]; combined?: Totals; at?: string; expired?: boolean; needLogin?: boolean }
 
 const MSG: Record<string, [string, boolean]> = {
   connected: ["Zerodha account connected.", true],
@@ -118,13 +120,19 @@ export function ZerodhaCard() {
   const [note, setNote] = useState<[string, boolean] | null>(null);
   const [copied, setCopied] = useState(false);
   const searchStock = useDesk((x) => x.searchStock);
+  const { token, ready, init } = useAuth();
+  useEffect(() => { if (DESK_API && !ready) init(); }, [ready, init]);
+  useEffect(() => { if (DESK_API && ready && !token) setNote(null); }, [ready, token]); // logged out: drop old messages
 
+  // With the NSE Desk API (Laravel), accounts belong to your login; otherwise this site's own routes.
   const load = useCallback(async () => {
+    if (DESK_API && !ready) return;
+    if (DESK_API && !token) { setS({ configured: true, apps: [], accounts: [], needLogin: true }); return; }
     setBusy(true);
-    try { setS(await (await fetch("/api/broker/zerodha", { cache: "no-store" })).json()); }
+    try { setS(DESK_API ? await deskApi<State>("/api/zerodha") : await (await fetch("/api/broker/zerodha", { cache: "no-store" })).json()); }
     catch { setS((x) => x ?? { configured: false, apps: [], accounts: [] }); }
     setBusy(false);
-  }, []);
+  }, [ready, token]);
 
   useEffect(() => {
     load();
@@ -140,7 +148,18 @@ export function ZerodhaCard() {
     return () => clearInterval(t);
   }, [anyConnected, load]);
 
-  const callback = typeof window !== "undefined" ? `${window.location.origin}/api/broker/zerodha/callback` : "/api/broker/zerodha/callback";
+  const callback = DESK_API ? `${DESK_API}/api/zerodha/callback` : typeof window !== "undefined" ? `${window.location.origin}/api/broker/zerodha/callback` : "/api/broker/zerodha/callback";
+  const connect = async (slot: number) => {
+    if (!DESK_API) { window.location.href = `/api/broker/zerodha/login?slot=${slot}`; return; }
+    try { const { url } = await deskApi<{ url: string }>("/api/zerodha/connect", { method: "POST", body: JSON.stringify({ slot }) }); window.location.href = url; }
+    catch (e) { setNote([(e as Error).message, false]); }
+  };
+  const disconnect = async (a: Account) => {
+    setNote(null);
+    if (DESK_API && a.id) await deskApi(`/api/zerodha/accounts/${a.id}`, { method: "DELETE" }).catch(() => {});
+    else await fetch(`/api/broker/zerodha/logout?slot=${a.slot}&user=${encodeURIComponent(a.user?.id ?? "")}`, { method: "POST" });
+    load();
+  };
   const connected = s?.accounts ?? [];
   const apps = s?.apps ?? [];
   const label = (a: Account) => (a.user ? `${a.user.name ?? "Zerodha"} · ${a.user.id}` : "Zerodha account");
@@ -163,6 +182,11 @@ export function ZerodhaCard() {
 
       {!s ? (
         <p className="flex items-center gap-2 px-4 py-6 text-[13px] text-muted-foreground"><Loader2 className="size-4 animate-spin" />Checking Zerodha…</p>
+      ) : s.needLogin ? (
+        <div className="flex flex-wrap items-center gap-3 px-4 py-4">
+          <p className="min-w-0 flex-1 basis-64 text-[13px] text-muted-foreground">Log in to your NSE Agent Desk account to connect your Zerodha accounts. They stay linked to your login on every device.</p>
+          <Button asChild><a href="/login"><Link2 />Log in</a></Button>
+        </div>
       ) : !s.configured ? (
         <div className="space-y-3 px-4 py-4 text-[13px] leading-relaxed">
           <p>To connect, create a Kite Connect app once (Zerodha&apos;s official API):</p>
@@ -177,7 +201,7 @@ export function ZerodhaCard() {
                 </button>
               </span>
             </li>
-            <li>Add the app&apos;s API key and secret to the server as <code>KITE_API_KEY</code> and <code>KITE_API_SECRET</code> (on Vercel: Project → Settings → Environment Variables, then redeploy; locally: <code>.env.local</code>). Never paste the secret into a chat.</li>
+            <li>Add the app&apos;s API key and secret as <code>KITE_API_KEY</code> and <code>KITE_API_SECRET</code> {DESK_API ? <>in the NSE Desk API&apos;s <code>.env</code> on its server</> : <>on this site&apos;s server (on Vercel: Project → Settings → Environment Variables, then redeploy; locally: <code>.env.local</code>)</>}. Never paste the secret into a chat.</li>
             <li>Come back here and press <b className="text-foreground">Connect</b>.</li>
           </ol>
         </div>
@@ -190,10 +214,10 @@ export function ZerodhaCard() {
             </div>
           )}
           {connected.map((a) => (
-            <div key={`${a.slot}-${a.user?.id}`} className="space-y-3 p-4">
+            <div key={`${a.id ?? a.slot}-${a.user?.id}`} className="space-y-3 p-4">
               <div className="flex flex-wrap items-center gap-2">
                 <h3 className="min-w-0 flex-1 truncate text-[14px] font-semibold">{label(a)}</h3>
-                <Button size="sm" variant="ghost" onClick={async () => { setNote(null); await fetch(`/api/broker/zerodha/logout?slot=${a.slot}&user=${encodeURIComponent(a.user?.id ?? "")}`, { method: "POST" }); load(); }}><LogOut />Disconnect</Button>
+                <Button size="sm" variant="ghost" onClick={() => disconnect(a)}><LogOut />Disconnect</Button>
               </div>
               {a.error ? <p className="text-[13px] text-neg">Couldn&apos;t load from Zerodha: {a.error}</p> : <AccountView a={a} onOpen={(sym) => searchStock(sym)} />}
             </div>
@@ -207,8 +231,8 @@ export function ZerodhaCard() {
             </p>
             <div className="flex flex-wrap gap-2">
               {apps.map((slot) => (
-                <Button key={slot} asChild variant={connected.length ? "outline" : "default"}>
-                  <a href={`/api/broker/zerodha/login?slot=${slot}`}><Link2 />{connected.length ? "Connect another account" : "Connect Zerodha"}{apps.length > 1 ? ` (app ${slot})` : ""}</a>
+                <Button key={slot} variant={connected.length ? "outline" : "default"} onClick={() => connect(slot)}>
+                  <Link2 />{connected.length ? "Connect another account" : "Connect Zerodha"}{apps.length > 1 ? ` (app ${slot})` : ""}
                 </Button>
               ))}
             </div>

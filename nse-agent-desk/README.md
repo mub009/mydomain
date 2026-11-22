@@ -343,3 +343,7 @@ The Positions page has a Zerodha card that shows your holdings and today's posit
 
 The access token Zerodha returns is kept only in an encrypted, http-only cookie in your browser and ends at 06:00 IST each day, when Kite sessions end; press Connect again after that. Tap any holding to open the agents' analysis of it.
 
+## Logins and Zerodha through the NSE Desk API (Laravel)
+
+`../nse-desk-api` is a separate, API-only Laravel app for user logins and each user's Zerodha accounts (stored in its database, so they follow the user to any device). Set `NEXT_PUBLIC_DESK_API` to its address (e.g. `https://nse-api.example.com`) and rebuild: the app then shows **Log in** / **Sign up**, and the Zerodha card connects accounts through that API instead of this site's own routes. Without it, nothing changes. Deployment steps are in `../nse-desk-api/README.md`.
+
