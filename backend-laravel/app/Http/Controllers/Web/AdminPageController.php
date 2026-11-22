@@ -12,6 +12,7 @@ use App\Http\Controllers\QrCodeController;
 use App\Http\Controllers\SeoController;
 use App\Http\Controllers\VisitorController;
 use App\Support\InternalApi;
+use App\Support\SiteBuilder\TemplateRegistry;
 use Illuminate\Http\Request;
 
 // The admin console. Each tab is its own server-rendered view of one admin
@@ -19,7 +20,7 @@ use Illuminate\Http\Request;
 class AdminPageController extends Controller
 {
     // Poster Studio is not part of the Laravel backend yet (see README).
-    public const TABS = ['Overview', 'Users', 'Businesses', 'Approvals', 'QR Boards', 'Visitors', 'Analytics', 'SEO', 'Reports', 'Gold Rates', 'Card Templates', 'Feature Pricing', 'Commission'];
+    public const TABS = ['Overview', 'Users', 'Businesses', 'Approvals', 'QR Boards', 'Visitors', 'Analytics', 'SEO', 'Reports', 'Gold Rates', 'Card Templates', 'Website Templates', 'Feature Pricing', 'Commission'];
 
     public const ROLES = ['CUSTOMER', 'BUSINESS_OWNER', 'DEALER', 'ADMIN'];
 
@@ -89,6 +90,9 @@ class AdminPageController extends Controller
                 ]), [], true)['data'] ?? null;
                 $data['categories'] = InternalApi::tryCall([CategoryController::class, 'index'])['data'] ?? [];
                 break;
+            case 'Website Templates':
+                $data['siteTemplates'] = TemplateRegistry::choices();
+                break;
             case 'Commission':
                 $data['commissionReport'] = InternalApi::tryCall([\App\Http\Controllers\CommissionController::class, 'adminIndex'], array_filter([
                     'search' => $q('search'), 'sort' => $q('sort'), 'due' => $request->boolean('due') ? '1' : null, 'page' => $page,
@@ -119,6 +123,16 @@ class AdminPageController extends Controller
             'options' => InternalApi::call([CardTemplateController::class, 'options'], [], [], true)['data'],
             'categories' => InternalApi::tryCall([CategoryController::class, 'index'])['data'] ?? [],
         ]);
+    }
+
+    // The website-template style editor: /admin/site-templates/<id>, full
+    // screen — no dashboard chrome, just the CSS editor and its preview.
+    public function siteTemplate(string $templateId)
+    {
+        abort_unless(TemplateRegistry::isKnown($templateId), 404);
+        $meta = collect(TemplateRegistry::choices())->firstWhere('id', $templateId);
+
+        return view('pages.admin.site-template-editor', ['templateId' => $templateId, 'meta' => $meta]);
     }
 
     // The "Online now" list alone, for the Analytics tab's 15-second refresh.

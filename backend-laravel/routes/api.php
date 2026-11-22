@@ -352,6 +352,14 @@ Route::prefix('admin')->middleware(['auth.jwt', 'role:ADMIN'])->group(function (
     Route::post('/seo/pages/{id}/submit', [SeoController::class, 'adminSubmit']);
     Route::post('/seo/pages/{id}/check', [SeoController::class, 'adminCheck']);
 
+    // Website templates: an admin's CSS overrides for one of the 7 designs,
+    // applied on top of what every business using it already gets.
+    Route::prefix('site-templates')->group(function () {
+        Route::get('/{templateId}', [\App\Http\Controllers\SiteTemplateStyleController::class, 'show']);
+        Route::put('/{templateId}', [\App\Http\Controllers\SiteTemplateStyleController::class, 'update']);
+        Route::post('/{templateId}/preview', [\App\Http\Controllers\SiteTemplateStyleController::class, 'preview']);
+    });
+
     // Gold-rate poster maker: today's rates and templates (a master PNG plus
     // where the business's logo and the rates go on it).
     Route::prefix('card-templates')->group(function () {

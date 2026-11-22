@@ -87,6 +87,8 @@ Route::middleware('web.role:ADMIN')->group(function () {
     Route::get('/admin/online', [AdminPageController::class, 'online']);
     // The digital-visiting-card template editor.
     Route::get('/admin/card-templates/{id}', [AdminPageController::class, 'cardTemplate']);
+    // A website template's CSS override editor, full screen.
+    Route::get('/admin/site-templates/{templateId}', [AdminPageController::class, 'siteTemplate']);
     // The gold-rate template editor, and the stored images it draws on —
     // kept off public URLs, so they're served here to admins only.
     Route::get('/admin/gold-rates/templates/{id}', [GoldRatePageController::class, 'editor']);

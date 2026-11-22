@@ -3,6 +3,7 @@
 namespace App\Support\SiteBuilder;
 
 use App\Models\Business;
+use App\Models\SiteTemplateStyle;
 use App\Support\SiteBuilder\Templates\ClassicTemplate;
 use App\Support\SiteBuilder\Templates\ElegantTemplate;
 use App\Support\SiteBuilder\Templates\FreshTemplate;
@@ -87,10 +88,16 @@ class TemplateRegistry
 
         $category = $business->category?->name;
 
+        // An admin's styling tweaks for this template (App\Models\SiteTemplateStyle),
+        // if any — appended after the template's own rules so it can restyle
+        // them, but still ahead of whatever a business saved for itself.
+        $overrideCss = SiteTemplateStyle::find($class::ID)?->customCss;
+        $css = $overrideCss ? $built['css']."\n".$overrideCss : $built['css'];
+
         return [
             'templateId' => $class::ID,
             'html' => $built['html'],
-            'css' => $built['css'],
+            'css' => $css,
             // The rules that depend on the listing's data (the slider's
             // timing), for LiveSite to lay over a saved page.
             'liveCss' => $built['liveCss'] ?? '',

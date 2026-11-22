@@ -34,6 +34,7 @@
         'Content' => [
             'Gold Rates' => ['coins', "Today's gold rates and poster templates"],
             'Card Templates' => ['layout-template', 'Digital visiting card designs'],
+            'Website Templates' => ['globe', 'Styling for the 7 website designs'],
             'SEO' => ['search-check', 'Pages on Google and their status'],
         ],
         'Insights' => [

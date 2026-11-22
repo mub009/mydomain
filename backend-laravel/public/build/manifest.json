@@ -88,7 +88,7 @@
     ]
   },
   "resources/css/app.css": {
-    "file": "assets/app-9JgWkBuf.css",
+    "file": "assets/app-JDjnNjp-.css",
     "src": "resources/css/app.css",
     "isEntry": true
   },
@@ -339,6 +339,16 @@
     ],
     "css": [
       "assets/site-builder-UW_WCGPW.css"
+    ]
+  },
+  "resources/js/pages/site-template-editor.js": {
+    "file": "assets/site-template-editor-COPe9x32.js",
+    "name": "site-template-editor",
+    "src": "resources/js/pages/site-template-editor.js",
+    "isEntry": true,
+    "imports": [
+      "_api-B_riRJ0q.js",
+      "_ui-BdSpcnW7.js"
     ]
   },
   "resources/js/pages/site.js": {
