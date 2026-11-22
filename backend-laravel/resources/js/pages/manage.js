@@ -37,7 +37,7 @@ $("[data-share-business]")?.addEventListener("click", (e) => {
   const message = [`*${share.name}*`, ...links.map((l) => `${l.label}: ${l.url}`)].join("\n");
   // Open them right here too — the header has no separate buttons for this.
   const openLinks = [
-    share.website && `<a href="${esc(share.website)}" target="_blank" rel="noopener" class="btn-secondary flex-1 justify-center py-2.5 text-sm">${icon("globe", { size: 15 })} Open website</a>`,
+    share.website && `<a href="${esc(share.website)}" target="_blank" rel="noopener" class="btn-secondary flex-1 justify-center py-2.5 text-sm">${icon("globe", { size: 15 })} View page</a>`,
     share.listing && `<a href="${esc(share.listing)}" target="_blank" rel="noopener" class="btn-secondary flex-1 justify-center py-2.5 text-sm">${icon("external-link", { size: 15 })} View public page</a>`,
   ].filter(Boolean);
   const body = links.length

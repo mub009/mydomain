@@ -595,7 +595,7 @@ __p+='`),fe}),it+=`';
     ${Nt.notice?`<p class="mt-3 rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-800">${Ln(Nt.notice)}</p>`:""}
     ${Nt.error?`<p class="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">${Ln(Nt.error)}</p>`:""}
     <div class="mt-4 flex flex-wrap items-center gap-2">
-      ${t?`<a href="${Ln(r)}" target="_blank" rel="noreferrer" class="btn-secondary px-3 py-2 text-sm">${jn("external-link",{size:14})} Open ${i?"shop":"website"}</a>`:`<span class="text-xs text-ink-500">${i?"":"Goes live once your listing is published."}</span>`}
+      ${t?`<a href="${Ln(r)}" target="_blank" rel="noreferrer" class="btn-secondary px-3 py-2 text-sm">${jn("external-link",{size:14})} ${i?"Open shop":"View page"}</a>`:`<span class="text-xs text-ink-500">${i?"":"Goes live once your listing is published."}</span>`}
       ${i?`<button type="button" data-action="publish" ${Nt.publishing?"disabled":""} class="px-3 py-2 text-sm ${Nt.isPublished?"btn-secondary":"btn-primary"} disabled:opacity-50">${jn("upload",{size:14})} ${Nt.publishing?"Working…":Nt.isPublished?"Close shop":"Open shop"}</button>`:""}
       <label class="flex items-center gap-1.5 text-sm">
         <span class="text-xs font-semibold text-ink-700">Template</span>

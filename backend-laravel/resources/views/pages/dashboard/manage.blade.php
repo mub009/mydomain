@@ -44,7 +44,7 @@
         @endif
         {{-- On every page, not just the Website section — this is the one place it's always in reach. --}}
         @if (! empty($share['website']))
-          <a href="{{ $share['website'] }}" target="_blank" rel="noopener" class="btn-secondary px-3 py-2 text-sm"><x-icon name="globe" :size="15" /> Open website</a>
+          <a href="{{ $share['website'] }}" target="_blank" rel="noopener" class="btn-secondary px-3 py-2 text-sm"><x-icon name="globe" :size="15" /> View page</a>
         @endif
         <button type="button" data-share-business="{{ json_encode($share) }}" class="btn-secondary px-3 py-2 text-sm"><x-icon name="share-2" :size="15" /> Share</button>
         {{-- Opening the website and the public page is in the Share pop-up (manage.js). --}}

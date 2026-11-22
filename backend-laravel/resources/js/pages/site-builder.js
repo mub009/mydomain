@@ -89,7 +89,7 @@ function headerView() {
     <div class="mt-4 flex flex-wrap items-center gap-2">
       ${
         isLive
-          ? `<a href="${esc(publicUrl)}" target="_blank" rel="noreferrer" class="btn-secondary px-3 py-2 text-sm">${icon("external-link", { size: 14 })} Open ${isShop ? "shop" : "website"}</a>`
+          ? `<a href="${esc(publicUrl)}" target="_blank" rel="noreferrer" class="btn-secondary px-3 py-2 text-sm">${icon("external-link", { size: 14 })} ${isShop ? "Open shop" : "View page"}</a>`
           : `<span class="text-xs text-ink-500">${isShop ? "" : "Goes live once your listing is published."}</span>`
       }
       ${

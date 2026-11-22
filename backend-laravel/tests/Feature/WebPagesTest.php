@@ -164,9 +164,9 @@ class WebPagesTest extends TestCase
             ->assertSee('data-share-business', false)
             ->assertSee(e(json_encode("https://{$business->slug}.markkito.test")), false)
             ->assertSee(e(json_encode(\App\Support\Seo\SeoTracker::listingUrl($business->slug))), false)
-            // A direct "Open website" button sits in the header on every page;
+            // A direct "View page" button sits in the header on every page;
             // the listing link stays inside the Share pop-up only.
-            ->assertSee('href="https://'.$business->slug.'.markkito.test"', false)->assertSee('Open website')
+            ->assertSee('href="https://'.$business->slug.'.markkito.test"', false)->assertSee('View page')
             ->assertDontSee('View public page');
     }
 
