@@ -7,13 +7,28 @@
  * browser; it is never stored on the server or sent to any other site.
  *
  * Needs KITE_API_KEY and KITE_API_SECRET (from developers.kite.trade).
+ * Zerodha licenses one Kite Connect app per client ID, so each further account
+ * has its own app: KITE_API_KEY_2 / KITE_API_SECRET_2, up to _5.
  */
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 
 const API = process.env.KITE_API_ROOT ?? "https://api.kite.trade"; // override only for tests
 export const COOKIE = "kite_session";
+export const cookieName = (slot: number) => (slot === 1 ? COOKIE : `${COOKIE}_${slot}`);
 
-export const kiteConfigured = () => Boolean(process.env.KITE_API_KEY && process.env.KITE_API_SECRET);
+export interface KiteApp { slot: number; key: string; secret: string }
+/** The Kite Connect apps set on the server, one per Zerodha account. */
+export function kiteApps(): KiteApp[] {
+  const out: KiteApp[] = [];
+  for (let slot = 1; slot <= 5; slot++) {
+    const sfx = slot === 1 ? "" : `_${slot}`;
+    const key = process.env[`KITE_API_KEY${sfx}`], secret = process.env[`KITE_API_SECRET${sfx}`];
+    if (key && secret) out.push({ slot, key, secret });
+  }
+  return out;
+}
+export const kiteApp = (slot: number) => kiteApps().find((a) => a.slot === slot);
+export const kiteConfigured = () => kiteApps().length > 0;
 export const loginUrl = (apiKey: string) => `${process.env.KITE_LOGIN_ROOT ?? "https://kite.zerodha.com"}/connect/login?v=3&api_key=${encodeURIComponent(apiKey)}`;
 
 /** Kite's checksum: SHA-256 of api_key + request_token + api_secret. */
@@ -29,19 +44,19 @@ export function sessionExpiry(now = new Date()): Date {
 
 export interface KiteSession { token: string; userId: string; name?: string; exp: number }
 
-// AES-256-GCM, keyed from the API secret, so the cookie can't be read or altered.
-const key = () => createHash("sha256").update(`nse-agent-desk:${process.env.KITE_API_SECRET ?? ""}`).digest();
-export function seal(s: KiteSession): string {
+// AES-256-GCM, keyed from that app's API secret, so the cookie can't be read or altered.
+const key = (secret: string) => createHash("sha256").update(`nse-agent-desk:${secret}`).digest();
+export function seal(s: KiteSession, secret = process.env.KITE_API_SECRET ?? ""): string {
   const iv = randomBytes(12);
-  const c = createCipheriv("aes-256-gcm", key(), iv);
+  const c = createCipheriv("aes-256-gcm", key(secret), iv);
   const body = Buffer.concat([c.update(JSON.stringify(s), "utf8"), c.final()]);
   return Buffer.concat([iv, c.getAuthTag(), body]).toString("base64url");
 }
-export function unseal(v: string | undefined, now = Date.now()): KiteSession | null {
+export function unseal(v: string | undefined, now = Date.now(), secret = process.env.KITE_API_SECRET ?? ""): KiteSession | null {
   if (!v) return null;
   try {
     const b = Buffer.from(v, "base64url");
-    const d = createDecipheriv("aes-256-gcm", key(), b.subarray(0, 12));
+    const d = createDecipheriv("aes-256-gcm", key(secret), b.subarray(0, 12));
     d.setAuthTag(b.subarray(12, 28));
     const s = JSON.parse(Buffer.concat([d.update(b.subarray(28)), d.final()]).toString("utf8")) as KiteSession;
     return s.token && s.exp > now ? s : null;
@@ -50,9 +65,9 @@ export function unseal(v: string | undefined, now = Date.now()): KiteSession | n
 
 export class KiteError extends Error { constructor(message: string, public status: number, public type?: string) { super(message); } }
 
-async function kite<T>(path: string, init: RequestInit & { token?: string } = {}): Promise<T> {
+async function kite<T>(path: string, init: RequestInit & { token?: string; apiKey?: string } = {}): Promise<T> {
   const headers: Record<string, string> = { "X-Kite-Version": "3", ...(init.headers as Record<string, string>) };
-  if (init.token) headers.Authorization = `token ${process.env.KITE_API_KEY}:${init.token}`;
+  if (init.token) headers.Authorization = `token ${init.apiKey ?? process.env.KITE_API_KEY}:${init.token}`;
   const res = await fetch(API + path, { ...init, headers, signal: AbortSignal.timeout(15000), cache: "no-store" });
   const j = await res.json().catch(() => null) as { status?: string; data?: T; message?: string; error_type?: string } | null;
   if (!res.ok || j?.status !== "success") throw new KiteError(j?.message ?? `Zerodha error ${res.status}`, res.status, j?.error_type);
@@ -60,8 +75,8 @@ async function kite<T>(path: string, init: RequestInit & { token?: string } = {}
 }
 
 /** Swap the request token from the login redirect for a session. */
-export async function createSession(requestToken: string): Promise<KiteSession> {
-  const apiKey = process.env.KITE_API_KEY!, secret = process.env.KITE_API_SECRET!;
+export async function createSession(requestToken: string, app: KiteApp): Promise<KiteSession> {
+  const apiKey = app.key, secret = app.secret;
   const d = await kite<{ access_token: string; user_id: string; user_name?: string }>("/session/token", {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
@@ -70,9 +85,9 @@ export async function createSession(requestToken: string): Promise<KiteSession> 
   return { token: d.access_token, userId: d.user_id, name: d.user_name, exp: sessionExpiry().getTime() };
 }
 
-export async function endSession(token: string) {
-  const q = new URLSearchParams({ api_key: process.env.KITE_API_KEY!, access_token: token });
-  await kite(`/session/token?${q}`, { method: "DELETE", token }).catch(() => {});
+export async function endSession(token: string, app: KiteApp) {
+  const q = new URLSearchParams({ api_key: app.key, access_token: token });
+  await kite(`/session/token?${q}`, { method: "DELETE", token, apiKey: app.key }).catch(() => {});
 }
 
 export interface BrokerHolding { symbol: string; exchange: string; qty: number; avgPrice: number; lastPrice: number; closePrice: number; invested: number; value: number; pnl: number; pnlPct: number; dayChangePct: number }
@@ -103,10 +118,10 @@ export function normalizePositions(raw: { net?: RawPosition[] }): BrokerPosition
   }));
 }
 
-export async function portfolio(token: string) {
+export async function portfolio(token: string, apiKey?: string) {
   const [h, p] = await Promise.all([
-    kite<RawHolding[]>("/portfolio/holdings", { token }),
-    kite<{ net?: RawPosition[] }>("/portfolio/positions", { token }),
+    kite<RawHolding[]>("/portfolio/holdings", { token, apiKey }),
+    kite<{ net?: RawPosition[] }>("/portfolio/positions", { token, apiKey }),
   ]);
   const holdings = normalizeHoldings(h), positions = normalizePositions(p);
   const invested = holdings.reduce((s, x) => s + x.invested, 0), value = holdings.reduce((s, x) => s + x.value, 0);

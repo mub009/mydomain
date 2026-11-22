@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { checksum, normalizeHoldings, normalizePositions, seal, sessionExpiry, unseal } from "./broker/zerodha";
+import { checksum, cookieName, kiteApps, normalizeHoldings, normalizePositions, seal, sessionExpiry, unseal } from "./broker/zerodha";
 
 describe("Zerodha", () => {
   afterEach(() => vi.unstubAllEnvs());
@@ -45,5 +45,16 @@ describe("Zerodha", () => {
   it("reads today's net positions", () => {
     const p = normalizePositions({ net: [{ tradingsymbol: "SBIN", exchange: "NSE", product: "MIS", quantity: -50, average_price: 800, last_price: 790, pnl: 500, m2m: 500 }] });
     expect(p[0]).toMatchObject({ symbol: "SBIN", product: "MIS", qty: -50, pnl: 500 });
+  });
+
+  it("finds one Kite Connect app per account, each with its own cookie", () => {
+    vi.stubEnv("KITE_API_KEY", "k1"); vi.stubEnv("KITE_API_SECRET", "s1");
+    vi.stubEnv("KITE_API_KEY_3", "k3"); vi.stubEnv("KITE_API_SECRET_3", "s3");
+    vi.stubEnv("KITE_API_KEY_2", "k2"); // no secret: skipped
+    expect(kiteApps().map((a) => a.slot)).toEqual([1, 3]);
+    expect([cookieName(1), cookieName(3)]).toEqual(["kite_session", "kite_session_3"]);
+    const v = seal({ token: "t", userId: "u", exp: Date.now() + 1000 }, "s3");
+    expect(unseal(v, Date.now(), "s3")?.token).toBe("t");
+    expect(unseal(v, Date.now(), "s1")).toBeNull(); // one account's cookie can't be read with another's key
   });
 });

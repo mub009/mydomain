@@ -339,5 +339,7 @@ The Positions page has a Zerodha card that shows your holdings and today's posit
 3. Put the app's key and secret on the server as `KITE_API_KEY` and `KITE_API_SECRET` (Vercel: Project → Settings → Environment Variables, then redeploy; locally `.env.local`).
 4. Press **Connect Zerodha** on the Positions page and log in on Zerodha's own page.
 
+**Several Zerodha accounts** (yours and family's): Zerodha licenses one Kite Connect app per client ID, so create one app per account and add them as `KITE_API_KEY_2` / `KITE_API_SECRET_2` and so on, up to `_5`, all with the same redirect URL. The card then shows a Connect button for each account, each account's holdings, and the totals across all of them.
+
 The access token Zerodha returns is kept only in an encrypted, http-only cookie in your browser and ends at 06:00 IST each day, when Kite sessions end; press Connect again after that. Tap any holding to open the agents' analysis of it.
 
