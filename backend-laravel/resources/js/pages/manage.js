@@ -248,6 +248,16 @@ $$("[data-delete-photo]").forEach((button) =>
     }
   }),
 );
+$$("[data-photo-caption]").forEach((input) =>
+  input.addEventListener("change", async () => {
+    try {
+      await api.patch(`${base}/photos/${input.dataset.photoCaption}`, { caption: input.value || undefined });
+      reloadWithFlash("Caption saved.");
+    } catch (err) {
+      fail(err);
+    }
+  }),
+);
 
 // --- Slider / Our Gallery ----------------------------------------------------
 // The website's own photo sets. Every change saves the whole list straight

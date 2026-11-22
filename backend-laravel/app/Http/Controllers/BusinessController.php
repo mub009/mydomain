@@ -622,6 +622,22 @@ class BusinessController extends Controller
         return ApiResponse::noContent();
     }
 
+    public function updatePhoto(Request $request, string $id, string $photoId)
+    {
+        $actor = $request->attributes->get('auth');
+        $business = $this->findOrFail($id);
+        $this->assertOwnerOrAdmin($actor, $business);
+
+        $data = $request->validate(['caption' => ['nullable', 'string', 'max:200']]);
+        $photo = BusinessPhoto::where('id', $photoId)->first();
+        if (! $photo) {
+            throw ApiException::notFound('Photo not found');
+        }
+        $photo->update($data);
+
+        return ApiResponse::ok($photo);
+    }
+
     public function setHours(Request $request, string $id)
     {
         $actor = $request->attributes->get('auth');

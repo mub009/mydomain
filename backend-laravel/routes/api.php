@@ -146,6 +146,7 @@ Route::prefix('businesses')->group(function () {
         Route::post('/{id}/features/{feature}/renew', [BusinessController::class, 'renewFeature'])->middleware('role:DEALER,ADMIN');
 
         Route::post('/{id}/photos', [BusinessController::class, 'addPhoto']);
+        Route::patch('/{id}/photos/{photoId}', [BusinessController::class, 'updatePhoto']);
         Route::delete('/{id}/photos/{photoId}', [BusinessController::class, 'removePhoto']);
 
         Route::put('/{id}/hours', [BusinessController::class, 'setHours']);

@@ -129,14 +129,24 @@ class StandardTemplate
             HTML;
         $navGallery = $gallerySection === '' ? '' : '<li class="nav-item"><a class="nav-link" href="#gallery">Gallery</a></li>';
 
-        $socialSection = $ctx['instagram'] ? <<<HTML
+        $fbItem = $ctx['facebookUrl'] ? <<<HTML
+            <div class="col-md-4">
+                <h5>Follow Us On Facebook <a href="{$ctx['facebookUrl']}" target="_blank" rel="noreferrer" class="fb-link">{$facebook}</a></h5>
+                <a href="{$ctx['facebookUrl']}" target="_blank" rel="noreferrer" class="fb-badge" aria-label="Facebook">{$facebook}</a>
+            </div>
+            HTML : '';
+        $instaItem = $ctx['instagram'] ? <<<HTML
+            <div class="col-md-4">
+                <h5>Follow Us On Instagram <a href="https://www.instagram.com/{$ctx['instagram']}/" target="_blank" rel="noreferrer" class="insta">{$instagram}</a></h5>
+                <a href="https://www.instagram.com/{$ctx['instagram']}/" target="_blank" rel="noreferrer" class="insta-badge" aria-label="Instagram">{$instagram}</a>
+            </div>
+            HTML : '';
+        $socialSection = ($fbItem || $instaItem) ? <<<HTML
             <div class="socail_feeds">
                 <div class="container">
                     <div class="row">
-                        <div class="col-md-4">
-                            <h5>Follow Us On Instagram <a href="https://www.instagram.com/{$ctx['instagram']}/" target="_blank" rel="noreferrer" class="insta">{$instagram}</a></h5>
-                            <a href="https://www.instagram.com/{$ctx['instagram']}/" target="_blank" rel="noreferrer" class="insta-badge" aria-label="Instagram">{$instagram}</a>
-                        </div>
+                        {$fbItem}
+                        {$instaItem}
                     </div>
                 </div>
             </div>
@@ -459,9 +469,13 @@ class StandardTemplate
         .img-overlay svg{color:#fff;width:3em;height:3em;font-size:14px}
 
         .socail_feeds{padding:30px 0;text-align:center}
+        .socail_feeds .row{justify-content:center}
         .socail_feeds h5 .insta{color:#c13584}
-        .insta-badge{display:inline-flex;align-items:center;justify-content:center;width:50px;height:50px;border-radius:12px;color:#fff;background:linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888)}
-        .insta-badge svg{width:28px;height:28px}
+        .socail_feeds h5 .fb-link{color:#1877f2}
+        .insta-badge,.fb-badge{display:inline-flex;align-items:center;justify-content:center;width:50px;height:50px;border-radius:12px;color:#fff}
+        .insta-badge{background:linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888)}
+        .fb-badge{background:#1877f2}
+        .insta-badge svg,.fb-badge svg{width:28px;height:28px}
 
         .contact_wrap{padding-bottom:10px;padding-top:30px;background:#fafcff}
         .contact_wrap .title{text-align:center;margin-bottom:0}

@@ -8,6 +8,7 @@
             <div class="aspect-[4/3] bg-gray-100">
               <img src="{{ $p['url'] }}" alt="{{ $p['caption'] ?? '' }}" class="h-full w-full object-cover" />
             </div>
+            <input type="text" value="{{ $p['caption'] ?? '' }}" maxlength="200" placeholder="Caption (optional)" data-photo-caption="{{ $p['id'] }}" class="w-full border-t border-gray-200 bg-white px-2.5 py-1.5 text-xs text-ink-700 placeholder:text-ink-400 focus:outline-none focus:ring-1 focus:ring-inset focus:ring-brand-500" />
             <button type="button" data-delete-photo="{{ $p['id'] }}" class="flex w-full items-center justify-center gap-1.5 border-t border-gray-200 bg-white py-2 text-xs font-semibold text-red-600 hover:bg-red-50">
               <x-icon name="trash-2" :size="13" /> Remove
             </button>

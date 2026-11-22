@@ -131,6 +131,7 @@ class Helpers
                 : "<span class=\"mk-logo mk-logo-text\">{$initial}</span>",
             'workingTime' => self::escapeHtml(self::summariseHours($business->hours)),
             'instagram' => self::escapeHtml($business->instagramUsername ? preg_replace('/^@/', '', $business->instagramUsername) : ''),
+            'facebookUrl' => self::escapeHtml($business->facebookPageUrl ?: ''),
             'mapsQuery' => "{$business->latitude},{$business->longitude}",
             'directionsUrl' => "https://www.google.com/maps/dir/?api=1&destination={$business->latitude},{$business->longitude}",
             'mapEmbedUrl' => "https://maps.google.com/maps?q={$business->latitude},{$business->longitude}&amp;z=16&amp;output=embed",

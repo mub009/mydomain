@@ -540,4 +540,28 @@ class BusinessTest extends TestCase
         $photos = $this->getJson("/api/v1/businesses/{$business['id']}/manage", $auth)->json('data.photos');
         $this->assertSame(['Esdee paints', 'Asian paints', 'Berger paints'], array_column($photos, 'caption'));
     }
+
+    public function test_a_photos_caption_can_be_edited_after_its_uploaded(): void
+    {
+        [, $token] = $this->actingToken(['role' => 'BUSINESS_OWNER']);
+        $category = $this->category();
+        $auth = ['Authorization' => "Bearer {$token}"];
+
+        $business = $this->postJson('/api/v1/businesses', [
+            'name' => 'Paint Shop', 'slug' => 'paint-shop', 'categoryId' => $category->id,
+            'phone' => '9998887777', 'addressLine1' => '1 Main St', 'city' => 'Pune', 'state' => 'MH',
+            'postalCode' => '411001', 'latitude' => 18.5, 'longitude' => 73.8,
+        ], $auth)->json('data');
+        $photo = $this->postJson("/api/v1/businesses/{$business['id']}/photos", ['url' => 'https://cdn.example.com/esdee.jpg', 'caption' => 'Esdee'], $auth)->json('data');
+
+        $this->patchJson("/api/v1/businesses/{$business['id']}/photos/{$photo['id']}", ['caption' => 'Esdee Paints — 20% off'], $auth)
+            ->assertOk()->assertJsonPath('data.caption', 'Esdee Paints — 20% off');
+
+        $photos = $this->getJson("/api/v1/businesses/{$business['id']}/manage", $auth)->json('data.photos');
+        $this->assertSame('Esdee Paints — 20% off', $photos[0]['caption']);
+
+        [, $strangerToken] = $this->actingToken(['role' => 'BUSINESS_OWNER']);
+        $this->patchJson("/api/v1/businesses/{$business['id']}/photos/{$photo['id']}", ['caption' => 'Hijacked'], ['Authorization' => "Bearer {$strangerToken}"])
+            ->assertStatus(403);
+    }
 }

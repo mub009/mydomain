@@ -256,4 +256,30 @@ class SiteBuilderTest extends TestCase
             $this->putJson("/api/v1/businesses/{$business->id}/site/gallery", ['images' => []], $auth);
         }
     }
+
+    public function test_the_standard_template_shows_facebook_and_instagram_independently(): void
+    {
+        $owner = $this->user(['role' => 'BUSINESS_OWNER']);
+        $business = $this->business($owner, ['facebookPageUrl' => null, 'instagramUsername' => null]);
+        $auth = ['Authorization' => "Bearer {$this->token($owner)}"];
+        $url = fn () => $this->getJson("/api/v1/businesses/{$business->id}/site/templates/standard", $auth)->json('data.html');
+
+        // Neither set: no social section at all.
+        $this->assertStringNotContainsString('socail_feeds', $url());
+
+        // Facebook only.
+        $business->update(['facebookPageUrl' => 'https://facebook.com/alicesdiner']);
+        $html = $url();
+        $this->assertStringContainsString('socail_feeds', $html);
+        $this->assertStringContainsString('https://facebook.com/alicesdiner', $html);
+        $this->assertStringContainsString('Follow Us On Facebook', $html);
+        $this->assertStringNotContainsString('Follow Us On Instagram', $html);
+
+        // Both set.
+        $business->update(['instagramUsername' => 'alicesdiner']);
+        $html = $url();
+        $this->assertStringContainsString('Follow Us On Facebook', $html);
+        $this->assertStringContainsString('Follow Us On Instagram', $html);
+        $this->assertStringContainsString('https://www.instagram.com/alicesdiner/', $html);
+    }
 }
