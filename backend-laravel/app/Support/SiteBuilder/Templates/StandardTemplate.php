@@ -36,6 +36,9 @@ class StandardTemplate
 
     private const PLUS_CIRCLE = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 100 20 10 10 0 000-20m5 11h-4v4h-2v-4H7v-2h4V7h2v4h4z"/></svg>';
 
+    // Google's own multi-colour "G" — unlike the rest, not fill="currentColor".
+    private const GOOGLE = '<svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>';
+
     public static function meta(): array
     {
         return [
@@ -60,6 +63,7 @@ class StandardTemplate
         $twitter = self::TWITTER;
         $googlePlus = self::GOOGLE_PLUS;
         $plus = self::PLUS_CIRCLE;
+        $google = self::GOOGLE;
 
         // WhatsApp needs the country code; local numbers are Indian.
         $waNumber = strlen($ctx['phoneDigits']) === 10 ? "91{$ctx['phoneDigits']}" : $ctx['phoneDigits'];
@@ -129,24 +133,25 @@ class StandardTemplate
             HTML;
         $navGallery = $gallerySection === '' ? '' : '<li class="nav-item"><a class="nav-link" href="#gallery">Gallery</a></li>';
 
-        $fbItem = $ctx['facebookUrl'] ? <<<HTML
-            <div class="col-md-4">
-                <h5>Follow Us On Facebook <a href="{$ctx['facebookUrl']}" target="_blank" rel="noreferrer" class="fb-link">{$facebook}</a></h5>
-                <a href="{$ctx['facebookUrl']}" target="_blank" rel="noreferrer" class="fb-badge" aria-label="Facebook">{$facebook}</a>
-            </div>
-            HTML : '';
-        $instaItem = $ctx['instagram'] ? <<<HTML
-            <div class="col-md-4">
-                <h5>Follow Us On Instagram <a href="https://www.instagram.com/{$ctx['instagram']}/" target="_blank" rel="noreferrer" class="insta">{$instagram}</a></h5>
-                <a href="https://www.instagram.com/{$ctx['instagram']}/" target="_blank" rel="noreferrer" class="insta-badge" aria-label="Instagram">{$instagram}</a>
-            </div>
-            HTML : '';
-        $socialSection = ($fbItem || $instaItem) ? <<<HTML
+        // Icon-only row — no "Follow us on..." text, just the badges,
+        // largest first for a thumb to tap: Instagram, Facebook, Google
+        // review, call. Any one of these a business hasn't set is skipped.
+        $socialIcons = collect([
+            ['url' => $ctx['instagram'] !== '' ? "https://www.instagram.com/{$ctx['instagram']}/" : '', 'icon' => $instagram, 'label' => 'Instagram', 'class' => 'social-ig'],
+            ['url' => $ctx['facebookUrl'], 'icon' => $facebook, 'label' => 'Facebook', 'class' => 'social-fb'],
+            ['url' => $ctx['googleReviewUrl'], 'icon' => $google, 'label' => 'Leave us a Google review', 'class' => 'social-google'],
+            ['url' => $ctx['phoneDigits'] !== '' ? "tel:{$ctx['phoneDigits']}" : '', 'icon' => $phone, 'label' => 'Call us', 'class' => 'social-call'],
+        ])->filter(fn ($i) => $i['url'] !== '');
+
+        $socialIconsHtml = $socialIcons->map(fn ($i) => $i['class'] === 'social-call'
+            ? "<a href=\"{$i['url']}\" class=\"social-icon-btn {$i['class']}\" aria-label=\"{$i['label']}\">{$i['icon']}</a>"
+            : "<a href=\"{$i['url']}\" target=\"_blank\" rel=\"noreferrer\" class=\"social-icon-btn {$i['class']}\" aria-label=\"{$i['label']}\">{$i['icon']}</a>")->implode('');
+
+        $socialSection = $socialIcons->isNotEmpty() ? <<<HTML
             <div class="socail_feeds">
                 <div class="container">
-                    <div class="row">
-                        {$fbItem}
-                        {$instaItem}
+                    <div class="social-icon-row">
+                        {$socialIconsHtml}
                     </div>
                 </div>
             </div>
@@ -468,14 +473,15 @@ class StandardTemplate
         .img-wrapper:hover .img-overlay{opacity:1}
         .img-overlay svg{color:#fff;width:3em;height:3em;font-size:14px}
 
-        .socail_feeds{padding:30px 0;text-align:center}
-        .socail_feeds .row{justify-content:center}
-        .socail_feeds h5 .insta{color:#c13584}
-        .socail_feeds h5 .fb-link{color:#1877f2}
-        .insta-badge,.fb-badge{display:inline-flex;align-items:center;justify-content:center;width:50px;height:50px;border-radius:12px;color:#fff}
-        .insta-badge{background:linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888)}
-        .fb-badge{background:#1877f2}
-        .insta-badge svg,.fb-badge svg{width:28px;height:28px}
+        .socail_feeds{padding:40px 0;text-align:center}
+        .social-icon-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:20px}
+        .social-icon-btn{display:inline-flex;align-items:center;justify-content:center;width:64px;height:64px;border-radius:50%;color:#fff;transition:transform .2s}
+        .social-icon-btn:hover{transform:translateY(-4px)}
+        .social-icon-btn svg{width:32px;height:32px}
+        .social-ig{background:linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888)}
+        .social-fb{background:#1877f2}
+        .social-google{background:#fff;border:1px solid #e5e5e5}
+        .social-call{background:#ee1c25}
 
         .contact_wrap{padding-bottom:10px;padding-top:30px;background:#fafcff}
         .contact_wrap .title{text-align:center;margin-bottom:0}
@@ -526,7 +532,7 @@ class StandardTemplate
         .floating-wpp .floating-wpp-btn-send svg{width:24px;height:24px}
 
         @media (max-width:991.98px){.main_nav.navbar-nav a.nav-link{padding:1rem .8rem;border-bottom:1px solid #e1e1e1;font-size:14px}.main_banner{height:400px}}
-        @media (max-width:767.98px){.navbar-collapse{background:#f4f4f4}.navbar-brand h1{font-size:18px;white-space:break-spaces}.socail_feeds .col-md-4{padding-top:15px}.banner .owl-dots{left:15px;bottom:15px}header .wrapper{display:flex}.contact_wrap .title h2,.popular_sec .title h2{font-size:26px;font-weight:600}.about_section{padding:30px 0}.popular_sec{padding-bottom:30px;padding-top:30px}}
+        @media (max-width:767.98px){.navbar-collapse{background:#f4f4f4}.navbar-brand h1{font-size:18px;white-space:break-spaces}.banner .owl-dots{left:15px;bottom:15px}header .wrapper{display:flex}.contact_wrap .title h2,.popular_sec .title h2{font-size:26px;font-weight:600}.about_section{padding:30px 0}.popular_sec{padding-bottom:30px;padding-top:30px}}
         @media (max-width:575.98px){.main_banner{height:290px}.banner{height:300px;margin-bottom:0}.logo img{max-width:110px}.popular_sec .title{margin-top:0}}
         @media only screen and (max-width:600px){#social-share{bottom:85px;right:20px}.img-wrapper{height:180px}.image{padding:5px}.w-box{padding:0}}
         @media (prefers-reduced-motion:reduce){.owl-item,.owl-dot span{animation:none}.owl-item-1{opacity:1}}

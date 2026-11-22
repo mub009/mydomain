@@ -132,6 +132,7 @@ class Helpers
             'workingTime' => self::escapeHtml(self::summariseHours($business->hours)),
             'instagram' => self::escapeHtml($business->instagramUsername ? preg_replace('/^@/', '', $business->instagramUsername) : ''),
             'facebookUrl' => self::escapeHtml($business->facebookPageUrl ?: ''),
+            'googleReviewUrl' => self::escapeHtml(\App\Support\ReviewChannels::google($business) ?? ''),
             'mapsQuery' => "{$business->latitude},{$business->longitude}",
             'directionsUrl' => "https://www.google.com/maps/dir/?api=1&destination={$business->latitude},{$business->longitude}",
             'mapEmbedUrl' => "https://maps.google.com/maps?q={$business->latitude},{$business->longitude}&amp;z=16&amp;output=embed",

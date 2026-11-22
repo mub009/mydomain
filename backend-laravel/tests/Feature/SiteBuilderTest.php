@@ -257,29 +257,35 @@ class SiteBuilderTest extends TestCase
         }
     }
 
-    public function test_the_standard_template_shows_facebook_and_instagram_independently(): void
+    public function test_the_standard_template_shows_an_icon_only_social_row(): void
     {
         $owner = $this->user(['role' => 'BUSINESS_OWNER']);
-        $business = $this->business($owner, ['facebookPageUrl' => null, 'instagramUsername' => null]);
+        $business = $this->business($owner, ['facebookPageUrl' => null, 'instagramUsername' => null, 'googlePlaceId' => null, 'phone' => null]);
         $auth = ['Authorization' => "Bearer {$this->token($owner)}"];
         $url = fn () => $this->getJson("/api/v1/businesses/{$business->id}/site/templates/standard", $auth)->json('data.html');
 
-        // Neither set: no social section at all.
+        // Nothing set: no social section at all.
         $this->assertStringNotContainsString('socail_feeds', $url());
 
-        // Facebook only.
+        // Facebook only — icon, no "Follow us" text.
         $business->update(['facebookPageUrl' => 'https://facebook.com/alicesdiner']);
         $html = $url();
         $this->assertStringContainsString('socail_feeds', $html);
+        $this->assertStringContainsString('social-fb', $html);
         $this->assertStringContainsString('https://facebook.com/alicesdiner', $html);
-        $this->assertStringContainsString('Follow Us On Facebook', $html);
-        $this->assertStringNotContainsString('Follow Us On Instagram', $html);
+        $this->assertStringNotContainsString('Follow Us On', $html);
+        $this->assertStringNotContainsString('social-ig', $html);
+        $this->assertStringNotContainsString('social-google', $html);
+        $this->assertStringNotContainsString('social-call', $html);
 
-        // Both set.
-        $business->update(['instagramUsername' => 'alicesdiner']);
+        // Instagram, Google review and a call button all join it.
+        $business->update(['instagramUsername' => 'alicesdiner', 'googlePlaceId' => 'ChIJ123', 'phone' => '+91 98765 43210']);
         $html = $url();
-        $this->assertStringContainsString('Follow Us On Facebook', $html);
-        $this->assertStringContainsString('Follow Us On Instagram', $html);
+        $this->assertStringContainsString('social-ig', $html);
         $this->assertStringContainsString('https://www.instagram.com/alicesdiner/', $html);
+        $this->assertStringContainsString('social-google', $html);
+        $this->assertStringContainsString('writereview?placeid=ChIJ123', $html);
+        $this->assertStringContainsString('social-call', $html);
+        $this->assertStringContainsString('tel:919876543210', $html);
     }
 }
