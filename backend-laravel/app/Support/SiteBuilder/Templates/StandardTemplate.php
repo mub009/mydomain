@@ -202,13 +202,13 @@ class StandardTemplate
 
         <div class="about_section" id="about">
           <div class="container">
+            <div class="title">
+              <h2>About us</h2>
+            </div>
             <div class="row">
               <div class="col-md-12 text-center">
                 <div class="content">
                   <div class="ab">
-                    <span class="ab-eyebrow">Who we are</span>
-                    <h2>About us</h2>
-                    <span class="ab-rule"></span>
                     <p>{$ctx['description']}</p>
                   </div>
                 </div>
@@ -433,12 +433,9 @@ class StandardTemplate
         {$bannerCss}
 
         .about_section{padding:100px 0}
+        .about_section .title{text-align:center;margin-bottom:30px}
         .about_section .content p{line-height:28px;font-size:16px;color:#555}
         .ab{max-width:700px;margin:0 auto}
-        .ab h2{font-size:36px;font-weight:700;letter-spacing:1px}
-        .ab-eyebrow{display:block;margin-bottom:12px;font-size:13px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#ee1c25}
-        .ab-rule{display:block;width:60px;height:3px;margin:20px auto 24px;background:#ee1c25;border-radius:2px}
-        .ab h2{text-transform:uppercase}
 
         .title{text-transform:uppercase}
         .popular_sec{padding-bottom:50px;padding-top:50px;background:#f1f7ff}
