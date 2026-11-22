@@ -219,9 +219,9 @@ class StandardTemplate
 
         {$servicesSection}
 
-        {$gallerySection}
-
         {$socialSection}
+
+        {$gallerySection}
 
         <div class="contact_wrap" id="map">
           <div class="container">
