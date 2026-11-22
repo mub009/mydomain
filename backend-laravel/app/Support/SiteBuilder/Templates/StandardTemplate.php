@@ -444,14 +444,14 @@ class StandardTemplate
         .service-gallery .container{padding:0}
         .our_gallery .g-item{padding:8px}
         .our_gallery img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:4px;display:block}
-        .image{margin-bottom:32px}
+        .image{margin-bottom:18px}
         /* A row's columns stretch to equal height; without height:100% here a
            short caption left extra room under its box while a long one ate
            into it, so the gap looked different card to card. */
         .w-box{background:#fff;width:100%;height:100%;display:flex;flex-direction:column;border-radius:5px;box-shadow:0 5px 15px rgba(0,0,0,.1);overflow:hidden}
         .w-box p{margin-top:5px;margin-bottom:0;padding:5px}
         .w-box-text{padding:30px 10px;font-weight:600}
-        .img-wrapper{position:relative;height:320px;flex:0 0 auto}
+        .img-wrapper{position:relative;height:320px;flex:0 0 auto;border:1px solid #e5e5e5}
         @media (min-width:992px){.img-wrapper{height:360px}}
         .img-wrapper img{width:100%;height:100%;object-fit:cover;display:block}
         .img-overlay{background:rgba(0,0,0,.7);width:100%;height:100%;position:absolute;top:0;left:0;display:flex;justify-content:center;align-items:center;opacity:0;pointer-events:none;transition:opacity .3s}
