@@ -42,6 +42,10 @@
         @if ($authUser?->role === 'DEALER')
           <button type="button" data-clone-business="{{ json_encode(['id' => $biz['id'], 'name' => $biz['name']]) }}" class="btn-secondary px-3 py-2 text-sm"><x-icon name="copy" :size="15" /> Clone</button>
         @endif
+        {{-- On every page, not just the Website section — this is the one place it's always in reach. --}}
+        @if (! empty($share['website']))
+          <a href="{{ $share['website'] }}" target="_blank" rel="noopener" class="btn-secondary px-3 py-2 text-sm"><x-icon name="globe" :size="15" /> Open website</a>
+        @endif
         <button type="button" data-share-business="{{ json_encode($share) }}" class="btn-secondary px-3 py-2 text-sm"><x-icon name="share-2" :size="15" /> Share</button>
         {{-- Opening the website and the public page is in the Share pop-up (manage.js). --}}
         @if (! in_array($biz['status'], ['PUBLISHED', 'PENDING_APPROVAL'], true))
