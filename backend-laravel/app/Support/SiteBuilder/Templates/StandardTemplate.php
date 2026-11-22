@@ -451,9 +451,9 @@ class StandardTemplate
         .w-box{background:#fff;width:100%;height:100%;display:flex;flex-direction:column;border-radius:5px;box-shadow:0 5px 15px rgba(0,0,0,.1);overflow:hidden}
         .w-box p{margin-top:5px;margin-bottom:0;padding:5px}
         .w-box-text{padding:30px 10px;font-weight:600}
-        .img-wrapper{position:relative;height:320px;flex:0 0 auto;border:1px solid #e5e5e5}
+        .img-wrapper{position:relative;height:320px;flex:0 0 auto;border:1px solid #e5e5e5;background:#fff}
         @media (min-width:992px){.img-wrapper{height:360px}}
-        .img-wrapper img{width:100%;height:100%;object-fit:cover;display:block}
+        .img-wrapper img{width:100%;height:100%;object-fit:contain;display:block}
         .img-overlay{background:rgba(0,0,0,.7);width:100%;height:100%;position:absolute;top:0;left:0;display:flex;justify-content:center;align-items:center;opacity:0;pointer-events:none;transition:opacity .3s}
         .img-wrapper:hover .img-overlay{opacity:1}
         .img-overlay svg{color:#fff;width:3em;height:3em;font-size:14px}
