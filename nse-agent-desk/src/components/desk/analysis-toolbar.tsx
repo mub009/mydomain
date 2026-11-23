@@ -53,8 +53,10 @@ export function AnalysisToolbar() {
         <ChevronDown className={cn("size-4 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")} />
       </button>
       <div className={cn("contents", !open && "max-md:hidden")}>
-      <Field label="Universe">
+      <Field label="Universe" className="max-md:w-full">
+        {/* Phones: a 4-column grid so all seven choices fit. */}
         <Segmented label="Stock universe" value={s.universe} onChange={(universe) => s.set({ universe })}
+          className="max-md:grid max-md:h-auto max-md:grid-cols-4 max-md:gap-1 max-md:[&>button]:h-9 [&>button]:whitespace-nowrap"
           options={[{ value: "large", label: "Large" }, { value: "mid", label: "Mid" }, { value: "small", label: "Small" }, { value: "all", label: "All caps" }, { value: "nifty500", label: "Nifty 500" }, { value: "allnse", label: "All NSE" }, { value: "custom", label: "My Stocks" }]} />
       </Field>
 
