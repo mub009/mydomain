@@ -165,6 +165,7 @@ function MobileBars() {
 }
 
 export function Shell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
   const loadConfig = useDesk((s) => s.loadConfig);
   const loadPositions = usePositions((s) => s.load);
   useEffect(() => { loadConfig(); }, [loadConfig]);
@@ -174,6 +175,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
     const t = setInterval(loadPositions, 20000);
     return () => clearInterval(t);
   }, [loadPositions]);
+  // Log in and sign up are full-screen, without the app's sidebar and bars.
+  if (pathname === "/login" || pathname === "/signup") return <>{children}</>;
   return (
     <div className="flex min-h-dvh">
       <Sidebar />
