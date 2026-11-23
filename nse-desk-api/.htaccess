@@ -1,0 +1,19 @@
+# Safety net for shared hosting (cPanel) when the domain's document root is
+# this project folder instead of public/. Best fix: point the document root at
+# public/; then this file is never used.
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    # Pass the Authorization header (bearer tokens) through to PHP.
+    RewriteCond %{HTTP:Authorization} .
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+    # Never serve anything outside public/ (code, .env, vendor, storage …).
+    RewriteCond %{REQUEST_URI} !^/public/
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>
+
+# If mod_rewrite is missing, at least keep private files closed.
+<FilesMatch "^(\.env.*|composer\.(json|lock)|package(-lock)?\.json|artisan|phpunit\.xml)$">
+    Require all denied
+</FilesMatch>

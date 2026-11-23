@@ -18,10 +18,7 @@ class ZerodhaTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        config([
-            'services.kite.apps.1' => ['key' => 'testkey', 'secret' => 'testsecret'],
-            'services.frontend_url' => 'https://desk.example',
-        ]);
+        config(['services.frontend_url' => 'https://desk.example']);
     }
 
     /** Fake Kite: each request token logs in a different client. */
@@ -53,8 +50,18 @@ class ZerodhaTest extends TestCase
         });
     }
 
+    /** Each user saves their own Kite Connect app. */
+    private function addApp(User $u): int
+    {
+        return $this->actingAs($u)->postJson('/api/zerodha/apps', ['label' => 'Mine', 'api_key' => 'testkey', 'api_secret' => 'testsecret'])
+            ->assertCreated()->json('app.id');
+    }
+
     private function connect(User $u, string $requestToken): \Illuminate\Testing\TestResponse
     {
+        if (! $u->kiteApps()->exists()) {
+            $this->addApp($u);
+        }
         $url = $this->actingAs($u)->postJson('/api/zerodha/connect')->assertOk()->json('url');
         $this->assertStringStartsWith('https://kite.zerodha.com/connect/login?', $url);
         parse_str(parse_url($url, PHP_URL_QUERY), $q);
@@ -97,6 +104,7 @@ class ZerodhaTest extends TestCase
         $this->get('/api/zerodha/callback?status=cancelled')->assertRedirect('https://desk.example/positions?broker=cancelled');
 
         $u = User::factory()->create();
+        $this->addApp($u);
         $url = $this->actingAs($u)->postJson('/api/zerodha/connect')->json('url');
         parse_str(parse_url($url, PHP_URL_QUERY), $q);
         parse_str($q['redirect_params'], $rp);
@@ -122,18 +130,43 @@ class ZerodhaTest extends TestCase
     {
         $this->fakeKite();
         $u = User::factory()->create();
-        BrokerAccount::create(['user_id' => $u->id, 'client_id' => 'ZQ0001', 'access_token' => 'accDEAD', 'expires_at' => now()->addHour()]);
-        BrokerAccount::create(['user_id' => $u->id, 'client_id' => 'ZQ0002', 'access_token' => 'accZX1234', 'expires_at' => now()->subMinute()]);
+        $app = $this->addApp($u);
+        BrokerAccount::create(['user_id' => $u->id, 'kite_app_id' => $app, 'client_id' => 'ZQ0001', 'access_token' => 'accDEAD', 'expires_at' => now()->addHour()]);
+        BrokerAccount::create(['user_id' => $u->id, 'kite_app_id' => $app, 'client_id' => 'ZQ0002', 'access_token' => 'accZX1234', 'expires_at' => now()->subMinute()]);
         $this->actingAs($u)->getJson('/api/zerodha')->assertOk()->assertJsonPath('expired', true)->assertJsonCount(0, 'accounts');
         $this->assertSame(0, BrokerAccount::count());
     }
 
-    public function test_not_configured(): void
+    public function test_no_app_yet(): void
     {
-        config(['services.kite.apps.1' => ['key' => null, 'secret' => null]]);
         $u = User::factory()->create();
-        $this->actingAs($u)->getJson('/api/zerodha')->assertJsonPath('configured', false);
+        $this->actingAs($u)->getJson('/api/zerodha')->assertJsonPath('configured', false)->assertJsonPath('redirectUrl', url('/api/zerodha/callback'));
         $this->actingAs($u)->postJson('/api/zerodha/connect')->assertStatus(422);
+    }
+
+    public function test_apps_are_per_user_with_the_secret_encrypted_and_never_returned(): void
+    {
+        [$a, $b] = User::factory()->count(2)->create();
+        $id = $this->addApp($a);
+        $r = $this->actingAs($a)->getJson('/api/zerodha')->assertJsonPath('configured', true)->assertJsonPath('apps.0.apiKey', '•••••••'); // short test key: fully hidden (16-character Kite keys show as abcd••••wxyz)
+        $this->assertStringNotContainsString('testsecret', $r->getContent());
+        $this->assertNotSame('testsecret', DB::table('kite_apps')->value('api_secret'));
+        $this->actingAs($a)->postJson('/api/zerodha/apps', ['api_key' => 'testkey', 'api_secret' => 'other1'])->assertStatus(422)->assertJsonValidationErrors('api_key');
+        $this->actingAs($a)->postJson('/api/zerodha/apps', ['api_key' => 'bad key!', 'api_secret' => 'x'])->assertStatus(422)->assertJsonValidationErrors(['api_key', 'api_secret']);
+        // someone else can't see, use or remove it
+        $this->actingAs($b)->getJson('/api/zerodha')->assertJsonPath('configured', false);
+        $this->actingAs($b)->postJson('/api/zerodha/connect', ['app_id' => $id])->assertStatus(422);
+        $this->actingAs($b)->deleteJson("/api/zerodha/apps/{$id}")->assertNotFound();
+    }
+
+    public function test_removing_an_app_disconnects_its_accounts(): void
+    {
+        $this->fakeKite();
+        $u = User::factory()->create();
+        $this->connect($u, 'reqAAAA01');
+        $this->assertSame(1, BrokerAccount::count());
+        $this->actingAs($u)->deleteJson('/api/zerodha/apps/'.$u->kiteApps()->value('id'))->assertOk();
+        $this->assertSame(0, BrokerAccount::count());
     }
 
     public function test_session_ends_at_six_ist(): void
