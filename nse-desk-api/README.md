@@ -46,6 +46,12 @@ Needs PHP 8.2+, Composer and MySQL (or MariaDB), like Markkito.
    `https://nse-api.<your-domain>/api/zerodha/callback`.
 6. **Web app:** in Vercel, add `NEXT_PUBLIC_DESK_API=https://nse-api.<your-domain>` to the nse-agent-desk project and redeploy. The app then shows **Log in** and keeps each user's Zerodha accounts here.
 
+### On cPanel hosting
+
+- **Document root:** cPanel → *Domains* → `nse-api.<your-domain>` → *Manage* → set the document root to the project's `public` folder (e.g. `nse-api.markkito.com/public`). The `.htaccess` in the project folder is only a safety net if you can't.
+- **Imunify360 / bot protection:** the web app calls this API from the browser on another site, which can't pass a "One moment, please…" check. In cPanel → *Imunify360* (or ask the host), turn off bot protection / the anti-bot challenge for this subdomain, or allow-list it.
+- **Check:** `https://nse-api.<your-domain>/up` must show Laravel's "Application up" page, and `https://nse-api.<your-domain>/api/auth/me` must return `{"message":"Unauthenticated."}`. The bare domain must **not** show a file listing.
+
 After changing `.env` later, run `php artisan config:cache` again.
 
 **Several Zerodha accounts:** after connecting one, log out on kite.zerodha.com, then press **Connect another account** and log in with the next user ID. If Zerodha won't allow your app for that account, create another Kite Connect app and add it as `KITE_API_KEY_2` / `KITE_API_SECRET_2` (up to `_5`), with the same Redirect URL.
