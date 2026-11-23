@@ -9,6 +9,19 @@ An AI stock research desk for the Indian market (NSE / Nifty 50). Four AI agents
 - **`/` (home page):** what the desk does and why it helps: today's Nifty 50 (NSE), Sensex (BSE), Bank Nifty and gold with why each moved, the benefits, how the agents work, the whole team, data sources, who it's for, FAQ and a not-investment-advice notice.
 - **`/dashboard` (Overview):** the research desk itself (run the agents, final picks, market cards). The sidebar's Overview link and the logo go here.
 
+## Stock lists: from 3 stocks to every NSE share
+
+The Universe setting on the Overview chooses what the agents scan:
+
+| Choice | Stocks | How |
+|---|---|---|
+| Large / Mid / Small / All caps | 50 / 30 / 30 / 110 | Built-in lists, every stock researched in full |
+| **Nifty 500** | ~500 | Official list from NSE (niftyindices.com), with each company's industry |
+| **All NSE** | ~2,000+ | NSE's list of every main-board (EQ series) share |
+| My Stocks | 3-150 | Your own list or saved groups |
+
+For Nifty 500 and All NSE the server first runs a **quick scan**: one year of closing prices for 20 stocks per request (about 2 seconds for 2,000 stocks), scored on 1- and 3-month gains, distance from the 52-week high and the 50/200-day averages. Shares under ₹10 or with under ₹1 crore traded that day are left out. The **strongest 150** then get the full 16-agent research. The lists are downloaded once a day; if NSE can't be reached, the built-in 110 stocks are used and the agents' chat says so. `GET /api/universe?list=nifty500|allnse` shows the list size and where it came from.
+
 ## The team
 
 | Agent | Role | What they do |

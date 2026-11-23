@@ -17,7 +17,7 @@ import { NEWS_BOOST } from "./agents/news";
 import { SECTOR_ADJ } from "./sectors";
 import { factorName } from "./macro";
 import type { PolicyReport } from "./policy";
-import type { AgentReport, Analysis, DataSource, Decision, MacroReport, MessageTable, NewsBrief, NewsItem, Person, SectorView, Snapshot, VixReport } from "./types";
+import type { AgentReport, Analysis, DataSource, Decision, MacroReport, MessageTable, NewsBrief, NewsItem, Person, QuickScanSummary, SectorView, Snapshot, VixReport } from "./types";
 
 const ROLE: Record<Person, string> = {
   News: "news scout who collects the morning stock news",
@@ -51,6 +51,7 @@ export interface DialogueInput {
   minCapCr: number;
   source: DataSource;
   stockCount: number;
+  scan?: QuickScanSummary;
   skipped: string[];
   indexRet21d: number;
   aiLabel: string;
@@ -109,6 +110,7 @@ export async function runDialogue(bus: MessageBus, llm: LLM, d: DialogueInput) {
     `agent conversation is simulated from the analysis · AI notes ${d.aiLabel}` +
     (d.skipped.length ? ` · skipped: ${d.skipped.join(", ")}` : "") +
     (d.excluded.length ? ` · left out below ₹${d.minCapCr} Cr market cap: ${d.excluded.map((e) => e.symbol).join(", ")}` : ""), { kind: "system" });
+  if (d.scan) bus.send("System", "ALL", scanLine(d.scan), { kind: "system" });
 
   // ---------- Step 0: News Agent hands over the news ----------
   if (d.news) {
@@ -589,4 +591,17 @@ export async function runDialogue(bus: MessageBus, llm: LLM, d: DialogueInput) {
     bus.send("Momentum", "ALL", "Understood. I'll rescan tomorrow.");
     bus.send("Trend", "ALL", "Agreed. No trend worth holding today.");
   }
+}
+
+/** One line on how a big list was narrowed down to the stocks researched in full. */
+export function scanLine(s: QuickScanSummary): string {
+  const n = (x: number) => x.toLocaleString("en-IN");
+  if (s.from === "demo") return `${s.label}: ${s.note}`;
+  if (s.from === "built-in") return `${s.label}: ${s.note} All ${n(s.total)} were researched in full.`;
+  const left = s.priced - s.thin;
+  return `Quick scan of the ${s.label} list: ${n(s.total)} stocks` +
+    (s.shortlisted < s.total ? ` · ${n(left)} had a year of prices and traded at least ₹1 Cr today` +
+      `${s.thin ? ` (${n(s.thin)} too cheap, too new or barely traded)` : ""}` +
+      ` · the ${n(s.shortlisted)} strongest by 1- and 3-month gains, 52-week high and 50/200-day averages went on to the full research` : " · all researched in full") +
+    (s.note ? ` · ${s.note}` : "");
 }

@@ -410,6 +410,8 @@ export interface RunResult {
   /** Stocks left out for being below the minimum market cap. */
   excluded: { symbol: string; marketCapCr: number }[];
   minCapCr: number;
+  /** Set when a big list was quick-scanned first. */
+  scan?: QuickScanSummary;
   sectors: SectorView[];
   macro: MacroReport | null;
   picks: Decision[];
@@ -433,6 +435,20 @@ export interface RunRequest {
   sectors?: Record<string, string>;
   /** Stocks to research in full whatever their rank (single-stock search). */
   focus?: string[];
+  /** A big list (Nifty 500 or all NSE): quick-scanned first, the best 150 get the full research. */
+  universe?: "nifty500" | "allnse";
+}
+
+/** How a big list was narrowed down before the full research. */
+export interface QuickScanSummary {
+  label: string;
+  /** Stocks in the list, stocks with prices, and stocks left out as too cheap or barely traded. */
+  total: number;
+  priced: number;
+  thin: number;
+  shortlisted: number;
+  from: "nse" | "built-in" | "demo";
+  note?: string;
 }
 
 export type StreamEvent =

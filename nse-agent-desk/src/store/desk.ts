@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import { UNIVERSES, type Universe } from "@/lib/market/universe";
+import { type BigUniverse, isBigUniverse } from "@/lib/market/lists";
 import { PEOPLE } from "@/lib/team";
 import type { AgentName, Decision, Message, Person, RunResult, Stage, StreamEvent } from "@/lib/types";
 
@@ -26,7 +27,8 @@ export interface StockInfo { name: string; sector?: string }
 export interface StockGroup { name: string; symbols: string[] }
 
 interface Settings {
-  universe: Universe;
+  /** A starter list, My Stocks, or a big list (Nifty 500, all NSE) that the server quick-scans. */
+  universe: Universe | BigUniverse;
   custom: string;
   /** Names and sectors of stocks picked with the search. */
   stockInfo: Record<string, StockInfo>;
@@ -87,8 +89,9 @@ function loadLocal(): Partial<Settings> {
   } catch { return {}; }
 }
 
-export const symbolsOf = (s: Pick<Settings, "universe" | "custom">) =>
-  s.universe !== "custom" ? UNIVERSES[s.universe].symbols
+export const symbolsOf = (s: Pick<Settings, "universe" | "custom">): string[] =>
+  isBigUniverse(s.universe) ? [] // the server downloads the list
+  : s.universe !== "custom" ? UNIVERSES[s.universe].symbols
     : [...new Set(s.custom.split(/[\s,]+/).map((x) => x.trim().toUpperCase()).filter(Boolean))];
 
 export const useDesk = create<DeskState>((set, get) => {
@@ -156,7 +159,7 @@ export const useDesk = create<DeskState>((set, get) => {
         const res = await fetch("/api/analysis", {
           method: "POST", signal: abort.signal, headers: { "content-type": "application/json" },
           body: JSON.stringify({
-            symbols: symbolsOf(s), top: s.top, demo: s.demo, aiNotes: s.aiNotes && Boolean(s.config?.aiAvailable),
+            symbols: symbolsOf(s), ...(isBigUniverse(s.universe) ? { universe: s.universe } : {}), top: s.top, demo: s.demo, aiNotes: s.aiNotes && Boolean(s.config?.aiAvailable),
             capital: Number(s.capital) > 0 ? Number(s.capital) : undefined, riskPerTrade: s.risk,
             sectors: s.universe === "custom" ? Object.fromEntries(symbolsOf(s).flatMap((k) => (s.stockInfo[k]?.sector ? [[k, s.stockInfo[k].sector]] : []))) : undefined,
           }),

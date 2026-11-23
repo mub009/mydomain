@@ -25,13 +25,19 @@ import { nseMarketMood, nseMcpEnabled } from "./nse-mcp/client";
 import { holdPlan, type HoldPlan } from "./forecast";
 import { longTermView } from "./long-term";
 import { addTradingDays } from "./market/calendar";
-import type { Bar, RunRequest, RunResult, StreamEvent } from "./types";
+import type { Bar, QuickScanSummary, RunRequest, RunResult, StreamEvent } from "./types";
+import { BIG_UNIVERSES, loadStockList } from "./market/lists";
+import { quickScan } from "./market/prescreen";
+import { ALL_CAPS } from "./market/universe";
 
 export async function runAnalysis(o: RunRequest, emit: (e: StreamEvent) => void): Promise<RunResult> {
   const started = Date.now();
   const bus = new MessageBus((message) => emit({ type: "message", message }));
   const llm = new LLM(o.aiNotes);
   registerSectors(o.sectors);
+  // Big lists (Nifty 500, all NSE): quick-scan every stock, then research the best 150 in full.
+  let scan: QuickScanSummary | undefined;
+  if (o.universe) ({ o, scan } = await narrowDown(o, emit));
 
   emit({ type: "progress", text: "Loading prices…" });
   const { frames, indexClose, vixClose, sectorIndex, source, skipped } = await loadMarket(o.symbols, o.demo,
@@ -106,7 +112,7 @@ export async function runAnalysis(o: RunRequest, emit: (e: StreamEvent) => void)
   const sectorViews = enrichSectors(sectors, all);
 
   await runDialogue(bus, llm, {
-    source, stockCount: rows.length, skipped, indexRet21d,
+    source, stockCount: rows.length, skipped, indexRet21d, scan,
     aiLabel: llm.enabled ? `on (${aiModel()})` : "off",
     capital: o.capital, riskPerTrade: o.riskPerTrade,
     macro, sectors: sectorViews, excluded, minCapCr, news, vix, positive: morning.positive(news), negative: morning.negative(news),
@@ -116,12 +122,36 @@ export async function runAnalysis(o: RunRequest, emit: (e: StreamEvent) => void)
   const result: RunResult = {
     source, generatedAt: new Date().toISOString(), simulatedAgents: !llm.enabled,
     capital: o.capital, riskPerTrade: o.riskPerTrade,
-    indexRet21d: Math.round(indexRet21d * 100) / 100, news, vix, blackPoints: bp.summary, policy, excluded, minCapCr, sectors: sectorViews, macro, picks, watchlist, all, skipped,
+    indexRet21d: Math.round(indexRet21d * 100) / 100, news, vix, blackPoints: bp.summary, policy, excluded, minCapCr, ...(scan ? { scan } : {}), sectors: sectorViews, macro, picks, watchlist, all, skipped,
   };
   emit({ type: "result", result });
   console.log(`[nse-agent-desk] run: ${rows.length} stocks, source=${source.kind}${source.seed !== undefined ? `#${source.seed}` : ""}, ` +
     `picks=${picks.map((p) => p.symbol).join(",") || "none"}, messages=${bus.log.length}, ai=${llm.enabled}, ${Date.now() - started}ms`);
   return result;
+}
+
+/** Full research takes at most this many stocks from a big list. */
+export const SHORTLIST = 150;
+
+async function narrowDown(o: RunRequest, emit: (e: StreamEvent) => void): Promise<{ o: RunRequest; scan: QuickScanSummary }> {
+  const id = o.universe!;
+  const label = BIG_UNIVERSES[id].label;
+  if (o.demo) {
+    return { o: { ...o, symbols: ALL_CAPS }, scan: { label, total: ALL_CAPS.length, priced: ALL_CAPS.length, thin: 0, shortlisted: ALL_CAPS.length, from: "demo", note: `Demo data uses the built-in ${ALL_CAPS.length} stocks.` } };
+  }
+  emit({ type: "progress", text: `Downloading the ${label} list from NSE…` });
+  const list = await loadStockList(id);
+  registerSectors(list.sectors);
+  if (list.symbols.length <= SHORTLIST) {
+    return { o: { ...o, symbols: list.symbols }, scan: { label, total: list.symbols.length, priced: list.symbols.length, thin: 0, shortlisted: list.symbols.length, from: list.from, note: list.note } };
+  }
+  const q = await quickScan(list.symbols, SHORTLIST, (d, t) => emit({ type: "progress", text: `Quick scan of ${label}: ${d.toLocaleString("en-IN")}/${t.toLocaleString("en-IN")} stocks` }));
+  if (q.shortlist.length < 3) throw new Error(`The quick scan couldn't get prices for the ${label} list. Try again in a minute, or pick a smaller list.`);
+  const symbols = [...new Set([...(o.focus ?? []), ...q.shortlist.map((r) => r.symbol)])];
+  return {
+    o: { ...o, symbols },
+    scan: { label, total: q.total, priced: q.priced, thin: q.thin, shortlisted: q.shortlist.length, from: list.from, note: list.note },
+  };
 }
 
 /** Swing trades are held up to 10 trading days, positional (or swing-then-hold) up to 21. */

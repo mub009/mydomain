@@ -1,3 +1,4 @@
+import { isBigUniverse } from "@/lib/market/lists";
 import { runAnalysis } from "@/lib/pipeline";
 import type { RunRequest, StreamEvent } from "@/lib/types";
 
@@ -8,9 +9,11 @@ const SYMBOL = /^[A-Z0-9&.\-]{1,20}$/;
 
 function validate(body: unknown): RunRequest | string {
   const b = body as Partial<RunRequest>;
-  if (!b || !Array.isArray(b.symbols)) return "symbols must be a list";
-  const symbols = [...new Set(b.symbols.map((s) => String(s).trim().toUpperCase()))].filter(Boolean);
-  if (symbols.length < 3 || symbols.length > 150) return "Choose between 3 and 150 stocks";
+  if (!b) return "symbols must be a list";
+  const universe = isBigUniverse(b.universe) ? b.universe : undefined;
+  if (!universe && !Array.isArray(b.symbols)) return "symbols must be a list";
+  const symbols = universe ? [] : [...new Set((b.symbols ?? []).map((s) => String(s).trim().toUpperCase()))].filter(Boolean);
+  if (!universe && (symbols.length < 3 || symbols.length > 150)) return "Choose between 3 and 150 stocks";
   const bad = symbols.find((s) => !SYMBOL.test(s));
   if (bad) return `"${bad.slice(0, 20)}" is not a valid NSE symbol`;
   const top = Number(b.top);
@@ -31,7 +34,7 @@ function validate(body: unknown): RunRequest | string {
       if (symbols.includes(sym) && typeof v === "string" && /^[A-Za-z &]{2,30}$/.test(v)) sectors[sym] = v;
     }
   }
-  return { symbols, top, riskPerTrade, capital, demo: Boolean(b.demo), aiNotes: Boolean(b.aiNotes), sectors };
+  return { symbols, top, riskPerTrade, capital, demo: Boolean(b.demo), aiNotes: Boolean(b.aiNotes), sectors, ...(universe ? { universe } : {}) };
 }
 
 /** Runs one analysis and streams progress, agent messages and the result as Server-Sent Events. */

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronDown, Download, FastForward, Loader2, Play, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Field, inputClass, Segmented } from "@/components/ui/segmented";
@@ -8,15 +8,28 @@ import { StockGroupPicker } from "./stock-group-picker";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { type Speed, symbolsOf, useBusy, useDesk } from "@/store/desk";
+import { BIG_UNIVERSES, isBigUniverse } from "@/lib/market/lists";
 
 export function AnalysisToolbar() {
   const s = useDesk();
   const busy = useBusy();
   const symbols = symbolsOf(s);
-  const valid = symbols.length >= 3 && symbols.length <= 150;
+  const big = isBigUniverse(s.universe);
+  // How many stocks the big list really has (downloaded from NSE on the server, kept for a day).
+  const [count, setCount] = useState<Record<string, { count: number; from: string }>>({});
+  useEffect(() => {
+    if (!big || count[s.universe] || s.demo) return;
+    let live = true;
+    fetch(`/api/universe?list=${s.universe}`).then((r) => r.json())
+      .then((r) => { if (live && r.count) setCount((c) => ({ ...c, [r.id]: { count: r.count, from: r.from } })); })
+      .catch(() => { /* the hint keeps the rough number */ });
+    return () => { live = false; };
+  }, [big, s.universe, s.demo, count]);
+  const known = big ? count[s.universe] : undefined;
+  const valid = big || (symbols.length >= 3 && symbols.length <= 150);
   const playing = !s.running && busy;
   const [open, setOpen] = useState(false); // phones: settings folded away so Run Analysis stays in view
-  const UNI: Record<string, string> = { large: "Large caps", mid: "Mid caps", small: "Small caps", all: "All caps", custom: "My Stocks" };
+  const UNI: Record<string, string> = { large: "Large caps", mid: "Mid caps", small: "Small caps", all: "All caps", custom: "My Stocks", nifty500: "Nifty 500", allnse: "All NSE stocks" };
 
   function exportJson() {
     if (!s.result) return;
@@ -42,7 +55,7 @@ export function AnalysisToolbar() {
       <div className={cn("contents", !open && "max-md:hidden")}>
       <Field label="Universe">
         <Segmented label="Stock universe" value={s.universe} onChange={(universe) => s.set({ universe })}
-          options={[{ value: "large", label: "Large" }, { value: "mid", label: "Mid" }, { value: "small", label: "Small" }, { value: "all", label: "All caps" }, { value: "custom", label: "My Stocks" }]} />
+          options={[{ value: "large", label: "Large" }, { value: "mid", label: "Mid" }, { value: "small", label: "Small" }, { value: "all", label: "All caps" }, { value: "nifty500", label: "Nifty 500" }, { value: "allnse", label: "All NSE" }, { value: "custom", label: "My Stocks" }]} />
       </Field>
 
       <Field label="Top picks">
@@ -76,6 +89,11 @@ export function AnalysisToolbar() {
         </Button>
       </div>
       {s.universe === "custom" && <div className="w-full border-t border-[var(--edge)] pt-3"><StockGroupPicker /></div>}
+      {big && (
+        <p className="w-full text-xs text-muted-foreground">
+          {BIG_UNIVERSES[s.universe as keyof typeof BIG_UNIVERSES].label}: a quick scan checks {known ? `${known.count.toLocaleString("en-IN")}${known.from === "nse" ? " NSE" : " built-in"}` : BIG_UNIVERSES[s.universe as keyof typeof BIG_UNIVERSES].about} stocks, then the agents research the strongest 150 in full. Takes 1-2 minutes{s.demo ? " (demo data uses the built-in 110 stocks)" : ""}.
+        </p>
+      )}
       {!valid && s.universe !== "custom" && <p className="w-full text-xs text-neg">Enter between 3 and 150 NSE symbols.</p>}
     </section>
   );

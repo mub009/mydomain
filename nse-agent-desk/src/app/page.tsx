@@ -11,7 +11,7 @@ import { useEffect, useState } from "react";
 import { AgentAvatar } from "@/components/desk/agent-avatar";
 import { Logo, ThemeToggle } from "@/components/desk/shell";
 import type { AssetBrief, MarketBrief } from "@/lib/market-brief";
-import { ALL_CAPS, MIDCAPS, NIFTY50, SMALLCAPS } from "@/lib/market/universe";
+import { MIDCAPS, SMALLCAPS } from "@/lib/market/universe";
 import { PEOPLE, TEAM } from "@/lib/team";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/store/auth";
@@ -50,7 +50,7 @@ const FAQ = [
   { q: "Is this investment advice?", a: "No. NSE Agent Desk is a research tool. It shows the data and the reasons behind each view so you can decide. We are not a SEBI-registered adviser. Always do your own research or talk to a registered adviser before you invest." },
   { q: "Where does the data come from?", a: "Prices and indices from NSE and BSE through public market data feeds, plus company filings, SEBI orders, RBI and Fed policy, world markets and news headlines. Prices can be delayed." },
   { q: "Can it place orders in my Zerodha account?", a: "No. The Zerodha link is read-only: it reads holdings and positions. It cannot buy, sell or move money. Your Kite secret is stored encrypted." },
-  { q: "Which stocks does it cover?", a: `The Nifty 50, plus a list of midcap and smallcap stocks: ${ALL_CAPS.length} stocks in all. You can also look up other NSE stocks by name or symbol.` },
+  { q: "Which stocks does it cover?", a: `Every share on the NSE's main board. Pick "All NSE" (about 2,000 stocks) or the Nifty 500: a quick scan ranks every stock on trend and momentum, then the agents research the strongest 150 in full. There are also quick lists: the Nifty 50, ${MIDCAPS.length} midcaps and ${SMALLCAPS.length} smallcaps, or your own stocks. You can look up any NSE stock by name or symbol.` },
   { q: "Do I need an account?", a: "You can open the desk and run the research without one. An account keeps your Zerodha links and settings on every device." },
 ];
 
@@ -151,13 +151,13 @@ export default function Home() {
         <div className="relative mx-auto max-w-6xl px-4 pb-14 pt-12 sm:px-6 sm:pt-20 lg:pb-20">
           <div className="max-w-3xl">
             <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[12px] font-medium text-sidebar-foreground">
-              <span className="size-1.5 rounded-full bg-emerald-400" />For NSE and BSE stocks · Nifty 50, midcap and smallcap
+              <span className="size-1.5 rounded-full bg-emerald-400" />Every NSE stock · Nifty 50, Nifty 500, midcap and smallcap
             </span>
             <h1 className="mt-5 text-[34px] font-extrabold leading-[1.1] tracking-tight sm:text-[48px] lg:text-[56px]">
               Research Indian stocks with a team of {PEOPLE.length} AI agents.
             </h1>
             <p className="mt-5 max-w-2xl text-[16px] leading-relaxed text-sidebar-foreground sm:text-[18px]">
-              They scan the Nifty 50 plus {MIDCAPS.length + SMALLCAPS.length} midcap and smallcap stocks, check every risk and explain each pick: where to buy, where to exit, how long to hold, and why the Nifty, Sensex and gold moved today.
+              They scan every NSE stock, from the Nifty 50 to small caps, check every risk and explain each pick: where to buy, where to exit, how long to hold, and why the Nifty, Sensex and gold moved today.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Link href="/dashboard" className="btn-3d-primary flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3.5 text-[15px] font-semibold text-primary-foreground">
@@ -199,7 +199,7 @@ export default function Home() {
         <dl className="mx-auto grid max-w-6xl grid-cols-2 gap-px px-4 py-8 sm:px-6 md:grid-cols-4">
           {[
             [String(PEOPLE.length), "AI agents working together"],
-            [String(ALL_CAPS.length), `stocks covered: ${NIFTY50.length} Nifty 50, ${MIDCAPS.length} midcap, ${SMALLCAPS.length} smallcap`],
+            ["2,000+", `NSE stocks quick-scanned; the strongest 150 researched in full`],
             ["3-25", "picks per run, with a sector cap"],
             ["Daily", "why Nifty, Sensex and gold moved"],
           ].map(([n, t]) => (
