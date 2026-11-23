@@ -53,7 +53,7 @@ export function demoNews(snaps: Record<string, Snapshot>, seed: number): NewsBri
 // ---------- Google News RSS ----------
 const QUERIES = ["Nifty 50 stocks today", "NSE stocks to watch", "Indian stock market shares news", "stocks in news India"];
 
-function parseRss(xml: string) {
+export function parseRss(xml: string) {
   const out: { title: string; link: string; source: string; date: string }[] = [];
   for (const m of xml.matchAll(/<item>([\s\S]*?)<\/item>/g)) {
     const tag = (t: string) => (m[1].match(new RegExp(`<${t}[^>]*>([\\s\\S]*?)</${t}>`))?.[1] ?? "")

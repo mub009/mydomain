@@ -121,3 +121,57 @@ export function forecast(bars: Bar[], o: { horizon: number; stop: number; target
     paths: N,
   };
 }
+
+/**
+ * How long to hold: the same kind of simulated paths, run from today for the
+ * holding period, recording the day each path reaches the target or the
+ * stop-loss. The expected exit is the median day among paths that reach the
+ * target; the expected return averages every path's exit (target, stop-loss,
+ * or the price at the end of the period), measured from the entry price.
+ */
+export interface HoldPlan {
+  maxDays: number;            // trading days in the holding period (swing 10, positional 21)
+  expectedDays: number | null; // median trading days to the target, among paths that reach it
+  daysRange: [number, number] | null; // middle half of those paths
+  probTarget: number;         // % reaching the target before the stop-loss, within maxDays
+  probStop: number;
+  probOpen: number;           // % still open at the end (exit at the market price then)
+  expectedReturnPct: number;  // average exit return from the entry price
+  targetPct: number;
+  stopPct: number;
+  expectedBy?: string;        // dates (YYYY-MM-DD), filled in by the caller from the trading calendar
+  exitBy?: string;
+}
+
+export function holdPlan(bars: Bar[], o: { entry: number; stop: number; target: number; maxDays: number; seed: string; paths?: number }): HoldPlan {
+  const closes = bars.map((b) => b.close);
+  const last = closes[closes.length - 1];
+  const rets = closes.slice(1).map((c, i) => Math.log(c / closes[i])).slice(-250);
+  const mean = rets.reduce((s, x) => s + x, 0) / rets.length;
+  const sdHist = Math.sqrt(rets.reduce((s, x) => s + (x - mean) ** 2, 0) / (rets.length - 1)) || 1e-6;
+  const sdNow = ewmaVol(rets);
+  const drift = mean * 0.5;
+  const pool = rets.map((r) => ((r - mean) * sdNow) / sdHist);
+  const N = o.paths ?? 1000, H = o.maxDays, rand = rng(o.seed);
+  const hitDays: number[] = [];
+  let stops = 0, sumRet = 0;
+  for (let p = 0; p < N; p++) {
+    let lp = Math.log(last), exit: number | null = null;
+    for (let d = 1; d <= H && exit === null; d++) {
+      lp += drift + pool[Math.floor(rand() * pool.length)];
+      const px = Math.exp(lp);
+      if (px >= o.target) { exit = o.target; hitDays.push(d); } else if (px <= o.stop) { exit = o.stop; stops++; }
+    }
+    sumRet += ((exit ?? Math.exp(lp)) / o.entry - 1) * 100;
+  }
+  hitDays.sort((a, b) => a - b);
+  const pct = (n: number) => Math.round((n / N) * 1000) / 10;
+  return {
+    maxDays: H,
+    expectedDays: hitDays.length >= N * 0.05 ? Math.round(quantile(hitDays, 0.5)) : null,
+    daysRange: hitDays.length >= N * 0.05 ? [Math.round(quantile(hitDays, 0.25)), Math.round(quantile(hitDays, 0.75))] : null,
+    probTarget: pct(hitDays.length), probStop: pct(stops), probOpen: Math.round((100 - pct(hitDays.length) - pct(stops)) * 10) / 10,
+    expectedReturnPct: r2(sumRet / N),
+    targetPct: r2((o.target / o.entry - 1) * 100), stopPct: r2((o.stop / o.entry - 1) * 100),
+  };
+}

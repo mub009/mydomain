@@ -38,7 +38,7 @@ export function MessageFeed({ messages, times, typing, compact, empty, className
   const firstTime = messages.length ? times[messages[0].id] : undefined;
   return (
     <div className={cn("relative min-h-0 flex-1", className)}>
-      <div ref={ref} onScroll={onScroll} className={cn("flex h-full flex-col gap-3.5 overflow-y-auto scroll-thin", compact ? "px-3.5 py-3" : "px-5 py-4")}
+      <div ref={ref} onScroll={onScroll} className={cn("flex h-full flex-col gap-3.5 overflow-y-auto scroll-thin", compact ? "px-3.5 py-3" : "px-3.5 py-3 md:px-5 md:py-4")}
         aria-live="polite" aria-label="Agent messages">
         {firstTime && (
           <div className="flex items-center gap-3 text-[11px] font-medium text-muted-foreground">

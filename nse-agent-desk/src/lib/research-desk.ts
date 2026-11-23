@@ -25,6 +25,9 @@
  */
 import { demoShareholding, loadFinancials, yahooAnalystTarget } from "./company";
 import { computeRatios } from "./company/quality";
+import { loadSeasonal, seasonalView } from "./seasonal";
+import { nseIndexSnapshot, nseMcpEnabled } from "./nse-mcp/client";
+import { NSE_SECTOR_INDEX } from "./market/nse-sectors";
 import { loadSurveillance, type Surveillance } from "./surveillance";
 import type { YearFinancials } from "./company/types";
 import { getProvider } from "./market";
@@ -124,7 +127,8 @@ export function performanceView(o: { ytd?: number; niftyYtd?: number; five: { va
 
 // ---------- Valuation Agent ----------
 
-export function valuationView(o: { price: number; f?: Fundamentals; latest?: YearFinancials; sectorPe?: number; financial: boolean }): DeskView {
+export function valuationView(o: { price: number; f?: Fundamentals; latest?: YearFinancials; sectorPe?: number; sectorPeLabel?: string; financial: boolean }): DeskView {
+  const of = o.sectorPeLabel ? `${o.sectorPeLabel}'s` : "the sector's";
   const eps = o.f?.epsTTM, mcap = o.f?.marketCapCr;
   const pe = eps !== undefined && eps > 0 ? r1(o.price / eps) : undefined;
   const pb = mcap && o.latest?.equity && o.latest.equity > 0 ? r1(mcap / o.latest.equity) : undefined;
@@ -135,10 +139,10 @@ export function valuationView(o: { price: number; f?: Fundamentals; latest?: Yea
   if (eps !== undefined && eps <= 0) { points -= 1; reasons.push("loss-making, so P/E is not meaningful"); }
   if (pe !== undefined && o.sectorPe) {
     const rel = pe / o.sectorPe;
-    if (rel <= 0.8) { points += 2; reasons.push(`P/E ${pe}x is below the sector's ${r1(o.sectorPe)}x`); }
-    else if (rel <= 1.2) reasons.push(`P/E ${pe}x is in line with the sector's ${r1(o.sectorPe)}x`);
-    else if (rel <= 1.5) { points -= 1; reasons.push(`P/E ${pe}x is above the sector's ${r1(o.sectorPe)}x`); }
-    else { points -= 2; reasons.push(`P/E ${pe}x is far above the sector's ${r1(o.sectorPe)}x`); }
+    if (rel <= 0.8) { points += 2; reasons.push(`P/E ${pe}x is below ${of} ${r1(o.sectorPe)}x`); }
+    else if (rel <= 1.2) reasons.push(`P/E ${pe}x is in line with ${of} ${r1(o.sectorPe)}x`);
+    else if (rel <= 1.5) { points -= 1; reasons.push(`P/E ${pe}x is above ${of} ${r1(o.sectorPe)}x`); }
+    else { points -= 2; reasons.push(`P/E ${pe}x is far above ${of} ${r1(o.sectorPe)}x`); }
   }
   if (pcfo !== undefined && pe !== undefined && pcfo > pe * 1.5) { points -= 1; reasons.push(`P/CFO ${pcfo}x is much higher than P/E: profits are not fully backed by cash`); }
   if (!o.financial && cfo !== undefined && cfo <= 0) { points -= 1; reasons.push("operating cash flow is negative"); }
@@ -150,7 +154,7 @@ export function valuationView(o: { price: number; f?: Fundamentals; latest?: Yea
     agent: "Valuation", points, tone: tone(points + 1, any), // fair value (0 points) reads as OK
     verdict: !any ? "No data" : points >= 1 ? "Attractive" : points === 0 ? "Fair" : points === -1 ? "Rich" : "Expensive",
     metrics: [
-      { label: "P/E (TTM)", unit: "x", value: pe, note: pe === undefined && eps !== undefined && eps <= 0 ? "loss-making" : o.sectorPe ? `sector median ${r1(o.sectorPe)}x` : undefined },
+      { label: "P/E (TTM)", unit: "x", value: pe, note: pe === undefined && eps !== undefined && eps <= 0 ? "loss-making" : o.sectorPe ? `${o.sectorPeLabel ? `${o.sectorPeLabel} (NSE)` : "sector median"} ${r1(o.sectorPe)}x` : undefined },
       { label: "P/B", unit: "x", value: pb },
       { label: "P/CFO", unit: "x", value: pcfo, note: o.financial ? "not used for lenders" : cfo !== undefined && cfo <= 0 ? "negative cash flow" : undefined },
     ],
@@ -392,14 +396,25 @@ export async function runResearchDesk(symbols: string[], ctx: DeskContext): Prom
   const demo = ctx.source.kind === "demo", seed = ctx.source.seed ?? 0;
   const price = (s: string) => ctx.frames[s][ctx.frames[s].length - 1].close;
   const pes = sectorPes(ctx);
+  // NSE's published P/E for each stock's sector index replaces the run's median when available.
+  const peLabels: Record<string, string> = {};
+  if (!demo && nseMcpEnabled()) {
+    const snap = await nseIndexSnapshot().catch(() => []);
+    for (const s of symbols) {
+      const name = NSE_SECTOR_INDEX[ctx.sectorOf(s)];
+      const row = name ? snap.find((x) => x.indexName.toLowerCase() === name.toLowerCase()) : undefined;
+      if (row?.pe && row.pe > 0) { pes[s] = row.pe; peLabels[s] = row.indexName; }
+    }
+  }
   const nifty = niftyYtd(ctx.indexClose, ctx.frames[symbols[0]]);
   const provider = demo ? null : getProvider();
   const demoPledge = demo ? Object.fromEntries(symbols.map((s) => [s, demoShareholding(s, seed).pledgedPct ?? 0])) : undefined;
-  const [fin, longs, targets, surv] = await Promise.all([
+  const [fin, longs, targets, surv, seasons] = await Promise.all([
     loadFinancials(Object.fromEntries(symbols.map((s) => [s, price(s)])), { demo, seed }),
     Promise.all(symbols.map(async (s) => (demo ? demoLongBars(ctx.frames[s], s, seed) : await provider?.getLongBars(s).catch(() => []) ?? []))),
     demo ? Promise.resolve(symbols.map(() => null)) : inBatches(symbols, 3, yahooAnalystTarget),
     loadSurveillance(symbols, { demo, seed, demoPledge }),
+    loadSeasonal(symbols, { demo, seed, frames: ctx.frames }),
   ]);
   const out: Record<string, ResearchDesk> = {};
   symbols.forEach((s, i) => {
@@ -409,7 +424,7 @@ export async function runResearchDesk(symbols: string[], ctx: DeskContext): Prom
     const growth = growthView(years, financial);
     const epsHist = f?.epsHistory ?? [];
     const epsCagr = epsHist.length >= 2 ? cagr(epsHist[0].eps, epsHist[epsHist.length - 1].eps, epsHist.length - 1) ?? f?.epsGrowth1y : f?.epsGrowth1y;
-    const valuation = valuationView({ price: price(s), f, latest: years[years.length - 1], sectorPe: pes[s], financial });
+    const valuation = valuationView({ price: price(s), f, latest: years[years.length - 1], sectorPe: pes[s], sectorPeLabel: peLabels[s], financial });
     const pe = valuation.metrics[0].value;
     const performance = performanceView({
       ytd: ytdReturn(ctx.frames[s]), niftyYtd: nifty, five: fiveYearCagr(longs[i]),
@@ -423,9 +438,11 @@ export async function runResearchDesk(symbols: string[], ctx: DeskContext): Prom
     const pd = !financial && f?.marketCapCr && latest?.debt !== undefined
       ? defaultProbability({ marketCapCr: f.marketCapCr, debtCr: latest.debt, equityVol: vol, ret1y: bars[bars.length - 1].close / bars[0].close - 1 }) : undefined;
     const redFlags = redFlagView({ symbol: s, surv, pledgePct: surv.pledge[s], pd, financial, pump: pumpPattern(bars, f?.cap) });
-    const core = clamp(performance.points + valuation.points + growth.points + profitability.points, -10, 10);
+    const season = seasons[s];
+    const seasonal = season && season.daily.length > 60 ? seasonalView(season, price(s)) : undefined;
+    const core = clamp(performance.points + valuation.points + growth.points + profitability.points + (seasonal?.points ?? 0), -10, 10);
     out[s] = {
-      performance, valuation, growth, profitability, redFlags,
+      performance, valuation, growth, profitability, seasonal, redFlags,
       points: core + redFlags.points,
       severe: redFlags.flags!.some((x) => x.status === "severe"),
       sample: demo, source: demo ? "Sample figures (demo)" : `Yahoo Finance (unofficial); surveillance: ${surv.source}`,

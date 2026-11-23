@@ -4,6 +4,7 @@ export const TEAM: Record<Person, { name: string; title: string; focus: string; 
   News: { name: "News Agent", title: "Pre-market news & sentiment", focus: "Collects stock news · 9:00 AM IST", color: "#EC4899" },
   Volatility: { name: "Volatility Agent", title: "India VIX analysis", focus: "Tracks market fear · explains moves", color: "#84CC16" },
   Macro: { name: "Macro Agent", title: "Gold · crude · USD/INR", focus: "Commodity & currency effects", color: "#06B6D4" },
+  CentralBank: { name: "Central Bank Agent", title: "RBI & Fed policy", focus: "Reports to Research Agent", color: "#0369A1", lead: "Research" },
   Momentum: { name: "Momentum Agent", title: "Short-term trades · 1-10 days", focus: "Breakouts, RSI, volume, MACD", color: "#3B82F6" },
   Trend: { name: "Trend Agent", title: "Positional trades · ~1 month", focus: "Moving averages, relative strength", color: "#A855F7" },
   Research: { name: "Research Agent", title: "Combines signals, risk & charts", focus: "EPS, sectors, charts, buy zones", color: "#14B8A6" },
@@ -11,8 +12,10 @@ export const TEAM: Record<Person, { name: string; title: string; focus: string; 
   Valuation: { name: "Valuation Agent", title: "P/E, P/B, P/CFO", focus: "Reports to Research Agent", color: "#6366F1", lead: "Research" },
   Growth: { name: "Growth Agent", title: "3-year revenue, cash flow, profit", focus: "Reports to Research Agent", color: "#22C55E", lead: "Research" },
   Profitability: { name: "Profitability Agent", title: "ROE, profit margin, cash flow", focus: "Reports to Research Agent", color: "#D946EF", lead: "Research" },
+  Seasonal: { name: "Seasonality Agent", title: "Seasonal trends & dividends", focus: "Reports to Research Agent", color: "#EAB308", lead: "Research" },
   RedFlag: { name: "Red Flag Agent", title: "ASM, GSM, pledge, tips, default risk", focus: "Reports to Research Agent", color: "#EF4444", lead: "Research" },
   Entry: { name: "Entry Point Agent", title: "Fundamentals + technicals entry", focus: "Reports to Research Agent", color: "#0EA5E9", lead: "Research" },
+  BlackPoints: { name: "Black Points Analyst", title: "Downside risks · filings & evidence", focus: "Reports to Research Agent", color: "#52525B", lead: "Research" },
   Decision: { name: "Decision Agent", title: "Final picks & portfolio rules", focus: "Verdicts, sector cap, sizing", color: "#F59E0B" },
 };
 
@@ -23,7 +26,7 @@ export const LEGACY_AGENT: Record<string, Person> = {
 export const migrateAgent = <T extends string>(n: T): T | Person => LEGACY_AGENT[n] ?? n;
 
 export const PEOPLE = Object.keys(TEAM) as Person[];
-export const DESK_AGENTS = ["Performance", "Valuation", "Growth", "Profitability", "RedFlag", "Entry"] as const;
+export const DESK_AGENTS = ["Performance", "Valuation", "Growth", "Profitability", "Seasonal", "RedFlag", "Entry"] as const;
 export const isDeskAgent = (n: string) => (DESK_AGENTS as readonly string[]).includes(n);
 
 export const displayName = (n: AgentName | "ALL") =>
@@ -38,7 +41,10 @@ export const THREADS: { id: string; title: string; members: Person[] }[] = [
   { id: "Momentum|Research", title: "Momentum Agent & Research Agent", members: ["Momentum", "Research"] },
   { id: "Research|Trend", title: "Trend Agent & Research Agent", members: ["Trend", "Research"] },
   { id: "Macro|Research", title: "Macro Agent & Research Agent", members: ["Macro", "Research"] },
+  { id: "CentralBank|Research", title: "Central Bank Agent & Research Agent", members: ["CentralBank", "Research"] },
   { id: "Research|Volatility", title: "Volatility Agent & Research Agent", members: ["Volatility", "Research"] },
-  { id: "desk", title: "Research desk", members: ["Research", "Performance", "Valuation", "Growth", "Profitability", "RedFlag", "Entry"] },
+  { id: "desk", title: "Research desk", members: ["Research", "Performance", "Valuation", "Growth", "Profitability", "Seasonal", "RedFlag", "Entry"] },
+  { id: "BlackPoints|Research", title: "Research Agent & Black Points Analyst", members: ["Research", "BlackPoints"] },
+  { id: "BlackPoints|Decision", title: "Black Points Analyst & Decision Agent", members: ["BlackPoints", "Decision"] },
   { id: "Decision|Research", title: "Research Agent & Decision Agent", members: ["Research", "Decision"] },
 ];

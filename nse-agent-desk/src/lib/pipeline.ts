@@ -18,7 +18,13 @@ import { analyseSectors, applySectors, enrichSectors } from "./sectors";
 import { analyseMacro, applyMacro, loadMacro } from "./macro";
 import { registerSectors, sectorOf } from "./market/universe";
 import { runResearchDesk } from "./research-desk";
-import type { RunRequest, RunResult, StreamEvent } from "./types";
+import { runBlackPoints } from "./black-points";
+import { loadPolicy, policyEffect, type PolicyReport } from "./policy";
+import { globalCues, worldQuotes } from "./world";
+import { nseMarketMood, nseMcpEnabled } from "./nse-mcp/client";
+import { holdPlan, type HoldPlan } from "./forecast";
+import { addTradingDays } from "./market/calendar";
+import type { Bar, RunRequest, RunResult, StreamEvent } from "./types";
 
 export async function runAnalysis(o: RunRequest, emit: (e: StreamEvent) => void): Promise<RunResult> {
   const started = Date.now();
@@ -45,7 +51,9 @@ export async function runAnalysis(o: RunRequest, emit: (e: StreamEvent) => void)
   emit({ type: "progress", text: "Collecting news…" });
   const news = await loadNews(Object.keys(snaps), source.kind === "demo", snaps, source.seed);
   const morning = new NewsAgent();
-  const vix = new VolatilityAgent().analyse(vixClose, indexClose, frames, snaps, news, source.kind === "demo");
+  // NSE's market mood (breadth, VIX range) from the NSE MCP server, live runs only.
+  const mood = source.kind !== "demo" && nseMcpEnabled() ? await nseMarketMood().catch(() => null) : null;
+  const vix = new VolatilityAgent().analyse(vixClose, indexClose, frames, snaps, news, source.kind === "demo", mood);
   const lot = morning.apply(new MomentumAgent().scan(snaps), news);
   const may = morning.apply(new TrendAgent().scan(snaps, indexRet21d), news);
   const mubashir = new ResearchAgent();
@@ -55,21 +63,42 @@ export async function runAnalysis(o: RunRequest, emit: (e: StreamEvent) => void)
   const sectors = analyseSectors(frames, snaps, sectorOf, indexClose, sectorIndex);
   // Macro Agent: gold, crude and USD/INR, and the stocks that depend on them — before Research Agent's analysis.
   emit({ type: "progress", text: "Reading gold, crude and USD/INR…" });
-  const macroData = await loadMacro(source.kind === "demo", source.seed);
+  const [macroData, policy] = await Promise.all([
+    loadMacro(source.kind === "demo", source.seed),
+    // Central Bank Agent: RBI and Fed policy from their own websites.
+    loadPolicy(source.kind === "demo").catch(() => null),
+  ]);
   const macro = macroData ? analyseMacro(frames, macroData.series, macroData.sample) : null;
-  const first = applySectors(mubashir.applyFundamentals(applyMacro(mubashir.analyse(lot, may, snaps), macro), funds), sectors);
-  const candidates = first.slice(0, Math.max(12, o.top * 2)).map((r) => r.symbol);
+  const first = applyPolicy(policy, applySectors(mubashir.applyFundamentals(applyMacro(mubashir.analyse(lot, may, snaps), macro), funds), sectors));
+  const focus = (o.focus ?? []).filter((s) => frames[s]);
+  const candidates = [...new Set([...focus, ...first.slice(0, Math.max(12, o.top * 2)).map((r) => r.symbol)])];
   // Research desk: Performance, Valuation and Growth Agents check the candidates for Research Agent.
   emit({ type: "progress", text: "Research desk: performance, valuation, growth, profitability, red flags…" });
   const desk = await runResearchDesk(candidates, { frames, funds, source, indexClose, sectorOf });
+  const withDesk = mubashir.applyDesk(first, desk);
+  // Black Points Analyst: downside risks for every stock that passed the Momentum or Trend scan.
+  emit({ type: "progress", text: "Black Points Analyst: checking filings, regulator orders and financial health…" });
+  const bp = await runBlackPoints(withDesk, { demo: source.kind === "demo", seed: source.seed ?? 0, frames, sectorOf, sectors, focus, policy });
+  const checked = withDesk.map((r) => (bp.reports[r.symbol] ? { ...r, blackPoints: bp.reports[r.symbol] } : r));
+  // Chart check: the original candidates plus the top stocks still eligible for a holding period,
+  // so stocks held out by the Black Points Analyst don't crowd out the ones that can be picked.
+  const eligible = checked.filter((r) => !r.blackPoints || Object.values(r.blackPoints.status).includes("Eligible"));
+  const chartSyms = [...new Set([...candidates, ...eligible.slice(0, Math.max(12, o.top * 2)).map((r) => r.symbol)])];
   emit({ type: "progress", text: "Checking charts…" });
-  const intraday = await loadIntraday(candidates, source, frames);
-  const charts = Object.fromEntries(candidates.map((s) => [s, analyseChart(frames[s], intraday[s]?.m30 ?? null, intraday[s]?.h1 ?? null)]));
-  const rows = mubashir.applyEntry(mubashir.applyCharts(mubashir.applyDesk(first, desk), charts));
+  const intraday = await loadIntraday(chartSyms, source, frames);
+  const charts = Object.fromEntries(chartSyms.map((s) => [s, analyseChart(frames[s], intraday[s]?.m30 ?? null, intraday[s]?.h1 ?? null)]));
+  const rows = mubashir.applyEntry(mubashir.applyCharts(checked, charts));
+  // Macro Agent's global cues: the main world indices (live runs only).
+  const cues = source.kind !== "demo" ? await worldQuotes().then(globalCues).catch(() => null) : null;
   const fd = new DecisionAgent();
   const conflicted = fd.conflicted(rows, o.top);
   const clarifications = Object.fromEntries(conflicted.map((r) => [r.symbol, mubashir.adviseOnConflict(r)]));
-  const { all, picks, watchlist, passed } = fd.decide(rows, sparks, o.top, clarifications, o.capital, o.riskPerTrade);
+  const decided = fd.decide(rows, sparks, o.top, clarifications, o.capital, o.riskPerTrade);
+  // Decision Agent's holding plan for every stock: how long to hold, by when, the odds and the expected return.
+  emit({ type: "progress", text: "Decision Agent: working out how long to hold…" });
+  const plans = Object.fromEntries(decided.all.map((d) => [d.symbol, planHold(d, frames[d.symbol], source.seed)]));
+  const withHold = <T extends { symbol: string }>(xs: T[]) => xs.map((d) => (plans[d.symbol] ? { ...d, hold: plans[d.symbol] } : d));
+  const { all, picks, watchlist, passed } = { ...decided, all: withHold(decided.all), picks: withHold(decided.picks), watchlist: withHold(decided.watchlist) };
 
   const sectorViews = enrichSectors(sectors, all);
 
@@ -78,16 +107,35 @@ export async function runAnalysis(o: RunRequest, emit: (e: StreamEvent) => void)
     aiLabel: llm.enabled ? `on (${aiModel()})` : "off",
     capital: o.capital, riskPerTrade: o.riskPerTrade,
     macro, sectors: sectorViews, excluded, minCapCr, news, vix, positive: morning.positive(news), negative: morning.negative(news),
-    snaps, lot, may, rows, conflicted, clarifications, picks, passed, watchlist,
+    snaps, lot, may, rows, conflicted, clarifications, picks, passed, watchlist, all, bpCoverage: bp.summary.coverage, globalCues: cues, policy,
   });
 
   const result: RunResult = {
     source, generatedAt: new Date().toISOString(), simulatedAgents: !llm.enabled,
     capital: o.capital, riskPerTrade: o.riskPerTrade,
-    indexRet21d: Math.round(indexRet21d * 100) / 100, news, vix, excluded, minCapCr, sectors: sectorViews, macro, picks, watchlist, all, skipped,
+    indexRet21d: Math.round(indexRet21d * 100) / 100, news, vix, blackPoints: bp.summary, policy, excluded, minCapCr, sectors: sectorViews, macro, picks, watchlist, all, skipped,
   };
   emit({ type: "result", result });
   console.log(`[nse-agent-desk] run: ${rows.length} stocks, source=${source.kind}${source.seed !== undefined ? `#${source.seed}` : ""}, ` +
     `picks=${picks.map((p) => p.symbol).join(",") || "none"}, messages=${bus.log.length}, ai=${llm.enabled}, ${Date.now() - started}ms`);
   return result;
+}
+
+/** Swing trades are held up to 10 trading days, positional (or swing-then-hold) up to 21. */
+export const holdDays = (horizon: string) => (horizon.startsWith("Swing ·") ? 10 : 21);
+
+function planHold(d: { symbol: string; entry: number; stopLoss: number; target: number; horizon: string }, bars: Bar[] | undefined, seed?: number): HoldPlan | undefined {
+  if (!bars || bars.length < 60 || !(d.stopLoss < d.entry && d.entry < d.target)) return undefined;
+  const plan = holdPlan(bars, { entry: d.entry, stop: d.stopLoss, target: d.target, maxDays: holdDays(d.horizon), seed: `${d.symbol}:${seed ?? "live"}:hold` });
+  const from = bars[bars.length - 1].date.slice(0, 10);
+  return { ...plan, exitBy: addTradingDays(from, plan.maxDays), expectedBy: plan.expectedDays ? addTradingDays(from, plan.expectedDays) : undefined };
+}
+
+/** Central Bank Agent: move rate-sensitive sectors by the RBI's direction (+/-2). */
+function applyPolicy<T extends { sector: string; combined: number; notes: string[] }>(p: PolicyReport | null, rows: T[]): T[] {
+  return rows.map((r) => {
+    const e = policyEffect(p, r.sector);
+    if (!e) return r;
+    return { ...r, policy: e, combined: Math.max(0, Math.min(100, Math.round((r.combined + e.points) * 10) / 10)), notes: [...r.notes, `Policy: ${e.effect.toLowerCase()}${e.points ? ` (${e.points > 0 ? "+" : ""}${e.points})` : ""}, ${e.reason}`] };
+  }).sort((a, b) => b.combined - a.combined);
 }

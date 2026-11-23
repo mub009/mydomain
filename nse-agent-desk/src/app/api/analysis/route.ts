@@ -2,6 +2,7 @@ import { runAnalysis } from "@/lib/pipeline";
 import type { RunRequest, StreamEvent } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 300; // a full live run can take a few minutes on a hosted server
 
 const SYMBOL = /^[A-Z0-9&.\-]{1,20}$/;
 

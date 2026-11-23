@@ -104,11 +104,36 @@ describe("monitor with storage", () => {
     const p = pos(); p.buyPrice = 1000; p.stop = 999.99; p.partial = 1000.01; p.target = 1000.02; // any move fires
     p.openedAt = new Date(Date.now() - 3600 * 1000).toISOString();
     await update((s) => { s.positions.push(p); });
-    const alerts = await checkPositions("demo");
+    const { alerts } = await checkPositions("demo");
     expect(alerts.length).toBeGreaterThan(0);
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe("https://api.telegram.org/bot123:abc/sendMessage");
     expect(JSON.parse(String(init.body)).chat_id).toBe("42");
     vi.unstubAllGlobals();
+  });
+});
+
+describe("positions kept in the browser", () => {
+  it("changes the copy it is sent and leaves the saved file alone", async () => {
+    const { change, readState } = await import("./positions/store");
+    const before = (await readState()).positions.length;
+    const p = pos(); p.symbol = "BROWSERONLY";
+    const { state } = await change({ positions: [], alerts: [] }, (s) => { s.positions.push(p); });
+    expect(state?.positions.map((x) => x.symbol)).toEqual(["BROWSERONLY"]);
+    expect((await readState()).positions.length).toBe(before);
+  });
+
+  it("refuses a copy with the wrong shape", async () => {
+    const { clientState } = await import("./positions/store");
+    expect(clientState({ positions: "x", alerts: [] })).toBeNull();
+    expect(clientState(null)).toBeNull();
+    expect(clientState({ positions: [], alerts: [] })).not.toBeNull();
+  });
+
+  it("checks prices on the browser's copy", async () => {
+    const p = pos(); p.feed = "demo";
+    const r = await checkPositions("demo", { positions: [p], alerts: [] });
+    expect(r.state?.positions[0].lastPrice).toBeGreaterThan(0);
+    expect(r.state?.lastRunAt).toBeTruthy();
   });
 });

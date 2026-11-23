@@ -122,7 +122,7 @@ export function MarketStatusBadge({ className }: { className?: string }) {
     <span className={cn("inline-flex h-8 items-center gap-2 whitespace-nowrap rounded-full border bg-card px-3 text-xs font-medium", className)}
       title={st && !st.calendarKnown ? "Holiday calendar for this year is not loaded; weekends only." : "NSE regular session 09:15-15:30 IST"}>
       <span className={cn("size-2 rounded-full", st?.open ? "bg-emerald-500 text-emerald-500 [animation:pulse-ring_1.6s_infinite]" : "bg-slate-400")} />
-      <span>NSE {st ? (st.open ? "Market Open" : st.label === "Closed" ? "Market Closed" : `Closed · ${st.label}`) : "…"}</span>
+      <span>NSE {st ? (st.open ? "Open" : "Closed") : "…"}<span className="max-[430px]:hidden">{st ? (st.open ? "" : st.label === "Closed" ? "" : ` · ${st.label}`) : ""}</span></span>
       <span className="text-muted-foreground tnum">{st ? `${st.time} IST` : ""}</span>
     </span>
   );

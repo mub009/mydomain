@@ -60,3 +60,15 @@ export function marketStatus(at = new Date()): MarketStatus {
   if (p.minutes >= 555 && p.minutes <= 930) return { ...base, open: true, label: "Open" };
   return { ...base, open: false, label: "Closed" };
 }
+
+/** The trading day `n` sessions after `from` (a YYYY-MM-DD date), skipping weekends and NSE holidays. */
+export function addTradingDays(from: string, n: number): string {
+  const d = new Date(`${from}T00:00:00Z`);
+  let left = n;
+  while (left > 0) {
+    d.setUTCDate(d.getUTCDate() + 1);
+    const day = d.getUTCDay(), iso = d.toISOString().slice(0, 10);
+    if (day !== 0 && day !== 6 && !(NSE_HOLIDAYS[d.getUTCFullYear()] ?? []).includes(iso)) left--;
+  }
+  return d.toISOString().slice(0, 10);
+}

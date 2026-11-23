@@ -144,7 +144,7 @@ describe("research desk in a run", () => {
       if (d.desk!.severe) expect(["WATCH", "AVOID"]).toContain(d.verdict);
     }
     const desk = msgs.filter((m) => m.thread === "desk");
-    expect(desk.map((m) => m.sender)).toEqual(["Research", "Performance", "Valuation", "Growth", "Profitability", "RedFlag", "Entry", "Research"]);
+    expect(desk.map((m) => m.sender)).toEqual(["Research", "Performance", "Valuation", "Growth", "Profitability", "Seasonal", "RedFlag", "Entry", "Research"]);
     expect(desk[1].table?.columns).toContain("5Y a year");
     expect(desk[2].table?.columns).toContain("P/CFO");
     expect(desk[3].table?.columns).toContain("Cash flow");

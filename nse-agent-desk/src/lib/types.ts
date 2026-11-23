@@ -141,9 +141,13 @@ export interface Analysis {
   chart?: ChartAnalysis;
   /** Research desk: Performance, Valuation and Growth Agents (top candidates only). */
   desk?: ResearchDesk;
+  /** Central Bank Agent: effect of RBI policy on this stock's sector. */
+  policy?: { points: number; effect: "Tailwind" | "Headwind" | "Mixed" | "Neutral"; reason: string };
+  /** Black Points Analyst's downside-risk report (stocks that passed a scan). */
+  blackPoints?: BPReport;
 }
 
-export type DeskAgent = "Performance" | "Valuation" | "Growth" | "Profitability" | "Entry" | "RedFlag";
+export type DeskAgent = "Performance" | "Valuation" | "Growth" | "Profitability" | "Seasonal" | "Entry" | "RedFlag";
 export type DeskTone = "good" | "ok" | "weak" | "n/a";
 
 export interface DeskMetric {
@@ -165,6 +169,8 @@ export interface DeskView {
   reasons: string[];
   /** Red Flag Agent only: each check and what it found. */
   flags?: RedFlag[];
+  /** Seasonality Agent only: month-by-month returns, quarters and dividends. */
+  seasonalDetail?: import("./seasonal").SeasonalDetail;
   /** Entry Agent only: the entry call and its price area. */
   entry?: { plan: EntryPlan; low?: number; high?: number };
 }
@@ -182,15 +188,68 @@ export interface ResearchDesk {
   valuation: DeskView;
   growth: DeskView;
   profitability: DeskView;
+  /** Missing when the history couldn't be loaded. */
+  seasonal?: DeskView;
   redFlags: DeskView;
   /** Set after the chart check. */
   entry?: DeskView;
-  /** Total points: performance + valuation + growth + profitability (capped at +/-10), plus red flags (down to -10) and entry (+/-2). */
+  /** Total points: performance + valuation + growth + profitability + seasonality (capped at +/-10), plus red flags (down to -10) and entry (+/-2). */
   points: number;
   /** A severe red flag: the Decision Agent won't rate it above WATCH. */
   severe: boolean;
   sample: boolean;
   source: string;
+}
+
+// ---------- Black Points Analyst ----------
+
+export type HoldingPeriod = "swing" | "positional";
+export type BPStatus = "Eligible" | "Excluded" | "Needs Review";
+export type BPCategory = "Structural decline" | "Sector pressure" | "Company weakness" | "Governance & events" | "Evidence coverage";
+
+export interface BPEvidence {
+  summary: string;
+  /** Publication or period date (YYYY-MM-DD). */
+  date?: string;
+  source: string;
+  url?: string;
+  kind: "exchange filing" | "regulator" | "company financials" | "industry data" | "news" | "market data";
+}
+
+export interface BPFinding {
+  category: BPCategory;
+  flag: string;
+  scope: "Company" | "Sector";
+  /** Material findings decide the status; "watch" findings are reported only. */
+  materiality: "material" | "watch";
+  /** Verified needs a primary source (filing, regulator, company financials, industry data). */
+  verification: "verified" | "unverified" | "stale" | "conflicting" | "missing";
+  evidence: BPEvidence[];
+  /** Status this finding implies for each holding period it affects. */
+  impact: Partial<Record<HoldingPeriod, BPStatus>>;
+  note: string;
+}
+
+export interface BPReport {
+  symbol: string;
+  sector: string;
+  subsector?: string;
+  company?: string;
+  /** Why it passed the technical scan, per holding period. */
+  passed: Partial<Record<HoldingPeriod, string>>;
+  findings: BPFinding[];
+  status: Partial<Record<HoldingPeriod, BPStatus>>;
+  /** What the Decision Agent did with it. */
+  finalDecision?: string;
+  checkedAt: string;
+  sample: boolean;
+}
+
+export interface BPSummary {
+  coverage: string[];
+  /** Earliest SEBI order date read this run. */
+  sebiFrom?: string;
+  sample: boolean;
 }
 
 export interface Decision extends Analysis {
@@ -201,9 +260,11 @@ export interface Decision extends Analysis {
   quantity?: number;
   investment?: number;
   spark: number[]; // last ~60 closes
+  /** Decision Agent's holding plan: expected days to the target, hold-until date, odds and expected return. */
+  hold?: import("./forecast").HoldPlan;
 }
 
-export type Person = "News" | "Volatility" | "Macro" | "Momentum" | "Trend" | "Research" | DeskAgent | "Decision";
+export type Person = "News" | "Volatility" | "Macro" | "CentralBank" | "Momentum" | "Trend" | "Research" | DeskAgent | "BlackPoints" | "Decision";
 export type AgentName = Person | "System";
 export type Stage = "scan" | "analyze" | "debate" | "decide";
 
@@ -353,6 +414,10 @@ export interface RunResult {
   watchlist: Decision[];
   all: Decision[];
   skipped: string[];
+  /** Black Points Analyst: what was checked this run. */
+  blackPoints?: BPSummary;
+  /** Central Bank Agent: RBI and Fed policy. */
+  policy?: import("./policy").PolicyReport | null;
 }
 
 export interface RunRequest {
@@ -364,6 +429,8 @@ export interface RunRequest {
   riskPerTrade: number;
   /** Sectors for searched stocks outside the built-in lists. */
   sectors?: Record<string, string>;
+  /** Stocks to research in full whatever their rank (single-stock search). */
+  focus?: string[];
 }
 
 export type StreamEvent =

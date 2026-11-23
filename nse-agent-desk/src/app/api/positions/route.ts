@@ -1,5 +1,5 @@
 import { newPosition, telegramEnabled } from "@/lib/positions/monitor";
-import { readState, update } from "@/lib/positions/store";
+import { browserStorage, change, readState } from "@/lib/positions/store";
 
 export const dynamic = "force-dynamic";
 
@@ -7,10 +7,11 @@ const SYMBOL = /^[A-Z0-9&.\-]{1,20}$/;
 
 /** All positions, recent alerts and monitor settings. */
 export async function GET() {
-  const s = await readState();
+  const s = browserStorage() ? { positions: [], alerts: [] as never[], lastRunAt: undefined } : await readState();
   return Response.json({
+    storage: browserStorage() ? "browser" : "server",
     positions: s.positions, alerts: s.alerts.slice(-100).reverse(), lastRunAt: s.lastRunAt ?? null,
-    monitor: { enabled: process.env.POSITION_MONITOR_ENABLED !== "false", minutes: Number(process.env.POSITION_CHECK_MINUTES ?? 5) || 5, telegram: telegramEnabled() },
+    monitor: { enabled: process.env.POSITION_MONITOR_ENABLED !== "false", inApp: browserStorage(), minutes: Number(process.env.POSITION_CHECK_MINUTES ?? 5) || 5, telegram: telegramEnabled() },
   });
 }
 
@@ -26,6 +27,6 @@ export async function POST(req: Request) {
   const cap = ["Large", "Mid", "Small", "Unknown"].includes(b?.cap) ? b.cap : undefined;
   const sector = typeof b?.sector === "string" && /^[A-Za-z &]{1,30}$/.test(b.sector) ? b.sector : undefined;
   const p = newPosition({ symbol, qty, buyPrice, stop, target, feed: b?.feed === "live" ? "live" : "demo", sector, cap });
-  await update((s) => { s.positions.unshift(p); });
-  return Response.json({ position: p }, { status: 201 });
+  const { state } = await change(b?.state, (s) => { s.positions.unshift(p); });
+  return Response.json({ position: p, state }, { status: 201 });
 }

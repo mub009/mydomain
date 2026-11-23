@@ -1,21 +1,24 @@
 "use client";
 
-import { AlertTriangle, Check, Maximize2, Minimize2, X } from "lucide-react";
+import { AlertTriangle, Check, Loader2, Maximize2, Minimize2, Search, X } from "lucide-react";
 import { Dialog } from "radix-ui";
 import { inr, pct } from "@/lib/format";
 import { TEAM } from "@/lib/team";
 import type { Decision, Person } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { findStock, useDesk } from "@/store/desk";
+import { findStock, useDesk, useStockResult } from "@/store/desk";
 import { AgentAvatar } from "./agent-avatar";
 import { ChartCheck } from "./chart-check";
 import { ResearchDeskSection } from "./desk-ui";
+import { BlackPointsSection } from "./black-points-ui";
 import { FundamentalsCard } from "./fundamentals";
 import { TrackTradeButton } from "./positions-ui";
 import { CompanyTab } from "./company-tab";
 import { ForecastTab } from "./forecast-tab";
 import { SectorCheck } from "./sector-ui";
 import { MacroExposureSection } from "./macro-ui";
+import { holdShort, shortDate } from "@/lib/hold";
+import { StockFinder } from "./stock-finder";
 import { Tabs } from "radix-ui";
 import { useEffect, useMemo } from "react";
 import type { ChartResponse } from "@/lib/market/chart-data";
@@ -39,6 +42,7 @@ function useQuote(symbol: string | undefined) {
   return q;
 }
 import { StockChart } from "./stock-chart";
+import { StockAgentsTab } from "./stock-agents-tab";
 import { useState } from "react";
 import { RiskTag, VerdictBadge } from "./primitives";
 
@@ -70,10 +74,34 @@ function AgentView({ who, score, reasons, warnings, children }: { who: Person; s
   );
 }
 
+/** Decision Agent's holding plan: how long, until when, the odds and the expected return. */
+function HoldCard({ d }: { d: Decision }) {
+  const h = d.hold!;
+  return (
+    <section className="rounded-xl border p-3" aria-label="How long to hold">
+      <div className="flex items-center gap-2">
+        <AgentAvatar who="Decision" size={22} />
+        <h3 className="text-[13px] font-semibold">How long to hold</h3>
+        <span className="ml-auto text-[11px] text-muted-foreground">{d.horizon}</span>
+      </div>
+      <dl className="mt-2.5 grid grid-cols-3 gap-2 text-center tnum">
+        <div className="rounded-lg bg-muted/60 px-1 py-1.5"><dt className="text-[10.5px] text-muted-foreground">Expected hold</dt><dd className="text-[14px] font-bold">{holdShort(h)}</dd>{h.expectedBy && <dd className="text-[10.5px] text-muted-foreground">around {shortDate(h.expectedBy)}</dd>}</div>
+        <div className="rounded-lg bg-muted/60 px-1 py-1.5"><dt className="text-[10.5px] text-muted-foreground">Exit by</dt><dd className="text-[14px] font-bold">{shortDate(h.exitBy)}</dd><dd className="text-[10.5px] text-muted-foreground">{h.maxDays} trading days</dd></div>
+        <div className="rounded-lg bg-muted/60 px-1 py-1.5"><dt className="text-[10.5px] text-muted-foreground">Expected return</dt><dd className={cn("text-[14px] font-bold", h.expectedReturnPct >= 0 ? "text-pos" : "text-neg")}>{pct(h.expectedReturnPct)}</dd><dd className="text-[10.5px] text-muted-foreground">target {pct(h.targetPct)}</dd></div>
+      </dl>
+      <div className="mt-2.5 flex h-2 overflow-hidden rounded-full" aria-hidden>
+        <span className="bg-pos" style={{ width: `${h.probTarget}%` }} /><span className="bg-muted-foreground/30" style={{ width: `${h.probOpen}%` }} /><span className="bg-neg" style={{ width: `${h.probStop}%` }} />
+      </div>
+      <p className="mt-1.5 flex justify-between text-[11px] tnum"><span className="text-pos">{h.probTarget}% target first</span><span className="text-muted-foreground">{h.probOpen}% neither</span><span className="text-neg">{h.probStop}% stop-loss first</span></p>
+      <p className="mt-1.5 text-[11.5px] leading-snug text-muted-foreground">From 1,000 simulated price paths using this stock&apos;s own daily moves. If neither the target nor the stop-loss is hit by {shortDate(h.exitBy)}, exit at the market price. Estimates, not guarantees.</p>
+    </section>
+  );
+}
+
 function Body({ d, isPick }: { d: Decision; isPick: boolean }) {
-  const sectors = useDesk((s) => s.result?.sectors);
+  const sectors = useStockResult()?.sectors;
   const sector = sectors?.find((s) => s.sector === d.sector);
-  const macroFactors = useDesk((s) => s.result?.macro?.factors ?? []);
+  const macroFactors = useStockResult()?.macro?.factors ?? [];
   return (
     <div className="flex-1 space-y-4 overflow-y-auto px-5 pb-6 pt-1 scroll-thin">
 
@@ -84,6 +112,8 @@ function Body({ d, isPick }: { d: Decision; isPick: boolean }) {
       </dl>
       <p className="text-[11.5px] leading-snug text-muted-foreground">Research scenario, not guaranteed prices. Target = entry + 2 × (entry − stop-loss), a {pct((d.target / d.entry - 1) * 100)} move.{d.quantity !== undefined && ` Sized at ${d.quantity} shares (${inr(d.investment ?? 0, 0)}).`}</p>
 
+      {d.hold && <HoldCard d={d} />}
+      {d.blackPoints && <BlackPointsSection bp={d.blackPoints} />}
       <div className="space-y-2.5">
         <ScoreBar label="Combined score" value={d.combined} color="var(--primary)" />
         <ScoreBar label="Momentum Agent · short-term" value={d.lotappi} color={TEAM.Momentum.color} />
@@ -124,63 +154,137 @@ function Body({ d, isPick }: { d: Decision; isPick: boolean }) {
  * nearly full screen: the full price chart on the left, the agents' research
  * on the right. "Full chart" hides the research column.
  */
+/** True on screens 1024px and wider (chart and research side by side). */
+function useWide() {
+  const [w, setW] = useState(true);
+  useEffect(() => {
+    const m = window.matchMedia("(min-width: 1024px)");
+    const on = () => setW(m.matches);
+    on(); m.addEventListener("change", on);
+    return () => m.removeEventListener("change", on);
+  }, []);
+  return w;
+}
+
 export function StockDrawer() {
   const symbol = useDesk((s) => s.drawerSymbol);
-  const result = useDesk((s) => s.result);
+  const result = useStockResult();
+  const currentRun = useDesk((s) => s.result);
+  const lookup = useDesk((s) => s.lookup);
+  const searchStock = useDesk((s) => s.searchStock);
   const openStock = useDesk((s) => s.openStock);
   const d = findStock(result, symbol);
-  const [tab, setTab] = useState("research");
+  const desktop = useWide();
+  const [tab, setTab] = useState("agents");
+  const [mtab, setMtab] = useState("chart"); // phones: one section at a time
   const [wide, setWide] = useState(false);
+  const [finding, setFinding] = useState(false);
   const levels = useMemo(() => (d ? { entry: d.entry, stop: d.stopLoss, target: d.target, zoneLow: d.chart?.zone?.low, zoneHigh: d.chart?.zone?.high } : undefined), [d]);
   const demo = result?.source.kind === "demo";
   const quote = useQuote(d?.symbol);
   return (
-    <Dialog.Root open={Boolean(d)} onOpenChange={(o) => { if (!o) { openStock(null); setWide(false); } }}>
+    <Dialog.Root open={Boolean(d) || Boolean(lookup && lookup.symbol === symbol)} onOpenChange={(o) => { if (!o) { openStock(null); setWide(false); setTab("agents"); setMtab("chart"); setFinding(false); } }}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-[rgb(8_12_28/0.62)] backdrop-blur-sm" />
+        {!d && lookup && (
+          <Dialog.Content className="card fixed left-1/2 top-1/2 z-50 w-[min(520px,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 p-6 outline-none">
+            <div className="flex items-start gap-3">
+              <div className="min-w-0 flex-1">
+                <Dialog.Title className="text-xl font-extrabold tracking-tight">{lookup.symbol}</Dialog.Title>
+                <Dialog.Description className="text-[13px] text-muted-foreground">{lookup.name ?? "NSE stock"}</Dialog.Description>
+              </div>
+              <Dialog.Close aria-label="Close" className="btn-3d grid size-9 place-items-center rounded-full text-muted-foreground hover:text-foreground"><X className="size-4" /></Dialog.Close>
+            </div>
+            {lookup.loading ? (
+              <div className="mt-5 space-y-3" aria-live="polite">
+                <p className="flex items-center gap-2 text-[14px] font-semibold"><Loader2 className="size-4 animate-spin text-primary" />The agents are researching {lookup.symbol}…</p>
+                <p className="text-[12.5px] leading-relaxed text-muted-foreground">Loading live prices, financials, news, SEBI orders and its sector peers, then running the scanners, the research desk, the chart check and the Black Points Analyst. This takes about 15 seconds.</p>
+                <div className="h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full w-1/3 animate-[lookup-bar_1.4s_ease-in-out_infinite] rounded-full bg-primary" /></div>
+              </div>
+            ) : (
+              <div className="mt-5 space-y-3" role="alert">
+                <p className="text-[13.5px] font-semibold text-neg">{lookup.error}</p>
+                <button type="button" onClick={() => searchStock(lookup.symbol, { name: lookup.name })} className="btn-3d inline-flex h-9 items-center gap-1.5 rounded-xl px-3 text-[13px] font-semibold">Try again</button>
+              </div>
+            )}
+          </Dialog.Content>
+        )}
         {d && (
           <Dialog.Content
             className="card fixed inset-0 z-50 flex flex-col overflow-hidden rounded-none outline-none sm:inset-[2.5vh_2vw] sm:rounded-[22px]"
             onOpenAutoFocus={(e) => e.preventDefault()}>
-            <header className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-[var(--edge)] px-4 py-3 sm:px-5">
+            <header className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-b border-[var(--edge)] px-4 py-2.5 sm:gap-y-2 sm:px-5 sm:py-3">
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <Dialog.Title className="text-xl font-extrabold tracking-tight">{d.symbol}</Dialog.Title>
                   <VerdictBadge verdict={d.verdict} />
                 </div>
-                <Dialog.Description className="text-[12.5px] text-muted-foreground">
+                <Dialog.Description className="text-[12.5px] text-muted-foreground max-sm:line-clamp-1">
                   {d.sector} · NSE{d.fundamentals?.marketCapCr ? ` · ${d.fundamentals.cap} cap ₹${d.fundamentals.marketCapCr.toLocaleString("en-IN")} Cr` : ""}
                   {demo ? " · analysis on demo prices; the chart shows real prices" : " · live data, end of day"}
+                  {result && result !== currentRun ? " · analysed on its own with its sector peers" : ""}
                 </Dialog.Description>
               </div>
               <div className="tnum">
                 <div className="flex items-baseline gap-2">
-                  <span className="text-2xl font-bold">{inr(quote?.last ?? d.entry)}</span>
+                  <span className="text-xl font-bold sm:text-2xl">{inr(quote?.last ?? d.entry)}</span>
                   {quote && <span className={cn("text-[13px] font-semibold", quote.change >= 0 ? "text-pos" : "text-neg")}>{pct(quote.change)} today</span>}
                 </div>
-                <div className="text-[11.5px] text-muted-foreground">{quote ? `Last price, ${quote.date} · analysis entry ${inr(d.entry)}` : "Analysis entry price"}</div>
+                <div className="text-[11.5px] text-muted-foreground max-sm:hidden">{quote ? `Last price, ${quote.date} · analysis entry ${inr(d.entry)}` : "Analysis entry price"}</div>
               </div>
               <div className="ml-auto flex items-center gap-2">
                 <button type="button" onClick={() => setWide((w) => !w)} aria-pressed={wide}
                   className="btn-3d hidden h-9 items-center gap-1.5 rounded-xl px-3 text-[13px] font-semibold lg:inline-flex">
                   {wide ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}{wide ? "Show research" : "Full chart"}
                 </button>
+                <button type="button" onClick={() => setFinding((f) => !f)} aria-pressed={finding} aria-label="Search another stock" title="Search another stock"
+                  className={cn("btn-3d grid size-9 place-items-center rounded-full text-muted-foreground hover:text-foreground", finding && "text-primary")}>
+                  <Search className="size-4" />
+                </button>
                 <TrackTradeButton d={d} className="h-9" />
-                <Dialog.Close aria-label="Close" className="btn-3d grid size-10 place-items-center rounded-full text-muted-foreground hover:text-foreground">
+                <Dialog.Close aria-label="Close" className="btn-3d grid size-9 place-items-center sm:size-10 rounded-full text-muted-foreground hover:text-foreground">
                   <X className="size-5" />
                 </Dialog.Close>
               </div>
+              {finding && <StockFinder className="w-full lg:w-96" hotkey={false} autoFocus onPicked={() => { setFinding(false); setMtab("chart"); }} />}
             </header>
 
+            {!desktop ? (
+              <Tabs.Root value={mtab} onValueChange={setMtab} className="flex min-h-0 flex-1 flex-col">
+                <Tabs.List className="well mx-3 mt-2.5 grid shrink-0 grid-cols-5 rounded-xl p-1" aria-label="Stock details">
+                  {[["chart", "Chart"], ["agents", "Agents"], ["research", "Research"], ["forecast", "Forecast"], ["company", "Company"]].map(([v, l]) => (
+                    <Tabs.Trigger key={v} value={v} className="truncate rounded-lg px-1 py-1.5 text-[12px] font-medium text-muted-foreground data-[state=active]:raised data-[state=active]:font-semibold data-[state=active]:text-foreground">{l}</Tabs.Trigger>
+                  ))}
+                </Tabs.List>
+                <Tabs.Content value="chart" className="flex min-h-0 flex-1 flex-col overflow-y-auto outline-none">
+                  <StockChart symbol={d.symbol} levels={levels} fill className="min-h-[420px] flex-1 p-3" />
+                </Tabs.Content>
+                <Tabs.Content value="agents" className="flex min-h-0 flex-1 flex-col pt-2 outline-none">
+                  {result && <StockAgentsTab key={d.symbol} d={d} result={result} />}
+                </Tabs.Content>
+                <Tabs.Content value="research" className="flex min-h-0 flex-1 flex-col pt-2 outline-none">
+                  <Body d={d} isPick={Boolean(result?.picks.some((p) => p.symbol === d.symbol))} />
+                </Tabs.Content>
+                <Tabs.Content value="forecast" className="min-h-0 flex-1 overflow-y-auto pt-2 outline-none scroll-thin">
+                  <ForecastTab d={d} />
+                </Tabs.Content>
+                <Tabs.Content value="company" className="min-h-0 flex-1 overflow-y-auto pt-2 outline-none scroll-thin">
+                  <CompanyTab d={d} />
+                </Tabs.Content>
+              </Tabs.Root>
+            ) : (
             <div className={cn("min-h-0 flex-1 overflow-y-auto lg:grid lg:overflow-hidden", wide ? "lg:grid-cols-1" : "lg:grid-cols-[minmax(0,1fr)_440px]")}>
               <StockChart symbol={d.symbol} levels={levels} className="p-3 sm:p-4" />
               {!wide && (
                 <Tabs.Root value={tab} onValueChange={setTab} className="flex min-h-0 flex-col border-[var(--edge)] lg:border-l">
-                  <Tabs.List className="well mx-4 mb-3 mt-3 grid grid-cols-3 rounded-xl p-1" aria-label="Stock details">
-                    {[["research", "Research"], ["forecast", "Forecast"], ["company", "Company"]].map(([v, l]) => (
+                  <Tabs.List className="well mx-4 mb-3 mt-3 grid grid-cols-4 rounded-xl p-1" aria-label="Stock details">
+                    {[["agents", "Agents"], ["research", "Research"], ["forecast", "Forecast"], ["company", "Company"]].map(([v, l]) => (
                       <Tabs.Trigger key={v} value={v} className="truncate rounded-lg px-2 py-1.5 text-[13px] font-medium text-muted-foreground data-[state=active]:raised data-[state=active]:font-semibold data-[state=active]:text-foreground">{l}</Tabs.Trigger>
                     ))}
                   </Tabs.List>
+                  <Tabs.Content value="agents" className="flex min-h-0 flex-1 flex-col outline-none">
+                    {result && <StockAgentsTab key={d.symbol} d={d} result={result} />}
+                  </Tabs.Content>
                   <Tabs.Content value="research" className="flex min-h-0 flex-1 flex-col outline-none">
                     <Body d={d} isPick={Boolean(result?.picks.some((p) => p.symbol === d.symbol))} />
                   </Tabs.Content>
@@ -193,6 +297,7 @@ export function StockDrawer() {
                 </Tabs.Root>
               )}
             </div>
+            )}
           </Dialog.Content>
         )}
       </Dialog.Portal>

@@ -55,6 +55,9 @@ interface DeskState extends Settings {
   result: RunResult | null;
   seen: Record<string, number>;
   drawerSymbol: string | null;
+  /** Single-stock searches: each stock's own small run, by symbol. */
+  lookups: Record<string, RunResult>;
+  lookup: { symbol: string; name?: string; loading: boolean; error?: string } | null;
 
   set: (patch: Partial<Settings>) => void;
   loadConfig: () => Promise<void>;
@@ -63,6 +66,8 @@ interface DeskState extends Settings {
   skip: () => void;
   markSeen: (thread: string) => void;
   openStock: (symbol: string | null) => void;
+  /** Open any NSE stock: from the current run if it's there, otherwise analyse it on its own. */
+  searchStock: (symbol: string, info?: { name?: string; sector?: string }) => Promise<void>;
 }
 
 let timer: ReturnType<typeof setTimeout> | undefined;
@@ -107,7 +112,7 @@ export const useDesk = create<DeskState>((set, get) => {
     universe: "large", custom: "RELIANCE, TCS, INFY, HDFCBANK, ICICIBANK, SBIN, LT, ITC, MARUTI, TITAN", stockInfo: {}, groups: [],
     top: 5, capital: "500000", risk: 1, demo: false, aiNotes: false, speed: "normal",
     config: null, session: null, replayOf: null, running: false, progress: null, error: null,
-    messages: [], shown: 0, typing: null, times: {}, result: null, seen: {}, drawerSymbol: null,
+    messages: [], shown: 0, typing: null, times: {}, result: null, seen: {}, drawerSymbol: null, lookups: {}, lookup: null,
 
     set: (patch) => {
       set(patch);
@@ -206,7 +211,23 @@ export const useDesk = create<DeskState>((set, get) => {
       if (s.seen[thread] !== count) set({ seen: { ...s.seen, [thread]: count } });
     },
 
-    openStock: (symbol) => set({ drawerSymbol: symbol }),
+    openStock: (symbol) => set({ drawerSymbol: symbol, ...(symbol ? {} : { lookup: null }) }),
+
+    searchStock: async (symbol, info) => {
+      const s = get();
+      if (s.result?.all.some((d) => d.symbol === symbol) && s.shown >= s.messages.length) { set({ drawerSymbol: symbol, lookup: null }); return; }
+      if (s.lookups[symbol]) { set({ drawerSymbol: symbol, lookup: null }); return; }
+      set({ drawerSymbol: symbol, lookup: { symbol, name: info?.name, loading: true } });
+      try {
+        const res = await fetch("/api/stock", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ symbol, sector: info?.sector }) });
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok || !j.result) throw new Error(j.error ?? `Server error ${res.status}`);
+        if (get().drawerSymbol !== symbol) return; // closed or switched meanwhile
+        set((st) => ({ lookups: { ...st.lookups, [symbol]: j.result }, lookup: null }));
+      } catch (e) {
+        if (get().drawerSymbol === symbol) set({ lookup: { symbol, name: info?.name, loading: false, error: (e as Error).message } });
+      }
+    },
   };
 });
 
@@ -262,3 +283,8 @@ export function usePresence(): Record<Person, Presence> {
 
 export const findStock = (r: RunResult | null, symbol: string | null): Decision | undefined =>
   r && symbol ? r.all.find((d) => d.symbol === symbol) : undefined;
+
+/** The run that holds the open stock: its own single-stock run when it was searched, else the current run. */
+export function useStockResult(): RunResult | null {
+  return useDesk((s) => (s.drawerSymbol && s.lookups[s.drawerSymbol] && !s.result?.all.some((d) => d.symbol === s.drawerSymbol) ? s.lookups[s.drawerSymbol] : s.result));
+}

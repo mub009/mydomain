@@ -33,5 +33,29 @@ export function update<T>(fn: (s: PositionsState) => T | Promise<T>): Promise<T>
   return next;
 }
 
+/**
+ * Hosts without a lasting disk (Vercel: every server instance has its own
+ * temporary folder) keep positions in the browser instead. The browser sends
+ * its copy with each request and gets the changed copy back.
+ */
+export const browserStorage = () => Boolean(process.env.VERCEL) || process.env.POSITIONS_STORAGE === "browser";
+
+/** A state sent by the browser, checked for shape and size. */
+export function clientState(x: unknown): PositionsState | null {
+  const s = x as PositionsState | null;
+  if (!s || typeof s !== "object" || !Array.isArray(s.positions) || !Array.isArray(s.alerts)) return null;
+  if (s.positions.length > 500 || s.alerts.length > 1000) return null;
+  return { positions: s.positions, alerts: s.alerts, lastRunAt: typeof s.lastRunAt === "string" ? s.lastRunAt : undefined };
+}
+
+/** Apply a change to the browser's copy when one is sent, otherwise to the saved file. */
+export async function change<T>(given: unknown, fn: (s: PositionsState) => T | Promise<T>): Promise<{ out: T; state?: PositionsState }> {
+  const s = clientState(given);
+  if (!s) return { out: await update(fn) };
+  const out = await fn(s);
+  s.alerts = s.alerts.slice(-300);
+  return { out, state: s };
+}
+
 /** For tests: forget the in-memory copy. */
 export const resetCache = () => { cache = null; };

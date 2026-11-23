@@ -33,9 +33,19 @@ Rules worth knowing:
 
 With demo data off, market cap and EPS come from Yahoo Finance's fundamentals data (unofficial). If a stock's data can't be loaded it's marked "Unknown" and kept, with a note that its size wasn't verified.
 
-## Research desk: six sub-agents
+## Central Bank Agent (RBI and Fed policy)
 
-Six sub-agents report to the Research Agent on the top candidates (at least 12) before it ranks them. Performance, Valuation, Growth and Profitability together move the score by at most ±10; red flags take up to 10 more off; the entry call adds ±2. They talk in the **Research desk** chat thread, and each stock's panel shows their figures.
+Reports to the Research Agent, read from the central banks' own websites:
+
+- **RBI:** current policy rates from rbi.org.in (repo, standing deposit facility, marginal standing facility, bank rate, CRR, SLR), and the latest Monetary Policy Committee decision (hike, cut or hold, by how much), stance, CPI projection and next meeting date from RBI's MPC release.
+- **US Fed:** the federal funds target range and its last change, and the FOMC meeting calendar, from federalreserve.gov.
+- **Effect on scores:** when the RBI is tightening (a hike or a tightening stance), rate-sensitive sectors (NBFCs, realty, autos, capital goods, infrastructure, cement, building materials, consumer durables) lose 2 points; when it is easing they gain 2. Banks are mixed (wider margins, slower loan growth) and get no points.
+- **Events:** an RBI or Fed decision inside a stock's holding period is reported by the Black Points Analyst for rate-sensitive stocks and banks, and both banks' decisions appear in the Markets page's events calendar ("Central banks" filter).
+- Shown in a Central banks card on the Overview, in its chat with the Research Agent, and in each stock's Agents tab.
+
+## Research desk: seven sub-agents
+
+Seven sub-agents report to the Research Agent on the top candidates (at least 12) before it ranks them. Performance, Valuation, Growth, Profitability and Seasonality together move the score by at most ±10; red flags take up to 10 more off; the entry call adds ±2. They talk in the **Research desk** chat thread, and each stock's panel shows their figures.
 
 | Agent | Checks | Points |
 |---|---|---|
@@ -44,6 +54,7 @@ Six sub-agents report to the Research Agent on the top candidates (at least 12) 
 | **Growth Agent** | **3-year CAGR** of revenue, operating cash flow and net profit, from the last four annual reports | Average ≥ 15%: +3, ≥ 10%: +2, ≥ 5%: +1, below 0: −2; loss-making now: −2 |
 | **Profitability Agent** | **ROE** (latest year), **net margin** and profit in how many of the last years, **cash conversion** (3-year operating cash flow ÷ net profit) | ROE ≥ 20%: +2, ≥ 15%: +1, below 8%: −1; loss-making now: −2; a loss in an earlier year: −1; cash conversion ≥ 1: +1, below 0.7: −1 |
 | **Red Flag Agent** | **ASM** and **GSM** surveillance lists, **promoter pledge**, **unsolicited tips** (exchange alert list, or a pump-like pattern: up 25% in 10 days on 3× volume in a non-large-cap), **default probability** (1-year, naive Merton distance-to-default from market cap, debt, share-price volatility and last year's return) | Each severe flag −4, each caution −1 (at most −10). Severe: GSM, ASM long-term stage II or later, pledge above 50%, named in a tip alert, default probability above 5%. **A severe flag stops a BUY: the Decision Agent caps the stock at WATCH.** |
+| **Seasonality Agent** | **Seasonal price trend:** each calendar month's return over up to 10 years (average and share of years it rose), for this month and next. **Seasonal results:** revenue and profit by fiscal quarter (Q1 Apr–Jun) against the average quarter; Yahoo gives only the last ~5 quarters, so this is a light check. **Dividends:** every ex-date with amount, yield, the price move on the ex-date (the price normally drops by about the dividend) and the trading days to get back to the pre-dividend price; the next ex-date is estimated from last year's months | +2 when this month and next rose in 70%+ of years by 2%+ on average, +1 at 60%+, −1 at 45% or less, −2 at 35% or less and negative (needs 5+ years); ±1 when the coming results quarter is usually 5% above/below average; +1 for a dividend yield of 2% or more (at most ±3) |
 | **Entry Point Agent** | Fundamentals (valuation + growth + profitability points) and technicals (5-timeframe chart check, RSI, buy zone) | **Buy now** (+2) when the price is in the buy zone, fundamentals are not weak and the chart is not falling; **Buy on dip** (+1) with the zone price; **Wait** (0); **Avoid** (−2) on a severe red flag or weak business with a falling chart |
 
 **Expected return:** with live data, the analysts' mean 12-month price target from Yahoo when it exists. Otherwise an estimate: 3-year EPS growth (capped −10% to +25%) plus up to ±8 for the P/E against its sector. It's a rough guide, not a forecast. Banks and NBFCs skip P/CFO, cash-flow growth, cash conversion and the default model, because cash flow and debt work differently for lenders. In demo mode every figure is a sample.
@@ -56,6 +67,28 @@ Six sub-agents report to the Research Agent on the top candidates (at least 12) 
 ```
 
 Anything that couldn't be checked is shown as "not checked", never as clear.
+
+## Markets: world indices and upcoming events
+
+The **Markets** page has two tabs:
+
+- **World indices:** the main stock index of 35 markets across India, Asia-Pacific, Europe, the Americas and the Middle East & Africa. Each shows the level, today's and 1-month change, a 1-month line, and whether that market is open now with its local time. Delayed quotes from Yahoo Finance, refreshed every 2 minutes. (Saudi Arabia's TASI and Pakistan's KSE 100 aren't available from Yahoo.)
+- **Upcoming events (next 4 months):** results dates, ex-dividend dates and dividend payment dates, for Indian stocks (your current run, or the built-in lists) and 25 of the world's largest companies. **Confirmed** dates are ones the company has announced (Yahoo Finance company calendar). **Expected** dates are projected: Indian dividends from last year's ex-dates in NSE's official corporate actions, global ones from Yahoo's dividend history, and results from the quarterly cycle when the next date isn't announced. Filter by India/Global, results/dividends, or confirmed only; click an Indian stock to open it with the agents' research.
+
+The Macro Agent also opens its report with the latest moves of the S&P 500, Nasdaq, Nikkei, Hang Seng and DAX.
+
+Central-bank meetings (Fed, RBI, ECB) aren't included: their websites aren't reachable from the cloud sandbox this was built in.
+
+## Search any NSE stock
+
+The search box at the top of every page (press **/** to jump to it) finds any NSE-listed company by name or symbol. Pick one and it opens in the stock window with the agents' full research on live data, even if it isn't in your current run and you haven't run an analysis:
+
+- The stock is analysed together with up to 9 peers from its sector (topped up with Nifty 50 leaders), so the sector check, valuation medians and relative strength have something to compare with. This takes a few seconds; a stock you've already opened reopens instantly.
+- It always gets the research desk, the 5-timeframe chart check and the Black Points Analyst, even if it didn't pass a scan (the report says it was checked on request).
+- If it can't be analysed, the window says why: market cap below the ₹300 Cr minimum, too little price history (new listings), or a symbol Yahoo Finance doesn't know.
+- A stock that is in your current run opens from that run instead.
+- The stock window opens on the **Agents** tab: every agent discusses that one stock, played back like the live chat (Show all / Replay). The Research Agent opens; the News, Volatility and Macro Agents give the context; the Momentum and Trend Agents give their scores and reasons and argue if they disagree; each research-desk agent reports; the Research Agent sums up for the Decision Agent; the Black Points Analyst reports risks; and the Decision Agent gives the verdict and why. It's built from the stock's analysis, so every number is from the data. Works for stocks from a run and for searched stocks.
+- For a searched stock, the peers only provide comparison: the stock isn't left out because peers took the top picks or the sector cap.
 
 ## My Stocks: search and groups
 
@@ -74,6 +107,34 @@ Click any stock (table row, chip or chart point) to open it in a centred, nearly
 - **Full price chart** (TradingView lightweight-charts) with real Yahoo prices: **daily candles over 1 year by default**. Change the **range** (1D, 5D, 1M, 3M, 6M, YTD, 1Y, 2Y, 5Y, Max) and the **bar size** (1m, 2m, 5m, 15m, 30m, 1H, 1D, 1W, 1M). Yahoo's limits apply: 1-minute bars cover 7 days, 2- to 30-minute bars 60 days, hourly bars 1 year; picking one adjusts the other. Candles, bars or line; volume; 20/50 moving averages; the entry, stop-loss, target and buy zone as lines; OHLC and volume for the bar under the pointer; scroll to zoom, drag to pan. Times are IST.
 - **Header:** latest price and today's change, with the analysis entry price.
 - **Research, Forecast and Company** tabs beside the chart; **Full chart** hides them.
+
+## Black Points Analyst (downside risks)
+
+Reports to the Research Agent. Every stock that passed the Momentum Agent's scan (swing, 1-10 days) or the Trend Agent's scan (positional, ~1 month) is checked before the Decision Agent can shortlist it:
+
+1. The Research Agent sends the candidates to the Black Points Analyst.
+2. The analyst checks business outlook, sector conditions, financial health and near-term events.
+3. It sends the Decision Agent a structured report per stock and holding period.
+4. The Decision Agent applies it. A **verified material red flag** excludes the stock from the affected shortlist. **Missing, stale, conflicting or news-only evidence** puts it in **Needs Review** and holds it out of that shortlist. No technical score or agent vote can override either. A stock cleared for only one holding period is re-planned for that period.
+
+| Check | What counts |
+|---|---|
+| Structural decline | Revenue falling two years in a row (company statements); headlines about the product being replaced or demand shrinking |
+| Sector pressure | Sector-wide only when industry data (sector index lagging and down 5%+ over 3 months, or median peer revenue down 5%+) **and** at least two companies' disclosures (falling revenue or margins in their results, or pressure headlines) agree |
+| Company weakness | Debt repayment stress (debt/equity above 1.5 with interest cover below 2), poor cash flow (material only with interest cover below 3, since group accounts with a lending arm depress cash flow), revenue far below sector peers, customer losses, repeated project delays |
+| Governance & events | Auditor resignation, adverse audit opinion, regulatory orders or probes (SEBI orders read directly), exchange surveillance and heavy pledges (from the Red Flag Agent), results and ex-dividend dates inside the holding period (reported, don't change the status) |
+
+Each finding lists the stock's sector and subsector, why it passed the scan, the red flag and whether it hits the company or the whole sector, the evidence with its date, source and link, and the impact on each holding period (Eligible, Excluded or Needs Review).
+
+**Verification:** a finding is *verified* only with a primary source: an exchange filing, a SEBI order, the company's financial statements, the exchange surveillance list or sector index data. Headlines alone are *unverified*; headlines contradicted by the company's figures are *conflicting*; financials older than 18 months are *stale*. Banks, NBFCs and insurers skip the revenue and cash-flow tests.
+
+**Sources (live):** company statements and calendar from Yahoo Finance; the newest SEBI orders (Chairperson/Members, adjudication, settlement) from sebi.gov.in; Google News headlines from the last 180 days. **NSE and BSE block automated access**, so exchange filings are read from `.data/filings.json` if you add them:
+
+```json
+[{ "symbol": "ACME", "date": "2026-11-02", "title": "Resignation of Statutory Auditor", "url": "https://www.bseindia.com/..." }]
+```
+
+Set `BLACK_POINTS_STRICT=1` to also hold a stock for review when its news check could not run. Excluded and held stocks stay visible in the Screener's **Flagged Stocks** tab with the evidence and the final decision; the stock window shows the same report.
 
 ## Research Agent's chart check
 
@@ -213,7 +274,8 @@ Light and dark themes, and a mobile layout with a bottom navigation bar.
 
 ## Data: demo, end-of-day, and what is *not* claimed
 
-- **Live data (default):** prices, financials, holders and analyst targets from Yahoo Finance; headlines from Google News; India VIX, gold, crude and USD/INR from Yahoo. Yahoo is unofficial and delayed, labelled as such in the UI; it is **not** real-time NSE data. Yahoo leaves today's daily close empty, so the latest price is used for today's bar. If live prices can't be loaded, the run stops with an error: it never switches to sample prices on its own.
+- **NSE's official data (default for prices):** daily prices for every stock, the Nifty 50, India VIX and 17 NSE sector indices come from **NSE's Bhavcopy MCP server** (`mcp.nseindia.in`, run by National Stock Exchange of India Ltd.). Raw bhavcopy prices are adjusted for splits and bonuses with NSE's own corporate-action factors. The same server gives the Volatility Agent NSE's market breadth and VIX range, the Valuation Agent each sector index's published P/E, and the Seasonality Agent official dividend ex-dates. If a stock can't be loaded from NSE, Yahoo Finance is used for that stock and the data label says which. A full Nifty 50 run takes about 35 seconds (NSE serves history in 3-month pieces). Settings: `NSE_MCP=off` to switch it off, `NSE_MCP_CONCURRENCY` (default 12), `MARKET_DATA_PROVIDER=yahoo` to use Yahoo for prices.
+- **Yahoo Finance (still used):** intraday bars and the stock window's chart, financial statements, holders and analyst targets; headlines from Google News; India VIX, gold, crude and USD/INR from Yahoo. Yahoo is unofficial and delayed, labelled as such in the UI; it is **not** real-time NSE data. Yahoo leaves today's daily close empty, so the latest price is used for today's bar. If live prices can't be loaded, the run stops with an error: it never switches to sample prices on its own.
 - **Demo data (switch on to use):** fictional sample prices, clearly labelled, for trying the app offline.
 - **Behind an HTTPS proxy** (for example a cloud sandbox), start the server with `NODE_USE_ENV_PROXY=1` so Node's `fetch` uses `HTTPS_PROXY`.
 - **ASM/GSM and pledges:** NSE's website blocks automated requests, so save the lists to `.data/surveillance.json` (see the research desk section) for a reliable check.
@@ -256,3 +318,43 @@ src/components/ui/     shadcn-style primitives (button, switch, sheet, segmented
 
 - **NSE holidays:** `src/lib/market/calendar.ts` holds the 2026 holiday list. Check it against the NSE circular and add each new year; unknown years fall back to weekends only. Special sessions such as Muhurat trading are not modelled.
 - **Sector labels** in `universe.ts` are broad groupings for the sector cap, and index membership changes over time.
+
+## Deploy on Vercel (public link)
+
+1. Sign in at vercel.com with GitHub, then **Add New → Project** and import `mub009/mydomain`.
+2. **Root Directory:** `nse-agent-desk`. Framework: Next.js (detected).
+3. **Environment variable:** `NSE_DESK_DATA_DIR` = `/tmp` (Vercel's only writable folder; tracked trades and alerts are kept there and reset when the server restarts).
+4. Deploy, then under **Settings → Git** set the production branch to the branch you want, or merge into `main`.
+
+Positions on Vercel are kept in your browser (Vercel has no lasting disk): the app sends them with each request and checks them every 5 minutes while it's open. Locally they are saved in `.data/positions.json` and the server checks them in the background. Set `POSITIONS_STORAGE=browser` to use browser storage anywhere.
+
+Some sources (NSE, RBI, SEBI) may refuse requests from cloud servers; those sections then show an error while the rest works. Running locally avoids this.
+
+## Zerodha (read-only holdings and positions)
+
+The Positions page has a Zerodha card that shows your holdings and today's positions with live P&L, through Zerodha's official Kite Connect API. It is read-only: it never places orders.
+
+1. Create an app at developers.kite.trade (signed in with your Zerodha account).
+2. Set its Redirect URL to `https://<your-site>/api/broker/zerodha/callback` (locally `http://localhost:3000/api/broker/zerodha/callback`). The card shows the exact URL to copy.
+3. Put the app's key and secret on the server as `KITE_API_KEY` and `KITE_API_SECRET` (Vercel: Project → Settings → Environment Variables, then redeploy; locally `.env.local`).
+4. Press **Connect Zerodha** on the Positions page and log in on Zerodha's own page.
+
+**Several Zerodha accounts** (yours and family's): press **Connect another account** and log in with the other account's user ID (log out on kite.zerodha.com first). One app holds several accounts if Zerodha allows that app for more than one client ID; otherwise add another app as `KITE_API_KEY_2` / `KITE_API_SECRET_2` (up to `_5`) with the same redirect URL. The card shows each account and the totals across all of them.
+
+The access token Zerodha returns is kept only in an encrypted, http-only cookie in your browser and ends at 06:00 IST each day, when Kite sessions end; press Connect again after that. Tap any holding to open the agents' analysis of it.
+
+## Logins and Zerodha through the NSE Desk API (Laravel)
+
+`../nse-desk-api` is a separate, API-only Laravel app for user logins and each user's Zerodha accounts (stored in its database, so they follow the user to any device). Set `NEXT_PUBLIC_DESK_API` to its address (e.g. `https://nse-api.example.com`) and rebuild: the app then shows **Log in** / **Sign up**, and the Zerodha card connects accounts through that API instead of this site's own routes. Without it, nothing changes. Deployment steps are in `../nse-desk-api/README.md`.
+
+## How long to hold (Decision Agent)
+
+For every stock the Decision Agent runs 1,000 simulated price paths (the stock's own daily moves from the past year, scaled to its recent volatility) over the holding period, 10 trading days for swing trades and 21 for positional ones. It reports:
+
+- **Expected hold:** the median number of trading days to reach the target, among paths that reach it, with the date (weekends and NSE holidays skipped) and the usual range.
+- **Exit by:** the last day of the holding period; if neither the target nor the stop-loss is hit by then, exit at the market price.
+- **Odds:** how often the target, the stop-loss, or neither comes first.
+- **Expected return:** the average exit across all paths, from the entry price.
+
+It appears in the Decision Agent's chat message after the picks, the Final Picks table and cards, the Screener (Hold and Expected columns), each stock's Agents tab and a "How long to hold" card in its Research tab. These are estimates, not guarantees.
+

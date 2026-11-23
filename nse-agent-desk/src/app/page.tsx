@@ -10,6 +10,8 @@ import { MorningNewsCard, VixCard } from "@/components/desk/morning-cards";
 import { DiversificationCard } from "@/components/desk/diversification-card";
 import { SectorStrengthCard } from "@/components/desk/sector-ui";
 import { MacroCard } from "@/components/desk/macro-ui";
+import { PolicyCard } from "@/components/desk/policy-ui";
+import { BulkTrackButton } from "@/components/desk/positions-ui";
 import { diversify } from "@/lib/diversify";
 import { useMemo } from "react";
 import { DataBanner, KPICard, ResearchProgress } from "@/components/desk/primitives";
@@ -45,7 +47,7 @@ export default function OverviewPage() {
 
   return (
     <>
-      <PageHeader title="Overview" subtitle="Thirteen AI agents scan, analyse, debate and decide." />
+      <PageHeader title="Overview" subtitle="Sixteen AI agents scan, analyse, debate and decide." />
       <div className="space-y-4">
         {source ? <DataBanner source={source} /> : demo && <DataBanner source={{ kind: "demo", label: "Demo data" }} />}
         <AnalysisToolbar />
@@ -75,6 +77,7 @@ export default function OverviewPage() {
           <VixCard vix={result?.vix} revealed={Boolean(result) && said("Volatility")} busy={busy && !said("Volatility")} />
         </div>
 
+        <PolicyCard policy={result?.policy} revealed={Boolean(result) && said("CentralBank")} busy={busy && !said("CentralBank")} />
         <MacroCard macro={result?.macro} revealed={Boolean(result) && said("Macro")} busy={busy && !said("Macro")} />
 
         {r && <SectorStrengthCard sectors={r.sectors} />}
@@ -86,11 +89,14 @@ export default function OverviewPage() {
                 <div>
                   <h2 className="text-[15px] font-semibold">Final Picks</h2>
                   <p className="text-xs text-muted-foreground">
-                    {r ? (r.watchlist.length ? `Watchlist: ${r.watchlist.map((w) => w.symbol).join(", ")} · select a pick to track it` : "Select a pick to track it")
+                    {r ? (r.watchlist.length ? `Watchlist: ${r.watchlist.map((w) => w.symbol).join(", ")} · track them all, or open a pick` : "Track them all, or open a pick")
                       : "Announced by Decision Agent at the end of the discussion"}
                   </p>
                 </div>
-                {r && <ResearchProgress stage={stage} done={done} className="hidden sm:flex" />}
+                <div className="flex items-center gap-2">
+                  {r && <ResearchProgress stage={stage} done={done} className="hidden sm:flex" />}
+                  {r && done && r.picks.length > 0 && <BulkTrackButton items={r.picks} label={`Track all ${r.picks.length}`} />}
+                </div>
               </header>
               {r ? <FinalPicksTable picks={r.picks} onSelect={openStock} /> : <PicksWaiting stage={stage} idle={idle} />}
             </section>

@@ -12,8 +12,8 @@ import { randomUUID } from "node:crypto";
 import { marketStatus } from "../market/calendar";
 import { exitPlan, evaluate } from "./rules";
 import { currentPrice } from "./prices";
-import { readState, update } from "./store";
-import type { Position, PositionAlert } from "./types";
+import { browserStorage, change, clientState, readState } from "./store";
+import type { Position, PositionAlert, PositionsState } from "./types";
 
 const minutes = () => Math.max(1, Number(process.env.POSITION_CHECK_MINUTES ?? 5) || 5);
 export const telegramEnabled = () => Boolean(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID);
@@ -45,15 +45,16 @@ export function applyPrice(p: Position, price: number, at = new Date()): Positio
 }
 
 /** Check open positions now. `which` limits it to demo or live ones. */
-export async function checkPositions(which: "all" | "demo" | "live" = "all"): Promise<PositionAlert[]> {
+export async function checkPositions(which: "all" | "demo" | "live" = "all", given?: unknown): Promise<{ alerts: PositionAlert[]; state?: PositionsState }> {
   // Fetch prices outside the store lock, then apply them inside it.
-  const open = (await readState()).positions.filter((p) => p.status === "open" && (which === "all" || p.feed === which));
-  if (!open.length) return [];
+  const base = clientState(given) ?? await readState();
+  const open = base.positions.filter((p) => p.status === "open" && (which === "all" || p.feed === which));
+  if (!open.length) return { alerts: [], state: clientState(given) ? { ...base, lastRunAt: new Date().toISOString() } : undefined };
   const prices = new Map<string, number>();
   await Promise.all(open.map(async (p) => {
     try { prices.set(p.id, await currentPrice(p)); } catch (e) { console.warn(`[nse-agent-desk] no price for ${p.symbol}:`, (e as Error).message); }
   }));
-  const fresh = await update((s) => {
+  const { out: fresh, state } = await change(given, (s) => {
     const out: PositionAlert[] = [];
     for (const p of s.positions) {
       const price = prices.get(p.id);
@@ -64,7 +65,7 @@ export async function checkPositions(which: "all" | "demo" | "live" = "all"): Pr
     return out;
   });
   for (const a of fresh) await sendTelegram(a);
-  return fresh;
+  return { alerts: fresh, state };
 }
 
 export function newPosition(input: { symbol: string; qty: number; buyPrice: number; stop: number; target: number; feed: "demo" | "live"; sector?: string; cap?: Position["cap"] }): Position {
@@ -79,7 +80,7 @@ export function newPosition(input: { symbol: string; qty: number; buyPrice: numb
 let started = false;
 let lastLive = 0;
 export function startMonitor() {
-  if (started || process.env.POSITION_MONITOR_ENABLED === "false") return;
+  if (started || process.env.POSITION_MONITOR_ENABLED === "false" || browserStorage()) return; // browser-kept positions are checked from the app
   started = true;
   console.log(`[nse-agent-desk] position monitor on: live positions every ${minutes()} min in market hours, demo every minute`);
   const tick = async () => {

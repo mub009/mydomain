@@ -10,16 +10,19 @@
  */
 import { MAX_PER_SECTOR } from "./agents/decision";
 import type { MessageBus } from "./bus";
+import { holdSentence, holdShort, shortDate } from "./hold";
 import { inr, pct } from "./format";
 import type { LLM } from "./llm";
 import { NEWS_BOOST } from "./agents/news";
 import { SECTOR_ADJ } from "./sectors";
 import { factorName } from "./macro";
+import type { PolicyReport } from "./policy";
 import type { AgentReport, Analysis, DataSource, Decision, MacroReport, MessageTable, NewsBrief, NewsItem, Person, SectorView, Snapshot, VixReport } from "./types";
 
 const ROLE: Record<Person, string> = {
   News: "news scout who collects the morning stock news",
   Volatility: "volatility analyst who tracks India VIX",
+  CentralBank: "central bank analyst who tracks RBI and US Federal Reserve policy and what it means for rate-sensitive sectors",
   Macro: "commodity and currency analyst who tracks gold, crude oil and USD/INR",
   Momentum: "short-term (1-10 day) swing-trade scanner",
   Trend: "1-month positional trend scanner",
@@ -28,8 +31,10 @@ const ROLE: Record<Person, string> = {
   Valuation: "valuation analyst on the research desk who checks P/E, P/B and P/CFO",
   Growth: "growth analyst on the research desk who checks 3-year revenue, cash-flow and profit growth",
   Profitability: "profitability analyst on the research desk who checks ROE, profit margins and cash flow",
+  Seasonal: "seasonality analyst on the research desk who checks which months a stock usually rises, its strong quarters and its dividends",
   RedFlag: "risk analyst on the research desk who checks ASM/GSM surveillance, promoter pledges, tip alerts and default risk",
   Entry: "entry-point analyst on the research desk who combines fundamentals and technicals into an entry call",
+  BlackPoints: "downside-risk analyst who checks filings, regulator orders, financial health and sector conditions before a stock can be shortlisted",
   Decision: "final decision maker who picks the stocks to act on",
 };
 
@@ -62,6 +67,14 @@ export interface DialogueInput {
   conflicted: Analysis[];
   clarifications: Record<string, string>;
   picks: Decision[];
+  /** Every stock with its final verdict (includes the Black Points rulings). */
+  all: Decision[];
+  /** What the Black Points Analyst could check this run. */
+  bpCoverage?: string[];
+  /** Latest moves of the main world indices (live runs). */
+  globalCues?: string | null;
+  /** Central Bank Agent's RBI and Fed report. */
+  policy?: PolicyReport | null;
   passed: Decision[];
   watchlist: Decision[];
 }
@@ -166,6 +179,34 @@ export async function runDialogue(bus: MessageBus, llm: LLM, d: DialogueInput) {
     aiNote: await note("Trend", "In 3-4 short lines, explain your best 1-month picks and the main risk, speaking to your colleague Research Agent.", d.may.slice(0, 5)),
   });
 
+  // ---------- Central Bank Agent: RBI and Fed ----------
+  if (d.policy) {
+    const p = d.policy;
+    const days = (iso: string) => Math.round((Date.parse(iso) - Date.parse(new Date(Date.now() + 19800_000).toISOString().slice(0, 10))) / 86400_000);
+    const mpc = p.lastMpc;
+    const affected = d.rows.filter((r) => r.policy && r.policy.points !== 0);
+    const ups = affected.filter((r) => r.policy!.points > 0).map((r) => r.symbol), downs = affected.filter((r) => r.policy!.points < 0).map((r) => r.symbol);
+    bus.send("CentralBank", "Research",
+      `Research Agent, the rate picture first.${p.sample ? " (Sample figures in demo mode.)" : ""}\n` +
+      (p.rbi ? `• RBI: repo rate ${p.rbi.repo}%${p.rbi.crr !== undefined ? `, CRR ${p.rbi.crr}%` : ""}${p.rbi.slr !== undefined ? `, SLR ${p.rbi.slr}%` : ""}.` : "• RBI rates not available.") +
+      (mpc ? ` Last MPC (${mpc.meeting ?? "latest"}): ${mpc.decision === "hike" ? `raised the repo rate by ${mpc.bps} bps` : mpc.decision === "cut" ? `cut the repo rate by ${mpc.bps} bps` : "kept the repo rate unchanged"}${mpc.stance ? `, stance ${mpc.stance}` : ""}${mpc.inflation ? `, CPI inflation projected at ${mpc.inflation}` : ""}.` : "") +
+      (p.nextMpc ? `\n• Next RBI decision: ${p.nextMpc.decisionDate} (${p.nextMpc.label}), in ${days(p.nextMpc.decisionDate)} days.` : "") +
+      (p.fed ? `\n• US Fed: ${p.fed.range}%${p.fed.lastChange ? `, last move a ${p.fed.lastChange.bps} bps ${p.fed.lastChange.dir} on ${p.fed.lastChange.date}` : ""}${p.fed.nextMeeting ? `; next decision ${p.fed.nextMeeting.decisionDate}` : ""}.` : "") +
+      `\nThe RBI is ${p.direction}.` +
+      (p.direction === "neutral" ? " No adjustment for rate-sensitive sectors." : ` I've moved rate-sensitive sectors (NBFCs, realty, autos, capital goods, infrastructure, cement) by ${p.direction === "tightening" ? "-2" : "+2"}; banks are mixed.`) +
+      (downs.length ? ` Marked down: ${downs.length > 8 ? `${downs.slice(0, 8).join(", ")} and ${downs.length - 8} more` : list(downs)}.` : "") + (ups.length ? ` Lifted: ${list(ups.slice(0, 8))}.` : ""),
+      { kind: "report", tickers: [...downs, ...ups].slice(0, 12) });
+    bus.send("Research", "CentralBank",
+      p.nextMpc && days(p.nextMpc.decisionDate) <= 35
+        ? `Noted. The RBI decision on ${p.nextMpc.decisionDate} falls inside our holding periods, so the Black Points Analyst will flag it for rate-sensitive stocks.`
+        : "Noted, I'll fold the policy effect into the scores.");
+  }
+
+  // ---------- Macro Agent: global markets ----------
+  if (d.globalCues) {
+    bus.send("Macro", "Research", `Global cues first: ${d.globalCues} in their latest sessions. Large overnight moves abroad often show up in the Nifty's opening; the Markets page has every country's index.`);
+  }
+
   // ---------- Macro Agent: gold, crude, USD/INR → Research Agent (before his analysis) ----------
   if (d.macro && d.macro.factors.length) {
     const mx = d.macro;
@@ -199,7 +240,7 @@ export async function runDialogue(bus: MessageBus, llm: LLM, d: DialogueInput) {
     const best = (pick: (r: Analysis) => number | undefined, n = 3) =>
       deskRows.filter((r) => pick(r) !== undefined).sort((a, b) => pick(b)! - pick(a)!).slice(0, n).map((r) => r.symbol);
     bus.send("Research", "Performance",
-      `Research desk, before I rank the top ${plural(deskRows.length, "candidate")}: Performance Agent, check the returns; Valuation Agent, the price against earnings, book and cash flow; Growth Agent, the 3-year growth; Profitability Agent, ROE, margins and cash flow; Red Flag Agent, surveillance, pledges, tips and default risk; Entry Point Agent, where to get in.`,
+      `Research desk, before I rank the top ${plural(deskRows.length, "candidate")}: Performance Agent, check the returns; Valuation Agent, the price against earnings, book and cash flow; Growth Agent, the 3-year growth; Profitability Agent, ROE, margins and cash flow; Seasonality Agent, the seasonal pattern and dividends; Red Flag Agent, surveillance, pledges, tips and default risk; Entry Point Agent, where to get in.`,
       { tickers: names(deskRows) });
 
     const perf = (r: Analysis) => r.desk!.performance;
@@ -249,6 +290,32 @@ export async function runDialogue(bus: MessageBus, llm: LLM, d: DialogueInput) {
         columns: ["Symbol", "ROE", "Net margin", "Cash / profit", "View", "Points"],
         rows: deskRows.map((r) => { const v = pr(r); return [r.symbol, fmt(v.metrics[0].value, "%"), fmt(v.metrics[1].value, "%"), fmt(v.metrics[2].value, "x"), v.verdict, `${v.points >= 0 ? "+" : ""}${v.points}`]; }),
       } });
+
+    const withSeason = deskRows.filter((r) => r.desk!.seasonal?.seasonalDetail);
+    if (withSeason.length) {
+      const sv = (r: Analysis) => r.desk!.seasonal!;
+      const sd = (r: Analysis) => sv(r).seasonalDetail!;
+      const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      const win = sd(withSeason[0]).window.map((m) => MON[m - 1]).join("-");
+      const tail = withSeason.filter((r) => sv(r).points >= 2).map((r) => r.symbol);
+      const head = withSeason.filter((r) => sv(r).points < 0).map((r) => r.symbol);
+      const exSoon = withSeason.filter((r) => sd(r).nextEx && sd(r).window.some((m) => sd(r).nextEx!.month.startsWith(MON[m - 1])));
+      bus.send("Seasonal", "Research",
+        `Seasonal check for ${win}, from up to ${Math.max(...withSeason.map((r) => sd(r).years))} years of monthly prices, the last quarters' results and the dividend history.` +
+        `${tail.length ? ` Usually strong in ${win}: ${list(tail)}.` : ` None has a strong ${win} record.`}${head.length ? ` Usually weak now: ${list(head)}.` : ""}` +
+        `${exSoon.length ? ` Ex-dividend likely soon for ${list(exSoon.map((r) => r.symbol))}: the price normally drops by about the dividend on that day, so don't read it as a fall in value.` : ""}` +
+        `${withSeason[0].desk!.sample ? " (Sample history in demo mode.)" : ""}`,
+        { kind: "report", tickers: [...tail, ...head, ...names(exSoon)], table: {
+          columns: ["Symbol", `${win} up years`, "Best month", "Strong quarter", "Div. yield", "Next ex-date", "Points"],
+          rows: withSeason.map((r) => {
+            const d = sd(r), best = [...d.months].sort((a, b) => b.avg - a.avg)[0];
+            const q = [...d.quarters].filter((x) => x.revenueVsAvg !== undefined).sort((a, b) => b.revenueVsAvg! - a.revenueVsAvg!)[0];
+            return [r.symbol, d.years ? `${sv(r).metrics[0].value}% (avg ${sv(r).metrics[0].note?.split(" ")[1] ?? "–"})` : "–", d.years ? `${MON[best.month - 1]} ${best.avg >= 0 ? "+" : ""}${best.avg}%` : "–",
+              q ? q.label.split(" ")[0] + ` (${q.revenueVsAvg! >= 0 ? "+" : ""}${q.revenueVsAvg}%)` : "–", d.yieldPct !== undefined ? `${d.yieldPct}%` : "none",
+              d.nextEx ? `~${d.nextEx.month} ₹${d.nextEx.amount}` : "–", `${sv(r).points >= 0 ? "+" : ""}${sv(r).points}`];
+          }),
+        } });
+    }
 
     const rf = (r: Analysis) => r.desk!.redFlags;
     // Severe flags from every stock the desk checked, not only the top eight shown.
@@ -412,6 +479,48 @@ export async function runDialogue(bus: MessageBus, llm: LLM, d: DialogueInput) {
       aiNote: await note("Research", "In 4-5 short lines, tell Decision Agent where the short-term and 1-month views agree or conflict, and which stocks look strongest after risk.", top8),
     });
 
+  // ---------- Black Points Analyst: downside risks before anything is shortlisted ----------
+  const checked = d.all.filter((x) => x.blackPoints);
+  if (checked.length) {
+    const PL: Record<string, string> = { swing: "Swing", positional: "Positional" };
+    const st = (x: Decision, p: "swing" | "positional") => x.blackPoints!.status[p] ?? "–";
+    const blocked = checked.filter((x) => Object.values(x.blackPoints!.status).some((s) => s !== "Eligible"));
+    const excluded = checked.filter((x) => Object.values(x.blackPoints!.status).includes("Excluded"));
+    const review = checked.filter((x) => Object.values(x.blackPoints!.status).includes("Needs Review"));
+    bus.send("Research", "BlackPoints",
+      `Black Points Analyst, ${plural(checked.length, "stock")} passed the Momentum or Trend scan. Before Decision Agent shortlists any of them, check each for structural decline, sector pressure, company weakness, governance problems and events inside the holding period.`,
+      { tickers: names(checked).slice(0, 12) });
+    bus.send("BlackPoints", "Research",
+      `On it. What I can check this run:\n${(d.bpCoverage ?? []).map((c) => `• ${c}`).join("\n")}\nA finding counts as verified only when a primary source backs it; headlines alone put a stock in Needs Review.`);
+    const top = (x: Decision) => x.blackPoints!.findings.filter((f) => f.materiality === "material").sort((a, b) => (a.verification === "verified" ? -1 : 1) - (b.verification === "verified" ? -1 : 1))[0];
+    bus.send("BlackPoints", "Decision",
+      `Risk report for ${plural(checked.length, "stock")}: ${checked.length - blocked.length} eligible, ${excluded.length} excluded on verified evidence, ${review.length} need review.` +
+      (blocked.length ? " Details for the flagged ones follow." : " No material red flags in this group."),
+      { kind: "report", tickers: names(blocked), table: {
+        columns: ["Symbol", "Sector · subsector", "Passed scan", "Red flag", "Scope", "Swing", "Positional", "Evidence"],
+        rows: [...blocked, ...checked.filter((x) => !blocked.includes(x))].slice(0, 14).map((x) => {
+          const f = top(x), e = f?.evidence[0];
+          return [x.symbol, `${x.blackPoints!.sector}${x.blackPoints!.subsector ? ` · ${x.blackPoints!.subsector}` : ""}`,
+            Object.keys(x.blackPoints!.passed).map((p) => PL[p]).join(" + "), f ? `${f.flag} (${f.verification})` : "None material", f?.scope ?? "–",
+            st(x, "swing"), st(x, "positional"), e ? `${e.source}${e.date ? `, ${e.date}` : ""}` : "–"];
+        }),
+      } });
+    for (const x of blocked.slice(0, 4)) {
+      const bp = x.blackPoints!;
+      const fs = bp.findings.filter((f) => f.materiality === "material" && Object.values(f.impact).some((s) => s !== "Eligible"));
+      bus.send("BlackPoints", "Decision",
+        `${x.symbol} (${bp.sector}${bp.subsector ? `, ${bp.subsector}` : ""}). Passed the scan: ${Object.values(bp.passed).join(" | ")}.\n` +
+        fs.map((f) => `• ${f.flag}: ${f.scope === "Sector" ? "affects the whole sector" : "affects the company"}, ${f.verification}. ${f.note}\n  Evidence: ${f.evidence.slice(0, 2).map((e) => `${e.summary} (${e.source}${e.date ? `, ${e.date}` : ""})`).join("; ")}`).join("\n") +
+        `\nSuggested: ${Object.entries(bp.status).map(([p, s]) => `${PL[p]} ${s}`).join(", ")}. Source links are in the Flagged Stocks tab.`,
+        { tickers: [x.symbol] });
+    }
+    bus.send("Decision", "BlackPoints",
+      blocked.length
+        ? `Applied. ${excluded.length ? `${list(names(excluded))} ${excluded.length === 1 ? "is" : "are"} excluded from the affected shortlists. ` : ""}${review.length ? `${list(names(review))} ${review.length === 1 ? "is" : "are"} held out pending review. ` : ""}A strong technical score or a vote from the scanners can't override this. They stay visible in the Flagged Stocks tab with your evidence.`
+        : "Thanks. Everything you checked is eligible; I'll shortlist on the scores.",
+      { tickers: names(blocked) });
+  }
+
   // ---------- Step 5: portfolio review ----------
   bus.stage = "debate";
   if (d.conflicted.length) {
@@ -454,13 +563,22 @@ export async function runDialogue(bus: MessageBus, llm: LLM, d: DialogueInput) {
     {
       kind: "decision", tickers: [...names(d.picks), ...names(d.watchlist)],
       table: d.picks.length ? {
-        columns: ["Symbol", "Verdict", "Entry", "Stop-loss", "Target", "Buy zone"],
+        columns: ["Symbol", "Verdict", "Entry", "Stop-loss", "Target", "Hold", "Exit by", "Expected", "Buy zone"],
         rows: d.picks.map((p) => [p.symbol, p.verdict, inr(p.entry), inr(p.stopLoss), inr(p.target),
+          holdShort(p.hold), shortDate(p.hold?.exitBy) || "-", p.hold ? `${p.hold.expectedReturnPct >= 0 ? "+" : ""}${p.hold.expectedReturnPct.toFixed(1)}%` : "-",
           p.chart?.zone ? `${inr(p.chart.zone.low, 0)}-${inr(p.chart.zone.high, 0)}` : "-"]),
       } : undefined,
       aiNote: await note("Decision", "In 4-6 short lines, tell the team why these picks and how to manage them (stop-loss, target). End with one sentence saying this is not financial advice.",
         { picks: d.picks.map(({ spark: _s, ...p }) => p), watchlist: names(d.watchlist) }),
     });
+
+  // How long to hold each pick, from 1,000 simulated price paths per stock.
+  const planned = d.picks.filter((p) => p.hold);
+  if (planned.length) {
+    bus.send("Decision", "ALL",
+      `How long to hold, from 1,000 simulated price paths per stock:\n${planned.map((p) => `• ${p.symbol}: ${holdSentence(p.hold!)}`).join("\n")}`,
+      { kind: "report", tickers: names(planned) });
+  }
 
   if (d.picks.length) {
     const swing = d.picks.filter((p) => p.horizon.startsWith("Swing")).slice(0, 3);
