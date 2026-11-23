@@ -2,6 +2,7 @@
 
 /** Zerodha holdings and today's positions, read-only, shown on the Positions page. */
 import { Check, Copy, Eye, EyeOff, KeyRound, Link2, Loader2, Lock, LogOut, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { CopySymbol } from "./stock-tools";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { inr, istTime, pct } from "@/lib/format";
@@ -56,7 +57,7 @@ function AccountView({ a: s, onOpen }: { a: Account; onOpen: (symbol: string) =>
             {s.holdings.map((h) => (
               <li key={h.symbol + h.exchange} className="flex items-center gap-3 px-3 py-2.5 text-[12.5px] tnum">
                 <div className="min-w-0 flex-1">
-                  <button type="button" onClick={() => searchStock(h.symbol)} className="font-semibold text-primary">{h.symbol}</button>
+                  <button type="button" onClick={() => searchStock(h.symbol)} className="font-semibold text-primary">{h.symbol}</button><CopySymbol symbol={h.symbol} className="ml-0.5 align-middle" />
                   <div className="text-[11.5px] text-muted-foreground">{h.qty} × {inr(h.avgPrice)} · LTP {inr(h.lastPrice)} <span className={h.dayChangePct >= 0 ? "text-pos" : "text-neg"}>{pct(h.dayChangePct)}</span></div>
                 </div>
                 <div className="shrink-0 text-right">
@@ -76,6 +77,7 @@ function AccountView({ a: s, onOpen }: { a: Account; onOpen: (symbol: string) =>
                   <tr key={h.symbol + h.exchange} className="border-t">
                     <td className="px-3 py-2">
                       <button type="button" onClick={() => searchStock(h.symbol)} className="font-semibold text-primary hover:underline" title="Open the agents' analysis">{h.symbol}</button>
+                      <CopySymbol symbol={h.symbol} className="ml-0.5 align-middle" />
                       <span className="ml-1 text-[10.5px] text-muted-foreground">{h.exchange}</span>
                     </td>
                     <td className="px-3 py-2 text-right">{h.qty} · {inr(h.avgPrice)}</td>

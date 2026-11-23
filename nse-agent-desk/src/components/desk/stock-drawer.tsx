@@ -44,6 +44,7 @@ function useQuote(symbol: string | undefined) {
   return q;
 }
 import { StockChart } from "./stock-chart";
+import { CopySymbol, TradingViewLink } from "./stock-tools";
 import { StockAgentsTab } from "./stock-agents-tab";
 import { useState } from "react";
 import { RiskTag, VerdictBadge } from "./primitives";
@@ -223,7 +224,7 @@ export function StockDrawer() {
           <Dialog.Content className="card fixed left-1/2 top-1/2 z-50 w-[min(520px,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 p-6 outline-none">
             <div className="flex items-start gap-3">
               <div className="min-w-0 flex-1">
-                <Dialog.Title className="text-xl font-extrabold tracking-tight">{lookup.symbol}</Dialog.Title>
+                <Dialog.Title className="flex items-center gap-1 text-xl font-extrabold tracking-tight">{lookup.symbol}<CopySymbol symbol={lookup.symbol} size="md" /></Dialog.Title>
                 <Dialog.Description className="text-[13px] text-muted-foreground">{lookup.name ?? "NSE stock"}</Dialog.Description>
               </div>
               <Dialog.Close aria-label="Close" className="btn-3d grid size-9 place-items-center rounded-full text-muted-foreground hover:text-foreground"><X className="size-4" /></Dialog.Close>
@@ -250,6 +251,7 @@ export function StockDrawer() {
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <Dialog.Title className="text-xl font-extrabold tracking-tight">{d.symbol}</Dialog.Title>
+                  <CopySymbol symbol={d.symbol} size="md" className="-ml-1" />
                   <VerdictBadge verdict={d.verdict} />
                   {lookup?.loading && lookup.symbol === d.symbol && <span className="flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground"><Loader2 className="size-3 animate-spin" />Loading full research…</span>}
                 </div>
@@ -275,6 +277,7 @@ export function StockDrawer() {
                   className={cn("btn-3d grid size-9 place-items-center rounded-full text-muted-foreground hover:text-foreground", finding && "text-primary")}>
                   <Search className="size-4" />
                 </button>
+                <TradingViewLink symbol={d.symbol} compact className="max-sm:w-9 max-sm:justify-center max-sm:px-0" />
                 <TrackTradeButton d={d} className="h-9" />
                 <Dialog.Close aria-label="Close" className="btn-3d grid size-9 place-items-center sm:size-10 rounded-full text-muted-foreground hover:text-foreground">
                   <X className="size-5" />

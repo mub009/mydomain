@@ -19,13 +19,16 @@ import { cn } from "@/lib/utils";
 import { deskValue } from "@/components/desk/desk-ui";
 import { BPStatusChip, bpOverall, FlaggedStocks } from "@/components/desk/black-points-ui";
 import { useDecided, useDesk } from "@/store/desk";
+import { useQuotes } from "@/store/quotes";
+import { CopySymbol, lastClose, LivePriceCell, matchesZone, ZoneAndTopFilter, type ZoneFilter } from "@/components/desk/stock-tools";
 
 const VERDICTS: ("ALL" | Verdict)[] = ["ALL", "STRONG BUY", "BUY", "WATCH", "AVOID"];
 const RISK_ORDER = { LOW: 0, MEDIUM: 1, HIGH: 2 };
 const signed = (v: number) => <span className={v >= 0 ? "text-pos" : "text-neg"}>{pct(v)}</span>;
 
 const columns: ColumnDef<Decision>[] = [
-  { accessorKey: "symbol", header: "Stock", cell: ({ row: { original: d } }) => <div><div className="font-semibold">{d.symbol}</div><div className="text-[11px] text-muted-foreground">{d.sector}</div></div> },
+  { accessorKey: "symbol", header: "Stock", cell: ({ row: { original: d } }) => <div><div className="flex items-center gap-0.5 font-semibold">{d.symbol}<CopySymbol symbol={d.symbol} /></div><div className="text-[11px] text-muted-foreground">{d.sector}</div></div> },
+  { id: "price", header: "Price", meta: { num: true }, accessorFn: (d) => lastClose(d).price, cell: ({ row: { original: d } }) => <LivePriceCell d={d} /> },
   { accessorKey: "verdict", header: "Verdict", enableSorting: false, cell: ({ row }) => <VerdictBadge verdict={row.original.verdict} /> },
   { accessorKey: "combined", header: "Combined", meta: { num: true }, cell: ({ getValue }) => <b>{(getValue() as number).toFixed(1)}</b> },
   { accessorKey: "lotappi", header: "Momentum", meta: { num: true }, cell: ({ getValue }) => (getValue() as number).toFixed(1) },
@@ -88,6 +91,8 @@ export default function ScreenerPage() {
   const [sorting, setSorting] = useState<SortingState>([{ id: "combined", desc: true }]);
   const [view, setView] = useState<"all" | "flagged">("all");
   const [sel, setSel] = useState<Record<string, boolean>>({}); // rows ticked for "Track"
+  const [zone, setZone] = useState<ZoneFilter>("ALL");
+  const [top, setTop] = useState(0);
 
   const all = useMemo(() => r?.all ?? [], [r]);
   const flaggedCount = all.filter((d) => d.blackPoints && Object.values(d.blackPoints.status).some((s) => s !== "Eligible")).length;
@@ -98,9 +103,15 @@ export default function ScreenerPage() {
     (sector === "ALL" || d.sector === sector) && (risk === "ALL" || d.risk === risk) && (size === "ALL" || d.fundamentals?.cap === size) &&
     (rsiMin === "" || d.rsi >= Number(rsiMin)) && (rsiMax === "" || d.rsi <= Number(rsiMax)) && d.combined >= minScore),
   [all, q, sector, risk, size, rsiMin, rsiMax, minScore]);
-  const data = useMemo(() => (verdict === "ALL" ? base : base.filter((d) => d.verdict === verdict)), [base, verdict]);
-  const filtered = q || sector !== "ALL" || risk !== "ALL" || size !== "ALL" || rsiMin || rsiMax || minScore > 0 || verdict !== "ALL";
-  const reset = () => { setQ(""); setSector("ALL"); setRisk("ALL"); setSize("ALL"); setRsiMin(""); setRsiMax(""); setMinScore(0); setVerdict("ALL"); };
+  const byVerdict = useMemo(() => (verdict === "ALL" ? base : base.filter((d) => d.verdict === verdict)), [base, verdict]);
+  // Buy-zone filter, then "Top N" by combined score.
+  const data = useMemo(() => {
+    const xs = byVerdict.filter((d) => matchesZone(d, zone));
+    return top ? [...xs].sort((a, b) => b.combined - a.combined).slice(0, top) : xs;
+  }, [byVerdict, zone, top]);
+  const filtered = q || sector !== "ALL" || risk !== "ALL" || size !== "ALL" || rsiMin || rsiMax || minScore > 0 || verdict !== "ALL" || zone !== "ALL" || top > 0;
+  const reset = () => { setQ(""); setSector("ALL"); setRisk("ALL"); setSize("ALL"); setRsiMin(""); setRsiMax(""); setMinScore(0); setVerdict("ALL"); setZone("ALL"); setTop(0); };
+  useQuotes(useMemo(() => all.map((d) => d.symbol), [all]));
 
   const picked = data.filter((d) => sel[d.symbol]);
   const allTicked = data.length > 0 && picked.length === data.length;
@@ -169,6 +180,7 @@ export default function ScreenerPage() {
               })}
               <span className="ml-auto text-xs text-muted-foreground tnum">{data.length} of {all.length} stocks</span>
             </div>
+            <ZoneAndTopFilter items={byVerdict} zone={zone} onZone={setZone} top={top} onTop={setTop} className="border-t border-[var(--edge)] px-4 py-2.5" />
             <div className="flex flex-wrap items-center gap-2 border-t border-[var(--edge)] px-4 py-2.5">
               <span className="text-xs text-muted-foreground">{picked.length ? `${picked.length} selected` : "Tick stocks to track them, or track every stock shown"}</span>
               {picked.length > 0 && <Button variant="ghost" size="sm" onClick={() => setSel({})}><X />Clear</Button>}

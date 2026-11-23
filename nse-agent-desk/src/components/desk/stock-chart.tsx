@@ -18,6 +18,7 @@ import {
   RANGE_LABEL, RANGES, rangeFor,
 } from "@/lib/market/chart-data";
 import { cn } from "@/lib/utils";
+import { TradingViewLink } from "./stock-tools";
 
 export interface ChartLevels { entry?: number; stop?: number; target?: number; zoneLow?: number; zoneHigh?: number }
 type Style = "candles" | "bars" | "line";
@@ -159,6 +160,8 @@ export function StockChart({ symbol, levels, className, fill }: { symbol: string
         </div>
         <label className="flex items-center gap-1.5 text-[12.5px] text-muted-foreground"><input type="checkbox" checked={showMA} onChange={(e) => setShowMA(e.target.checked)} className="accent-[var(--primary)]" />MA 20 · 50</label>
         {levels && <label className="flex items-center gap-1.5 text-[12.5px] text-muted-foreground"><input type="checkbox" checked={showLevels} onChange={(e) => setShowLevels(e.target.checked)} className="accent-[var(--primary)]" />Entry · stop · target</label>}
+        {/* More indicators and drawing tools: the same stock on TradingView, in a new tab. */}
+        <TradingViewLink symbol={symbol} className="ml-auto" />
       </div>
 
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-[12px] tnum" aria-live="polite">

@@ -22,6 +22,13 @@ The Universe setting on the Overview chooses what the agents scan:
 
 For Nifty 500 and All NSE the server first runs a **quick scan**: one year of closing prices for 20 stocks per request (about 2 seconds for 2,000 stocks), scored on 1- and 3-month gains, distance from the 52-week high and the 50/200-day averages. Shares under ₹10 or with under ₹1 crore traded that day are left out. The **strongest 150** then get the full 16-agent research. The lists are downloaded once a day; if NSE can't be reached, the built-in 110 stocks are used and the agents' chat says so. `GET /api/universe?list=nifty500|allnse` shows the list size and where it came from.
 
+## Current price, filters, copy and TradingView
+
+- **Current price** on Final Picks (table and phone cards) and the Screener, with today's change. Delayed live prices come from `GET /api/quotes?symbols=…` (Yahoo, 20 stocks per request, kept 30 s), refreshed every minute while NSE is open. Without a quote the run's last close is shown. Positions, Sell check and Zerodha already show the current price.
+- **Filters** on Final Picks and the Screener: **Buy zone** (price inside the best buy area), **Buy on dip** (up to 6% above it) and **Extended** (further above), each with a count, and **Show Top 3 / 5 / 10 / 15 / 20 / 25** (the Screener ranks by combined score).
+- **Copy:** the copy icon next to every stock symbol (picks, screener, stock window, positions, Sell check, Zerodha) copies the NSE symbol.
+- **TradingView:** the stock window and its chart have a TradingView button that opens the same stock's chart in a new tab (`NSE:SYMBOL`; `&` and `-` become `_`, e.g. `NSE:M_M`).
+
 ## The team
 
 | Agent | Role | What they do |

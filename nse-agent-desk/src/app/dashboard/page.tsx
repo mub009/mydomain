@@ -14,12 +14,13 @@ import { MacroCard } from "@/components/desk/macro-ui";
 import { PolicyCard } from "@/components/desk/policy-ui";
 import { BulkTrackButton } from "@/components/desk/positions-ui";
 import { diversify } from "@/lib/diversify";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { DataBanner, KPICard, ResearchProgress } from "@/components/desk/primitives";
 import { PageHeader } from "@/components/desk/shell";
 import { Button } from "@/components/ui/button";
 import { istDate, istTime, pct } from "@/lib/format";
 import { useBusy, useDecided, useDesk, useStage } from "@/store/desk";
+import { matchesZone, ZoneAndTopFilter, type ZoneFilter } from "@/components/desk/stock-tools";
 
 export default function OverviewPage() {
   const r = useDecided();
@@ -42,6 +43,13 @@ export default function OverviewPage() {
   const balance = useMemo(() => (r ? diversify(r.picks.map((p) => ({
     symbol: p.symbol, sector: p.sector, cap: p.fundamentals?.cap ?? "Unknown", value: p.investment || p.entry * (p.quantity || 1), closes: p.spark,
   })), r.all) : null), [r]);
+  // Final Picks filters: where the price sits against the buy zone, and how many to show.
+  const [zone, setZone] = useState<ZoneFilter>("ALL");
+  const [top, setTop] = useState(0);
+  const shownPicks = useMemo(() => {
+    const xs = (r?.picks ?? []).filter((d) => matchesZone(d, zone));
+    return top ? xs.slice(0, top) : xs;
+  }, [r, zone, top]);
   const buys = r?.all.filter((d) => d.verdict === "STRONG BUY" || d.verdict === "BUY").length;
   const agree = r?.all.filter((d) => d.agree).length;
 
@@ -96,10 +104,14 @@ export default function OverviewPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   {r && <ResearchProgress stage={stage} done={done} className="hidden sm:flex" />}
-                  {r && done && r.picks.length > 0 && <BulkTrackButton items={r.picks} label={`Track all ${r.picks.length}`} />}
+                  {r && done && shownPicks.length > 0 && <BulkTrackButton items={shownPicks} label={`Track all ${shownPicks.length}`} />}
                 </div>
               </header>
-              {r ? <FinalPicksTable picks={r.picks} onSelect={openStock} /> : <PicksWaiting stage={stage} idle={idle} />}
+              {r && r.picks.length > 1 && (
+                <ZoneAndTopFilter items={r.picks} zone={zone} onZone={setZone} top={top} onTop={setTop} className="border-t border-[var(--edge)] px-4 py-2.5" />
+              )}
+              {r ? <FinalPicksTable picks={shownPicks} onSelect={openStock}
+                empty={r.picks.length ? "No pick matches this filter. Choose All to see every pick." : undefined} /> : <PicksWaiting stage={stage} idle={idle} />}
             </section>
 
             {balance && <DiversificationCard d={balance} title="Portfolio balance of these picks"

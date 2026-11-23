@@ -1,6 +1,7 @@
 "use client";
 
 import { Bell, BellOff, RefreshCw, Trash2 } from "lucide-react";
+import { CopySymbol } from "@/components/desk/stock-tools";
 import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/desk/shell";
 import { AlertItem } from "@/components/desk/positions-ui";
@@ -64,6 +65,7 @@ function PositionCard({ p }: { p: Position }) {
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-base font-bold"><button type="button" onClick={() => searchStock(p.symbol)} className="text-primary hover:underline" title="Open the full report and decision">{p.symbol}</button></h3>
+            <CopySymbol symbol={p.symbol} className="-ml-1.5" />
             <span className={cn("rounded-md px-1.5 py-px text-[11px] font-bold", HEALTH_STYLE[h])}>{h}</span>
             {p.feed === "demo" && <span className="rounded-md bg-warn-bg px-1.5 py-px text-[10.5px] font-semibold text-warn-fg">Demo price</span>}
             {p.stopAtCost && p.status === "open" && <span className="rounded-md bg-primary-soft px-1.5 py-px text-[10.5px] font-semibold text-primary">Stop at cost</span>}

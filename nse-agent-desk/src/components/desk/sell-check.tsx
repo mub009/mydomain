@@ -2,6 +2,7 @@
 
 /** Sell check: the agents look at what you already own and say Sell, Book profit or Hold. */
 import { CircleCheck, CircleMinus, CircleX, Loader2, Plus, ScanSearch, X } from "lucide-react";
+import { CopySymbol } from "./stock-tools";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import type { BrokerHolding } from "@/lib/broker/zerodha";
@@ -140,7 +141,7 @@ export function SellCheck() {
               return (
                 <li key={a.symbol} className="grid gap-2 px-4 py-3 sm:grid-cols-[minmax(0,180px)_minmax(0,1fr)_auto] sm:items-start">
                   <div>
-                    <button type="button" onClick={() => searchStock(a.symbol)} className="text-[14px] font-bold text-primary hover:underline">{a.symbol}</button>
+                    <button type="button" onClick={() => searchStock(a.symbol)} className="text-[14px] font-bold text-primary hover:underline">{a.symbol}</button><CopySymbol symbol={a.symbol} className="ml-0.5 align-middle" />
                     <div className="text-[11.5px] text-muted-foreground tnum">{a.qty} × {inr(a.avgPrice)} · now {inr(a.price)}</div>
                     <div className={cn("text-[12.5px] font-semibold tnum", a.pnlPct >= 0 ? "text-pos" : "text-neg")}>{pct(a.pnlPct)} · {a.pnl >= 0 ? "+" : "-"}{inr(Math.abs(a.pnl), 0)}</div>
                   </div>
