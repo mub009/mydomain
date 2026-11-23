@@ -29,6 +29,24 @@ For Nifty 500 and All NSE the server first runs a **quick scan**: one year of cl
 - **Copy:** the copy icon next to every stock symbol (picks, screener, stock window, positions, Sell check, Zerodha) copies the NSE symbol.
 - **TradingView:** the stock window and its chart have a TradingView button that opens the same stock's chart in a new tab (`NSE:SYMBOL`; `&` and `-` become `_`, e.g. `NSE:M_M`).
 
+## Short swing and long swing (from the bottom)
+
+Every run now gives two kinds of trade:
+
+| Trade | Hold | Found by |
+|---|---|---|
+| **Short swing** | 1-10 days | Momentum Agent: breakouts, RSI, volume, MACD (the main Final Picks) |
+| **Positional** | about 1 month | Trend Agent: moving averages, relative strength |
+| **Long swing** | 3 weeks to 3 months | Bottom check: turning up from a low (`src/lib/bottom.ts`) |
+
+**Long swing check**, on daily prices: the stock is at least 15% below its 52-week high, made its lowest low of the last ~6 months at least a week ago, and has bounced 3-20% off it. Points (out of 100) for a higher low, being back above the 20-day average, the 20-day average turning up, reclaiming the 50-day average, RSI recovering from oversold (under 35) to 45-70, MACD turning up and more volume on up days. A setup needs 70+ and a stop-loss within 12%.
+
+**Plan:** buy near today's price; stop-loss under the low of the last 20 days (at least 1.5 ATR away); target the bigger of 2:1 and halfway back to the 52-week high; hold up to 60 trading days. The Decision Agent ranks setups by score and leaves out loss-making companies, severe red flags and stocks the Black Points Analyst didn't clear for a positional hold (same sector cap). BUY at 80+, otherwise WATCH.
+
+On Nifty 500 / All NSE, the quick scan keeps up to 40 stocks turning up from a bottom as well as the strongest ones, so long swings aren't filtered out before the full research.
+
+**Where:** a **Trade** filter (All / Short swing / Positional / Long swing) on Final Picks and the Screener; the Screener has a *From bottom* column; the stock window's Research tab has a *Long swing · from the bottom* card; Trend Agent announces the long swing list in the team chat.
+
 ## The team
 
 | Agent | Role | What they do |

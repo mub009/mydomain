@@ -26,3 +26,18 @@ export const matchesZone = (d: Pick<Decision, "chart">, z: ZoneFilter) => z === 
 
 export const TOP_N = [0, 3, 5, 10, 15, 20, 25] as const;
 
+
+/** Trade type: short swing (1-10 days), positional (~1 month) or long swing (from a bottom, up to ~3 months). */
+export type TradeFilter = "ALL" | "Short swing" | "Positional" | "Long swing";
+export const TRADE_FILTERS: { value: TradeFilter; label: string; hint: string }[] = [
+  { value: "ALL", label: "All", hint: "Every trade type" },
+  { value: "Short swing", label: "Short swing", hint: "1-10 days, momentum" },
+  { value: "Positional", label: "Positional", hint: "About 1 month, trend" },
+  { value: "Long swing", label: "Long swing", hint: "3 weeks to 3 months, turning up from a bottom" },
+];
+export function matchesTrade(d: Pick<Decision, "horizon" | "bottom">, f: TradeFilter): boolean {
+  if (f === "ALL") return true;
+  if (f === "Long swing") return d.horizon.startsWith("Long swing") || Boolean(d.bottom?.isSetup);
+  if (f === "Short swing") return d.horizon.startsWith("Swing");
+  return d.horizon.startsWith("Positional") || d.horizon.startsWith("Swing, then");
+}

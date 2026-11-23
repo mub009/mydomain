@@ -128,6 +128,43 @@ function HoldCard({ d }: { d: Decision }) {
   );
 }
 
+/** Long swing: is the stock turning up from a bottom, and the plan if it is. */
+function BottomCard({ d }: { d: Decision }) {
+  const b = d.bottom!;
+  const long = useStockResult()?.longSwing?.find((x) => x.symbol === d.symbol);
+  return (
+    <section className="rounded-xl border p-3" aria-label="Long swing from the bottom">
+      <div className="flex items-center gap-2">
+        <AgentAvatar who="Trend" size={22} />
+        <h3 className="text-[13px] font-semibold">Long swing · from the bottom</h3>
+        <span className={cn("ml-auto rounded-md px-1.5 py-px text-[10.5px] font-bold", b.isSetup ? "bg-[var(--buy-bg)] text-[var(--buy-fg)]" : "bg-muted text-muted-foreground")}>
+          {b.isSetup ? `Turning up · ${b.score}/100` : `Not a setup · ${b.score}/100`}
+        </span>
+      </div>
+      <dl className="mt-2.5 grid grid-cols-3 gap-2 text-center tnum">
+        <div className="rounded-lg bg-muted/60 px-1 py-1.5"><dt className="text-[10.5px] text-muted-foreground">Bottom</dt><dd className="text-[14px] font-bold">{inr(b.low)}</dd><dd className="text-[10.5px] text-muted-foreground">{shortDate(b.lowDate)}</dd></div>
+        <div className="rounded-lg bg-muted/60 px-1 py-1.5"><dt className="text-[10.5px] text-muted-foreground">Above the low</dt><dd className="text-[14px] font-bold text-pos">+{b.offLowPct.toFixed(1)}%</dd></div>
+        <div className="rounded-lg bg-muted/60 px-1 py-1.5"><dt className="text-[10.5px] text-muted-foreground">Below 52-week high</dt><dd className="text-[14px] font-bold text-neg">-{b.offHighPct.toFixed(0)}%</dd><dd className="text-[10.5px] text-muted-foreground">{inr(b.high52w, 0)}</dd></div>
+      </dl>
+      {b.isSetup && (
+        <dl className="mt-2 grid grid-cols-3 gap-2 text-center tnum">
+          <div><dt className="text-[10.5px] text-muted-foreground">Entry</dt><dd className="text-[13px] font-semibold">{inr(b.entry)}</dd></div>
+          <div><dt className="text-[10.5px] text-muted-foreground">Stop (under the low)</dt><dd className="text-[13px] font-semibold text-neg">{inr(b.stopLoss)}</dd></div>
+          <div><dt className="text-[10.5px] text-muted-foreground">Target</dt><dd className="text-[13px] font-semibold text-pos">{inr(b.target)}</dd></div>
+        </dl>
+      )}
+      <ul className="mt-2 space-y-0.5 text-[12px] leading-snug">
+        {b.signals.map((s) => <li key={s} className="flex gap-1.5"><span className="text-pos">✓</span>{s}</li>)}
+        {b.warnings.map((s) => <li key={s} className="flex gap-1.5 text-muted-foreground"><span className="text-[var(--watch-fg)]">!</span>{s}</li>)}
+      </ul>
+      <p className="mt-1.5 text-[11.5px] leading-snug text-muted-foreground">
+        {long ? `In today's long swing list${long.hold ? `: hold up to ${long.hold.maxDays} trading days, exit by ${shortDate(long.hold.exitBy)}` : ""}. ` : b.isSetup ? "Turning up, but not in today's long swing list (sector cap, risk checks or the list was full). " : ""}
+        Held about 3 weeks to 3 months. A bottom can still fail, so keep the stop-loss.
+      </p>
+    </section>
+  );
+}
+
 function Body({ d, isPick, price }: { d: Decision; isPick: boolean; price?: number }) {
   const sectors = useStockResult()?.sectors;
   const sector = sectors?.find((s) => s.sector === d.sector);
@@ -144,6 +181,7 @@ function Body({ d, isPick, price }: { d: Decision; isPick: boolean; price?: numb
 
       <MyPositionCard d={d} price={price} />
       {d.hold && <HoldCard d={d} />}
+      {d.bottom && (d.bottom.isSetup || d.bottom.score >= 40) && <BottomCard d={d} />}
       {d.longTerm && <LongTermCard d={d} />}
       {d.blackPoints && <BlackPointsSection bp={d.blackPoints} />}
       <div className="space-y-2.5">

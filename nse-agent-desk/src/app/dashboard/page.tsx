@@ -20,7 +20,8 @@ import { PageHeader } from "@/components/desk/shell";
 import { Button } from "@/components/ui/button";
 import { istDate, istTime, pct } from "@/lib/format";
 import { useBusy, useDecided, useDesk, useStage } from "@/store/desk";
-import { matchesZone, ZoneAndTopFilter, type ZoneFilter } from "@/components/desk/stock-tools";
+import { matchesTrade, matchesZone, TradeChips, ZoneAndTopFilter, type TradeFilter, type ZoneFilter } from "@/components/desk/stock-tools";
+import type { Decision } from "@/lib/types";
 
 export default function OverviewPage() {
   const r = useDecided();
@@ -46,10 +47,19 @@ export default function OverviewPage() {
   // Final Picks filters: where the price sits against the buy zone, and how many to show.
   const [zone, setZone] = useState<ZoneFilter>("ALL");
   const [top, setTop] = useState(0);
+  const [trade, setTrade] = useState<TradeFilter>("ALL");
+  // The main picks plus the long swing picks (turning up from a bottom) not already among them.
+  const allPicks = useMemo<Decision[]>(() => {
+    const main = r?.picks ?? [];
+    const have = new Set(main.map((p) => p.symbol));
+    return [...main, ...(r?.longSwing ?? []).filter((p) => !have.has(p.symbol))];
+  }, [r]);
+  const ofTrade = (t: TradeFilter) => (t === "Long swing" ? r?.longSwing ?? [] : t === "ALL" ? allPicks : (r?.picks ?? []).filter((d) => matchesTrade(d, t)));
+  const byTrade = useMemo(() => ofTrade(trade), [r, allPicks, trade]); // eslint-disable-line react-hooks/exhaustive-deps
   const shownPicks = useMemo(() => {
-    const xs = (r?.picks ?? []).filter((d) => matchesZone(d, zone));
+    const xs = byTrade.filter((d) => matchesZone(d, zone));
     return top ? xs.slice(0, top) : xs;
-  }, [r, zone, top]);
+  }, [byTrade, zone, top]);
   const buys = r?.all.filter((d) => d.verdict === "STRONG BUY" || d.verdict === "BUY").length;
   const agree = r?.all.filter((d) => d.agree).length;
 
@@ -107,11 +117,20 @@ export default function OverviewPage() {
                   {r && done && shownPicks.length > 0 && <BulkTrackButton items={shownPicks} label={`Track all ${shownPicks.length}`} />}
                 </div>
               </header>
-              {r && r.picks.length > 1 && (
-                <ZoneAndTopFilter items={r.picks} zone={zone} onZone={setZone} top={top} onTop={setTop} className="border-t border-[var(--edge)] px-4 py-2.5" />
+              {r && done && allPicks.length > 0 && (
+                <div className="space-y-2 border-t border-[var(--edge)] px-4 py-2.5">
+                  <TradeChips value={trade} onChange={setTrade} count={(t) => ofTrade(t).length} />
+                  <ZoneAndTopFilter items={byTrade} zone={zone} onZone={setZone} top={top} onTop={setTop} />
+                  {trade === "Long swing" && (
+                    <p className="text-[12px] leading-snug text-muted-foreground">
+                      Long swing: stocks well below their 52-week high that bounced off a recent low and are turning up. Stop-loss under the low, target part of the way back to the old high, held about 3 weeks to 3 months. A bottom can still fail, so size these smaller.
+                    </p>
+                  )}
+                </div>
               )}
-              {r ? <FinalPicksTable picks={shownPicks} onSelect={openStock}
-                empty={r.picks.length ? "No pick matches this filter. Choose All to see every pick." : undefined} /> : <PicksWaiting stage={stage} idle={idle} />}
+              {r ? <FinalPicksTable picks={done ? shownPicks : r.picks} onSelect={openStock}
+                empty={trade === "Long swing" ? "No stock is clearly turning up from a bottom in this run. Try a bigger list (Nifty 500 or All NSE)."
+                  : allPicks.length ? "No pick matches this filter. Choose All to see every pick." : undefined} /> : <PicksWaiting stage={stage} idle={idle} />}
             </section>
 
             {balance && <DiversificationCard d={balance} title="Portfolio balance of these picks"

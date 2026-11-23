@@ -145,6 +145,8 @@ export interface Analysis {
   policy?: { points: number; effect: "Tailwind" | "Headwind" | "Mixed" | "Neutral"; reason: string };
   /** Black Points Analyst's downside-risk report (stocks that passed a scan). */
   blackPoints?: BPReport;
+  /** Long swing check: is it turning up from a bottom? */
+  bottom?: import("./bottom").BottomSetup;
 }
 
 export type DeskAgent = "Performance" | "Valuation" | "Growth" | "Profitability" | "Seasonal" | "Entry" | "RedFlag";
@@ -412,6 +414,8 @@ export interface RunResult {
   minCapCr: number;
   /** Set when a big list was quick-scanned first. */
   scan?: QuickScanSummary;
+  /** Long swing picks: stocks turning up from a bottom, held ~3 weeks to 3 months (missing in older runs). */
+  longSwing?: Decision[];
   sectors: SectorView[];
   macro: MacroReport | null;
   picks: Decision[];
@@ -447,6 +451,8 @@ export interface QuickScanSummary {
   priced: number;
   thin: number;
   shortlisted: number;
+  /** Of the shortlist, how many were kept as long swing (bottom) candidates. */
+  bottoms?: number;
   from: "nse" | "built-in" | "demo";
   note?: string;
 }

@@ -2,6 +2,7 @@
  *  portfolio rules (sector concentration, capital) and chooses the picks. */
 import { PERIOD_LABEL } from "../black-points/analyst";
 import type { Analysis, BPStatus, Decision, HoldingPeriod, Verdict } from "../types";
+import { LONG_SWING } from "../bottom";
 
 const periodsOf = (horizon: string): HoldingPeriod[] =>
   horizon.startsWith("Swing, then") ? ["swing", "positional"] : horizon.startsWith("Swing") ? ["swing"] : ["positional"];
@@ -114,5 +115,46 @@ export class DecisionAgent {
     for (const d of all) if (d.blackPoints) d.blackPoints = { ...d.blackPoints, finalDecision: this.ruling(d, picks.includes(d)) };
     const watchlist = [...passed, ...all.filter((d) => d.verdict === "WATCH")].slice(0, Math.max(top, 5));
     return { all, picks, watchlist, passed };
+  }
+
+  /**
+   * Long swing picks: stocks turning up from a bottom (a setup: score 70+), ranked by that score.
+   * Left out: loss-making companies, severe red flags, and anything the Black Points Analyst
+   * didn't clear for a positional hold. Same sector cap as the main picks.
+   * Each gets its own plan: buy near today's price, stop under the recent low, target part of the way back.
+   */
+  longSwing(all: Decision[], top: number, capital?: number, riskPerTrade = 1): Decision[] {
+    const cap = sectorCap(top);
+    const perSector: Record<string, number> = {};
+    const out: Decision[] = [];
+    const ok = (d: Decision) => {
+      if (!d.bottom?.isSetup) return false;
+      if (d.fundamentals?.epsTTM !== undefined && d.fundamentals.epsTTM < 0) return false;
+      if (d.desk?.severe) return false;
+      const st = d.blackPoints?.status;
+      return !st || st.positional === undefined || st.positional === "Eligible";
+    };
+    const ranked = all.filter(ok).sort((a, b) => (b.bottom!.score - a.bottom!.score) || (b.mayavi - a.mayavi));
+    for (const d of ranked) {
+      if (out.length >= top) break;
+      if ((perSector[d.sector] ?? 0) >= cap) continue;
+      perSector[d.sector] = (perSector[d.sector] ?? 0) + 1;
+      const b = d.bottom!;
+      const verdict: Verdict = b.score >= 80 && d.risk !== "HIGH" ? "BUY" : "WATCH";
+      out.push({
+        ...d, verdict, horizon: LONG_SWING, entry: b.entry, stopLoss: b.stopLoss, target: b.target,
+        quantity: undefined, investment: undefined, passedOver: undefined,
+        notes: [`Long swing from a bottom (score ${b.score}): ${b.signals.slice(0, 2).join("; ")}`, ...d.notes],
+      });
+    }
+    if (capital && capital > 0) {
+      let remaining = capital;
+      for (const p of out) {
+        const perShare = Math.max(p.entry - p.stopLoss, 0.01);
+        const qty = Math.max(0, Math.min(Math.floor((capital * riskPerTrade) / 100 / perShare), Math.floor(remaining / p.entry)));
+        p.quantity = qty; p.investment = Math.round(qty * p.entry * 100) / 100; remaining -= p.investment;
+      }
+    }
+    return out;
   }
 }

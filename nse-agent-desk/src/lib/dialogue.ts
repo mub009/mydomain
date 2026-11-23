@@ -68,6 +68,8 @@ export interface DialogueInput {
   conflicted: Analysis[];
   clarifications: Record<string, string>;
   picks: Decision[];
+  /** Long swing picks: turning up from a bottom. */
+  longSwing?: Decision[];
   /** Every stock with its final verdict (includes the Black Points rulings). */
   all: Decision[];
   /** What the Black Points Analyst could check this run. */
@@ -582,6 +584,22 @@ export async function runDialogue(bus: MessageBus, llm: LLM, d: DialogueInput) {
       { kind: "report", tickers: names(planned) });
   }
 
+  // Long swing: stocks turning up from a bottom, a separate list with a longer hold.
+  const ls = d.longSwing ?? [];
+  bus.send("Trend", "ALL",
+    ls.length
+      ? `Long swing from the bottom: ${list(names(ls))}. These fell well below their 52-week highs, bounced off a low and are turning up. Stop-loss under the recent low, target part of the way back to the old high, held about 3 weeks to 3 months.`
+      : "Long swing from the bottom: no stock is clearly turning up from a low today (we look for a bounce off the low, a higher low, the averages turning up and RSI recovering).",
+    {
+      kind: "report", tickers: names(ls),
+      table: ls.length ? {
+        columns: ["Symbol", "Verdict", "Bottom", "Above low", "Below high", "Entry", "Stop-loss", "Target", "Hold", "Setup"],
+        rows: ls.map((p) => [p.symbol, p.verdict, `${inr(p.bottom!.low)} (${shortDate(p.bottom!.lowDate)})`, `+${p.bottom!.offLowPct.toFixed(1)}%`, `-${p.bottom!.offHighPct.toFixed(0)}%`,
+          inr(p.entry), inr(p.stopLoss), inr(p.target), holdShort(p.hold), `${p.bottom!.score}/100`]),
+      } : undefined,
+    });
+  if (ls.length) bus.send("Decision", "Trend", `Noted. The long swings are a separate list with their own stop-losses; size them smaller, because a bottom can still fail.`);
+
   if (d.picks.length) {
     const swing = d.picks.filter((p) => p.horizon.startsWith("Swing")).slice(0, 3);
     bus.send("Momentum", "ALL",
@@ -602,6 +620,7 @@ export function scanLine(s: QuickScanSummary): string {
   return `Quick scan of the ${s.label} list: ${n(s.total)} stocks` +
     (s.shortlisted < s.total ? ` · ${n(left)} had a year of prices and traded at least ₹1 Cr today` +
       `${s.thin ? ` (${n(s.thin)} too cheap, too new or barely traded)` : ""}` +
-      ` · the ${n(s.shortlisted)} strongest by 1- and 3-month gains, 52-week high and 50/200-day averages went on to the full research` : " · all researched in full") +
+      ` · ${n(s.shortlisted - (s.bottoms ?? 0))} strongest by 1- and 3-month gains, 52-week high and 50/200-day averages` +
+      (s.bottoms ? ` and ${n(s.bottoms)} turning up from a bottom (long swing candidates)` : "") + ` went on to the full research` : " · all researched in full") +
     (s.note ? ` · ${s.note}` : "");
 }

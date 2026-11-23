@@ -20,7 +20,7 @@ import { deskValue } from "@/components/desk/desk-ui";
 import { BPStatusChip, bpOverall, FlaggedStocks } from "@/components/desk/black-points-ui";
 import { useDecided, useDesk } from "@/store/desk";
 import { useQuotes } from "@/store/quotes";
-import { CopySymbol, lastClose, LivePriceCell, matchesZone, ZoneAndTopFilter, type ZoneFilter } from "@/components/desk/stock-tools";
+import { CopySymbol, lastClose, LivePriceCell, matchesTrade, matchesZone, TradeChips, ZoneAndTopFilter, type TradeFilter, type ZoneFilter } from "@/components/desk/stock-tools";
 
 const VERDICTS: ("ALL" | Verdict)[] = ["ALL", "STRONG BUY", "BUY", "WATCH", "AVOID"];
 const RISK_ORDER = { LOW: 0, MEDIUM: 1, HIGH: 2 };
@@ -71,6 +71,10 @@ const columns: ColumnDef<Decision>[] = [
     cell: ({ row: { original: d } }) => <span className="whitespace-nowrap text-xs font-medium">{d.desk?.entry?.verdict ?? "–"}</span> },
   { id: "charts", header: "Charts", accessorFn: (d) => (d.chart ? d.chart.bullish - d.chart.bearish : -99), meta: { num: false },
     cell: ({ row: { original: d } }) => (d.chart ? <TimeframeDots chart={d.chart} /> : <span className="text-xs text-muted-foreground">–</span>) },
+  { id: "bottom", header: "From bottom", meta: { num: true }, accessorFn: (d) => (d.bottom?.isSetup ? d.bottom.score : -1),
+    cell: ({ row: { original: d } }) => d.bottom?.isSetup
+      ? <span title={[...d.bottom.signals, ...d.bottom.warnings].join(" · ")}><span className="font-semibold text-pos">Turning up {d.bottom.score}</span><span className="block text-[11px] text-muted-foreground">+{d.bottom.offLowPct.toFixed(1)}% off low · -{d.bottom.offHighPct.toFixed(0)}% from high</span></span>
+      : <span className="text-xs text-muted-foreground" title={d.bottom?.warnings[0]}>–</span> },
   { id: "zone", header: "Buy zone", accessorFn: (d) => d.chart?.zone?.distancePct ?? 999,
     cell: ({ row: { original: d } }) => (d.chart?.zone ? <div><div className="text-xs font-medium">{inr(d.chart.zone.low, 0)}–{inr(d.chart.zone.high, 0)}</div><PlanTag zone={d.chart.zone} /></div> : <span className="text-xs text-muted-foreground">–</span>) },
   { id: "notes", header: "Notes", enableSorting: false, cell: ({ row: { original: d } }) => <span className="line-clamp-2 w-96 whitespace-normal text-xs text-muted-foreground" title={[d.passedOver, ...d.notes, ...d.lotWarnings.slice(0, 1), ...d.mayWarnings.slice(0, 1)].filter(Boolean).join(" · ") || undefined}>{[d.passedOver, ...d.notes, ...d.lotWarnings.slice(0, 1), ...d.mayWarnings.slice(0, 1)].filter(Boolean).join(" · ") || "–"}</span> },
@@ -93,6 +97,7 @@ export default function ScreenerPage() {
   const [sel, setSel] = useState<Record<string, boolean>>({}); // rows ticked for "Track"
   const [zone, setZone] = useState<ZoneFilter>("ALL");
   const [top, setTop] = useState(0);
+  const [trade, setTrade] = useState<TradeFilter>("ALL");
 
   const all = useMemo(() => r?.all ?? [], [r]);
   const flaggedCount = all.filter((d) => d.blackPoints && Object.values(d.blackPoints.status).some((s) => s !== "Eligible")).length;
@@ -103,14 +108,16 @@ export default function ScreenerPage() {
     (sector === "ALL" || d.sector === sector) && (risk === "ALL" || d.risk === risk) && (size === "ALL" || d.fundamentals?.cap === size) &&
     (rsiMin === "" || d.rsi >= Number(rsiMin)) && (rsiMax === "" || d.rsi <= Number(rsiMax)) && d.combined >= minScore),
   [all, q, sector, risk, size, rsiMin, rsiMax, minScore]);
-  const byVerdict = useMemo(() => (verdict === "ALL" ? base : base.filter((d) => d.verdict === verdict)), [base, verdict]);
+  const byVerdict = useMemo(() => (verdict === "ALL" ? base : base.filter((d) => d.verdict === verdict)).filter((d) => matchesTrade(d, trade)), [base, verdict, trade]);
   // Buy-zone filter, then "Top N" by combined score.
   const data = useMemo(() => {
     const xs = byVerdict.filter((d) => matchesZone(d, zone));
-    return top ? [...xs].sort((a, b) => b.combined - a.combined).slice(0, top) : xs;
-  }, [byVerdict, zone, top]);
-  const filtered = q || sector !== "ALL" || risk !== "ALL" || size !== "ALL" || rsiMin || rsiMax || minScore > 0 || verdict !== "ALL" || zone !== "ALL" || top > 0;
-  const reset = () => { setQ(""); setSector("ALL"); setRisk("ALL"); setSize("ALL"); setRsiMin(""); setRsiMax(""); setMinScore(0); setVerdict("ALL"); setZone("ALL"); setTop(0); };
+    // Top N: by bottom score for long swings, by combined score otherwise.
+    const rank = (d: Decision) => (trade === "Long swing" ? d.bottom?.score ?? 0 : d.combined);
+    return top ? [...xs].sort((a, b) => rank(b) - rank(a)).slice(0, top) : xs;
+  }, [byVerdict, zone, top, trade]);
+  const filtered = q || sector !== "ALL" || risk !== "ALL" || size !== "ALL" || rsiMin || rsiMax || minScore > 0 || verdict !== "ALL" || zone !== "ALL" || top > 0 || trade !== "ALL";
+  const reset = () => { setQ(""); setSector("ALL"); setRisk("ALL"); setSize("ALL"); setRsiMin(""); setRsiMax(""); setMinScore(0); setVerdict("ALL"); setZone("ALL"); setTop(0); setTrade("ALL"); };
   useQuotes(useMemo(() => all.map((d) => d.symbol), [all]));
 
   const picked = data.filter((d) => sel[d.symbol]);
@@ -180,7 +187,11 @@ export default function ScreenerPage() {
               })}
               <span className="ml-auto text-xs text-muted-foreground tnum">{data.length} of {all.length} stocks</span>
             </div>
-            <ZoneAndTopFilter items={byVerdict} zone={zone} onZone={setZone} top={top} onTop={setTop} className="border-t border-[var(--edge)] px-4 py-2.5" />
+            <div className="space-y-2 border-t border-[var(--edge)] px-4 py-2.5">
+              <TradeChips value={trade} onChange={(t) => { setTrade(t); if (t === "Long swing") setSorting([{ id: "bottom", desc: true }]); }}
+                count={(t) => (verdict === "ALL" ? base : base.filter((d) => d.verdict === verdict)).filter((d) => matchesTrade(d, t)).length} />
+              <ZoneAndTopFilter items={byVerdict} zone={zone} onZone={setZone} top={top} onTop={setTop} />
+            </div>
             <div className="flex flex-wrap items-center gap-2 border-t border-[var(--edge)] px-4 py-2.5">
               <span className="text-xs text-muted-foreground">{picked.length ? `${picked.length} selected` : "Tick stocks to track them, or track every stock shown"}</span>
               {picked.length > 0 && <Button variant="ghost" size="sm" onClick={() => setSel({})}><X />Clear</Button>}

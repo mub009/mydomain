@@ -6,8 +6,8 @@ import { useState } from "react";
 import { inr, pct } from "@/lib/format";
 import { tradingViewUrl, type Quote } from "@/lib/market/quotes";
 import type { Decision } from "@/lib/types";
-import { currentPrice, matchesZone, ZONE_FILTERS, TOP_N, type ZoneFilter } from "@/lib/stock-view";
-export { currentPrice, lastClose, matchesZone, ZONE_FILTERS, TOP_N, type ZoneFilter } from "@/lib/stock-view";
+import { currentPrice, matchesZone, ZONE_FILTERS, TOP_N, TRADE_FILTERS, type ZoneFilter, type TradeFilter } from "@/lib/stock-view";
+export { currentPrice, lastClose, matchesZone, matchesTrade, ZONE_FILTERS, TOP_N, TRADE_FILTERS, type ZoneFilter, type TradeFilter } from "@/lib/stock-view";
 import { cn } from "@/lib/utils";
 import { useQuoteStore } from "@/store/quotes";
 
@@ -90,4 +90,22 @@ export function ZoneAndTopFilter({ items, zone, onZone, top, onTop, className }:
 export function LivePriceCell({ d, align }: { d: Pick<Decision, "spark" | "entry" | "symbol">; align?: "left" | "right" }) {
   const q = useQuoteStore((s) => s.quotes[d.symbol]);
   return <PriceCell d={d} q={q} align={align} />;
+}
+
+/** Chips for the trade type (short swing / positional / long swing), each with a count. */
+export function TradeChips({ value, onChange, count, className }: {
+  value: TradeFilter; onChange: (v: TradeFilter) => void; count: (v: TradeFilter) => number; className?: string;
+}) {
+  return (
+    <div role="group" aria-label="Filter by trade type" className={cn("flex flex-wrap items-center gap-1.5", className)}>
+      <span className="mr-0.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Trade</span>
+      {TRADE_FILTERS.map(({ value: v, label, hint }) => (
+        <button key={v} type="button" onClick={() => onChange(v)} aria-pressed={value === v} title={hint}
+          className={cn("rounded-full border px-3 py-1 text-xs font-semibold transition-colors",
+            value === v ? "border-primary bg-primary text-primary-foreground" : "bg-card text-muted-foreground hover:text-foreground")}>
+          {label} <span className="tnum opacity-75">{count(v)}</span>
+        </button>
+      ))}
+    </div>
+  );
 }

@@ -14,6 +14,8 @@ export interface QuickRow {
   above200: boolean;
   /** Today's traded value, ₹ crore (volume × price). */
   tradedCr: number;
+  /** 0-100: turning up from a bottom (long swing candidate); 0 when it isn't near one. */
+  bottom: number;
   score: number;
 }
 
@@ -22,6 +24,8 @@ export interface QuickScan {
   priced: number;
   /** Left out: too few prices, under ₹10, or under ₹1 crore traded today. */
   thin: number;
+  /** How many of the shortlist were kept as long swing (bottom) candidates. */
+  bottoms?: number;
   shortlist: QuickRow[];
 }
 
@@ -57,6 +61,13 @@ export function quickRow(symbol: string, s: SparkSeries): Omit<QuickRow, "score"
   const last = c[c.length - 1];
   const back = (n: number) => c[Math.max(0, c.length - 1 - n)];
   const high = Math.max(s.high52 ?? 0, ...c);
+  // Bottom check on closes: the lowest close of ~6 months, how long ago, and the bounce since.
+  const win = c.slice(-120);
+  let li = 0; win.forEach((x, i) => { if (x < win[li]) li = i; });
+  const offLow = (last / win[li] - 1) * 100, lowAgo = win.length - 1 - li;
+  const sma20 = avg(c.slice(-20)), sma20prev = avg(c.slice(-25, -5));
+  const nearBottom = (1 - last / high) * 100 >= 15 && lowAgo >= 5 && offLow >= 3 && offLow <= 30;
+  const bottom = nearBottom ? 40 * Number(last > sma20) + 30 * Number(sma20 > sma20prev) + 30 * Number(last > back(21)) : 0;
   return {
     symbol, close: last,
     ret21: (last / back(21) - 1) * 100,
@@ -65,6 +76,7 @@ export function quickRow(symbol: string, s: SparkSeries): Omit<QuickRow, "score"
     above50: last > avg(c.slice(-50)),
     above200: c.length >= 200 ? last > avg(c.slice(-200)) : last > avg(c),
     tradedCr: ((s.volume ?? 0) * last) / 1e7,
+    bottom,
   };
 }
 
@@ -91,6 +103,17 @@ export function rankQuick(rows: Omit<QuickRow, "score">[]): QuickRow[] {
 
 export const isThin = (r: Omit<QuickRow, "score">) => r.close < 10 || r.tradedCr < 1;
 
+/** Up to this many of the shortlist are kept for stocks turning up from a bottom (long swing). */
+export const BOTTOM_KEEP = 40;
+
+/** The strongest by trend and momentum, plus the clearest turns from a bottom (score 70+). */
+export function shortlist(ranked: QuickRow[], keep: number): { rows: QuickRow[]; bottoms: number } {
+  const bottomRows = ranked.filter((r) => r.bottom >= 70).sort((a, b) => b.bottom - a.bottom || b.ret21 - a.ret21).slice(0, Math.min(BOTTOM_KEEP, Math.floor(keep / 3)));
+  const taken = new Set(bottomRows.map((r) => r.symbol));
+  const strong = ranked.filter((r) => !taken.has(r.symbol)).slice(0, keep - bottomRows.length);
+  return { rows: [...strong, ...bottomRows], bottoms: bottomRows.length };
+}
+
 /** Quick-scan the whole list and keep the best `keep` stocks for the full research. */
 export async function quickScan(symbols: string[], keep: number, onProgress?: (done: number, total: number) => void): Promise<QuickScan> {
   const batches: string[][] = [];
@@ -113,5 +136,6 @@ export async function quickScan(symbols: string[], keep: number, onProgress?: (d
       onProgress?.(Math.min(done, symbols.length), symbols.length);
     }
   }));
-  return { total: symbols.length, priced, thin, shortlist: rankQuick(rows).slice(0, keep) };
+  const { rows: list, bottoms } = shortlist(rankQuick(rows), keep);
+  return { total: symbols.length, priced, thin, shortlist: list, bottoms };
 }

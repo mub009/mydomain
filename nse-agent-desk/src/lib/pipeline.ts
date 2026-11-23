@@ -29,6 +29,7 @@ import type { Bar, QuickScanSummary, RunRequest, RunResult, StreamEvent } from "
 import { BIG_UNIVERSES, loadStockList } from "./market/lists";
 import { quickScan } from "./market/prescreen";
 import { ALL_CAPS } from "./market/universe";
+import { bottomSetup, LONG_SWING_DAYS, type BottomSetup } from "./bottom";
 
 export async function runAnalysis(o: RunRequest, emit: (e: StreamEvent) => void): Promise<RunResult> {
   const started = Date.now();
@@ -52,6 +53,11 @@ export async function runAnalysis(o: RunRequest, emit: (e: StreamEvent) => void)
   const snaps = Object.fromEntries(Object.entries(frames).map(([k, v]) => [k, snapshot(v)]));
   const sparks = Object.fromEntries(Object.entries(frames).map(([k, v]) => [k, v.slice(-60).map((b) => Math.round(b.close * 100) / 100)]));
   const indexRet21d = indexClose.length > 21 ? pctReturn(indexClose, 21) : 0;
+  // Long swing check: stocks turning up from a bottom (they score low on momentum, so they get their own list).
+  const bottoms: Record<string, BottomSetup> = {};
+  for (const [k, v] of Object.entries(frames)) { const b = bottomSetup(v); if (b) bottoms[k] = b; }
+  const bottomTop = Object.entries(bottoms).filter(([, b]) => b.isSetup).sort((a, b) => b[1].score - a[1].score)
+    .slice(0, Math.max(10, o.top)).map(([k]) => k);
 
   emit({ type: "progress", text: "Agents are analysing…" });
   // News Agent collects the news; positive stories boost Momentum Agent's and Trend Agent's scores.
@@ -78,23 +84,23 @@ export async function runAnalysis(o: RunRequest, emit: (e: StreamEvent) => void)
   const macro = macroData ? analyseMacro(frames, macroData.series, macroData.sample) : null;
   const first = applyPolicy(policy, applySectors(mubashir.applyFundamentals(applyMacro(mubashir.analyse(lot, may, snaps), macro), funds), sectors));
   const focus = (o.focus ?? []).filter((s) => frames[s]);
-  const candidates = [...new Set([...focus, ...first.slice(0, Math.max(12, o.top * 2)).map((r) => r.symbol)])];
+  const candidates = [...new Set([...focus, ...first.slice(0, Math.max(12, o.top * 2)).map((r) => r.symbol), ...bottomTop])];
   // Research desk: Performance, Valuation and Growth Agents check the candidates for Research Agent.
   emit({ type: "progress", text: "Research desk: performance, valuation, growth, profitability, red flags…" });
   const desk = await runResearchDesk(candidates, { frames, funds, source, indexClose, sectorOf });
   const withDesk = mubashir.applyDesk(first, desk);
   // Black Points Analyst: downside risks for every stock that passed the Momentum or Trend scan.
   emit({ type: "progress", text: "Black Points Analyst: checking filings, regulator orders and financial health…" });
-  const bp = await runBlackPoints(withDesk, { demo: source.kind === "demo", seed: source.seed ?? 0, frames, sectorOf, sectors, focus, policy });
+  const bp = await runBlackPoints(withDesk, { demo: source.kind === "demo", seed: source.seed ?? 0, frames, sectorOf, sectors, focus: [...focus, ...bottomTop], policy });
   const checked = withDesk.map((r) => (bp.reports[r.symbol] ? { ...r, blackPoints: bp.reports[r.symbol] } : r));
   // Chart check: the original candidates plus the top stocks still eligible for a holding period,
   // so stocks held out by the Black Points Analyst don't crowd out the ones that can be picked.
   const eligible = checked.filter((r) => !r.blackPoints || Object.values(r.blackPoints.status).includes("Eligible"));
-  const chartSyms = [...new Set([...candidates, ...eligible.slice(0, Math.max(12, o.top * 2)).map((r) => r.symbol)])];
+  const chartSyms = [...new Set([...candidates, ...eligible.slice(0, Math.max(12, o.top * 2)).map((r) => r.symbol)])]; // includes the long swing candidates
   emit({ type: "progress", text: "Checking charts…" });
   const intraday = await loadIntraday(chartSyms, source, frames);
   const charts = Object.fromEntries(chartSyms.map((s) => [s, analyseChart(frames[s], intraday[s]?.m30 ?? null, intraday[s]?.h1 ?? null)]));
-  const rows = mubashir.applyEntry(mubashir.applyCharts(checked, charts));
+  const rows = mubashir.applyEntry(mubashir.applyCharts(checked, charts)).map((r) => (bottoms[r.symbol] ? { ...r, bottom: bottoms[r.symbol] } : r));
   // Macro Agent's global cues: the main world indices (live runs only).
   const cues = source.kind !== "demo" ? await worldQuotes().then(globalCues).catch(() => null) : null;
   const fd = new DecisionAgent();
@@ -108,6 +114,11 @@ export async function runAnalysis(o: RunRequest, emit: (e: StreamEvent) => void)
   const longs = Object.fromEntries(decided.all.map((d) => [d.symbol, longTermView(d)]));
   const withHold = <T extends { symbol: string }>(xs: T[]) => xs.map((d) => ({ ...d, ...(plans[d.symbol] ? { hold: plans[d.symbol] } : {}), ...(longs[d.symbol] ? { longTerm: longs[d.symbol] } : {}) }));
   const { all, picks, watchlist, passed } = { ...decided, all: withHold(decided.all), picks: withHold(decided.picks), watchlist: withHold(decided.watchlist) };
+  // Long swing picks have their own entry, stop and target, so their own holding plan (up to ~3 months).
+  const longSwing = fd.longSwing(decided.all, o.top, o.capital, o.riskPerTrade).map((d) => {
+    const plan = planHold(d, frames[d.symbol], source.seed);
+    return { ...d, ...(plan ? { hold: plan } : {}), ...(longs[d.symbol] ? { longTerm: longs[d.symbol] } : {}) };
+  });
 
   const sectorViews = enrichSectors(sectors, all);
 
@@ -116,13 +127,13 @@ export async function runAnalysis(o: RunRequest, emit: (e: StreamEvent) => void)
     aiLabel: llm.enabled ? `on (${aiModel()})` : "off",
     capital: o.capital, riskPerTrade: o.riskPerTrade,
     macro, sectors: sectorViews, excluded, minCapCr, news, vix, positive: morning.positive(news), negative: morning.negative(news),
-    snaps, lot, may, rows, conflicted, clarifications, picks, passed, watchlist, all, bpCoverage: bp.summary.coverage, globalCues: cues, policy,
+    snaps, lot, may, rows, conflicted, clarifications, picks, passed, watchlist, all, longSwing, bpCoverage: bp.summary.coverage, globalCues: cues, policy,
   });
 
   const result: RunResult = {
     source, generatedAt: new Date().toISOString(), simulatedAgents: !llm.enabled,
     capital: o.capital, riskPerTrade: o.riskPerTrade,
-    indexRet21d: Math.round(indexRet21d * 100) / 100, news, vix, blackPoints: bp.summary, policy, excluded, minCapCr, ...(scan ? { scan } : {}), sectors: sectorViews, macro, picks, watchlist, all, skipped,
+    indexRet21d: Math.round(indexRet21d * 100) / 100, news, vix, blackPoints: bp.summary, policy, excluded, minCapCr, ...(scan ? { scan } : {}), longSwing, sectors: sectorViews, macro, picks, watchlist, all, skipped,
   };
   emit({ type: "result", result });
   console.log(`[nse-agent-desk] run: ${rows.length} stocks, source=${source.kind}${source.seed !== undefined ? `#${source.seed}` : ""}, ` +
@@ -150,12 +161,12 @@ async function narrowDown(o: RunRequest, emit: (e: StreamEvent) => void): Promis
   const symbols = [...new Set([...(o.focus ?? []), ...q.shortlist.map((r) => r.symbol)])];
   return {
     o: { ...o, symbols },
-    scan: { label, total: q.total, priced: q.priced, thin: q.thin, shortlisted: q.shortlist.length, from: list.from, note: list.note },
+    scan: { label, total: q.total, priced: q.priced, thin: q.thin, shortlisted: q.shortlist.length, bottoms: q.bottoms, from: list.from, note: list.note },
   };
 }
 
-/** Swing trades are held up to 10 trading days, positional (or swing-then-hold) up to 21. */
-export const holdDays = (horizon: string) => (horizon.startsWith("Swing ·") ? 10 : 21);
+/** Short swings are held up to 10 trading days, long swings up to ~3 months, positional (or swing-then-hold) up to 21. */
+export const holdDays = (horizon: string) => (horizon.startsWith("Swing ·") ? 10 : horizon.startsWith("Long swing") ? LONG_SWING_DAYS : 21);
 
 function planHold(d: { symbol: string; entry: number; stopLoss: number; target: number; horizon: string }, bars: Bar[] | undefined, seed?: number): HoldPlan | undefined {
   if (!bars || bars.length < 60 || !(d.stopLoss < d.entry && d.entry < d.target)) return undefined;
