@@ -7,6 +7,7 @@ export const maxDuration = 300; // a full live run can take a few minutes on a h
 
 const SYMBOL = /^[A-Z0-9&.\-]{1,20}$/;
 
+/** Sample (demo) prices are only accepted where ALLOW_DEMO_DATA=true, e.g. for local testing. */
 function validate(body: unknown): RunRequest | string {
   const b = body as Partial<RunRequest>;
   if (!b) return "symbols must be a list";
@@ -34,7 +35,7 @@ function validate(body: unknown): RunRequest | string {
       if (symbols.includes(sym) && typeof v === "string" && /^[A-Za-z &]{2,30}$/.test(v)) sectors[sym] = v;
     }
   }
-  return { symbols, top, riskPerTrade, capital, demo: Boolean(b.demo), aiNotes: Boolean(b.aiNotes), sectors, ...(universe ? { universe } : {}) };
+  return { symbols, top, riskPerTrade, capital, demo: Boolean(b.demo) && process.env.ALLOW_DEMO_DATA === "true", aiNotes: Boolean(b.aiNotes), sectors, ...(universe ? { universe } : {}) };
 }
 
 /** Runs one analysis and streams progress, agent messages and the result as Server-Sent Events. */

@@ -25,7 +25,6 @@ export default function OverviewPage() {
   const r = useDecided();
   const busy = useBusy();
   const { stage, done } = useStage();
-  const demo = useDesk((s) => s.demo);
   const error = useDesk((s) => s.error);
   const source = useDesk((s) => s.result?.source);
   const messages = useDesk((s) => s.messages);
@@ -50,7 +49,7 @@ export default function OverviewPage() {
     <>
       <PageHeader title="Overview" subtitle="Sixteen AI agents scan, analyse, debate and decide." />
       <div className="space-y-4">
-        {source ? <DataBanner source={source} /> : demo && <DataBanner source={{ kind: "demo", label: "Demo data" }} />}
+        {source && <DataBanner source={source} />}
         <AnalysisToolbar />
         <MarketTodayCard />
         {(session?.ranAt || session?.enabled) && (

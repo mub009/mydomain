@@ -159,7 +159,7 @@ export const useDesk = create<DeskState>((set, get) => {
         const res = await fetch("/api/analysis", {
           method: "POST", signal: abort.signal, headers: { "content-type": "application/json" },
           body: JSON.stringify({
-            symbols: symbolsOf(s), ...(isBigUniverse(s.universe) ? { universe: s.universe } : {}), top: s.top, demo: s.demo, aiNotes: s.aiNotes && Boolean(s.config?.aiAvailable),
+            symbols: symbolsOf(s), ...(isBigUniverse(s.universe) ? { universe: s.universe } : {}), top: s.top, demo: false, aiNotes: s.aiNotes && Boolean(s.config?.aiAvailable),
             capital: Number(s.capital) > 0 ? Number(s.capital) : undefined, riskPerTrade: s.risk,
             sectors: s.universe === "custom" ? Object.fromEntries(symbolsOf(s).flatMap((k) => (s.stockInfo[k]?.sector ? [[k, s.stockInfo[k].sector]] : []))) : undefined,
           }),

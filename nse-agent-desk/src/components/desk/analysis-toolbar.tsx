@@ -18,13 +18,13 @@ export function AnalysisToolbar() {
   // How many stocks the big list really has (downloaded from NSE on the server, kept for a day).
   const [count, setCount] = useState<Record<string, { count: number; from: string }>>({});
   useEffect(() => {
-    if (!big || count[s.universe] || s.demo) return;
+    if (!big || count[s.universe]) return;
     let live = true;
     fetch(`/api/universe?list=${s.universe}`).then((r) => r.json())
       .then((r) => { if (live && r.count) setCount((c) => ({ ...c, [r.id]: { count: r.count, from: r.from } })); })
       .catch(() => { /* the hint keeps the rough number */ });
     return () => { live = false; };
-  }, [big, s.universe, s.demo, count]);
+  }, [big, s.universe, count]);
   const known = big ? count[s.universe] : undefined;
   const valid = big || (symbols.length >= 3 && symbols.length <= 150);
   const playing = !s.running && busy;
@@ -48,7 +48,7 @@ export function AnalysisToolbar() {
         <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary"><SlidersHorizontal className="size-4" /></span>
         <span className="min-w-0 flex-1">
           <span className="block text-[13px] font-semibold">Analysis settings</span>
-          <span className="block truncate text-xs text-muted-foreground">{UNI[s.universe]} · top {s.top} · {s.risk}% risk{s.capital ? ` · ₹${Number(s.capital).toLocaleString("en-IN")}` : ""}{s.demo ? " · demo data" : ""}</span>
+          <span className="block truncate text-xs text-muted-foreground">{UNI[s.universe]} · top {s.top} · {s.risk}% risk{s.capital ? ` · ₹${Number(s.capital).toLocaleString("en-IN")}` : ""}</span>
         </span>
         <ChevronDown className={cn("size-4 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")} />
       </button>
@@ -75,7 +75,6 @@ export function AnalysisToolbar() {
           options={[{ value: "slow", label: "Slow" }, { value: "normal", label: "Normal" }, { value: "fast", label: "Fast" }]} />
       </Field>
       <div className="flex h-9 items-center gap-4">
-        <label className="flex items-center gap-2 text-[13px] font-medium"><Switch checked={s.demo} onCheckedChange={(demo) => s.set({ demo })} />Demo data</label>
         <label className={cn("flex items-center gap-2 text-[13px] font-medium", !s.config?.aiAvailable && "text-muted-foreground")}
           title={s.config?.aiAvailable ? `Real model notes (${s.config.aiModel})` : "Set NVIDIA_API_KEY or ANTHROPIC_API_KEY on the server to enable AI notes"}>
           <Switch checked={s.aiNotes && Boolean(s.config?.aiAvailable)} disabled={!s.config?.aiAvailable} onCheckedChange={(aiNotes) => s.set({ aiNotes })} />AI notes
@@ -93,7 +92,7 @@ export function AnalysisToolbar() {
       {s.universe === "custom" && <div className="w-full border-t border-[var(--edge)] pt-3"><StockGroupPicker /></div>}
       {big && (
         <p className="w-full text-xs text-muted-foreground">
-          {BIG_UNIVERSES[s.universe as keyof typeof BIG_UNIVERSES].label}: a quick scan checks {known ? `${known.count.toLocaleString("en-IN")}${known.from === "nse" ? " NSE" : " built-in"}` : BIG_UNIVERSES[s.universe as keyof typeof BIG_UNIVERSES].about} stocks, then the agents research the strongest 150 in full. Takes 1-2 minutes{s.demo ? " (demo data uses the built-in 110 stocks)" : ""}.
+          {BIG_UNIVERSES[s.universe as keyof typeof BIG_UNIVERSES].label}: a quick scan checks {known ? `${known.count.toLocaleString("en-IN")}${known.from === "nse" ? " NSE" : " built-in"}` : BIG_UNIVERSES[s.universe as keyof typeof BIG_UNIVERSES].about} stocks, then the agents research the strongest 150 in full. Takes 1-2 minutes.
         </p>
       )}
       {!valid && s.universe !== "custom" && <p className="w-full text-xs text-neg">Enter between 3 and 150 NSE symbols.</p>}
