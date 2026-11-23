@@ -56,7 +56,7 @@ Needs PHP 8.2+, Composer and MySQL (or MariaDB), like Markkito.
 
 ### On cPanel hosting
 
-- **Document root:** cPanel → *Domains* → `nse-api.<your-domain>` → *Manage* → set the document root to the project's `public` folder (e.g. `nse-api.markkito.com/public`). The `.htaccess` in the project folder is only a safety net if you can't.
+- **Document root:** cPanel → *Domains* → `nse-api.<your-domain>` → *Manage* → set the document root to the project's `public` folder (e.g. `nse-api.markkito.com/public`). If you can't, copy `htaccess.example` to `.htaccess` in the project folder as a safety net (it is git-ignored, so your server keeps its own copy).
 - **Imunify360 / bot protection:** the web app calls this API from the browser on another site, which can't pass a "One moment, please…" check. In cPanel → *Imunify360* (or ask the host), turn off bot protection / the anti-bot challenge for this subdomain, or allow-list it.
 - **Check:** `https://nse-api.<your-domain>/up` must show Laravel's "Application up" page, and `https://nse-api.<your-domain>/api/auth/me` must return `{"message":"Unauthenticated."}`. The bare domain must **not** show a file listing.
 
