@@ -358,3 +358,13 @@ For every stock the Decision Agent runs 1,000 simulated price paths (the stock's
 
 It appears in the Decision Agent's chat message after the picks, the Final Picks table and cards, the Screener (Hold and Expected columns), each stock's Agents tab and a "How long to hold" card in its Research tab. These are estimates, not guarantees.
 
+## Sell check (what to stop holding)
+
+On the Positions page, **Check my holdings** runs the agents on what you already own: your Zerodha holdings (all connected accounts), the trades you track, and any stock you add by hand with its quantity and buy price. Each stock gets a fresh analysis and one of:
+
+- **Sell (all):** a verified red flag from the Black Points Analyst, a severe red flag from the Red Flag Agent, a loss past the stop-loss (8% below your buy price, or 3 days' average range if larger) while the agents aren't positive on it, or a broken trend (rated AVOID, both scanners weak, price down over the month).
+- **Book profit (sell half):** up 15% or more while momentum fades or it's overbought, or the agents now rate it AVOID / WATCH; the rest is kept with the stop raised to at least your buy price.
+- **Hold:** everything else, with the stop-loss to keep and the target. A stock past its stop-loss that the agents still rate BUY with its trend holding is a Hold with a fresh, tighter stop.
+
+The same stock held in several places is checked once, at the weighted buy price. Research only, not investment advice.
+

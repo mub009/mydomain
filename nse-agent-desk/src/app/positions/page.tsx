@@ -10,6 +10,7 @@ import { sectorOf } from "@/lib/market/universe";
 import { useDesk } from "@/store/desk";
 import { Button } from "@/components/ui/button";
 import { ZerodhaCard } from "@/components/desk/broker-ui";
+import { SellCheck } from "@/components/desk/sell-check";
 import { inr, istDate, istTime, pct } from "@/lib/format";
 import { health, progress, type Health } from "@/lib/positions/rules";
 import type { Position } from "@/lib/positions/types";
@@ -136,6 +137,8 @@ export default function PositionsPage() {
         </section>
 
         <ZerodhaCard />
+
+        <SellCheck />
 
         <section className="card flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 text-[13px]">
           <span className="min-w-0 flex-1 basis-64">
