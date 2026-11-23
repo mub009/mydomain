@@ -1,6 +1,6 @@
 "use client";
 
-import { Briefcase, CandlestickChart, Globe2, LayoutDashboard, LogIn, LogOut, MessagesSquare, Moon, SlidersHorizontal, Sun } from "lucide-react";
+import { Briefcase, CandlestickChart, Globe2, LayoutDashboard, MessagesSquare, Moon, SlidersHorizontal, Sun } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
@@ -8,9 +8,9 @@ import { useEffect, useState } from "react";
 import { PEOPLE, TEAM } from "@/lib/team";
 import type { Person } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { DESK_API, useAuth } from "@/store/auth";
 import { type Presence, useDesk, usePresence } from "@/store/desk";
 import { usePositions, useUnreadAlerts } from "@/store/positions";
+import { AccountMenu } from "./account-menu";
 import { AgentAvatar, PRESENCE_TEXT } from "./agent-avatar";
 import { MarketStatusBadge, TypingIndicator } from "./primitives";
 import { AlertsBell, AlertToasts } from "./positions-ui";
@@ -71,30 +71,6 @@ function useUnread() {
   return useDesk((s) => (pathname === "/chat" ? 0 : Math.max(0, s.messages.slice(0, s.shown).length - (s.seen.all ?? 0))));
 }
 
-/** Your NSE Desk login (only when the Laravel API is switched on). */
-function AccountControl({ compact }: { compact?: boolean }) {
-  const { ready, user, init, logout } = useAuth();
-  useEffect(() => { if (DESK_API && !ready) init(); }, [ready, init]);
-  if (!DESK_API || !ready) return null;
-  if (!user) return (
-    <Link href="/login" className={cn("flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg font-semibold text-white", compact ? "h-7 border border-sidebar-border bg-sidebar-hover px-2 text-[11px]" : "px-1 py-1 text-[12.5px] hover:underline")}>
-      <LogIn className="size-3.5" />Log in
-    </Link>
-  );
-  return compact ? (
-    <button type="button" onClick={logout} title={`Logged in as ${user.email}. Log out`} aria-label="Log out"
-      className="grid size-7 place-items-center rounded-full border border-sidebar-border bg-sidebar-hover text-[11px] font-bold text-white">
-      {user.name.slice(0, 1).toUpperCase()}
-    </button>
-  ) : (
-    <div className="flex items-center gap-2 text-[12.5px] text-white">
-      <span className="grid size-7 shrink-0 place-items-center rounded-full bg-sidebar-hover font-bold">{user.name.slice(0, 1).toUpperCase()}</span>
-      <span className="min-w-0 flex-1 truncate" title={user.email}>{user.name}</span>
-      <button type="button" onClick={logout} className="flex items-center gap-1 text-sidebar-muted hover:text-white"><LogOut className="size-3.5" />Log out</button>
-    </div>
-  );
-}
-
 function Sidebar() {
   const pathname = usePathname();
   const alertsUnread = useUnreadAlerts();
@@ -128,7 +104,7 @@ function Sidebar() {
         {PEOPLE.map((p) => <AgentStatusCard key={p} who={p} presence={presence[p]} lastMessage={last(p)} />)}
       </div>
       <div className="border-t border-sidebar-border px-5 py-3 text-[11px] leading-snug text-sidebar-muted">
-        <div className="mb-2"><AccountControl /></div>
+        <div className="-mx-2 mb-2"><AccountMenu /></div>
         Research tool only, not investment advice.
         <Link href="/components" className="mt-1 block underline-offset-2 hover:text-white hover:underline">Component showcase</Link>
       </div>
@@ -145,7 +121,7 @@ function MobileBars() {
       <header className="sticky top-0 z-30 flex items-center gap-2 bg-sidebar px-3 py-2 text-white lg:hidden">
         <Logo />
         <b className="min-w-0 truncate whitespace-nowrap text-sm font-bold">NSE Agent Desk</b>
-        <div className="ml-auto flex items-center gap-2"><AccountControl compact /><MarketStatusBadge className="h-7 border-sidebar-border bg-sidebar-hover px-2 text-[11px] text-white [&>span:last-child]:hidden min-[420px]:[&>span:last-child]:inline" /><AlertsBell className="border-sidebar-border bg-sidebar-hover text-white" /><ThemeToggle className="border-sidebar-border bg-sidebar-hover text-white" /></div>
+        <div className="ml-auto flex items-center gap-2"><AccountMenu compact /><MarketStatusBadge className="h-7 border-sidebar-border bg-sidebar-hover px-2 text-[11px] text-white [&>span:last-child]:hidden min-[420px]:[&>span:last-child]:inline" /><AlertsBell className="border-sidebar-border bg-sidebar-hover text-white" /><ThemeToggle className="border-sidebar-border bg-sidebar-hover text-white" /></div>
       </header>
       <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t bg-card pb-[env(safe-area-inset-bottom)] lg:hidden" aria-label="Main">
         {NAV.map(({ href, label, Icon }) => {

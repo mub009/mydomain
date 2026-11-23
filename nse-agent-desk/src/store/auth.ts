@@ -50,6 +50,12 @@ export async function deskApi<T = unknown>(path: string, init: RequestInit = {})
 
 interface AuthStore {
   ready: boolean; token: string | null; user: DeskUser | null;
+  updateProfile: (name: string, email: string) => Promise<void>;
+  /** Returns how many other devices were logged out. */
+  changePassword: (current: string, next: string, confirm: string) => Promise<number>;
+  devices: () => Promise<number>;
+  logoutOthers: () => Promise<number>;
+  deleteAccount: (password: string) => Promise<void>;
   init: () => void;
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string, confirm: string) => Promise<void>;
@@ -66,6 +72,19 @@ export const useAuth = create<AuthStore>((set) => ({
   register: async (name, email, password, confirm) => {
     const r = await deskApi<{ token: string; user: DeskUser }>("/api/auth/register", { method: "POST", body: JSON.stringify({ name, email, password, password_confirmation: confirm, device: "web" }) });
     write(r); set({ token: r.token, user: r.user });
+  },
+  updateProfile: async (name, email) => {
+    const r = await deskApi<{ user: DeskUser }>("/api/auth/profile", { method: "PUT", body: JSON.stringify({ name, email }) });
+    const token = useAuth.getState().token!;
+    write({ token, user: r.user }); set({ user: r.user });
+  },
+  changePassword: async (current, next, confirm) =>
+    (await deskApi<{ loggedOutDevices: number }>("/api/auth/password", { method: "PUT", body: JSON.stringify({ current_password: current, password: next, password_confirmation: confirm }) })).loggedOutDevices,
+  devices: async () => (await deskApi<{ devices: number }>("/api/auth/devices")).devices,
+  logoutOthers: async () => (await deskApi<{ loggedOutDevices: number }>("/api/auth/logout-others", { method: "POST" })).loggedOutDevices,
+  deleteAccount: async (password) => {
+    await deskApi("/api/auth/account", { method: "DELETE", body: JSON.stringify({ password }) });
+    write(null); set({ token: null, user: null });
   },
   logout: async () => {
     await deskApi("/api/auth/logout", { method: "POST" }).catch(() => {});

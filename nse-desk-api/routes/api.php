@@ -15,6 +15,11 @@ Route::get('/zerodha/callback', [ZerodhaController::class, 'callback']);
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/auth/me', [AuthController::class, 'me']);
     Route::post('/auth/logout', [AuthController::class, 'logout']);
+    Route::put('/auth/profile', [AuthController::class, 'updateProfile']);
+    Route::put('/auth/password', [AuthController::class, 'updatePassword'])->middleware('throttle:10,1');
+    Route::get('/auth/devices', [AuthController::class, 'devices']);
+    Route::post('/auth/logout-others', [AuthController::class, 'logoutOthers']);
+    Route::delete('/auth/account', [AuthController::class, 'destroy'])->middleware('throttle:10,1');
 
     Route::get('/zerodha', [ZerodhaController::class, 'index']);
     Route::post('/zerodha/connect', [ZerodhaController::class, 'connect']);

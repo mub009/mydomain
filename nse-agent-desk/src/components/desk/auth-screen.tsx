@@ -19,7 +19,7 @@ const FEATURES = [
 ];
 
 /** 0-4: length, upper and lower case, a digit, a symbol. */
-function strength(p: string): { score: number; label: string } {
+export function strength(p: string): { score: number; label: string } {
   let s = 0;
   if (p.length >= 8) s++;
   if (p.length >= 12) s++;
@@ -29,7 +29,7 @@ function strength(p: string): { score: number; label: string } {
   return { score, label: !p ? "" : p.length < 8 ? "Too short" : ["Weak", "Weak", "Fair", "Good", "Strong"][score] };
 }
 
-function Input({ id, label, icon: Icon, right, ...rest }: React.InputHTMLAttributes<HTMLInputElement> & { id: string; label: string; icon: typeof Mail; right?: React.ReactNode }) {
+export function Input({ id, label, icon: Icon, right, ...rest }: React.InputHTMLAttributes<HTMLInputElement> & { id: string; label: string; icon: typeof Mail; right?: React.ReactNode }) {
   return (
     <div className="space-y-1.5">
       <label htmlFor={id} className="text-[13px] font-medium">{label}</label>
