@@ -1,7 +1,8 @@
 "use client";
 
-import { CalendarDays, Globe2, Loader2, RefreshCw } from "lucide-react";
+import { CalendarDays, Globe2, Loader2, Newspaper, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { MarketBriefView } from "@/components/desk/market-brief-ui";
 import { PageHeader } from "@/components/desk/shell";
 import type { MarketEvent } from "@/lib/events";
 import type { WorldQuote } from "@/lib/world";
@@ -185,20 +186,21 @@ function Events() {
 }
 
 export default function MarketsPage() {
-  const [tab, setTab] = useState<"world" | "events">("world");
+  const [tab, setTab] = useState<"today" | "world" | "events">("today");
+  useEffect(() => { const t = new URLSearchParams(window.location.search).get("tab"); if (t === "world" || t === "events" || t === "today") setTab(t); }, []);
   return (
     <>
-      <PageHeader title="Markets" subtitle="World indices, and upcoming results and dividends." />
+      <PageHeader title="Markets" subtitle="Why the market and gold moved today, world indices, and upcoming results and dividends." />
       <div className="space-y-4">
-        <div role="tablist" aria-label="Markets view" className="well inline-flex h-10 items-center gap-0.5 rounded-xl p-1">
-          {([["world", "World indices", Globe2], ["events", "Upcoming events", CalendarDays]] as const).map(([v, l, I]) => (
+        <div role="tablist" aria-label="Markets view" className="well inline-flex h-10 max-w-full items-center gap-0.5 overflow-x-auto rounded-xl p-1 scroll-thin">
+          {([["today", "Why it moved", Newspaper], ["world", "World indices", Globe2], ["events", "Upcoming events", CalendarDays]] as const).map(([v, l, I]) => (
             <button key={v} type="button" role="tab" aria-selected={tab === v} onClick={() => setTab(v)}
-              className={cn("flex h-full items-center gap-1.5 rounded-lg px-3 text-[13px] font-medium", tab === v ? "raised -translate-y-px font-semibold text-foreground" : "text-muted-foreground hover:text-foreground")}>
+              className={cn("shrink-0 whitespace-nowrap flex h-full items-center gap-1.5 rounded-lg px-3 text-[13px] font-medium", tab === v ? "raised -translate-y-px font-semibold text-foreground" : "text-muted-foreground hover:text-foreground")}>
               <I className="size-4" />{l}
             </button>
           ))}
         </div>
-        {tab === "world" ? <WorldIndices /> : <Events />}
+        {tab === "today" ? <MarketBriefView /> : tab === "world" ? <WorldIndices /> : <Events />}
       </div>
     </>
   );

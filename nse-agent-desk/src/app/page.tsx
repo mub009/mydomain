@@ -4,6 +4,7 @@ import { History, Handshake, ScanSearch, TrendingUp, Trophy } from "lucide-react
 import Link from "next/link";
 import { AgentAgreementScatter } from "@/components/desk/agent-agreement-scatter";
 import { AnalysisToolbar } from "@/components/desk/analysis-toolbar";
+import { MarketTodayCard } from "@/components/desk/market-brief-ui";
 import { FinalPicksTable, PicksWaiting } from "@/components/desk/final-picks-table";
 import { MessageFeed } from "@/components/desk/message-feed";
 import { MorningNewsCard, VixCard } from "@/components/desk/morning-cards";
@@ -51,6 +52,7 @@ export default function OverviewPage() {
       <div className="space-y-4">
         {source ? <DataBanner source={source} /> : demo && <DataBanner source={{ kind: "demo", label: "Demo data" }} />}
         <AnalysisToolbar />
+        <MarketTodayCard />
         {(session?.ranAt || session?.enabled) && (
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border bg-card px-3.5 py-2.5 text-[13px]">
             <History className="size-4 text-[#EC4899]" aria-hidden />

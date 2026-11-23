@@ -384,3 +384,14 @@ After a Sell check, **Improve my portfolio** shows the split by sector, how much
 
 **Top picks** offers 3, 5, 10, 15, 20 and 25. The Decision Agent allows at most 2 picks per sector up to 15 picks, 4 for 20 and 5 for 25, so the longer lists can fill. Only BUY or STRONG BUY stocks become picks, so for 20-25 use a larger universe (All caps); a smaller one may give fewer. More picks means more stocks get the full research and chart check, so the run takes longer (about a minute for 25 from All caps).
 
+## Why the market and gold moved (daily)
+
+Markets → **Why it moved** (also a "Market today" card on the Overview) explains each day's move in the Nifty 50, Sensex, Bank Nifty, gold and silver, from data:
+
+- **Indices:** the sectors that moved most in the index's direction, Asian markets the same day, Wall Street's previous session (India trades before the US opens), NSE breadth (how many stocks rose and fell), India VIX, Brent crude and the rupee.
+- **Gold and silver** (international prices in rupees, without import duty and GST): the dollar-price move, the US dollar index, US 10-year bond yields, the rupee, and whether stocks fell (safe-haven buying).
+- Reasons that pushed the other way are listed separately under "Working against it", and the day's headlines (Google News) are shown with each.
+- **Day by day:** the last 10 sessions with Nifty, Bank Nifty, gold, USD/INR and crude, and the sector that drove each day.
+
+Refreshes every 5 minutes during market hours (cached for 10 minutes on the server).
+
