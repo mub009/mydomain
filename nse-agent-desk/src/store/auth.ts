@@ -21,10 +21,23 @@ const write = (v: { token: string; user: DeskUser } | null) => {
 /** A request to the API with this browser's token; a 401 logs you out. */
 export async function deskApi<T = unknown>(path: string, init: RequestInit = {}): Promise<T> {
   const token = useAuth.getState().token;
-  const res = await fetch(DESK_API + path, {
+  const send = () => fetch(DESK_API + path, {
     ...init,
     headers: { accept: "application/json", "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}), ...init.headers },
   });
+  // The API's host sometimes answers with a security check page instead of the API
+  // (the browser then reports a network error). It's random, so try again a few times.
+  let res: Response | null = null;
+  for (let attempt = 0; attempt < 4 && !res; attempt++) {
+    if (attempt) await new Promise((r) => setTimeout(r, 700 * attempt));
+    try {
+      const r = await send();
+      // A check page that did get through (HTML instead of JSON): treat it like a failed try.
+      if (!(r.headers.get("content-type") ?? "").includes("json") && r.status !== 204 && attempt < 3) continue;
+      res = r;
+    } catch (e) { if (attempt === 3) throw e; }
+  }
+  if (!res || (!(res.headers.get("content-type") ?? "").includes("json") && res.status !== 204)) throw new Error("Failed to fetch");
   const j = await res.json().catch(() => ({}));
   if (res.status === 401 && token) { write(null); useAuth.setState({ token: null, user: null }); }
   if (!res.ok) {
