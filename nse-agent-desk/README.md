@@ -374,3 +374,9 @@ Next to the short-term calls, every stock the research desk covers gets a long-t
 
 It appears in the Sell check (with a Short term / Long term switch and a line on what to do when the two disagree), in a "Long-term view" card in each stock's Research tab, as a Screener column, and in the Decision Agent's message in the Agents tab.
 
+## My position and improving your investments
+
+Tap any stock you hold (a tracked trade, a Zerodha holding, or a stock in the Sell check) to open its full report. Stocks you hold open on the Research tab with a **My position** card: your shares and buy price, profit/loss, its share of your portfolio, the decision for you (short term and long term), and **how to improve this investment**: average down in the agents' buy zone (only when the long-term case is good and the buy zone is above your stop-loss), add on dips, don't add, trim an oversized position, where to keep the stop-loss, and how the stock moves with gold, crude oil or the dollar. If the current run didn't research the stock in full, the full research loads automatically.
+
+After a Sell check, **Improve my portfolio** shows the split by sector, how much is tied to commodities and to gold, the largest holding, and suggestions: exit the weak holdings, build up the strongest, cut any stock over 25% or sector over 40%, keep 5-10% in gold (Gold ETF or Sovereign Gold Bonds) for balance, keep commodity stocks to 10-20%, and the commodity stocks (metals, energy) the agents rate BUY or better in the latest run.
+

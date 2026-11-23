@@ -17,6 +17,7 @@ import { CompanyTab } from "./company-tab";
 import { ForecastTab } from "./forecast-tab";
 import { SectorCheck } from "./sector-ui";
 import { MacroExposureSection } from "./macro-ui";
+import { MyPositionCard, useHolding } from "./my-position";
 import { holdShort, shortDate } from "@/lib/hold";
 import { LONG_TERM_LABEL } from "@/lib/long-term";
 import { StockFinder } from "./stock-finder";
@@ -126,7 +127,7 @@ function HoldCard({ d }: { d: Decision }) {
   );
 }
 
-function Body({ d, isPick }: { d: Decision; isPick: boolean }) {
+function Body({ d, isPick, price }: { d: Decision; isPick: boolean; price?: number }) {
   const sectors = useStockResult()?.sectors;
   const sector = sectors?.find((s) => s.sector === d.sector);
   const macroFactors = useStockResult()?.macro?.factors ?? [];
@@ -140,6 +141,7 @@ function Body({ d, isPick }: { d: Decision; isPick: boolean }) {
       </dl>
       <p className="text-[11.5px] leading-snug text-muted-foreground">Research scenario, not guaranteed prices. Target = entry + 2 × (entry − stop-loss), a {pct((d.target / d.entry - 1) * 100)} move.{d.quantity !== undefined && ` Sized at ${d.quantity} shares (${inr(d.investment ?? 0, 0)}).`}</p>
 
+      <MyPositionCard d={d} price={price} />
       {d.hold && <HoldCard d={d} />}
       {d.longTerm && <LongTermCard d={d} />}
       {d.blackPoints && <BlackPointsSection bp={d.blackPoints} />}
@@ -208,6 +210,8 @@ export function StockDrawer() {
   const [mtab, setMtab] = useState("chart"); // phones: one section at a time
   const [wide, setWide] = useState(false);
   const [finding, setFinding] = useState(false);
+  const held = Boolean(useHolding(d?.symbol));
+  useEffect(() => { if (held) { setTab("research"); setMtab("research"); } }, [held, d?.symbol]);
   const levels = useMemo(() => (d ? { entry: d.entry, stop: d.stopLoss, target: d.target, zoneLow: d.chart?.zone?.low, zoneHigh: d.chart?.zone?.high } : undefined), [d]);
   const demo = result?.source.kind === "demo";
   const quote = useQuote(d?.symbol);
@@ -247,6 +251,7 @@ export function StockDrawer() {
                 <div className="flex items-center gap-2">
                   <Dialog.Title className="text-xl font-extrabold tracking-tight">{d.symbol}</Dialog.Title>
                   <VerdictBadge verdict={d.verdict} />
+                  {lookup?.loading && lookup.symbol === d.symbol && <span className="flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground"><Loader2 className="size-3 animate-spin" />Loading full research…</span>}
                 </div>
                 <Dialog.Description className="text-[12.5px] text-muted-foreground max-sm:line-clamp-1">
                   {d.sector} · NSE{d.fundamentals?.marketCapCr ? ` · ${d.fundamentals.cap} cap ₹${d.fundamentals.marketCapCr.toLocaleString("en-IN")} Cr` : ""}
@@ -292,7 +297,7 @@ export function StockDrawer() {
                   {result && <StockAgentsTab key={d.symbol} d={d} result={result} />}
                 </Tabs.Content>
                 <Tabs.Content value="research" className="flex min-h-0 flex-1 flex-col pt-2 outline-none">
-                  <Body d={d} isPick={Boolean(result?.picks.some((p) => p.symbol === d.symbol))} />
+                  <Body d={d} price={quote?.last} isPick={Boolean(result?.picks.some((p) => p.symbol === d.symbol))} />
                 </Tabs.Content>
                 <Tabs.Content value="forecast" className="min-h-0 flex-1 overflow-y-auto pt-2 outline-none scroll-thin">
                   <ForecastTab d={d} />
@@ -315,7 +320,7 @@ export function StockDrawer() {
                     {result && <StockAgentsTab key={d.symbol} d={d} result={result} />}
                   </Tabs.Content>
                   <Tabs.Content value="research" className="flex min-h-0 flex-1 flex-col outline-none">
-                    <Body d={d} isPick={Boolean(result?.picks.some((p) => p.symbol === d.symbol))} />
+                    <Body d={d} price={quote?.last} isPick={Boolean(result?.picks.some((p) => p.symbol === d.symbol))} />
                   </Tabs.Content>
                   <Tabs.Content value="forecast" className="min-h-0 flex-1 overflow-y-auto outline-none scroll-thin">
                     <ForecastTab d={d} />

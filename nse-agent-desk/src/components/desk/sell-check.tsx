@@ -6,11 +6,14 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import type { BrokerHolding } from "@/lib/broker/zerodha";
 import { ACTION_ORDER, type ExitAction, type ExitAdvice, type Holding } from "@/lib/exit-check";
+import { commodityPicks, improvePortfolio } from "@/lib/improve";
 import { LONG_TERM_LABEL, type LongTermAction } from "@/lib/long-term";
+import { TIP_ICON } from "./my-position";
 import { inr, pct } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { DESK_API, deskApi, useAuth } from "@/store/auth";
 import { useDesk } from "@/store/desk";
+import { useHoldings } from "@/store/holdings";
 import { usePositions } from "@/store/positions";
 
 const STYLE: Record<ExitAction, { cls: string; Icon: typeof CircleX; text: string }> = {
@@ -42,7 +45,9 @@ async function zerodhaHoldings(): Promise<Holding[]> {
 export function SellCheck() {
   const positions = usePositions((s) => s.positions);
   const searchStock = useDesk((s) => s.searchStock);
-  const [extra, setExtra] = useState<Holding[]>([]);
+  const lastRun = useDesk((s) => s.result);
+  const extra = useHoldings((x) => x.extra);
+  const setExtra = useHoldings((x) => x.setExtra);
   const [sym, setSym] = useState(""); const [qty, setQty] = useState(""); const [avg, setAvg] = useState("");
   const [busy, setBusy] = useState(false); const [step, setStep] = useState("");
   const [res, setRes] = useState<Result | null>(null); const [err, setErr] = useState<string | null>(null);
@@ -159,6 +164,40 @@ export function SellCheck() {
               );
             })}
           </ul>
+          {res.advice.length > 0 && (() => {
+            const pf = improvePortfolio(res.advice, commodityPicks(lastRun?.all ?? []));
+            return (
+              <div className="border-t border-[var(--edge)] px-4 py-4">
+                <h3 className="text-[14px] font-bold">Improve my portfolio</h3>
+                <div className="mt-2 grid gap-3 md:grid-cols-[minmax(0,260px)_minmax(0,1fr)]">
+                  <div className="space-y-2.5 rounded-xl bg-muted/50 p-3 text-[12px] tnum">
+                    <div>
+                      <p className="mb-1 font-semibold">By sector</p>
+                      {pf.sectors.slice(0, 6).map((x) => (
+                        <div key={x.sector} className="flex items-center gap-2">
+                          <span className="w-24 truncate text-muted-foreground">{x.sector}</span>
+                          <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted"><span className={cn("block h-full rounded-full", x.pct >= 40 ? "bg-amber-500" : "bg-primary")} style={{ width: `${x.pct}%` }} /></span>
+                          <span className="w-9 text-right">{x.pct.toFixed(0)}%</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex justify-between border-t border-[var(--edge)] pt-2"><span className="text-muted-foreground">Commodity-linked</span><b>{pf.commodityPct.toFixed(0)}%</b></div>
+                    <div className="flex justify-between"><span className="text-muted-foreground">Gold (ETF / bonds)</span><b>{pf.goldPct.toFixed(0)}%</b></div>
+                    <div className="flex justify-between"><span className="text-muted-foreground">Largest holding</span><b>{pf.weights[0]?.symbol} {pf.weights[0]?.pct.toFixed(0)}%</b></div>
+                  </div>
+                  <ul className="space-y-2">
+                    {pf.tips.map((t) => { const I = TIP_ICON[t.kind]; return (
+                      <li key={t.title} className="flex gap-2.5 rounded-lg border px-3 py-2">
+                        <I.Icon className={cn("mt-0.5 size-4 shrink-0", I.cls)} />
+                        <span className="min-w-0"><b className="block text-[12.5px] font-semibold">{t.title}</b><span className="block text-[12px] leading-snug text-muted-foreground">{t.text}</span></span>
+                      </li>
+                    ); })}
+                    {!lastRun && <li className="text-[11.5px] text-muted-foreground">Run an analysis on the Overview to also see commodity stocks the agents rate well today.</li>}
+                  </ul>
+                </div>
+              </div>
+            );
+          })()}
           {res.missing.length > 0 && (
             <p className="border-t border-[var(--edge)] px-4 py-2.5 text-[12px] text-muted-foreground">Not checked: {res.missing.map((m) => `${m.symbol} (${m.why})`).join("; ")}.</p>
           )}

@@ -10,6 +10,7 @@ import { marketStatus } from "@/lib/market/calendar";
 import { cn } from "@/lib/utils";
 import { DESK_API, deskApi, useAuth } from "@/store/auth";
 import { useDesk } from "@/store/desk";
+import { useHoldings } from "@/store/holdings";
 
 type Totals = { invested: number; value: number; pnl: number; pnlPct: number; dayPnl: number; positionsPnl: number };
 interface Account {
@@ -165,7 +166,12 @@ export function ZerodhaCard() {
     if (DESK_API && !ready) return;
     if (DESK_API && !token) { setS({ configured: true, apps: [], accounts: [], needLogin: true }); return; }
     setBusy(true);
-    try { setS(DESK_API ? await deskApi<State>("/api/zerodha") : await (await fetch("/api/broker/zerodha", { cache: "no-store" })).json()); }
+    try {
+      const st: State = DESK_API ? await deskApi<State>("/api/zerodha") : await (await fetch("/api/broker/zerodha", { cache: "no-store" })).json();
+      setS(st);
+      // Let the stock window and the sell check know what you hold.
+      useHoldings.getState().setZerodha((st.accounts ?? []).flatMap((a) => (a.holdings ?? []).map((h) => ({ symbol: h.symbol, qty: h.qty, avgPrice: h.avgPrice, source: `Zerodha ${a.user?.id ?? ""}`.trim() }))));
+    }
     catch { setS((x) => x ?? { configured: false, apps: [], accounts: [] }); }
     setBusy(false);
   }, [ready, token]);

@@ -215,7 +215,9 @@ export const useDesk = create<DeskState>((set, get) => {
 
     searchStock: async (symbol, info) => {
       const s = get();
-      if (s.result?.all.some((d) => d.symbol === symbol) && s.shown >= s.messages.length) { set({ drawerSymbol: symbol, lookup: null }); return; }
+      // In the current run with the full research (research desk)? Open it straight away. Otherwise
+      // show what the run has (if anything) while the full research loads.
+      if (s.result?.all.some((d) => d.symbol === symbol && d.desk) && s.shown >= s.messages.length) { set({ drawerSymbol: symbol, lookup: null }); return; }
       if (s.lookups[symbol]) { set({ drawerSymbol: symbol, lookup: null }); return; }
       set({ drawerSymbol: symbol, lookup: { symbol, name: info?.name, loading: true } });
       try {
@@ -286,5 +288,6 @@ export const findStock = (r: RunResult | null, symbol: string | null): Decision 
 
 /** The run that holds the open stock: its own single-stock run when it was searched, else the current run. */
 export function useStockResult(): RunResult | null {
-  return useDesk((s) => (s.drawerSymbol && s.lookups[s.drawerSymbol] && !s.result?.all.some((d) => d.symbol === s.drawerSymbol) ? s.lookups[s.drawerSymbol] : s.result));
+  // A stock looked up on its own has the full research, so it wins over a lighter entry in the current run.
+  return useDesk((s) => (s.drawerSymbol && s.lookups[s.drawerSymbol] ? s.lookups[s.drawerSymbol] : s.result));
 }
