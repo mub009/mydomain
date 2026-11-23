@@ -9,6 +9,8 @@ const HORIZON: Record<HoldingPeriod, string> = { swing: "Swing · 1-10 days", po
 const STOP_ATR: Record<HoldingPeriod, number> = { swing: 1.5, positional: 2.5 };
 
 export const MAX_PER_SECTOR = 2;
+/** Most picks from one sector: 2 up to 15 picks, then 4 for 20 and 5 for 25, so the longer lists can fill. */
+export const sectorCap = (top: number) => (top <= 15 ? MAX_PER_SECTOR : Math.ceil(top / 5));
 
 export class DecisionAgent {
   verdict(r: Analysis): Verdict {
@@ -76,7 +78,8 @@ export class DecisionAgent {
       ...this.fitHorizon(r), verdict: this.verdict(r), clarification: clarifications[r.symbol], spark: sparks[r.symbol] ?? [],
     }));
 
-    // Choose picks in score order, but never more than MAX_PER_SECTOR from one sector.
+    // Choose picks in score order, but never more than the sector cap from one sector.
+    const cap = sectorCap(top);
     const picks: Decision[] = [], passed: Decision[] = [];
     const perSector: Record<string, number> = {};
     // When the Research Agent chart-checked the leaders, only those can become picks.
@@ -85,8 +88,8 @@ export class DecisionAgent {
       if (d.verdict !== "STRONG BUY" && d.verdict !== "BUY") continue;
       if (picks.length >= top) break;
       if (charted && !d.chart) { d.passedOver = "Outside the chart-checked candidates"; passed.push(d); continue; }
-      if ((perSector[d.sector] ?? 0) >= MAX_PER_SECTOR) {
-        d.passedOver = `Sector cap: already ${MAX_PER_SECTOR} ${d.sector} picks`;
+      if ((perSector[d.sector] ?? 0) >= cap) {
+        d.passedOver = `Sector cap: already ${cap} ${d.sector} picks`;
         passed.push(d);
         continue;
       }

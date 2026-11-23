@@ -46,7 +46,7 @@ export function AnalysisToolbar() {
       </Field>
 
       <Field label="Top picks">
-        <Segmented label="Top N selections" value={s.top} onChange={(top) => s.set({ top })} options={[3, 5, 10, 15].map((v) => ({ value: v, label: String(v) }))} />
+        <Segmented label="Top N selections" value={s.top} onChange={(top) => s.set({ top })} options={[3, 5, 10, 15, 20, 25].map((v) => ({ value: v, label: String(v) }))} />
       </Field>
       <Field label="Capital (₹)">
         <input className={cn(inputClass, "w-32")} inputMode="numeric" value={s.capital} placeholder="optional"

@@ -380,3 +380,7 @@ Tap any stock you hold (a tracked trade, a Zerodha holding, or a stock in the Se
 
 After a Sell check, **Improve my portfolio** shows the split by sector, how much is tied to commodities and to gold, the largest holding, and suggestions: exit the weak holdings, build up the strongest, cut any stock over 25% or sector over 40%, keep 5-10% in gold (Gold ETF or Sovereign Gold Bonds) for balance, keep commodity stocks to 10-20%, and the commodity stocks (metals, energy) the agents rate BUY or better in the latest run.
 
+## Picking 20 or 25 stocks
+
+**Top picks** offers 3, 5, 10, 15, 20 and 25. The Decision Agent allows at most 2 picks per sector up to 15 picks, 4 for 20 and 5 for 25, so the longer lists can fill. Only BUY or STRONG BUY stocks become picks, so for 20-25 use a larger universe (All caps); a smaller one may give fewer. More picks means more stocks get the full research and chart check, so the run takes longer (about a minute for 25 from All caps).
+

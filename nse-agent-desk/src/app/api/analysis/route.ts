@@ -14,7 +14,7 @@ function validate(body: unknown): RunRequest | string {
   const bad = symbols.find((s) => !SYMBOL.test(s));
   if (bad) return `"${bad.slice(0, 20)}" is not a valid NSE symbol`;
   const top = Number(b.top);
-  if (![3, 5, 10, 15].includes(top)) return "top must be 3, 5, 10 or 15";
+  if (![3, 5, 10, 15, 20, 25].includes(top)) return "top must be 3, 5, 10, 15, 20 or 25";
   const riskPerTrade = Number(b.riskPerTrade);
   if (![0.5, 1, 2, 3].includes(riskPerTrade)) return "risk must be 0.5, 1, 2 or 3";
   let capital: number | undefined;

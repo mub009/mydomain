@@ -539,7 +539,7 @@ export async function runDialogue(bus: MessageBus, llm: LLM, d: DialogueInput) {
     const syms = names(d.passed);
     bus.send("Decision", "Research",
       `On concentration: I'm leaving out ${list(d.passed.map((p) => `${p.symbol} (${p.sector})`))}. ` +
-      `We already hold ${MAX_PER_SECTOR} from ${d.passed.length === 1 ? "that sector" : "those sectors"}, and I won't put more than that in one sector.`, { tickers: syms });
+      `We already hold ${Number(/already (\d+)/.exec(d.passed.find((p) => p.passedOver?.startsWith("Sector cap"))?.passedOver ?? "")?.[1] ?? MAX_PER_SECTOR)} from ${d.passed.length === 1 ? "that sector" : "those sectors"}, and I won't put more than that in one sector.`, { tickers: syms });
     bus.send("Research", "Decision", `Agreed. ${list(syms)} ${syms.length === 1 ? "goes" : "go"} on the watchlist instead.`, { tickers: syms });
   }
   if (d.capital && d.picks.length) {
