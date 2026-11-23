@@ -1,7 +1,9 @@
-/** Company financials for the research drawer. Amounts in ₹ crore. */
+/** Company financials for the research drawer. Amounts in ₹ crore (EPS in ₹ per share). */
 export interface YearFinancials {
-  /** Fiscal year label, e.g. "FY25" (Indian fiscal year ending March). */
+  /** Period label: "FY25" for a year (Indian fiscal year ending March) or "Q2 FY26" for a quarter. */
   year: string;
+  /** Last day of the period, YYYY-MM-DD. */
+  date?: string;
   revenue?: number;
   netIncome?: number;
   totalAssets?: number;
@@ -16,6 +18,16 @@ export interface YearFinancials {
   freeCashFlow?: number;
   ebit?: number;
   interestExpense?: number;
+  // Income statement
+  costOfRevenue?: number;
+  grossProfit?: number;
+  operatingExpense?: number;
+  operatingIncome?: number;
+  ebitda?: number;
+  pretaxIncome?: number;
+  tax?: number;
+  /** Diluted earnings per share, ₹. */
+  eps?: number;
 }
 
 export interface QualityCheck {
@@ -61,6 +73,8 @@ export interface CompanyReport {
   symbol: string;
   sector: string;
   years: YearFinancials[];
+  /** The last ~5 quarters (income statement; balance sheet only where published, usually half-yearly). */
+  quarters: YearFinancials[];
   ratios: Ratios;
   quality: Quality;
   shareholding: Shareholding | null;

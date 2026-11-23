@@ -1,9 +1,10 @@
 "use client";
 
 import { ExternalLink, Loader2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Bar, BarChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import type { CompanyReport, PeerRow, Quality, QualityCheck, Ratios } from "@/lib/company/types";
+import type { CompanyReport, PeerRow, Quality, QualityCheck, Ratios, YearFinancials } from "@/lib/company/types";
+import { Segmented } from "@/components/ui/segmented";
 import { inr } from "@/lib/format";
 import type { Decision } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -32,6 +33,76 @@ function Section({ title, children, right }: { title: string; children: React.Re
   );
 }
 
+type Key = keyof YearFinancials;
+type Row = { label: string; key?: Key; calc?: (y: YearFinancials, all: YearFinancials[]) => number | undefined; fmt?: "cr" | "rs" | "pct" | "ratio"; strong?: boolean };
+
+/** One statement as a table: periods across, items down; rows with no data at all are left out. */
+function StatementTable({ periods, rows, label }: { periods: YearFinancials[]; rows: Row[]; label: string }) {
+  const value = (r: Row, i: number) => (r.calc ? r.calc(periods[i], periods) : (periods[i][r.key!] as number | undefined));
+  const shown = rows.filter((r) => periods.some((_, i) => value(r, i) !== undefined));
+  const show = (r: Row, v: number | undefined) => v === undefined ? "–" : r.fmt === "pct" ? `${v >= 0 && r.label.includes("growth") ? "+" : ""}${v.toFixed(1)}%` : r.fmt === "rs" ? `₹${v.toFixed(2)}` : r.fmt === "ratio" ? v.toFixed(2) : Math.round(v).toLocaleString("en-IN");
+  // Start scrolled to the newest period (on the right) when the table is wider than the panel.
+  const box = useRef<HTMLDivElement>(null);
+  const cols = periods.map((p) => p.year).join(",");
+  useEffect(() => { const el = box.current; if (el) el.scrollLeft = el.scrollWidth; }, [cols]);
+  return (
+    <div ref={box} className="-mx-1 overflow-x-auto scroll-thin">
+      <table className="w-full text-[12px] tnum" aria-label={label}>
+        <thead><tr className="text-[10px] uppercase tracking-wide text-muted-foreground"><th className="sticky left-0 z-[1] bg-card px-1 py-1 text-left font-semibold">Item</th>
+          {periods.map((y) => <th key={y.year} className="whitespace-nowrap px-1 py-1 text-right font-semibold" title={y.date}>{y.year}</th>)}</tr></thead>
+        <tbody>
+          {shown.map((r) => (
+            <tr key={r.label} className={cn("border-t", r.strong && "font-semibold")}><td className={cn("sticky left-0 z-[1] whitespace-nowrap bg-card px-1 py-1 pr-2", r.strong ? "text-foreground" : "text-muted-foreground")}>{r.label}</td>
+              {periods.map((y, i) => { const v = value(r, i); return <td key={y.year} className={cn("whitespace-nowrap px-1 py-1 text-right", v !== undefined && v < 0 && "text-neg")}>{show(r, v)}</td>; })}</tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+const pctOf = (a?: number, b?: number) => (a !== undefined && b ? (a / b) * 100 : undefined);
+const growth = (a?: number, b?: number) => (a !== undefined && b && b > 0 ? (a / b - 1) * 100 : undefined);
+/** The same period a year earlier (same month), if we have it: last year for annual, the same quarter last year for quarterly. */
+const yearAgo = (y: YearFinancials, all: YearFinancials[]) => {
+  if (!y.date) return undefined;
+  const want = `${Number(y.date.slice(0, 4)) - 1}${y.date.slice(4, 7)}`;
+  return all.find((p) => p.date?.slice(0, 7) === want);
+};
+
+const INCOME_ROWS = (quarterly: boolean): Row[] => [
+  { label: "Revenue", key: "revenue", strong: true },
+  { label: quarterly ? "Revenue growth (vs same quarter last year)" : "Revenue growth (vs last year)", calc: (y, all) => growth(y.revenue, yearAgo(y, all)?.revenue), fmt: "pct" },
+  { label: "Cost of revenue", key: "costOfRevenue" },
+  { label: "Gross profit", key: "grossProfit" },
+  { label: "Operating expenses", key: "operatingExpense" },
+  { label: "EBITDA", key: "ebitda" },
+  { label: "Operating profit", calc: (y) => y.operatingIncome ?? y.ebit },
+  { label: "Operating margin", calc: (y) => pctOf(y.operatingIncome ?? y.ebit, y.revenue), fmt: "pct" },
+  { label: "Interest", key: "interestExpense" },
+  { label: "Profit before tax", key: "pretaxIncome" },
+  { label: "Tax", key: "tax" },
+  { label: "Net profit", key: "netIncome", strong: true },
+  { label: "Net margin", calc: (y) => pctOf(y.netIncome, y.revenue), fmt: "pct" },
+  { label: quarterly ? "Profit growth (vs same quarter last year)" : "Profit growth (vs last year)", calc: (y, all) => growth(y.netIncome, yearAgo(y, all)?.netIncome), fmt: "pct" },
+  { label: "EPS (₹ per share)", key: "eps", fmt: "rs", strong: true },
+];
+
+const BALANCE_ROWS: Row[] = [
+  { label: "Total assets", key: "totalAssets" }, { label: "Total liabilities", key: "totalLiabilities" },
+  { label: "Shareholders’ equity", key: "equity", strong: true }, { label: "Total debt", key: "debt" }, { label: "Cash", key: "cash" },
+  { label: "Debt / equity", calc: (y) => (y.debt !== undefined && y.equity ? y.debt / y.equity : undefined), fmt: "ratio" },
+  { label: "Current ratio", calc: (y) => (y.currentAssets !== undefined && y.currentLiabilities ? y.currentAssets / y.currentLiabilities : undefined), fmt: "ratio" },
+];
+
+const CASH_ROWS: Row[] = [
+  { label: "Operating cash flow", key: "operatingCashFlow", strong: true }, { label: "Capital spending", key: "capex" },
+  { label: "Free cash flow", key: "freeCashFlow", strong: true }, { label: "Net profit", key: "netIncome" },
+  { label: "Cash flow ÷ profit", calc: (y) => pctOf(y.operatingCashFlow, y.netIncome), fmt: "pct" },
+];
+
+const has = (ps: YearFinancials[], ks: Key[]) => ps.some((p) => ks.some((k) => p[k] !== undefined));
+
 const cache = new Map<string, { report: CompanyReport; peers: PeerRow[] }>();
 
 export function CompanyTab({ d }: { d: Decision }) {
@@ -51,6 +122,7 @@ export function CompanyTab({ d }: { d: Decision }) {
   const key = `${d.symbol}:${demo}:${seed}:${peers.map((p) => p.symbol).join(",")}`;
   const [data, setData] = useState(cache.get(key) ?? null);
   const [err, setErr] = useState<string | null>(null);
+  const [period, setPeriod] = useState<"annual" | "quarterly">("annual");
   useEffect(() => {
     if (cache.has(key)) { setData(cache.get(key)!); return; }
     setData(null); setErr(null);
@@ -64,7 +136,7 @@ export function CompanyTab({ d }: { d: Decision }) {
   }, [key, d.symbol, d.entry, demo, seed, peers]);
 
   if (err) return <p className="px-5 py-8 text-sm text-neg">Could not load company data: {err}</p>;
-  if (!data) return <p className="flex items-center justify-center gap-2 px-5 py-12 text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin" />Loading balance sheet, cash flow and shareholders…</p>;
+  if (!data) return <p className="flex items-center justify-center gap-2 px-5 py-12 text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin" />Loading income statement, balance sheet, cash flow and shareholders…</p>;
 
   const { report: r, peers: peerData } = data;
   const peerBy = new Map(peerData.map((p) => [p.symbol, p]));
@@ -74,6 +146,12 @@ export function CompanyTab({ d }: { d: Decision }) {
   ];
   const pe = (x: Decision) => (x.fundamentals?.epsTTM && x.fundamentals.epsTTM > 0 ? (x.entry / x.fundamentals.epsTTM).toFixed(1) : "–");
   const fmt = (n: number | undefined, f: (n: number) => string) => (n === undefined ? "–" : f(n));
+  const quarterly = period === "quarterly";
+  const periods = quarterly ? r.quarters ?? [] : r.years;
+  const noun = quarterly ? "quarterly" : "annual";
+  // Quarterly data more than ~5 months old: newer results have probably been published.
+  const lastDate = periods.at(-1)?.date;
+  const stale = Boolean(lastDate && Date.now() - new Date(lastDate).getTime() > 150 * 86400000);
 
   return (
     <div className="space-y-4 px-5 pb-6">
@@ -126,9 +204,51 @@ export function CompanyTab({ d }: { d: Decision }) {
         ) : <p className="text-[12.5px] text-muted-foreground">No other {d.sector === "Other" ? "known-sector" : d.sector} stocks in this run. Choose “All caps” to compare with more companies.</p>}
       </Section>
 
+      {/* Statements: annual or quarterly */}
+      <div className="sticky top-0 z-10 -mx-1 flex flex-wrap items-center justify-between gap-2 bg-card/95 px-1 py-1.5 backdrop-blur">
+        <h3 className="text-[13px] font-semibold">Financial statements</h3>
+        <Segmented label="Annual or quarterly statements" value={period} onChange={setPeriod}
+          options={[{ value: "annual", label: "Annual" }, { value: "quarterly", label: "Quarterly" }]} />
+      </div>
+
+      <Section title={`Income statement (₹ Cr) · ${quarterly ? "last 5 quarters" : "last 4 years"}`}>
+        {has(periods, ["revenue", "netIncome", "pretaxIncome"]) ? (
+          <>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11.5px] text-muted-foreground">
+              {[["Revenue", "var(--series-2)"], ["Net profit", "var(--series-1)"]].map(([l, c]) => (
+                <span key={l} className="inline-flex items-center gap-1.5"><i className="size-2.5 rounded-sm" style={{ background: c }} />{l}</span>
+              ))}
+            </div>
+            <div className="h-36" role="img" aria-label={`Revenue and net profit by ${quarterly ? "quarter" : "year"}`}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={periods} margin={{ top: 6, right: 4, bottom: 0, left: 0 }} barGap={2} barCategoryGap="22%">
+                  <CartesianGrid stroke="var(--border)" vertical={false} />
+                  <XAxis dataKey="year" tickLine={false} axisLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} />
+                  <YAxis width={56} tickLine={false} axisLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 10 }} tickFormatter={(v: number) => Math.round(v).toLocaleString("en-IN")} />
+                  <ReferenceLine y={0} stroke="var(--muted-foreground)" />
+                  <Tooltip isAnimationActive={false} cursor={{ fill: "var(--muted)", opacity: 0.5 }}
+                    formatter={(v, n) => [crore(Number(v)), n === "revenue" ? "Revenue" : "Net profit"]}
+                    contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }} />
+                  <Bar dataKey="revenue" fill="var(--series-2)" radius={[4, 4, 0, 0]} isAnimationActive={false} />
+                  <Bar dataKey="netIncome" fill="var(--series-1)" radius={[4, 4, 0, 0]} isAnimationActive={false} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <StatementTable periods={periods} rows={INCOME_ROWS(quarterly)} label={`Income statement, ${noun}`} />
+            {quarterly && stale && (
+              <p className="rounded-lg bg-warn-bg px-2.5 py-1.5 text-[11.5px] text-warn-fg">
+                The latest quarter we have is {periods.at(-1)!.year}. Newer results may be out: check the company&apos;s financial results on NSE (link below).
+              </p>
+            )}
+            {r.sector === "Banks" || r.sector === "Financials"
+              ? <p className="text-[11px] text-muted-foreground">Banks and finance companies don&apos;t report gross profit or EBITDA; their revenue is mostly interest earned.</p> : null}
+          </>
+        ) : <p className="text-[12.5px] text-muted-foreground">The {noun} income statement isn&apos;t available for this stock from our data source.{quarterly ? " Try Annual." : ""} Check the company&apos;s results on NSE (link below).</p>}
+      </Section>
+
       {/* Cash flow */}
-      <Section title="Profit vs cash flow (₹ Cr)">
-        {r.years.length ? (
+      <Section title={`Profit vs cash flow (₹ Cr) · ${noun}`}>
+        {has(periods, ["operatingCashFlow", "freeCashFlow"]) ? (
           <>
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11.5px] text-muted-foreground">
               {[["Net profit", "var(--series-1)"], ["Operating cash flow", "var(--series-2)"], ["Free cash flow", "var(--series-3)"]].map(([l, c]) => (
@@ -137,7 +257,7 @@ export function CompanyTab({ d }: { d: Decision }) {
             </div>
             <div className="h-44" role="img" aria-label="Net profit, operating cash flow and free cash flow by year">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={r.years} margin={{ top: 6, right: 4, bottom: 0, left: 0 }} barGap={2} barCategoryGap="22%">
+                <BarChart data={periods} margin={{ top: 6, right: 4, bottom: 0, left: 0 }} barGap={2} barCategoryGap="22%">
                   <CartesianGrid stroke="var(--border)" vertical={false} />
                   <XAxis dataKey="year" tickLine={false} axisLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} />
                   <YAxis width={56} tickLine={false} axisLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 10 }} tickFormatter={(v: number) => Math.round(v).toLocaleString("en-IN")} />
@@ -151,30 +271,24 @@ export function CompanyTab({ d }: { d: Decision }) {
                 </BarChart>
               </ResponsiveContainer>
             </div>
+            <StatementTable periods={periods} rows={CASH_ROWS} label={`Cash flow, ${noun}`} />
             <p className="text-[11px] text-muted-foreground">Good quality: operating cash flow at or above net profit, and free cash flow (after capital spending) positive most years.</p>
           </>
-        ) : <p className="text-[12.5px] text-muted-foreground">Cash-flow statements are not available for this stock.</p>}
+        ) : <p className="text-[12.5px] text-muted-foreground">{quarterly
+          ? "Indian companies publish the cash-flow statement every six months or yearly, not every quarter. Switch to Annual to see it."
+          : "The cash-flow statement isn't available for this stock from our data source."}</p>}
       </Section>
 
       {/* Balance sheet */}
-      <Section title="Balance sheet (₹ Cr)">
-        {r.years.length ? (
-          <div className="-mx-1 overflow-x-auto scroll-thin">
-            <table className="w-full text-[12px] tnum">
-              <thead><tr className="text-[10px] uppercase tracking-wide text-muted-foreground"><th className="px-1 py-1 text-left font-semibold">Item</th>{r.years.map((y) => <th key={y.year} className="px-1 py-1 text-right font-semibold">{y.year}</th>)}</tr></thead>
-              <tbody>
-                {([["Revenue", "revenue"], ["Net profit", "netIncome"], ["Total assets", "totalAssets"], ["Total liabilities", "totalLiabilities"], ["Shareholders’ equity", "equity"], ["Total debt", "debt"], ["Cash", "cash"], ["Capital spending", "capex"]] as const).map(([l, k]) => (
-                  <tr key={k} className="border-t"><td className="px-1 py-1 text-muted-foreground">{l}</td>
-                    {r.years.map((y) => <td key={y.year} className={cn("px-1 py-1 text-right", (y[k] ?? 0) < 0 && "text-neg")}>{y[k] === undefined ? "–" : inr(y[k]!, 0)}</td>)}</tr>
-                ))}
-                <tr className="border-t"><td className="px-1 py-1 text-muted-foreground">Debt / equity</td>
-                  {r.years.map((y) => <td key={y.year} className="px-1 py-1 text-right">{y.debt !== undefined && y.equity ? (y.debt / y.equity).toFixed(2) : "–"}</td>)}</tr>
-                <tr className="border-t"><td className="px-1 py-1 text-muted-foreground">Current ratio</td>
-                  {r.years.map((y) => <td key={y.year} className="px-1 py-1 text-right">{y.currentAssets !== undefined && y.currentLiabilities ? (y.currentAssets / y.currentLiabilities).toFixed(2) : "–"}</td>)}</tr>
-              </tbody>
-            </table>
-          </div>
-        ) : <p className="text-[12.5px] text-muted-foreground">Balance-sheet data is not available for this stock.</p>}
+      <Section title={`Balance sheet (₹ Cr) · ${noun}`}>
+        {has(periods, ["totalAssets", "equity", "debt"]) ? (
+          <>
+            <StatementTable periods={periods} rows={BALANCE_ROWS} label={`Balance sheet, ${noun}`} />
+            {quarterly && <p className="text-[11px] text-muted-foreground">Indian companies publish the balance sheet every six months (September and March), so some quarters show “–”.</p>}
+          </>
+        ) : <p className="text-[12.5px] text-muted-foreground">{quarterly
+          ? "No balance sheet for these quarters yet (published every six months). Switch to Annual."
+          : "The balance sheet isn't available for this stock from our data source."}</p>}
       </Section>
 
       {/* Shareholders */}

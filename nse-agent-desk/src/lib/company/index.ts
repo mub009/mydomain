@@ -91,28 +91,48 @@ export function demoShareholding(symbol: string, seed: number): Shareholding {
 }
 
 // ---------- live ----------
-const ANNUAL = ["TotalRevenue", "NetIncome", "TotalAssets", "TotalLiabilitiesNetMinorityInterest", "StockholdersEquity", "TotalDebt",
-  "CashAndCashEquivalents", "CurrentAssets", "CurrentLiabilities", "OperatingCashFlow", "CapitalExpenditure", "FreeCashFlow", "EBIT", "InterestExpense"];
+const ITEMS = ["TotalRevenue", "NetIncome", "TotalAssets", "TotalLiabilitiesNetMinorityInterest", "StockholdersEquity", "TotalDebt",
+  "CashAndCashEquivalents", "CurrentAssets", "CurrentLiabilities", "OperatingCashFlow", "CapitalExpenditure", "FreeCashFlow", "EBIT", "InterestExpense",
+  "CostOfRevenue", "GrossProfit", "OperatingExpense", "OperatingIncome", "EBITDA", "PretaxIncome", "TaxProvision", "DilutedEPS", "BasicEPS"];
 
-async function yahooFinancials(symbol: string): Promise<YearFinancials[]> {
-  const s = await yahooTimeseries(symbol, ANNUAL.map((t) => `annual${t}`));
-  const dates = [...new Set(Object.values(s).flat().map((p) => p.date))].sort().slice(-4);
-  const at = (t: string, d: string) => {
-    const v = s[`annual${t}`]?.find((p) => p.date === d)?.v;
-    return v === undefined ? undefined : Math.round(v / CR);
-  };
+/** Indian fiscal year (April-March) label: a March 2025 statement is FY25; a September 2025 quarter is Q2 FY26. */
+export function periodLabel(date: string, period: "annual" | "quarterly"): string {
+  const y = Number(date.slice(0, 4)), m = Number(date.slice(5, 7));
+  const fy = (m > 3 ? y + 1 : y) % 100;
+  if (period === "annual") return `FY${String(fy).padStart(2, "0")}`;
+  const q = m >= 4 && m <= 6 ? 1 : m >= 7 && m <= 9 ? 2 : m >= 10 ? 3 : 4;
+  return `Q${q} FY${String(fy).padStart(2, "0")}`;
+}
+
+/** Statements for the last 4 years or ~5 quarters from Yahoo's fundamentals series (exported for tests). */
+export function toPeriods(s: Record<string, { date: string; v: number }[]>, period: "annual" | "quarterly", keep: number): YearFinancials[] {
+  // Periods come from the income statement when there is one, so half-yearly balance sheets don't add empty columns.
+  const income = ["TotalRevenue", "NetIncome", "PretaxIncome"].flatMap((t) => s[`${period}${t}`] ?? []);
+  const dates = [...new Set((income.length ? income : Object.values(s).flat()).map((p) => p.date))].sort().slice(-keep);
+  const raw = (t: string, d: string) => s[`${period}${t}`]?.find((p) => p.date === d)?.v;
+  const at = (t: string, d: string) => { const v = raw(t, d); return v === undefined ? undefined : Math.round(v / CR); };
   return dates.map((d) => {
     const capex = at("CapitalExpenditure", d);
-    // Indian fiscal year ends in March: a March 2025 statement is FY25.
-    const yr = Number(d.slice(2, 4)) + (Number(d.slice(5, 7)) > 3 ? 1 : 0);
+    const eps = raw("DilutedEPS", d) ?? raw("BasicEPS", d);
     return {
-      year: `FY${String(yr).padStart(2, "0")}`, revenue: at("TotalRevenue", d), netIncome: at("NetIncome", d), totalAssets: at("TotalAssets", d),
+      year: periodLabel(d, period), date: d, revenue: at("TotalRevenue", d), netIncome: at("NetIncome", d), totalAssets: at("TotalAssets", d),
       totalLiabilities: at("TotalLiabilitiesNetMinorityInterest", d), equity: at("StockholdersEquity", d), debt: at("TotalDebt", d),
       cash: at("CashAndCashEquivalents", d), currentAssets: at("CurrentAssets", d), currentLiabilities: at("CurrentLiabilities", d),
       operatingCashFlow: at("OperatingCashFlow", d), capex: capex === undefined ? undefined : Math.abs(capex),
       freeCashFlow: at("FreeCashFlow", d), ebit: at("EBIT", d), interestExpense: at("InterestExpense", d),
+      costOfRevenue: at("CostOfRevenue", d), grossProfit: at("GrossProfit", d), operatingExpense: at("OperatingExpense", d),
+      operatingIncome: at("OperatingIncome", d), ebitda: at("EBITDA", d), pretaxIncome: at("PretaxIncome", d), tax: at("TaxProvision", d),
+      eps: eps === undefined ? undefined : Math.round(eps * 100) / 100,
     };
   });
+}
+
+async function yahooFinancials(symbol: string): Promise<YearFinancials[]> {
+  return toPeriods(await yahooTimeseries(symbol, ITEMS.map((t) => `annual${t}`)), "annual", 4);
+}
+
+async function yahooQuarters(symbol: string): Promise<YearFinancials[]> {
+  return toPeriods(await yahooTimeseries(symbol, ITEMS.map((t) => `quarterly${t}`), 2), "quarterly", 5);
 }
 
 /** Yahoo's quoteSummary needs a session cookie and "crumb". */
@@ -206,14 +226,15 @@ export async function companyReport(symbol: string, opts: { demo: boolean; price
   if (opts.demo) {
     const years = demoFinancials(symbol, opts.price, opts.seed);
     const { ratios, quality } = gradeQuality(years, sector);
-    return { symbol, sector, years, ratios, quality, shareholding: demoShareholding(symbol, opts.seed), source: "Sample figures (demo)", sample: true, links: links(symbol) };
+    return { symbol, sector, years, quarters: [], ratios, quality, shareholding: demoShareholding(symbol, opts.seed), source: "Sample figures (demo)", sample: true, links: links(symbol) };
   }
-  const [years, shareholding] = await Promise.all([
+  const [years, quarters, shareholding] = await Promise.all([
     cached(`fin:${symbol}`, () => yahooFinancials(symbol)).catch(() => [] as YearFinancials[]),
+    cached(`finq:${symbol}`, () => yahooQuarters(symbol)).catch(() => [] as YearFinancials[]),
     cached(`sh:${symbol}`, () => yahooShareholding(symbol)).catch(() => null),
   ]);
   const { ratios, quality } = gradeQuality(years, sector);
-  return { symbol, sector, years, ratios, quality, shareholding, source: "Yahoo Finance (unofficial)", sample: false, links: links(symbol) };
+  return { symbol, sector, years, quarters, ratios, quality, shareholding, source: "Yahoo Finance (unofficial)", sample: false, links: links(symbol) };
 }
 
 export async function peerRows(peers: { symbol: string; price: number }[], opts: { demo: boolean; seed: number }): Promise<PeerRow[]> {

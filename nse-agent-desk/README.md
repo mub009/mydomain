@@ -255,6 +255,13 @@ Score out of 100: how many "effective" sectors and stocks the money is spread ov
 
 ## Company: peers, balance sheet, cash flow, owners
 
+**Financial statements, Annual or Quarterly** (switch at the top of the statements):
+- **Income statement:** revenue, cost of revenue, gross profit, operating expenses, EBITDA, operating profit and margin, interest, profit before tax, tax, net profit and margin, EPS, and growth vs last year (annual) or vs the same quarter last year (quarterly). Banks and finance companies don't report gross profit or EBITDA, so those rows are hidden for them.
+- **Balance sheet** and **cash flow** follow the same switch. Indian companies publish the balance sheet every six months and the cash flow yearly or half-yearly, so the quarterly view says so where a quarter has no figures.
+- Annual: last 4 fiscal years (FY = April-March). Quarterly: last ~5 quarters (Q1 = April-June). If the newest quarter in the data is over ~5 months old, a note points to the company's results on NSE.
+- Tables open scrolled to the newest period, with the item names fixed while you scroll.
+
+
 Open any stock and choose the **Company** tab:
 
 - **Balance sheet & cash-flow quality:** Research Agent grades the company A-D on cash conversion (operating cash flow ÷ net profit over 3 years, counted double), free cash flow (years positive out of 4), debt/equity, current ratio, return on equity and interest cover. A loss-making company can't grade above C. Banks and NBFCs are graded only on ROE and profit growth, because debt and cash flow work differently for lenders.
