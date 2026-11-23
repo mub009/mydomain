@@ -262,6 +262,8 @@ export interface Decision extends Analysis {
   spark: number[]; // last ~60 closes
   /** Decision Agent's holding plan: expected days to the target, hold-until date, odds and expected return. */
   hold?: import("./forecast").HoldPlan;
+  /** Long-term (1-3 years) view from the research desk: Accumulate / Hold / Reduce / Exit. */
+  longTerm?: import("./long-term").LongTermView;
 }
 
 export type Person = "News" | "Volatility" | "Macro" | "CentralBank" | "Momentum" | "Trend" | "Research" | DeskAgent | "BlackPoints" | "Decision";

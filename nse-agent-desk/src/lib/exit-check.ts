@@ -39,6 +39,10 @@ export interface ExitAdvice {
   stop?: number;
   target?: number;
   sources: string[];
+  /** Long-term (1-3 years) view, when the fundamentals are known. */
+  longTerm?: import("./long-term").LongTermView;
+  /** How the short-term and long-term views fit together. */
+  together?: string;
 }
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -105,6 +109,7 @@ export function exitAdvice(d: Decision, h: { qty: number; avgPrice: number; sour
     pnlPct: r2(pnlPct), pnl: r2(pnl), verdict: d.verdict, reasons: reasons.slice(0, 4),
     ...(action !== "SELL" ? { stop: r2(stop), target: r2(Math.max(d.target, price * 1.05)) } : {}),
     sources: h.sources,
+    ...(d.longTerm ? { longTerm: d.longTerm, together: together(action, d.longTerm.action) } : {}),
   };
 }
 
@@ -122,6 +127,18 @@ export function mergeHoldings(list: Holding[]): Map<string, { qty: number; avgPr
     }
   }
   return out;
+}
+
+/** One sentence on what to do when the trader's and the investor's views differ. */
+export function together(short: ExitAction, long: import("./long-term").LongTermAction): string {
+  if (short === "SELL" && (long === "ACCUMULATE" || long === "HOLD"))
+    return "Short term says sell, but the business is sound: a trader exits now; a long-term investor can keep it and add back near the stop-loss area once the trend recovers.";
+  if (short === "SELL") return "Both views agree: sell.";
+  if (short === "BOOK PROFIT" && long === "ACCUMULATE") return "Take some profit for the short term; as a long-term holding it's worth keeping the rest.";
+  if (short === "BOOK PROFIT") return "Book profit: the long-term case doesn't justify holding all of it.";
+  if (long === "EXIT" || long === "REDUCE") return "Fine to hold for now, but the long-term case is weak: plan to exit on strength rather than hold for years.";
+  if (long === "ACCUMULATE") return "Both views are positive: hold, and add on dips for the long term.";
+  return "Hold: nothing in either view says sell.";
 }
 
 export const ACTION_ORDER: Record<ExitAction, number> = { SELL: 0, "BOOK PROFIT": 1, HOLD: 2 };

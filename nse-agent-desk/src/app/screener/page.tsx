@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Field, inputClass } from "@/components/ui/segmented";
 import { BulkTrackButton } from "@/components/desk/positions-ui";
 import { holdSentence, holdShort, shortDate } from "@/lib/hold";
+import { LONG_TERM_LABEL } from "@/lib/long-term";
 import { inr, pct } from "@/lib/format";
 import type { Decision, Verdict } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -39,6 +40,8 @@ const columns: ColumnDef<Decision>[] = [
   { accessorKey: "target", header: "Target", meta: { num: true }, cell: ({ getValue }) => inr(getValue() as number) },
   { id: "hold", header: "Hold", meta: { num: true }, accessorFn: (d) => d.hold?.expectedDays ?? 99,
     cell: ({ row: { original: d } }) => d.hold ? <span title={holdSentence(d.hold)}>{holdShort(d.hold)}<span className="block text-[11px] text-muted-foreground">by {shortDate(d.hold.exitBy)}</span></span> : "–" },
+  { id: "longTerm", header: "Long term", meta: { num: true }, accessorFn: (d) => d.longTerm?.score ?? -1,
+    cell: ({ row: { original: d } }) => d.longTerm ? <span title={d.longTerm.summary}>{LONG_TERM_LABEL[d.longTerm.action]}<span className="block text-[11px] text-muted-foreground">{d.longTerm.score}/100</span></span> : "–" },
   { id: "expected", header: "Expected", meta: { num: true }, accessorFn: (d) => d.hold?.expectedReturnPct ?? -99,
     cell: ({ row: { original: d } }) => d.hold ? <span title={`${d.hold.probTarget}% reach the target first, ${d.hold.probStop}% the stop-loss`}>{signed(d.hold.expectedReturnPct)}<span className="block text-[11px] text-muted-foreground">{d.hold.probTarget}% target</span></span> : "–" },
   { id: "size", header: "Size", accessorFn: (d) => d.fundamentals?.marketCapCr ?? -1,

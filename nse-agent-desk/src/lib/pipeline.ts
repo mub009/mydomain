@@ -23,6 +23,7 @@ import { loadPolicy, policyEffect, type PolicyReport } from "./policy";
 import { globalCues, worldQuotes } from "./world";
 import { nseMarketMood, nseMcpEnabled } from "./nse-mcp/client";
 import { holdPlan, type HoldPlan } from "./forecast";
+import { longTermView } from "./long-term";
 import { addTradingDays } from "./market/calendar";
 import type { Bar, RunRequest, RunResult, StreamEvent } from "./types";
 
@@ -97,7 +98,9 @@ export async function runAnalysis(o: RunRequest, emit: (e: StreamEvent) => void)
   // Decision Agent's holding plan for every stock: how long to hold, by when, the odds and the expected return.
   emit({ type: "progress", text: "Decision Agent: working out how long to hold…" });
   const plans = Object.fromEntries(decided.all.map((d) => [d.symbol, planHold(d, frames[d.symbol], source.seed)]));
-  const withHold = <T extends { symbol: string }>(xs: T[]) => xs.map((d) => (plans[d.symbol] ? { ...d, hold: plans[d.symbol] } : d));
+  // ... and the long-term view (1-3 years) wherever the research desk has the fundamentals.
+  const longs = Object.fromEntries(decided.all.map((d) => [d.symbol, longTermView(d)]));
+  const withHold = <T extends { symbol: string }>(xs: T[]) => xs.map((d) => ({ ...d, ...(plans[d.symbol] ? { hold: plans[d.symbol] } : {}), ...(longs[d.symbol] ? { longTerm: longs[d.symbol] } : {}) }));
   const { all, picks, watchlist, passed } = { ...decided, all: withHold(decided.all), picks: withHold(decided.picks), watchlist: withHold(decided.watchlist) };
 
   const sectorViews = enrichSectors(sectors, all);

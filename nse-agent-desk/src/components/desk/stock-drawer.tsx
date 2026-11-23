@@ -18,6 +18,7 @@ import { ForecastTab } from "./forecast-tab";
 import { SectorCheck } from "./sector-ui";
 import { MacroExposureSection } from "./macro-ui";
 import { holdShort, shortDate } from "@/lib/hold";
+import { LONG_TERM_LABEL } from "@/lib/long-term";
 import { StockFinder } from "./stock-finder";
 import { Tabs } from "radix-ui";
 import { useEffect, useMemo } from "react";
@@ -74,6 +75,33 @@ function AgentView({ who, score, reasons, warnings, children }: { who: Person; s
   );
 }
 
+/** Long-term (1-3 years) view from the research desk. */
+function LongTermCard({ d }: { d: Decision }) {
+  const lt = d.longTerm!;
+  const tone = { good: "text-pos", ok: "text-foreground", weak: "text-neg", "n/a": "text-muted-foreground" } as const;
+  const badge = { ACCUMULATE: "bg-pos/12 text-pos", HOLD: "bg-sky-500/12 text-sky-700 dark:text-sky-400", REDUCE: "bg-amber-500/12 text-amber-700 dark:text-amber-400", EXIT: "bg-neg/12 text-neg" }[lt.action];
+  return (
+    <section className="rounded-xl border p-3" aria-label="Long-term view">
+      <div className="flex items-center gap-2">
+        <AgentAvatar who="Research" size={22} />
+        <h3 className="text-[13px] font-semibold">Long-term view <span className="font-normal text-muted-foreground">1-3 years</span></h3>
+        <span className={cn("ml-auto rounded-full px-2 py-0.5 text-[11.5px] font-bold", badge)}>{LONG_TERM_LABEL[lt.action]} · {lt.score}/100</span>
+      </div>
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted"><div className={cn("h-full rounded-full", lt.score >= 70 ? "bg-pos" : lt.score >= 50 ? "bg-sky-500" : lt.score >= 35 ? "bg-amber-500" : "bg-neg")} style={{ width: `${lt.score}%` }} /></div>
+      <dl className="mt-2.5 grid gap-1 text-[12px]">
+        {lt.pillars.map((p) => (
+          <div key={p.name} className="flex gap-2">
+            <dt className="w-24 shrink-0 text-muted-foreground">{p.name}</dt>
+            <dd className={cn("min-w-0 flex-1", tone[p.tone])}>{p.text}</dd>
+            <dd className="shrink-0 tnum text-muted-foreground">{p.points > 0 ? "+" : ""}{p.points}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="mt-2 text-[11.5px] leading-snug text-muted-foreground">Business quality and value, not the chart: 70+ accumulate, 50-69 hold, 35-49 reduce, below 35 exit. Estimates, not advice.</p>
+    </section>
+  );
+}
+
 /** Decision Agent's holding plan: how long, until when, the odds and the expected return. */
 function HoldCard({ d }: { d: Decision }) {
   const h = d.hold!;
@@ -113,6 +141,7 @@ function Body({ d, isPick }: { d: Decision; isPick: boolean }) {
       <p className="text-[11.5px] leading-snug text-muted-foreground">Research scenario, not guaranteed prices. Target = entry + 2 × (entry − stop-loss), a {pct((d.target / d.entry - 1) * 100)} move.{d.quantity !== undefined && ` Sized at ${d.quantity} shares (${inr(d.investment ?? 0, 0)}).`}</p>
 
       {d.hold && <HoldCard d={d} />}
+      {d.longTerm && <LongTermCard d={d} />}
       {d.blackPoints && <BlackPointsSection bp={d.blackPoints} />}
       <div className="space-y-2.5">
         <ScoreBar label="Combined score" value={d.combined} color="var(--primary)" />

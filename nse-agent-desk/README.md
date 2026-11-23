@@ -368,3 +368,9 @@ On the Positions page, **Check my holdings** runs the agents on what you already
 
 The same stock held in several places is checked once, at the weighted buy price. Research only, not investment advice.
 
+## Long-term view (1-3 years)
+
+Next to the short-term calls, every stock the research desk covers gets a long-term score out of 100: is it a business worth owning, whatever the chart does next? It starts at 50 and adds or takes points for quality (ROE, margins, cash: +20 to -12), 3-year growth (+18 to -20 for a loss-maker), valuation against the sector (+8 to -10; skipped when P/E is over 300, which means broken earnings data), the 5-year record (+8 to -8), safety (down to -30 for a verified red flag) and the 200-day trend (+4 / -6). 70+ **Accumulate**, 50-69 **Hold**, 35-49 **Reduce**, below 35 **Exit**.
+
+It appears in the Sell check (with a Short term / Long term switch and a line on what to do when the two disagree), in a "Long-term view" card in each stock's Research tab, as a Screener column, and in the Decision Agent's message in the Agents tab.
+

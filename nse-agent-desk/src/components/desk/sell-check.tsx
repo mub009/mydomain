@@ -5,7 +5,8 @@ import { CircleCheck, CircleMinus, CircleX, Loader2, Plus, ScanSearch, X } from 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import type { BrokerHolding } from "@/lib/broker/zerodha";
-import type { ExitAction, ExitAdvice, Holding } from "@/lib/exit-check";
+import { ACTION_ORDER, type ExitAction, type ExitAdvice, type Holding } from "@/lib/exit-check";
+import { LONG_TERM_LABEL, type LongTermAction } from "@/lib/long-term";
 import { inr, pct } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { DESK_API, deskApi, useAuth } from "@/store/auth";
@@ -17,6 +18,12 @@ const STYLE: Record<ExitAction, { cls: string; Icon: typeof CircleX; text: strin
   "BOOK PROFIT": { cls: "bg-amber-500/12 text-amber-700 ring-amber-500/30 dark:text-amber-400", Icon: CircleMinus, text: "Book profit" },
   HOLD: { cls: "bg-pos/12 text-pos ring-pos/30", Icon: CircleCheck, text: "Hold" },
 };
+
+const LT_STYLE: Record<LongTermAction, string> = {
+  ACCUMULATE: "bg-pos/12 text-pos ring-pos/30", HOLD: "bg-sky-500/12 text-sky-700 ring-sky-500/30 dark:text-sky-400",
+  REDUCE: "bg-amber-500/12 text-amber-700 ring-amber-500/30 dark:text-amber-400", EXIT: "bg-neg/12 text-neg ring-neg/30",
+};
+const LT_ORDER: Record<LongTermAction, number> = { EXIT: 0, REDUCE: 1, HOLD: 2, ACCUMULATE: 3 };
 
 type Result = { advice: ExitAdvice[]; missing: { symbol: string; why: string }[]; at: string };
 
@@ -39,6 +46,7 @@ export function SellCheck() {
   const [sym, setSym] = useState(""); const [qty, setQty] = useState(""); const [avg, setAvg] = useState("");
   const [busy, setBusy] = useState(false); const [step, setStep] = useState("");
   const [res, setRes] = useState<Result | null>(null); const [err, setErr] = useState<string | null>(null);
+  const [view, setView] = useState<"short" | "long">("short");
 
   const tracked: Holding[] = positions.filter((p) => p.status === "open").map((p) => ({ symbol: p.symbol, qty: p.qty, avgPrice: p.buyPrice, source: "Tracked" }));
 
@@ -66,6 +74,10 @@ export function SellCheck() {
   };
 
   const counts = res ? (["SELL", "BOOK PROFIT", "HOLD"] as ExitAction[]).map((k) => [k, res.advice.filter((x) => x.action === k).length] as const) : [];
+  const ltCounts = res ? (["EXIT", "REDUCE", "HOLD", "ACCUMULATE"] as LongTermAction[]).map((k) => [k, res.advice.filter((x) => x.longTerm?.action === k).length] as const).filter(([, n]) => n > 0) : [];
+  const rows = res ? [...res.advice].sort((a, b) => view === "short"
+    ? ACTION_ORDER[a.action] - ACTION_ORDER[b.action] || a.pnlPct - b.pnlPct
+    : (a.longTerm ? LT_ORDER[a.longTerm.action] : 9) - (b.longTerm ? LT_ORDER[b.longTerm.action] : 9) || (a.longTerm?.score ?? 0) - (b.longTerm?.score ?? 0)) : [];
   const field = "h-9 rounded-xl border border-[var(--edge)] bg-card px-3 text-[13px] outline-none focus:border-primary focus:ring-4 focus:ring-primary/15";
 
   return (
@@ -105,12 +117,20 @@ export function SellCheck() {
 
       {res && (
         <div className="border-t border-[var(--edge)]">
+          <div className="flex flex-wrap items-center gap-2 px-4 pt-3">
+            <div role="tablist" aria-label="View" className="well inline-flex rounded-xl p-1">
+              {([["short", "Short term (weeks)"], ["long", "Long term (1-3 years)"]] as const).map(([v, l]) => (
+                <button key={v} type="button" role="tab" aria-selected={view === v} onClick={() => setView(v)}
+                  className={cn("rounded-lg px-3 py-1.5 text-[12.5px] font-medium", view === v ? "raised font-semibold text-foreground" : "text-muted-foreground")}>{l}</button>
+              ))}
+            </div>
+          </div>
           <div className="flex flex-wrap items-center gap-2 px-4 py-3">
-            {counts.map(([k, n]) => { const S = STYLE[k]; return <span key={k} className={cn("flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12.5px] font-semibold ring-1", S.cls)}><S.Icon className="size-3.5" />{n} {S.text}</span>; })}
+            {view === "long" ? ltCounts.map(([k, n]) => <span key={k} className={cn("rounded-full px-2.5 py-1 text-[12.5px] font-semibold ring-1", LT_STYLE[k])}>{n} {LONG_TERM_LABEL[k]}</span>) : counts.map(([k, n]) => { const S = STYLE[k]; return <span key={k} className={cn("flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12.5px] font-semibold ring-1", S.cls)}><S.Icon className="size-3.5" />{n} {S.text}</span>; })}
             <span className="ml-auto text-[11.5px] text-muted-foreground">Checked {new Date(res.at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", day: "numeric", month: "short" })} IST</span>
           </div>
           <ul className="divide-y divide-[var(--edge)]">
-            {res.advice.map((a) => {
+            {rows.map((a) => {
               const S = STYLE[a.action];
               return (
                 <li key={a.symbol} className="grid gap-2 px-4 py-3 sm:grid-cols-[minmax(0,180px)_minmax(0,1fr)_auto] sm:items-start">
@@ -122,11 +142,18 @@ export function SellCheck() {
                   <ul className="space-y-0.5 text-[12.5px] leading-snug text-muted-foreground">
                     {a.reasons.map((r) => <li key={r}>• {r}</li>)}
                     {a.stop !== undefined && <li className="text-foreground">• Keep the stop-loss at <b>{inr(a.stop)}</b>{a.target ? <>, target <b>{inr(a.target)}</b></> : null}</li>}
+                    {a.longTerm ? (
+                      <li className="mt-1.5 rounded-lg bg-muted/60 px-2.5 py-1.5">
+                        <b className="text-foreground">Long term:</b> {a.longTerm.summary}
+                        {a.together && <span className="mt-0.5 block font-medium text-foreground">{a.together}</span>}
+                      </li>
+                    ) : <li className="mt-1 text-[11.5px]">Long term: not enough financial data.</li>}
                     <li className="text-[11px]">Held in: {a.sources.join(", ")}</li>
                   </ul>
-                  <div className="sm:text-right">
-                    <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12.5px] font-bold ring-1", S.cls)}><S.Icon className="size-3.5" />{S.text}</span>
-                    {a.sellQty > 0 && <div className="mt-1 text-[12px] font-medium tnum">{a.sellQty === a.qty ? `Sell all ${a.qty}` : `Sell ${a.sellQty} of ${a.qty}`}</div>}
+                  <div className="flex flex-wrap items-start gap-1.5 sm:flex-col sm:items-end sm:text-right">
+                    <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12.5px] font-bold ring-1", S.cls)} title="Short term (weeks)"><S.Icon className="size-3.5" />{S.text}</span>
+                    {a.sellQty > 0 && <div className="text-[12px] font-medium tnum">{a.sellQty === a.qty ? `Sell all ${a.qty}` : `Sell ${a.sellQty} of ${a.qty}`}</div>}
+                    {a.longTerm && <span className={cn("inline-flex rounded-full px-2.5 py-1 text-[11.5px] font-semibold ring-1", LT_STYLE[a.longTerm.action])} title="Long term (1-3 years)">Long term: {LONG_TERM_LABEL[a.longTerm.action]} · {a.longTerm.score}</span>}
                   </div>
                 </li>
               );
