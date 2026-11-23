@@ -119,7 +119,7 @@ export function AuthScreen({ mode }: { mode: "login" | "signup" }) {
       {/* form */}
       <main className="flex min-h-dvh flex-col px-5 py-5 sm:px-8">
         <div className="flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[13px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground">
+          <Link href="/dashboard" className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[13px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground">
             <ArrowLeft className="size-4" />Back to the app
           </Link>
           <ThemeToggle />

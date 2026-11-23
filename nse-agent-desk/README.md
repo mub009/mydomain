@@ -4,6 +4,11 @@ An AI stock research desk for the Indian market (NSE / Nifty 50). Four AI agents
 
 > Research tool only, not investment advice. Entry, stop-loss and target are research scenarios, not guaranteed prices. The scoring rules are simple technical signals and have not been backtested.
 
+## Home page and Overview
+
+- **`/` (home page):** what the desk does and why it helps: today's Nifty 50 (NSE), Sensex (BSE), Bank Nifty and gold with why each moved, the benefits, how the agents work, the whole team, data sources, who it's for, FAQ and a not-investment-advice notice.
+- **`/dashboard` (Overview):** the research desk itself (run the agents, final picks, market cards). The sidebar's Overview link and the logo go here.
+
 ## The team
 
 | Agent | Role | What they do |
