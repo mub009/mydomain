@@ -21,7 +21,8 @@ const write = (v: { token: string; user: DeskUser } | null) => {
 /** A request to the API with this browser's token; a 401 logs you out. */
 export async function deskApi<T = unknown>(path: string, init: RequestInit = {}): Promise<T> {
   const token = useAuth.getState().token;
-  const send = () => fetch(DESK_API + path, {
+  // Through this site's own /api/desk pass-through (same address: no cross-site pre-check).
+  const send = () => fetch(`/api/desk${path.replace(/^\/api/, "")}`, {
     ...init,
     headers: { accept: "application/json", "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}), ...init.headers },
   });
