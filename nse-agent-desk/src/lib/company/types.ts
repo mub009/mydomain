@@ -28,6 +28,36 @@ export interface YearFinancials {
   tax?: number;
   /** Diluted earnings per share, ₹. */
   eps?: number;
+  // Income statement: banks and finance companies, and other lines
+  interestIncome?: number;
+  netInterestIncome?: number;
+  /** Fees and other non-interest income. */
+  otherIncome?: number;
+  totalExpenses?: number;
+  depreciation?: number;
+  minorityInterests?: number;
+  // Cash flow
+  investingCashFlow?: number;
+  financingCashFlow?: number;
+  netChangeInCash?: number;
+  changeInWorkingCapital?: number;
+  /** Positive number = money paid out. */
+  dividendsPaid?: number;
+  debtIssued?: number;
+  /** Positive number = money paid back. */
+  debtRepaid?: number;
+  endCash?: number;
+  // Balance sheet
+  netPPE?: number;
+  goodwill?: number;
+  inventory?: number;
+  receivables?: number;
+  retainedEarnings?: number;
+  netDebt?: number;
+  workingCapital?: number;
+  minorityInterest?: number;
+  /** Shares issued, in crore shares. */
+  shares?: number;
 }
 
 export interface QualityCheck {

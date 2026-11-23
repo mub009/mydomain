@@ -260,6 +260,9 @@ Score out of 100: how many "effective" sectors and stocks the money is spread ov
 - **Balance sheet** and **cash flow** follow the same switch. Indian companies publish the balance sheet every six months and the cash flow yearly or half-yearly, so the quarterly view says so where a quarter has no figures.
 - Annual: last 4 fiscal years (FY = April-March). Quarterly: last ~5 quarters (Q1 = April-June). If the newest quarter in the data is over ~5 months old, a note points to the company's results on NSE.
 - Tables open scrolled to the newest period, with the item names fixed while you scroll.
+- **Two decimals, no rounding:** every amount is in ₹ crore to two decimals (e.g. 493.03), EPS and book value in ₹.
+- **More lines:** income statement adds interest income, net interest income and fees & other income (banks and finance companies), total expenses, depreciation, tax rate and minority interest. Cash flow shows cash from operating, investing and financing activities, net change in cash, changes in working capital, capital expenditures, free cash flow, dividends paid, debt raised and repaid, and cash at the end of the period. Balance sheet adds fixed assets, goodwill, inventory, receivables, current assets and liabilities, net debt, retained earnings, working capital, shares issued and book value per share. Lines a company doesn't report are hidden.
+- Different data providers define a few lines differently (e.g. changes in working capital), so those can differ from other apps.
 
 
 Open any stock and choose the **Company** tab:

@@ -5,7 +5,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Bar, BarChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { CompanyReport, PeerRow, Quality, QualityCheck, Ratios, YearFinancials } from "@/lib/company/types";
 import { Segmented } from "@/components/ui/segmented";
-import { inr } from "@/lib/format";
 import type { Decision } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { useDesk, useStockResult } from "@/store/desk";
@@ -13,7 +12,9 @@ import { AgentAvatar } from "./agent-avatar";
 import { CapTag, EpsGrowth } from "./fundamentals";
 import { VerdictBadge } from "./primitives";
 
-const crore = (n?: number) => (n === undefined ? "–" : `${inr(n, 0)} Cr`);
+/** ₹ crore with two decimals, Indian digit grouping. */
+const cr2 = (n: number) => n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const crore = (n?: number) => (n === undefined ? "–" : `₹${cr2(n)} Cr`);
 const GRADE_STYLE: Record<Quality["grade"], string> = {
   A: "bg-[var(--strong-bg)] text-[var(--strong-fg)]", B: "bg-[var(--buy-bg)] text-[var(--buy-fg)]",
   C: "bg-[var(--watch-bg)] text-[var(--watch-fg)]", D: "bg-[var(--avoid-bg)] text-[var(--avoid-fg)]", "n/a": "bg-muted text-muted-foreground",
@@ -40,7 +41,7 @@ type Row = { label: string; key?: Key; calc?: (y: YearFinancials, all: YearFinan
 function StatementTable({ periods, rows, label }: { periods: YearFinancials[]; rows: Row[]; label: string }) {
   const value = (r: Row, i: number) => (r.calc ? r.calc(periods[i], periods) : (periods[i][r.key!] as number | undefined));
   const shown = rows.filter((r) => periods.some((_, i) => value(r, i) !== undefined));
-  const show = (r: Row, v: number | undefined) => v === undefined ? "–" : r.fmt === "pct" ? `${v >= 0 && r.label.includes("growth") ? "+" : ""}${v.toFixed(1)}%` : r.fmt === "rs" ? `₹${v.toFixed(2)}` : r.fmt === "ratio" ? v.toFixed(2) : Math.round(v).toLocaleString("en-IN");
+  const show = (r: Row, v: number | undefined) => v === undefined ? "–" : r.fmt === "pct" ? `${v >= 0 && r.label.includes("growth") ? "+" : ""}${v.toFixed(1)}%` : r.fmt === "rs" ? `₹${v.toFixed(2)}` : r.fmt === "ratio" ? v.toFixed(2) : cr2(v);
   // Start scrolled to the newest period (on the right) when the table is wider than the panel.
   const box = useRef<HTMLDivElement>(null);
   const cols = periods.map((p) => p.year).join(",");
@@ -48,12 +49,12 @@ function StatementTable({ periods, rows, label }: { periods: YearFinancials[]; r
   return (
     <div ref={box} className="-mx-1 overflow-x-auto scroll-thin">
       <table className="w-full text-[12px] tnum" aria-label={label}>
-        <thead><tr className="text-[10px] uppercase tracking-wide text-muted-foreground"><th className="sticky left-0 z-[1] bg-card px-1 py-1 text-left font-semibold">Item</th>
-          {periods.map((y) => <th key={y.year} className="whitespace-nowrap px-1 py-1 text-right font-semibold" title={y.date}>{y.year}</th>)}</tr></thead>
+        <thead><tr className="text-[10px] uppercase tracking-wide text-muted-foreground"><th className="sticky left-0 z-[1] border-r border-[var(--edge)] bg-card px-1 py-1 text-left font-semibold">Item</th>
+          {periods.map((y) => <th key={y.year} className="whitespace-nowrap py-1 pl-3 pr-1 text-right font-semibold" title={y.date}>{y.year}</th>)}</tr></thead>
         <tbody>
           {shown.map((r) => (
-            <tr key={r.label} className={cn("border-t", r.strong && "font-semibold")}><td className={cn("sticky left-0 z-[1] whitespace-nowrap bg-card px-1 py-1 pr-2", r.strong ? "text-foreground" : "text-muted-foreground")}>{r.label}</td>
-              {periods.map((y, i) => { const v = value(r, i); return <td key={y.year} className={cn("whitespace-nowrap px-1 py-1 text-right", v !== undefined && v < 0 && "text-neg")}>{show(r, v)}</td>; })}</tr>
+            <tr key={r.label} className={cn("border-t", r.strong && "font-semibold")}><td className={cn("sticky left-0 z-[1] min-w-[7.5rem] max-w-[9.5rem] border-r border-[var(--edge)] bg-card px-1 py-1 pr-2 leading-snug sm:max-w-none sm:whitespace-nowrap", r.strong ? "text-foreground" : "text-muted-foreground")}>{r.label}</td>
+              {periods.map((y, i) => { const v = value(r, i); return <td key={y.year} className={cn("whitespace-nowrap py-1 pl-3 pr-1 text-right", v !== undefined && v < 0 && "text-neg")}>{show(r, v)}</td>; })}</tr>
           ))}
         </tbody>
       </table>
@@ -73,15 +74,22 @@ const yearAgo = (y: YearFinancials, all: YearFinancials[]) => {
 const INCOME_ROWS = (quarterly: boolean): Row[] => [
   { label: "Revenue", key: "revenue", strong: true },
   { label: quarterly ? "Revenue growth (vs same quarter last year)" : "Revenue growth (vs last year)", calc: (y, all) => growth(y.revenue, yearAgo(y, all)?.revenue), fmt: "pct" },
+  { label: "Interest income", key: "interestIncome" },
+  { label: "Net interest income", key: "netInterestIncome" },
+  { label: "Fees & other income", key: "otherIncome" },
   { label: "Cost of revenue", key: "costOfRevenue" },
   { label: "Gross profit", key: "grossProfit" },
   { label: "Operating expenses", key: "operatingExpense" },
+  { label: "Total expenses", key: "totalExpenses" },
   { label: "EBITDA", key: "ebitda" },
+  { label: "Depreciation", key: "depreciation" },
   { label: "Operating profit", calc: (y) => y.operatingIncome ?? y.ebit },
   { label: "Operating margin", calc: (y) => pctOf(y.operatingIncome ?? y.ebit, y.revenue), fmt: "pct" },
-  { label: "Interest", key: "interestExpense" },
+  { label: "Interest paid", key: "interestExpense" },
   { label: "Profit before tax", key: "pretaxIncome" },
   { label: "Tax", key: "tax" },
+  { label: "Tax rate", calc: (y) => pctOf(y.tax, y.pretaxIncome), fmt: "pct" },
+  { label: "Minority interest", key: "minorityInterests" },
   { label: "Net profit", key: "netIncome", strong: true },
   { label: "Net margin", calc: (y) => pctOf(y.netIncome, y.revenue), fmt: "pct" },
   { label: quarterly ? "Profit growth (vs same quarter last year)" : "Profit growth (vs last year)", calc: (y, all) => growth(y.netIncome, yearAgo(y, all)?.netIncome), fmt: "pct" },
@@ -89,15 +97,29 @@ const INCOME_ROWS = (quarterly: boolean): Row[] => [
 ];
 
 const BALANCE_ROWS: Row[] = [
-  { label: "Total assets", key: "totalAssets" }, { label: "Total liabilities", key: "totalLiabilities" },
-  { label: "Shareholders’ equity", key: "equity", strong: true }, { label: "Total debt", key: "debt" }, { label: "Cash", key: "cash" },
+  { label: "Total assets", key: "totalAssets", strong: true },
+  { label: "Fixed assets (net)", key: "netPPE" }, { label: "Goodwill", key: "goodwill" }, { label: "Inventory", key: "inventory" },
+  { label: "Receivables", key: "receivables" }, { label: "Cash", key: "cash" }, { label: "Current assets", key: "currentAssets" },
+  { label: "Total liabilities", key: "totalLiabilities", strong: true }, { label: "Current liabilities", key: "currentLiabilities" },
+  { label: "Total debt", key: "debt" }, { label: "Net debt", key: "netDebt" },
+  { label: "Shareholders’ equity", key: "equity", strong: true }, { label: "Retained earnings", key: "retainedEarnings" },
+  { label: "Minority interest", key: "minorityInterest" }, { label: "Working capital", key: "workingCapital" },
+  { label: "Shares issued (Cr)", key: "shares" },
+  { label: "Book value per share (₹)", calc: (y) => (y.equity !== undefined && y.shares ? y.equity / y.shares : undefined), fmt: "rs" },
   { label: "Debt / equity", calc: (y) => (y.debt !== undefined && y.equity ? y.debt / y.equity : undefined), fmt: "ratio" },
   { label: "Current ratio", calc: (y) => (y.currentAssets !== undefined && y.currentLiabilities ? y.currentAssets / y.currentLiabilities : undefined), fmt: "ratio" },
 ];
 
 const CASH_ROWS: Row[] = [
-  { label: "Operating cash flow", key: "operatingCashFlow", strong: true }, { label: "Capital spending", key: "capex" },
-  { label: "Free cash flow", key: "freeCashFlow", strong: true }, { label: "Net profit", key: "netIncome" },
+  { label: "Cash from operating activities", key: "operatingCashFlow", strong: true },
+  { label: "Cash from investing activities", key: "investingCashFlow", strong: true },
+  { label: "Cash from financing activities", key: "financingCashFlow", strong: true },
+  { label: "Net change in cash", key: "netChangeInCash", strong: true },
+  { label: "Changes in working capital", key: "changeInWorkingCapital" },
+  { label: "Capital expenditures", key: "capex" },
+  { label: "Free cash flow", key: "freeCashFlow", strong: true },
+  { label: "Dividends paid", key: "dividendsPaid" }, { label: "Debt raised", key: "debtIssued" }, { label: "Debt repaid", key: "debtRepaid" },
+  { label: "Cash at end of period", key: "endCash" }, { label: "Net profit", key: "netIncome" },
   { label: "Cash flow ÷ profit", calc: (y) => pctOf(y.operatingCashFlow, y.netIncome), fmt: "pct" },
 ];
 
@@ -247,7 +269,7 @@ export function CompanyTab({ d }: { d: Decision }) {
       </Section>
 
       {/* Cash flow */}
-      <Section title={`Profit vs cash flow (₹ Cr) · ${noun}`}>
+      <Section title={`Cash flow (₹ Cr) · ${noun}`}>
         {has(periods, ["operatingCashFlow", "freeCashFlow"]) ? (
           <>
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11.5px] text-muted-foreground">

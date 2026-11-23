@@ -93,7 +93,10 @@ export function demoShareholding(symbol: string, seed: number): Shareholding {
 // ---------- live ----------
 const ITEMS = ["TotalRevenue", "NetIncome", "TotalAssets", "TotalLiabilitiesNetMinorityInterest", "StockholdersEquity", "TotalDebt",
   "CashAndCashEquivalents", "CurrentAssets", "CurrentLiabilities", "OperatingCashFlow", "CapitalExpenditure", "FreeCashFlow", "EBIT", "InterestExpense",
-  "CostOfRevenue", "GrossProfit", "OperatingExpense", "OperatingIncome", "EBITDA", "PretaxIncome", "TaxProvision", "DilutedEPS", "BasicEPS"];
+  "CostOfRevenue", "GrossProfit", "OperatingExpense", "OperatingIncome", "EBITDA", "PretaxIncome", "TaxProvision", "DilutedEPS", "BasicEPS",
+  "InterestIncome", "NetInterestIncome", "NonInterestIncome", "TotalExpenses", "ReconciledDepreciation", "DepreciationAndAmortizationInIncomeStatement", "MinorityInterests",
+  "InvestingCashFlow", "FinancingCashFlow", "ChangesInCash", "ChangeInWorkingCapital", "CashDividendsPaid", "IssuanceOfDebt", "RepaymentOfDebt", "EndCashPosition",
+  "NetPPE", "Goodwill", "Inventory", "AccountsReceivable", "RetainedEarnings", "NetDebt", "WorkingCapital", "MinorityInterest", "ShareIssued"];
 
 /** Indian fiscal year (April-March) label: a March 2025 statement is FY25; a September 2025 quarter is Q2 FY26. */
 export function periodLabel(date: string, period: "annual" | "quarterly"): string {
@@ -110,7 +113,9 @@ export function toPeriods(s: Record<string, { date: string; v: number }[]>, peri
   const income = ["TotalRevenue", "NetIncome", "PretaxIncome"].flatMap((t) => s[`${period}${t}`] ?? []);
   const dates = [...new Set((income.length ? income : Object.values(s).flat()).map((p) => p.date))].sort().slice(-keep);
   const raw = (t: string, d: string) => s[`${period}${t}`]?.find((p) => p.date === d)?.v;
-  const at = (t: string, d: string) => { const v = raw(t, d); return v === undefined ? undefined : Math.round(v / CR); };
+  // ₹ crore to two decimals (no rounding to whole crores).
+  const at = (t: string, d: string) => { const v = raw(t, d); return v === undefined ? undefined : Math.round((v / CR) * 100) / 100; };
+  const abs = (x?: number) => (x === undefined ? undefined : Math.abs(x));
   return dates.map((d) => {
     const capex = at("CapitalExpenditure", d);
     const eps = raw("DilutedEPS", d) ?? raw("BasicEPS", d);
@@ -123,6 +128,15 @@ export function toPeriods(s: Record<string, { date: string; v: number }[]>, peri
       costOfRevenue: at("CostOfRevenue", d), grossProfit: at("GrossProfit", d), operatingExpense: at("OperatingExpense", d),
       operatingIncome: at("OperatingIncome", d), ebitda: at("EBITDA", d), pretaxIncome: at("PretaxIncome", d), tax: at("TaxProvision", d),
       eps: eps === undefined ? undefined : Math.round(eps * 100) / 100,
+      interestIncome: at("InterestIncome", d), netInterestIncome: at("NetInterestIncome", d), otherIncome: at("NonInterestIncome", d),
+      totalExpenses: at("TotalExpenses", d), depreciation: at("ReconciledDepreciation", d) ?? at("DepreciationAndAmortizationInIncomeStatement", d),
+      minorityInterests: at("MinorityInterests", d),
+      investingCashFlow: at("InvestingCashFlow", d), financingCashFlow: at("FinancingCashFlow", d), netChangeInCash: at("ChangesInCash", d),
+      changeInWorkingCapital: at("ChangeInWorkingCapital", d), dividendsPaid: abs(at("CashDividendsPaid", d)), debtIssued: at("IssuanceOfDebt", d),
+      debtRepaid: abs(at("RepaymentOfDebt", d)), endCash: at("EndCashPosition", d),
+      netPPE: at("NetPPE", d), goodwill: at("Goodwill", d), inventory: at("Inventory", d), receivables: at("AccountsReceivable", d),
+      retainedEarnings: at("RetainedEarnings", d), netDebt: at("NetDebt", d), workingCapital: at("WorkingCapital", d),
+      minorityInterest: at("MinorityInterest", d), shares: at("ShareIssued", d),
     };
   });
 }
