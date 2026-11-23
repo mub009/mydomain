@@ -53,4 +53,10 @@ class User extends Authenticatable
     {
         return $this->hasMany(BrokerAccount::class);
     }
+
+    /** The user's own Kite Connect apps. */
+    public function kiteApps(): HasMany
+    {
+        return $this->hasMany(KiteApp::class);
+    }
 }

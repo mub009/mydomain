@@ -36,15 +36,8 @@ return [
     ],
 
 
-    /*
-     * Zerodha Kite Connect apps. Slot 1 is KITE_API_KEY / KITE_API_SECRET;
-     * add _2 … _5 only for accounts Zerodha won't allow on the first app.
-     */
+    /* Zerodha Kite Connect (each user's own apps are stored in the database). */
     'kite' => [
-        'apps' => collect(range(1, 5))->mapWithKeys(fn ($n) => [$n => [
-            'key' => env($n === 1 ? 'KITE_API_KEY' : "KITE_API_KEY_{$n}"),
-            'secret' => env($n === 1 ? 'KITE_API_SECRET' : "KITE_API_SECRET_{$n}"),
-        ]])->all(),
         'api_root' => env('KITE_API_ROOT', 'https://api.kite.trade'),
         'login_root' => env('KITE_LOGIN_ROOT', 'https://kite.zerodha.com'),
     ],

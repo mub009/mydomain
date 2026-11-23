@@ -23,5 +23,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/zerodha', [ZerodhaController::class, 'index']);
     Route::post('/zerodha/connect', [ZerodhaController::class, 'connect']);
+    Route::post('/zerodha/apps', [ZerodhaController::class, 'storeApp'])->middleware('throttle:20,1');
+    Route::delete('/zerodha/apps/{app}', [ZerodhaController::class, 'destroyApp']);
     Route::delete('/zerodha/accounts/{account}', [ZerodhaController::class, 'destroy']);
 });

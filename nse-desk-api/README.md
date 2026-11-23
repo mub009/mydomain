@@ -17,6 +17,13 @@ API-only Laravel 11 backend for **NSE Agent Desk** (the Next.js app in `../nse-a
 | POST | `/api/zerodha/connect` | token | `{ slot? }` → `{ url }`: open it to log in on Zerodha |
 | GET | `/api/zerodha/callback` | – | Zerodha's Redirect URL; returns the browser to the web app |
 | DELETE | `/api/zerodha/accounts/{id}` | token | disconnect one account |
+| POST | `/api/zerodha/apps` | token | `label?, api_key, api_secret` → save your Kite Connect app |
+| DELETE | `/api/zerodha/apps/{id}` | token | remove an app (its accounts are disconnected) |
+| PUT | `/api/auth/profile` | token | `name, email` |
+| PUT | `/api/auth/password` | token | `current_password, password, password_confirmation` (logs out other devices) |
+| GET | `/api/auth/devices` | token | how many devices are logged in |
+| POST | `/api/auth/logout-others` | token | log out every other device |
+| DELETE | `/api/auth/account` | token | `password` → delete the account |
 
 Send the token as `Authorization: Bearer <token>`. Errors are JSON; login and sign-up are limited to 10 tries a minute.
 
@@ -34,16 +41,17 @@ Needs PHP 8.2+, Composer and MySQL (or MariaDB), like Markkito.
    php artisan key:generate
    ```
    In `.env` set `APP_ENV=production`, `APP_DEBUG=false`, `APP_URL=https://nse-api.<your-domain>`,
-   the `DB_*` values (`DB_CONNECTION=mysql`), `FRONTEND_URL=https://nse-agent-desk.vercel.app`,
-   and `KITE_API_KEY` / `KITE_API_SECRET` from your Kite Connect app.
+   the `DB_*` values (`DB_CONNECTION=mysql`) and `FRONTEND_URL=https://nse-agent-desk.vercel.app`.
+   No Kite keys go in `.env`: each user adds their own Kite Connect app in the web app.
 4. **Set up the tables and caches:**
    ```bash
    php artisan migrate --force
    php artisan config:cache && php artisan route:cache
    chown -R www-data:www-data storage bootstrap/cache   # your web server's user
    ```
-5. **Zerodha:** in your Kite Connect app (developers.kite.trade) change the **Redirect URL** to
-   `https://nse-api.<your-domain>/api/zerodha/callback`.
+5. **Zerodha:** every Kite Connect app (developers.kite.trade) used with this API needs the **Redirect URL**
+   `https://nse-api.<your-domain>/api/zerodha/callback`. Users paste the app's API key and secret on the
+   Positions page; they're stored in the `kite_apps` table, the secret encrypted with `APP_KEY`.
 6. **Web app:** in Vercel, add `NEXT_PUBLIC_DESK_API=https://nse-api.<your-domain>` to the nse-agent-desk project and redeploy. The app then shows **Log in** and keeps each user's Zerodha accounts here.
 
 ### On cPanel hosting
@@ -54,7 +62,9 @@ Needs PHP 8.2+, Composer and MySQL (or MariaDB), like Markkito.
 
 After changing `.env` later, run `php artisan config:cache` again.
 
-**Several Zerodha accounts:** after connecting one, log out on kite.zerodha.com, then press **Connect another account** and log in with the next user ID. If Zerodha won't allow your app for that account, create another Kite Connect app and add it as `KITE_API_KEY_2` / `KITE_API_SECRET_2` (up to `_5`), with the same Redirect URL.
+**Several Zerodha accounts:** after connecting one, log out on kite.zerodha.com, then press **Connect another account** and log in with the next user ID. If Zerodha won't allow your app for that account, add another Kite Connect app (**Add another Kite app**, up to 10 per user) with the same Redirect URL.
+
+**Keep `APP_KEY` safe and unchanged** once users have saved Kite apps: it encrypts their secrets and Zerodha tokens, so a new key makes them unreadable (users would need to add their apps again).
 
 ## Local development
 

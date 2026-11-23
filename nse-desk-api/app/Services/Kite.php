@@ -9,30 +9,12 @@ use Illuminate\Support\Facades\Http;
 /**
  * Zerodha Kite Connect v3, read-only: login, holdings and positions.
  *
- * Apps come from KITE_API_KEY / KITE_API_SECRET, then _2 … _5 for accounts
- * Zerodha won't allow on the first app. One app can hold several accounts
- * when Zerodha allows it.
+ * Each user saves their own Kite Connect apps (API key and encrypted secret)
+ * in the database; an app array here is ['id', 'key', 'secret']. One app can
+ * hold several accounts when Zerodha allows it.
  */
 class Kite
 {
-    /** @return array<int, array{slot:int, key:string, secret:string}> */
-    public static function apps(): array
-    {
-        $out = [];
-        foreach (config('services.kite.apps') as $slot => $app) {
-            if (! empty($app['key']) && ! empty($app['secret'])) {
-                $out[$slot] = ['slot' => $slot, 'key' => $app['key'], 'secret' => $app['secret']];
-            }
-        }
-
-        return $out;
-    }
-
-    public static function app(int $slot): ?array
-    {
-        return self::apps()[$slot] ?? null;
-    }
-
     public static function loginUrl(array $app, string $state): string
     {
         return rtrim(config('services.kite.login_root'), '/').'/connect/login?'.http_build_query([
