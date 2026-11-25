@@ -354,7 +354,7 @@ export default function Home() {
           <div>
             <h3 className="text-[13px] font-bold">The desk</h3>
             <ul className="mt-3 space-y-2 text-[13px] text-muted-foreground">
-              {[["/dashboard", "Overview"], ["/markets", "Markets"], ["/screener", "Screener"], ["/positions", "Positions"], ["/chat", "Agents' chat"]].map(([h, l]) => (
+              {[["/dashboard", "Overview"], ["/markets", "Markets"], ["/screener", "Screener"], ["/positions", "Positions"], ["/watchlist", "Watchlist"], ["/chat", "Agents' chat"]].map(([h, l]) => (
                 <li key={h}><Link href={h} className="hover:text-foreground">{l}</Link></li>
               ))}
             </ul>

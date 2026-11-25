@@ -9,6 +9,7 @@ import { inr, istTime, pct } from "@/lib/format";
 import type { BrokerHolding, BrokerPosition } from "@/lib/broker/zerodha";
 import { marketStatus } from "@/lib/market/calendar";
 import { cn } from "@/lib/utils";
+import { refreshNote, type Refreshed } from "@/lib/broker/refresh-note";
 import { DESK_API, deskApi, useAuth } from "@/store/auth";
 import { useDesk } from "@/store/desk";
 import { useHoldings } from "@/store/holdings";
@@ -17,12 +18,24 @@ type Totals = { invested: number; value: number; pnl: number; pnlPct: number; da
 interface Account {
   id?: number; // set by the NSE Desk API
   slot: number; connected: boolean; expired?: boolean; error?: string; expiresAt?: string;
+  /** NSE Desk API: the Kite app it was connected through, and when its holdings were last saved from Zerodha. */
+  appId?: number; syncedAt?: string;
   user?: { id: string; name?: string };
   holdings?: BrokerHolding[]; positions?: BrokerPosition[]; totals?: Totals;
 }
 /** A Kite Connect app the user saved (NSE Desk API); the secret never comes back. */
 interface KiteAppInfo { id: number; label: string | null; apiKey: string; accounts: number }
-interface State { configured: boolean; apps: (number | KiteAppInfo)[]; redirectUrl?: string; accounts: Account[]; combined?: Totals; at?: string; expired?: boolean; needLogin?: boolean }
+interface State {
+  configured: boolean; apps: (number | KiteAppInfo)[]; redirectUrl?: string; accounts: Account[]; combined?: Totals; at?: string; expired?: boolean; needLogin?: boolean;
+  /** After a refresh (NSE Desk API): holdings that were sold (removed) or are new, and accounts that couldn't refresh. */
+  refreshed?: Refreshed;
+}
+
+const ago = (iso?: string) => {
+  if (!iso) return "never";
+  const m = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+  return m < 1 ? "just now" : m < 60 ? `${m} min ago` : `${istTime(iso)} IST${m >= 24 * 60 ? `, ${new Date(iso).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short" })}` : ""}`;
+};
 
 const MSG: Record<string, [string, boolean]> = {
   connected: ["Zerodha account connected.", true],
@@ -153,6 +166,8 @@ function AddKiteApp({ onSaved, first }: { onSaved: () => void; first: boolean })
   );
 }
 
+const label = (a: Account) => (a.user ? `${a.user.name ?? "Zerodha"} · ${a.user.id}` : "Zerodha account");
+
 export function ZerodhaCard() {
   const [s, setS] = useState<State | null>(null);
   const [busy, setBusy] = useState(false);
@@ -164,19 +179,32 @@ export function ZerodhaCard() {
   useEffect(() => { if (DESK_API && ready && !token) setNote(null); }, [ready, token]); // logged out: drop old messages
 
   // With the NSE Desk API (Laravel), accounts belong to your login; otherwise this site's own routes.
+  const show = useCallback((st: State) => {
+    setS(st);
+    // Let the stock window and the sell check know what you hold.
+    useHoldings.getState().setZerodha((st.accounts ?? []).flatMap((a) => (a.holdings ?? []).map((h) => ({ symbol: h.symbol, qty: h.qty, avgPrice: h.avgPrice, source: `Zerodha ${a.user?.id ?? ""}`.trim() }))));
+  }, []);
+  // NSE Desk API: the holdings saved in the database (fast, and still there after the session ends).
   const load = useCallback(async () => {
     if (DESK_API && !ready) return;
     if (DESK_API && !token) { setS({ configured: true, apps: [], accounts: [], needLogin: true }); return; }
     setBusy(true);
-    try {
-      const st: State = DESK_API ? await deskApi<State>("/api/zerodha") : await (await fetch("/api/broker/zerodha", { cache: "no-store" })).json();
-      setS(st);
-      // Let the stock window and the sell check know what you hold.
-      useHoldings.getState().setZerodha((st.accounts ?? []).flatMap((a) => (a.holdings ?? []).map((h) => ({ symbol: h.symbol, qty: h.qty, avgPrice: h.avgPrice, source: `Zerodha ${a.user?.id ?? ""}`.trim() }))));
-    }
+    try { show(DESK_API ? await deskApi<State>("/api/zerodha") : await (await fetch("/api/broker/zerodha", { cache: "no-store" })).json()); }
     catch { setS((x) => x ?? { configured: false, apps: [], accounts: [] }); }
     setBusy(false);
-  }, [ready, token]);
+  }, [ready, token, show]);
+  // Fetch again from Zerodha and save: sold stocks are removed, new ones added. `quiet` only speaks up when something changed.
+  const refresh = useCallback(async (quiet = false) => {
+    if (!DESK_API) return load();
+    setBusy(true);
+    try {
+      const st = await deskApi<State>("/api/zerodha/refresh", { method: "POST" });
+      show(st);
+      const r = st.refreshed;
+      if (r && (!quiet || r.removed.length || r.added.length || r.errors.length)) setNote(refreshNote(r, st.accounts.length));
+    } catch (e) { if (!quiet) setNote([(e as Error).message, false]); }
+    setBusy(false);
+  }, [load, show]);
 
   useEffect(() => {
     load();
@@ -185,12 +213,16 @@ export function ZerodhaCard() {
   }, [load]);
 
   const anyConnected = Boolean(s?.accounts.some((a) => a.connected));
-  // Refresh every minute in market hours while an account is connected.
+  // Saved data older than 10 minutes: bring it up to date once, quietly.
+  const stale = Boolean(DESK_API && s?.accounts.some((a) => a.connected && (!a.syncedAt || Date.now() - new Date(a.syncedAt).getTime() > 10 * 60_000)));
+  const [autoDone, setAutoDone] = useState(false);
+  useEffect(() => { if (stale && !autoDone) { setAutoDone(true); refresh(true); } }, [stale, autoDone, refresh]);
+  // Refresh in market hours while an account is connected: every minute (this site) or every 5 minutes (saved to the database).
   useEffect(() => {
     if (!anyConnected) return;
-    const t = setInterval(() => { if (marketStatus().open) load(); }, 60_000);
+    const t = setInterval(() => { if (marketStatus().open && document.visibilityState === "visible") refresh(true); }, DESK_API ? 5 * 60_000 : 60_000);
     return () => clearInterval(t);
-  }, [anyConnected, load]);
+  }, [anyConnected, refresh]);
 
   const [adding, setAdding] = useState(false);
   const callback = s?.redirectUrl ?? (DESK_API ? `${DESK_API}/api/zerodha/callback` : typeof window !== "undefined" ? `${window.location.origin}/api/broker/zerodha/callback` : "/api/broker/zerodha/callback");
@@ -200,12 +232,15 @@ export function ZerodhaCard() {
     catch (e) { setNote([(e as Error).message, false]); }
   };
   const disconnect = async (a: Account) => {
+    if (DESK_API && !window.confirm(`Remove ${label(a)}? Its saved holdings are deleted too. You can connect it again any time.`)) return;
     setNote(null);
     if (DESK_API && a.id) await deskApi(`/api/zerodha/accounts/${a.id}`, { method: "DELETE" }).catch(() => {});
     else await fetch(`/api/broker/zerodha/logout?slot=${a.slot}&user=${encodeURIComponent(a.user?.id ?? "")}`, { method: "POST" });
     load();
   };
   const connected = s?.accounts ?? [];
+  const live = connected.filter((a) => a.connected).length;
+  const synced = connected.map((a) => a.syncedAt).filter(Boolean).sort().at(-1);
   // Saved Kite apps (NSE Desk API), or this site's own app slots.
   const apps: KiteAppInfo[] = (s?.apps ?? []).map((x) => (typeof x === "number" ? { id: x, label: x === 1 ? null : `App ${x}`, apiKey: "", accounts: 0 } : x));
   const removeApp = async (a: KiteAppInfo) => {
@@ -222,7 +257,6 @@ export function ZerodhaCard() {
       </button>
     </span>
   );
-  const label = (a: Account) => (a.user ? `${a.user.name ?? "Zerodha"} · ${a.user.id}` : "Zerodha account");
   const end = connected.find((a) => a.expiresAt)?.expiresAt;
 
   return (
@@ -232,10 +266,12 @@ export function ZerodhaCard() {
         <div className="min-w-0 flex-1">
           <h2 className="text-[15px] font-semibold">Zerodha</h2>
           <p className="truncate text-xs text-muted-foreground">
-            {s?.configured ? `${connected.length ? `${connected.length} account${connected.length > 1 ? "s" : ""} connected` : "Not connected"} · read-only${anyConnected && s.at ? ` · updated ${istTime(s.at)} IST` : ""}` : "Your holdings and today's positions, read-only"}
+            {s?.configured
+              ? `${connected.length ? `${connected.length} account${connected.length > 1 ? "s" : ""}${live < connected.length ? ` (${live} connected)` : ""}` : "Not connected"} · read-only${DESK_API && synced ? ` · synced ${ago(synced)}` : anyConnected && s.at ? ` · updated ${istTime(s.at)} IST` : ""}`
+              : "Your holdings and today's positions, read-only"}
           </p>
         </div>
-        {anyConnected && <Button size="sm" variant="outline" onClick={load} disabled={busy}><RefreshCw className={cn(busy && "animate-spin")} />Refresh</Button>}
+        {anyConnected && <Button size="sm" variant="outline" onClick={() => refresh()} disabled={busy} title="Check Zerodha again: sold stocks are removed, new ones added"><RefreshCw className={cn(busy && "animate-spin")} />Refresh</Button>}
       </header>
 
       {note && <p className={cn("border-b border-[var(--edge)] px-4 py-2 text-[12.5px] font-medium", note[1] ? "text-pos" : "text-neg")}>{note[0]}</p>}
@@ -271,7 +307,7 @@ export function ZerodhaCard() {
         <div className="divide-y divide-[var(--edge)]">
           {s.combined && (
             <div className="space-y-2 p-4">
-              <h3 className="text-[13px] font-semibold">All accounts <span className="font-normal text-muted-foreground">{connected.length} connected</span></h3>
+              <h3 className="text-[13px] font-semibold">All accounts <span className="font-normal text-muted-foreground">{connected.length} account{connected.length > 1 ? "s" : ""}</span></h3>
               <TotalsRow t={s.combined} count={connected.reduce((n, a) => n + (a.positions?.length ?? 0), 0)} />
             </div>
           )}
@@ -279,8 +315,16 @@ export function ZerodhaCard() {
             <div key={`${a.id ?? a.slot}-${a.user?.id}`} className="space-y-3 p-4">
               <div className="flex flex-wrap items-center gap-2">
                 <h3 className="min-w-0 flex-1 truncate text-[14px] font-semibold">{label(a)}</h3>
-                <Button size="sm" variant="ghost" onClick={() => disconnect(a)}><LogOut />Disconnect</Button>
+                {DESK_API && !a.connected && a.appId && <Button size="sm" onClick={() => connect(a.appId!)}><Link2 />Reconnect</Button>}
+                <Button size="sm" variant="ghost" onClick={() => disconnect(a)}><LogOut />{DESK_API ? "Remove" : "Disconnect"}</Button>
               </div>
+              {DESK_API && (
+                <p className={cn("text-[12px]", a.connected ? "text-muted-foreground" : "rounded-lg bg-warn-bg px-2.5 py-1.5 text-warn-fg")}>
+                  {a.connected
+                    ? `Saved from Zerodha ${ago(a.syncedAt)}. Refresh checks again and removes stocks you've sold.`
+                    : `Session ended (Kite sessions end at 6:00 AM IST). Showing the holdings saved ${ago(a.syncedAt)}; reconnect to refresh them.`}
+                </p>
+              )}
               {a.error ? <p className="text-[13px] text-neg">Couldn&apos;t load from Zerodha: {a.error}</p> : <AccountView a={a} onOpen={(sym) => searchStock(sym)} />}
             </div>
           ))}
@@ -296,7 +340,7 @@ export function ZerodhaCard() {
                 {apps.map((app) => (
                   <li key={app.id} className="flex flex-wrap items-center gap-3 px-3 py-2.5">
                     <KeyRound className="size-4 shrink-0 text-muted-foreground" />
-                    <span className="min-w-0 flex-1">
+                    <span className="min-w-0 flex-1 basis-44">
                       <b className="block truncate text-[13px] font-semibold">{app.label ?? "Kite Connect app"}</b>
                       <span className="text-[11.5px] text-muted-foreground"><span className="font-mono">{app.apiKey}</span> · {app.accounts} account{app.accounts === 1 ? "" : "s"} connected</span>
                     </span>
@@ -325,7 +369,7 @@ export function ZerodhaCard() {
           </div>
           {anyConnected && (
             <p className="px-4 py-3 text-[11.5px] text-muted-foreground">
-              From Zerodha, read-only. Tap a stock for the agents&apos; analysis. Refreshes every minute in market hours; sessions end at 6:00 AM IST{end ? ` (${new Date(end).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })})` : ""}.
+              From Zerodha, read-only{DESK_API ? ", saved to your account" : ""}. Tap a stock for the agents&apos; analysis. Refreshes every {DESK_API ? "5 minutes" : "minute"} in market hours; sessions end at 6:00 AM IST{end ? ` (${new Date(end).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })})` : ""}.
 
             </p>
           )}

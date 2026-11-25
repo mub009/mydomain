@@ -7,7 +7,12 @@ import type { StockHit } from "@/lib/market/search";
 import { cn } from "@/lib/utils";
 import { useDesk } from "@/store/desk";
 
-export function StockFinder({ className, hotkey = true, autoFocus = false, onPicked }: { className?: string; hotkey?: boolean; autoFocus?: boolean; onPicked?: () => void }) {
+export function StockFinder({ className, hotkey = true, autoFocus = false, onPicked, onChoose, placeholder }: {
+  className?: string; hotkey?: boolean; autoFocus?: boolean; onPicked?: () => void;
+  /** Use the chosen stock yourself (e.g. add it to the watchlist) instead of opening it. */
+  onChoose?: (h: StockHit) => void;
+  placeholder?: string;
+}) {
   const listId = useId();
   const searchStock = useDesk((s) => s.searchStock);
   const [q, setQ] = useState("");
@@ -45,7 +50,7 @@ export function StockFinder({ className, hotkey = true, autoFocus = false, onPic
   }, [q]);
 
   function pick(h: StockHit) {
-    searchStock(h.symbol, { name: h.name, sector: h.sector });
+    if (onChoose) onChoose(h); else searchStock(h.symbol, { name: h.name, sector: h.sector });
     setQ(""); setHits([]); setOpen(false);
     ref.current?.blur();
     onPicked?.();
@@ -69,7 +74,7 @@ export function StockFinder({ className, hotkey = true, autoFocus = false, onPic
         onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 150)}
         role="combobox" aria-expanded={open && hits.length > 0} aria-controls={listId} aria-autocomplete="list"
         aria-activedescendant={open && hits[active] ? `${listId}-${active}` : undefined}
-        aria-label="Search any NSE stock" placeholder="Search any NSE stock…"
+        aria-label={placeholder ?? "Search any NSE stock"} placeholder={placeholder ?? "Search any NSE stock…"}
         className="well h-10 w-full rounded-xl border-0 pl-9 pr-9 text-[13.5px] placeholder:text-muted-foreground/70 focus-visible:outline-2 focus-visible:outline-primary" />
       {loading ? <Loader2 className="absolute right-3 top-1/2 size-4 -translate-y-1/2 animate-spin text-muted-foreground" aria-label="Searching" />
         : !q && <kbd className="absolute right-2.5 top-1/2 hidden -translate-y-1/2 rounded border border-[var(--edge)] px-1.5 text-[10.5px] text-muted-foreground sm:block">/</kbd>}

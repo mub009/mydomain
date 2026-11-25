@@ -55,6 +55,11 @@ class User extends Authenticatable
     }
 
     /** The user's own Kite Connect apps. */
+    public function watchlist(): HasMany
+    {
+        return $this->hasMany(WatchlistItem::class);
+    }
+
     public function kiteApps(): HasMany
     {
         return $this->hasMany(KiteApp::class);

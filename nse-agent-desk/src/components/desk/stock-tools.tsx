@@ -1,8 +1,8 @@
 "use client";
 
 /** Small shared pieces for stock lists: current price, copy the symbol, open in TradingView, buy-zone filter. */
-import { Check, Copy, ExternalLink } from "lucide-react";
-import { useState } from "react";
+import { Check, Copy, ExternalLink, Star } from "lucide-react";
+import { useEffect, useState } from "react";
 import { inr, pct } from "@/lib/format";
 import { tradingViewUrl, type Quote } from "@/lib/market/quotes";
 import type { Decision } from "@/lib/types";
@@ -10,6 +10,7 @@ import { currentPrice, matchesZone, ZONE_FILTERS, TOP_N, TRADE_FILTERS, type Zon
 export { currentPrice, lastClose, matchesZone, matchesTrade, ZONE_FILTERS, TOP_N, TRADE_FILTERS, type ZoneFilter, type TradeFilter } from "@/lib/stock-view";
 import { cn } from "@/lib/utils";
 import { useQuoteStore } from "@/store/quotes";
+import { useWatchlist } from "@/store/watchlist";
 
 export function PriceCell({ d, q, className, align = "right" }: { d: Pick<Decision, "spark" | "entry" | "symbol">; q?: Quote; className?: string; align?: "left" | "right" }) {
   const p = currentPrice(d, q);
@@ -107,5 +108,19 @@ export function TradeChips({ value, onChange, count, className }: {
         </button>
       ))}
     </div>
+  );
+}
+
+/** ☆ Watch / ★ Watching: adds or removes the stock from the watchlist (with today's price, to show the move since). */
+export function WatchButton({ symbol, price, className }: { symbol: string; price?: number; className?: string }) {
+  const { loaded, load, add, remove } = useWatchlist();
+  const on = useWatchlist((s) => s.items.some((x) => x.symbol === symbol));
+  useEffect(() => { if (!loaded) load(); }, [loaded, load]);
+  return (
+    <button type="button" onClick={(e) => { e.stopPropagation(); if (on) remove(symbol); else add(symbol, { price }); }} aria-pressed={on}
+      title={on ? `Remove ${symbol} from your watchlist` : `Add ${symbol} to your watchlist`}
+      className={cn("btn-3d inline-flex h-9 items-center gap-1.5 rounded-xl px-3 text-[13px] font-semibold", on && "text-[var(--watch-fg)]", className)}>
+      <Star className={cn("size-4", on && "fill-current")} /><span className="max-sm:hidden">{on ? "Watching" : "Watch"}</span>
+    </button>
   );
 }

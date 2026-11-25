@@ -4,17 +4,19 @@
  * the API host's bot check, which sometimes answers instead of the API, is
  * retried here on the server.
  */
+import { safePath } from "@/lib/desk-path";
+
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
 const BASE = (process.env.DESK_API_URL ?? process.env.NEXT_PUBLIC_DESK_API ?? "").replace(/\/$/, "");
-const SAFE = /^[A-Za-z0-9/_-]+$/; // api paths only: auth/login, zerodha/accounts/12 …
+
 
 async function forward(req: Request, ctx: { params: Promise<{ path: string[] }> }) {
   const { path } = await ctx.params;
-  const sub = path.join("/");
   if (!BASE) return Response.json({ message: "The NSE Desk API is not set up on this site." }, { status: 503 });
-  if (!SAFE.test(sub) || sub.includes("..")) return Response.json({ message: "Not found" }, { status: 404 });
+  if (!safePath(path)) return Response.json({ message: "Not found" }, { status: 404 });
+  const sub = path.map(encodeURIComponent).join("/");
   const url = `${BASE}/api/${sub}${new URL(req.url).search}`;
   const headers: Record<string, string> = { accept: "application/json", "user-agent": "NSE-Agent-Desk/1.0 (+https://nse-agent-desk.vercel.app)" };
   for (const h of ["authorization", "content-type"]) { const v = req.headers.get(h); if (v) headers[h] = v; }

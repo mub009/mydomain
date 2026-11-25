@@ -47,6 +47,15 @@ On Nifty 500 / All NSE, the quick scan keeps up to 40 stocks turning up from a b
 
 **Where:** a **Trade** filter (All / Short swing / Positional / Long swing) on Final Picks and the Screener; the Screener has a *From bottom* column; the stock window's Research tab has a *Long swing · from the bottom* card; Trend Agent announces the long swing list in the team chat.
 
+## Zerodha saved to your account, Refresh, and Watchlist
+
+With the NSE Desk API (logged in):
+- **Saved:** Zerodha holdings and positions are stored in the API's database. The Positions page loads them from there, so they still show after the daily 6:00 AM session end (with a *Session ended · Reconnect* notice).
+- **Refresh** fetches every connected account from Zerodha again and saves it. **Stocks you've sold are removed**, new ones added, and a note says exactly what changed ("Removed 1 sold: ITC (25 sh). New: TCS (4 sh)."). Saved data older than 10 minutes is refreshed quietly when the page opens, and every 5 minutes in market hours.
+- **Remove** deletes an account and its saved holdings.
+
+**Watchlist** (menu → Watchlist): stocks to keep an eye on, separate from holdings. Add any NSE stock by name or symbol, or press **☆ Watch** in a stock's window. Each row shows the current price, today's change, the move since you added it, the last analysis's verdict and buy-zone plan, your note, TradingView and Remove. Logged in, it's saved to your account (same list on every device); otherwise in this browser, and moved to your account when you log in.
+
 ## The team
 
 | Agent | Role | What they do |

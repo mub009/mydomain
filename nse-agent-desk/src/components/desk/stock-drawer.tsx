@@ -44,7 +44,7 @@ function useQuote(symbol: string | undefined) {
   return q;
 }
 import { StockChart } from "./stock-chart";
-import { CopySymbol, TradingViewLink } from "./stock-tools";
+import { CopySymbol, TradingViewLink, WatchButton } from "./stock-tools";
 import { StockAgentsTab } from "./stock-agents-tab";
 import { useState } from "react";
 import { RiskTag, VerdictBadge } from "./primitives";
@@ -315,6 +315,7 @@ export function StockDrawer() {
                   className={cn("btn-3d grid size-9 place-items-center rounded-full text-muted-foreground hover:text-foreground", finding && "text-primary")}>
                   <Search className="size-4" />
                 </button>
+                <WatchButton symbol={d.symbol} price={quote?.last ?? d.entry} className="max-sm:w-9 max-sm:justify-center max-sm:px-0" />
                 <TradingViewLink symbol={d.symbol} compact className="max-sm:w-9 max-sm:justify-center max-sm:px-0" />
                 <TrackTradeButton d={d} className="h-9" />
                 <Dialog.Close aria-label="Close" className="btn-3d grid size-9 place-items-center sm:size-10 rounded-full text-muted-foreground hover:text-foreground">
