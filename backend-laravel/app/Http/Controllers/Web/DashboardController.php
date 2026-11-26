@@ -39,6 +39,8 @@ class DashboardController extends Controller
         'logins' => ['label' => 'Business logins', 'icon' => 'key-round', 'privilege' => 'MANAGE_LISTINGS', 'dealerOnly' => true],
         // Collected, commission, paid and due to the admin (dealers only).
         'commission' => ['label' => 'Commission', 'icon' => 'receipt', 'privilege' => 'MANAGE_LISTINGS', 'dealerOnly' => true],
+        // The QR boards a dealer generated or attached (dealers only).
+        'qr' => ['label' => 'QR Boards', 'icon' => 'qr-code', 'privilege' => 'MANAGE_LISTINGS', 'dealerOnly' => true],
     ];
 
     // "Show 5 / 10 / 20 / 50" on the Listings and Business logins lists
@@ -178,8 +180,17 @@ class DashboardController extends Controller
             ? (InternalApi::tryCall([\App\Http\Controllers\CommissionController::class, 'mine'], ['page' => $bizPage], [], true)['data'] ?? null)
             : null;
 
+        $qr = $tab === 'qr'
+            ? InternalApi::tryCall([QrCodeController::class, 'index'], array_filter([
+                'search' => trim((string) $request->query('search')) ?: null,
+                'status' => in_array($request->query('status'), ['UNASSIGNED', 'ASSIGNED', 'DISABLED'], true) ? $request->query('status') : null,
+                'page' => $bizPage,
+            ]), [], true)
+            : null;
+
         return view('pages.dashboard.index', [
             'user' => $user,
+            'qr' => $qr,
             'renewals' => $renewals,
             'commission' => $commission,
             'commissionReport' => $commissionReport,

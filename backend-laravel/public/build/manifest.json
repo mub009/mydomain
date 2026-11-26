@@ -36,13 +36,6 @@
       "_ui-BdSpcnW7.js"
     ]
   },
-  "_commission-charts-CadtPEUw.js": {
-    "file": "assets/commission-charts-CadtPEUw.js",
-    "name": "commission-charts",
-    "imports": [
-      "_ui-BdSpcnW7.js"
-    ]
-  },
   "_gold-rate-render-G4iVm5KL.js": {
     "file": "assets/gold-rate-render-G4iVm5KL.js",
     "name": "gold-rate-render",
@@ -56,6 +49,16 @@
     "imports": [
       "_api-B_riRJ0q.js",
       "_ui-BdSpcnW7.js"
+    ]
+  },
+  "_qr-boards-CJuVc8DU.js": {
+    "file": "assets/qr-boards-CJuVc8DU.js",
+    "name": "qr-boards",
+    "imports": [
+      "_ui-BdSpcnW7.js",
+      "_api-B_riRJ0q.js",
+      "_channels-DDVzhx-F.js",
+      "_widgets-D0FAX2Ot.js"
     ]
   },
   "_searchable-select-DGJiky5z.js": {
@@ -108,18 +111,18 @@
     ]
   },
   "resources/js/pages/admin.js": {
-    "file": "assets/admin-D8MIUlg_.js",
+    "file": "assets/admin-CC-U1EAf.js",
     "name": "admin",
     "src": "resources/js/pages/admin.js",
     "isEntry": true,
     "imports": [
       "_api-B_riRJ0q.js",
-      "_commission-charts-CadtPEUw.js",
-      "_channels-DDVzhx-F.js",
+      "_qr-boards-CJuVc8DU.js",
       "_ui-BdSpcnW7.js",
       "_searchable-select-DGJiky5z.js",
       "_state-city-C9nNh1Xh.js",
       "_widgets-D0FAX2Ot.js",
+      "_channels-DDVzhx-F.js",
       "__commonjsHelpers-CqkleIqs.js"
     ]
   },
@@ -208,13 +211,13 @@
     ]
   },
   "resources/js/pages/dashboard.js": {
-    "file": "assets/dashboard-DT-g4wzO.js",
+    "file": "assets/dashboard-BrQvR8VG.js",
     "name": "dashboard",
     "src": "resources/js/pages/dashboard.js",
     "isEntry": true,
     "imports": [
       "_api-B_riRJ0q.js",
-      "_commission-charts-CadtPEUw.js",
+      "_qr-boards-CJuVc8DU.js",
       "_ui-BdSpcnW7.js",
       "_widgets-D0FAX2Ot.js",
       "_channels-DDVzhx-F.js",

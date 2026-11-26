@@ -282,6 +282,11 @@ Route::prefix('qr-codes')->group(function () {
         Route::get('/assignable-businesses', [QrCodeController::class, 'assignableBusinesses']);
         Route::post('/claim', [QrCodeController::class, 'claim']);
     });
+    // A dealer's own boards: generate a batch, and list them.
+    Route::middleware(['auth.jwt', 'role:DEALER', 'privilege:MANAGE_LISTINGS'])->group(function () {
+        Route::get('/mine', [QrCodeController::class, 'index']);
+        Route::post('/mine/batch', [QrCodeController::class, 'generateBatch']);
+    });
 });
 
 // Public: the welcome popup posts here once the visitor consents.

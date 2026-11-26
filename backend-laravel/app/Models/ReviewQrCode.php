@@ -17,7 +17,7 @@ class ReviewQrCode extends Model
     protected $table = 'review_qr_codes';
 
     protected $fillable = [
-        'code', 'status', 'channel', 'batchLabel', 'businessId', 'assignedAt', 'assignedById', 'scanCount',
+        'code', 'status', 'channel', 'batchLabel', 'businessId', 'assignedAt', 'assignedById', 'scanCount', 'createdById',
     ];
 
     protected function casts(): array

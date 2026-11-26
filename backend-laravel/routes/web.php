@@ -87,13 +87,20 @@ Route::middleware('web.role:BUSINESS_OWNER,DEALER,ADMIN')->group(function () {
     Route::get('/dashboard/businesses/{id}/gold-rates/{templateId}/thumb', [GoldRatePageController::class, 'ownerTemplateThumb']);
 });
 
+// QR boards as images, one PNG per code, in a ZIP (?codes=MK-100001,MK-100002),
+// and a shareable link to the same boards, for WhatsApp. A dealer gets only
+// the boards they generated or attached.
+Route::middleware('web.role:DEALER,ADMIN')->group(function () {
+    Route::get('/qr-codes.zip', [QrCodeController::class, 'downloadZip']);
+    Route::get('/qr-codes/share-link', [QrCodeController::class, 'shareLink']);
+    // The admin page's older paths.
+    Route::get('/admin/qr-codes.zip', [QrCodeController::class, 'downloadZip']);
+    Route::get('/admin/qr-codes/share-link', [QrCodeController::class, 'shareLink']);
+});
+
 Route::middleware('web.role:ADMIN')->group(function () {
     Route::get('/admin', AdminPageController::class);
     Route::get('/admin/online', [AdminPageController::class, 'online']);
-    // QR boards as images, one PNG per code, in a ZIP (?codes=MK-100001,MK-100002).
-    Route::get('/admin/qr-codes.zip', [QrCodeController::class, 'downloadZip']);
-    // A shareable link to the same boards (?codes=…), for WhatsApp.
-    Route::get('/admin/qr-codes/share-link', [QrCodeController::class, 'shareLink']);
     // The digital-visiting-card template editor.
     Route::get('/admin/card-templates/{id}', [AdminPageController::class, 'cardTemplate']);
     // The gold-rate template editor, and the stored images it draws on —

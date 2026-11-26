@@ -65,10 +65,22 @@ class QrCodeController extends Controller
     // Admin issues a batch of boards, optionally all pointing at one
     // platform (picked from the list). Codes are unique; collisions are
     // retried.
+    // Dealers make boards for the shops they sign up: up to 100 at a time.
+    public const DEALER_BATCH_MAX = 100;
+
+    // A dealer sees the boards they generated, and any they attached to a shop.
+    private function scopeToDealer($query, array $actor)
+    {
+        return $actor['role'] === 'DEALER'
+            ? $query->where(fn ($q) => $q->where('createdById', $actor['sub'])->orWhere('assignedById', $actor['sub']))
+            : $query;
+    }
+
     public function generateBatch(Request $request)
     {
+        $actor = $request->attributes->get('auth');
         $data = $request->validate([
-            'count' => ['required', 'integer', 'min:1', 'max:500'],
+            'count' => ['required', 'integer', 'min:1', 'max:'.($actor['role'] === 'DEALER' ? self::DEALER_BATCH_MAX : 500)],
             'batchLabel' => ['sometimes', 'nullable', 'string', 'max:100'],
             'channel' => ['sometimes', 'nullable', 'in:'.implode(',', ReviewChannels::ALL)],
         ]);
@@ -86,6 +98,7 @@ class QrCodeController extends Controller
                         'channel' => $data['channel'] ?? null,
                         'status' => 'UNASSIGNED',
                         'scanCount' => 0,
+                        'createdById' => $actor['sub'] ?? null,
                     ]);
                     $created[] = $code;
                     break;
@@ -109,8 +122,10 @@ class QrCodeController extends Controller
             'batchLabel' => ['sometimes', 'nullable', 'string', 'max:100'],
         ]);
         $pagination = Pagination::parse($request->query());
+        $actor = $request->attributes->get('auth');
+        $mine = fn () => $this->scopeToDealer(ReviewQrCode::query(), $actor);
 
-        $query = ReviewQrCode::query();
+        $query = $mine();
         if ($status = $request->query('status')) {
             $query->where('status', $status);
         }
@@ -136,8 +151,8 @@ class QrCodeController extends Controller
                 'totalPages' => $pagination['pageSize'] > 0 ? ((int) ceil($total / $pagination['pageSize']) ?: 1) : 1,
             ],
             'summary' => [
-                'unassigned' => ReviewQrCode::where('status', 'UNASSIGNED')->count(),
-                'assigned' => ReviewQrCode::where('status', 'ASSIGNED')->count(),
+                'unassigned' => $mine()->where('status', 'UNASSIGNED')->count(),
+                'assigned' => $mine()->where('status', 'ASSIGNED')->count(),
             ],
         ]);
     }
@@ -370,10 +385,18 @@ class QrCodeController extends Controller
     {
         $wanted = collect(explode(',', (string) $request->query('codes')))
             ->map(fn ($c) => $this->normalizeCode($c))->filter(fn ($c) => strlen($c) > 3)->unique()->take(500)->values();
-        $codes = ReviewQrCode::whereIn('code', $wanted)->pluck('code')->sort()->values();
+        $codes = $this->webScoped()->whereIn('code', $wanted)->pluck('code')->sort()->values();
         abort_if($codes->isEmpty(), 404);
 
         return $this->zipResponse($codes, $this->publicBase($request));
+    }
+
+    // Boards the signed-in page user may download or share: a dealer, their own.
+    private function webScoped()
+    {
+        $user = \App\Support\WebAuth::user();
+
+        return $this->scopeToDealer(ReviewQrCode::query(), ['role' => $user?->role, 'sub' => $user?->id]);
     }
 
     // The address the QR codes carry: the QR domain (mydomainbook.com), so a
@@ -487,7 +510,7 @@ class QrCodeController extends Controller
     {
         $wanted = collect(explode(',', (string) $request->query('codes')))
             ->map(fn ($c) => $this->normalizeCode($c))->filter(fn ($c) => strlen($c) > 3)->unique()->take(500)->values();
-        $codes = ReviewQrCode::whereIn('code', $wanted)->pluck('code')->values();
+        $codes = $this->webScoped()->whereIn('code', $wanted)->pluck('code')->values();
         abort_if($codes->isEmpty(), 404);
         $packed = $this->packCodes($codes);
 
