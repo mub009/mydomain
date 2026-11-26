@@ -49,6 +49,8 @@ class ReviewLinkController extends Controller
                 'DIRECTIONS' => ReviewChannels::directions($business),
                 'MARKKITO' => ReviewChannels::markkito($business),
                 'MARKKITO_REVIEW' => ReviewChannels::markkitoReview($business),
+                'AI_REVIEW' => ReviewChannels::aiReview($business),
+                'ONE_REVIEW' => ReviewChannels::oneReview($business),
             ],
             'scanCounts' => (object) $scans->map(fn ($v) => (int) $v)->toArray(),
             'totalScans' => (int) $scans->sum(),

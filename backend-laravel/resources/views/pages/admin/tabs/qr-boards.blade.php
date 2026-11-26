@@ -5,7 +5,7 @@
     $tint = ['UNASSIGNED' => 'bg-gray-100 text-gray-600', 'ASSIGNED' => 'bg-emerald-50 text-emerald-700', 'DISABLED' => 'bg-red-50 text-red-700'];
     $channelLabels = [
         'GOOGLE' => 'Google review', 'INSTAGRAM' => 'Instagram', 'FACEBOOK' => 'Facebook', 'YOUTUBE' => 'YouTube',
-        'WEBSITE' => 'Website', 'DIRECTIONS' => 'Directions to shop', 'MARKKITO_REVIEW' => 'Markkito review', 'MARKKITO' => 'Markkito business page',
+        'WEBSITE' => 'Website', 'DIRECTIONS' => 'Directions to shop', 'AI_REVIEW' => 'AI Google Review page', 'ONE_REVIEW' => 'One Review page', 'MARKKITO_REVIEW' => 'Markkito review', 'MARKKITO' => 'Markkito business page',
     ];
 @endphp
 <div>

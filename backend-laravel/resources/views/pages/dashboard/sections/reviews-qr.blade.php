@@ -6,13 +6,16 @@
         ['YOUTUBE', 'YouTube', 'youtube', 'text-red-600'],
         ['WEBSITE', 'Website', 'globe', 'text-brand-600'],
         ['DIRECTIONS', 'Directions', 'navigation', 'text-sky-600'],
+        // Its own review pages, when it has those features.
+        ['AI_REVIEW', 'AI Google Review', 'sparkles', 'text-brand-600'],
+        ['ONE_REVIEW', 'One Review page', 'star', 'text-amber-600'],
         // Built from the listing itself, so these two are ready with no setup.
         ['MARKKITO_REVIEW', 'Markkito review', 'message-square-plus', 'text-brand-600'],
         ['MARKKITO', 'Markkito page', 'building-2', 'text-brand-600'],
     ];
     $boardChannels = [
         'GOOGLE' => 'Google review', 'INSTAGRAM' => 'Instagram', 'FACEBOOK' => 'Facebook', 'YOUTUBE' => 'YouTube',
-        'WEBSITE' => 'Website', 'DIRECTIONS' => 'Directions to shop', 'MARKKITO_REVIEW' => 'Markkito review', 'MARKKITO' => 'Markkito business page',
+        'WEBSITE' => 'Website', 'DIRECTIONS' => 'Directions to shop', 'AI_REVIEW' => 'AI Google Review page', 'ONE_REVIEW' => 'One Review page', 'MARKKITO_REVIEW' => 'Markkito review', 'MARKKITO' => 'Markkito business page',
     ];
     $resolved = $links['resolved'] ?? [];
     $configured = array_filter($channels, fn ($c) => ! empty($resolved[$c[0]]));

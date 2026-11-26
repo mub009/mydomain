@@ -188,4 +188,66 @@ class ReviewQrTest extends TestCase
     {
         $this->get('/r/q/MK-NOPE01')->assertRedirect(config('frontend.origin').'/qr/MK-NOPE01?unknown=1');
     }
+
+    public function test_new_boards_are_numbered_in_order(): void
+    {
+        $token = $this->token($this->user(['role' => 'ADMIN']));
+        $auth = ['Authorization' => "Bearer {$token}"];
+        // An older board with a letter code doesn't get in the way.
+        ReviewQrCode::create(['code' => 'MK-ABC123', 'status' => 'UNASSIGNED', 'scanCount' => 0]);
+
+        $this->postJson('/api/v1/admin/qr-codes/batch', ['count' => 3], $auth)->assertStatus(201)
+            ->assertJsonPath('data.codes', ['MK-100001', 'MK-100002', 'MK-100003']);
+        // The next batch carries on.
+        $this->postJson('/api/v1/admin/qr-codes/batch', ['count' => 2], $auth)->assertStatus(201)
+            ->assertJsonPath('data.codes', ['MK-100004', 'MK-100005']);
+
+        // Typed by hand, the number is enough.
+        $this->getJson('/api/v1/qr-codes/lookup/mk 100004')->assertStatus(200)->assertJsonPath('data.code', 'MK-100004');
+    }
+
+    public function test_the_admin_downloads_boards_as_qr_images_in_a_zip(): void
+    {
+        $admin = $this->user(['role' => 'ADMIN']);
+        $token = $this->token($admin);
+        $this->postJson('/api/v1/admin/qr-codes/batch', ['count' => 2], ['Authorization' => "Bearer {$token}"])->assertStatus(201);
+
+        $this->post('/login', ['email' => $admin->email, 'password' => 'Password123!']);
+        $response = $this->get('/admin/qr-codes.zip?codes=MK-100001,mk-100002,MK-999999')->assertOk()
+            ->assertHeader('Content-Type', 'application/zip');
+        $this->assertStringContainsString('qr-boards-MK-100001-to-MK-100002.zip', $response->headers->get('Content-Disposition'));
+        $zip = new \ZipArchive;
+        $zip->open($response->getFile()->getPathname());
+        $this->assertSame(2, $zip->numFiles);
+        $this->assertSame(['MK-100001.png', 'MK-100002.png'], [$zip->getNameIndex(0), $zip->getNameIndex(1)]);
+        // A real PNG of the board's scan address.
+        $this->assertStringStartsWith("\x89PNG", $zip->getFromName('MK-100001.png'));
+        $zip->close();
+
+        // Only admins.
+        $this->post('/logout');
+        $owner = $this->user(['role' => 'BUSINESS_OWNER']);
+        $this->post('/login', ['email' => $owner->email, 'password' => 'Password123!']);
+        $this->get('/admin/qr-codes.zip?codes=MK-100001')->assertRedirect();
+    }
+
+    public function test_a_board_can_open_the_ai_review_or_one_review_page(): void
+    {
+        $owner = $this->user(['role' => 'BUSINESS_OWNER']);
+        $business = $this->business($owner, ['slug' => 'spice-shop', 'features' => ['AI_REVIEW', 'ONE_REVIEW']]);
+        $origin = config('frontend.origin');
+        $ai = ReviewQrCode::create(['code' => 'MK-100001', 'status' => 'ASSIGNED', 'businessId' => $business->id, 'channel' => 'AI_REVIEW', 'scanCount' => 0]);
+        ReviewQrCode::create(['code' => 'MK-100002', 'status' => 'ASSIGNED', 'businessId' => $business->id, 'channel' => 'ONE_REVIEW', 'scanCount' => 0]);
+        // Not attached yet: it waits (the claim screen).
+        ReviewQrCode::create(['code' => 'MK-100003', 'status' => 'UNASSIGNED', 'scanCount' => 0]);
+
+        $this->get('/r/q/MK-100001')->assertRedirect("{$origin}/review/spice-shop");
+        $this->get('/r/q/MK-100002')->assertRedirect("{$origin}/one/spice-shop");
+        $this->get('/r/q/MK-100003')->assertRedirect("{$origin}/qr/MK-100003");
+        $this->assertSame(1, $ai->fresh()->scanCount);
+
+        // Without the feature, the board falls back to what the shop has.
+        $business->update(['features' => ['VISITING_CARD']]);
+        $this->get('/r/q/MK-100001')->assertRedirect('https://www.google.com/maps/dir/?api=1&destination=18.5,73.8');
+    }
 }
