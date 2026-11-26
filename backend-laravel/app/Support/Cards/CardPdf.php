@@ -635,13 +635,15 @@ class CardPdf
         return 'data:image/png;base64,'.base64_encode(ob_get_clean());
     }
 
+    // A clear QR, like the QR boards': medium error correction (fewer, bigger
+    // squares; still reads with 15% covered) and a white border to scan by.
     public static function qr(string $text): string
     {
         $png = (new QRCode(new QROptions([
             'outputInterface' => QRGdImagePNG::class,
-            'eccLevel' => EccLevel::H,
-            'scale' => 10,
-            'quietzoneSize' => 1,
+            'eccLevel' => EccLevel::M,
+            'scale' => 12,
+            'quietzoneSize' => 2,
             'outputBase64' => false,
         ])))->render($text);
 
