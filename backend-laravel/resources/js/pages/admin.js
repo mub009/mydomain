@@ -475,10 +475,42 @@ function printSheet(codes, purpose, onClose) {
     `${codes.length} QR ${codes.length === 1 ? "board" : "boards"} ready to print`,
     `<p class="mb-3 text-sm text-ink-600">Print these and hand them out. Each board waits until it is attached to a shop; then a scan opens what it was set to (Google review, AI review, social media…).</p>
     <a href="/admin/qr-codes.zip?codes=${encodeURIComponent(codes.join(","))}" class="btn-secondary mb-3 w-full py-2.5" data-download-all>${icon("download", { size: 15 })} Download all (ZIP of ${codes.length} QR ${codes.length === 1 ? "image" : "images"})</a>
+    <div class="mb-3 rounded-xl border border-green-200 bg-green-50 p-3 print:hidden" data-share-box>
+      <p class="text-xs font-semibold text-green-900">Share these QR codes as a link</p>
+      <p class="mb-2 text-[11px] text-green-800">Whoever opens the link sees every QR and can download each one.</p>
+      <input class="input mb-2 bg-white font-mono text-[11px]" readonly data-share-url value="Making the link…" />
+      <div class="grid grid-cols-3 gap-2">
+        <a class="btn-primary !bg-green-600 py-2 text-xs hover:!bg-green-700" target="_blank" rel="noopener" data-share-whatsapp>${icon("share-2", { size: 13 })} WhatsApp</a>
+        <button type="button" class="btn-secondary py-2 text-xs" data-share-copy>${icon("copy", { size: 13 })} <span>Copy link</span></button>
+        <a class="btn-secondary py-2 text-xs" target="_blank" rel="noopener" data-share-open>${icon("external-link", { size: 13 })} Open</a>
+      </div>
+    </div>
     <div id="qr-board" class="grid grid-cols-2 gap-4"><p class="col-span-2 py-6 text-center text-sm text-ink-500">Rendering codes…</p></div>
     <button type="button" data-print class="btn-primary mt-4 w-full py-2.5">${icon("printer", { size: 15 })} Print sheet</button>`,
     { onClose },
   );
+  // The shareable link for these boards (signed by the server), for WhatsApp.
+  const shareBox = $("[data-share-box]", modal.body);
+  fetch(`/admin/qr-codes/share-link?codes=${encodeURIComponent(codes.join(","))}`, { headers: { Accept: "application/json" } })
+    .then((r) => (r.ok ? r.json() : Promise.reject(r)))
+    .then(({ url }) => {
+      $("[data-share-url]", shareBox).value = url;
+      const text = `Markkito QR boards (${codes.length}): open the link to see and download each QR code ${url}`;
+      $("[data-share-whatsapp]", shareBox).href = `https://wa.me/?text=${encodeURIComponent(text)}`;
+      $("[data-share-open]", shareBox).href = url;
+      $("[data-share-copy]", shareBox).addEventListener("click", async (e) => {
+        const label = $("span", e.currentTarget);
+        try {
+          await navigator.clipboard.writeText(url);
+        } catch {
+          $("[data-share-url]", shareBox).select();
+          document.execCommand("copy");
+        }
+        label.textContent = "Copied";
+        setTimeout(() => (label.textContent = "Copy link"), 2000);
+      });
+    })
+    .catch(() => ($("[data-share-url]", shareBox).value = "Couldn't make the link — try again."));
   Promise.all(codes.map((code) => renderQrDataUrl(boardUrl(code), 320).then((dataUrl) => ({ code, dataUrl }))))
     .then((images) => {
       $("#qr-board", modal.body).innerHTML = images

@@ -51,6 +51,11 @@ Route::get('/one/{slug}', \App\Http\Controllers\Web\OneReviewPageController::cla
 
 // Short public path encoded on a printed QR board: /r/q/<code>
 Route::get('/r/q/{code}', [QrCodeController::class, 'scan']);
+// A set of QR boards shared as one link (e.g. on WhatsApp): see every QR,
+// download each one or all of them. The link is signed (?c=…&s=…).
+Route::get('/qr-share', [QrCodeController::class, 'sharePage'])->middleware('throttle:60,1,qr-share');
+Route::get('/qr-share.zip', [QrCodeController::class, 'shareZip'])->middleware('throttle:10,1,qr-share-zip');
+Route::get('/qr-share/{code}.png', [QrCodeController::class, 'sharePng'])->where('code', '[A-Za-z0-9-]+')->middleware('throttle:1200,1,qr-share-png');
 
 // The site's pages are server-rendered Blade (resources/views/pages), with
 // small plain-JS modules (resources/js/pages) for the interactive parts.
@@ -87,6 +92,8 @@ Route::middleware('web.role:ADMIN')->group(function () {
     Route::get('/admin/online', [AdminPageController::class, 'online']);
     // QR boards as images, one PNG per code, in a ZIP (?codes=MK-100001,MK-100002).
     Route::get('/admin/qr-codes.zip', [QrCodeController::class, 'downloadZip']);
+    // A shareable link to the same boards (?codes=…), for WhatsApp.
+    Route::get('/admin/qr-codes/share-link', [QrCodeController::class, 'shareLink']);
     // The digital-visiting-card template editor.
     Route::get('/admin/card-templates/{id}', [AdminPageController::class, 'cardTemplate']);
     // The gold-rate template editor, and the stored images it draws on —
