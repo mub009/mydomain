@@ -473,7 +473,8 @@ $$("[data-reassign]").forEach((button) =>
 function printSheet(codes, purpose, onClose) {
   const modal = openModal(
     `${codes.length} QR ${codes.length === 1 ? "board" : "boards"} ready to print`,
-    `<p class="mb-3 text-sm text-ink-600">Print these and hand them out. A shop scans one, confirms the code, and attaches it to their listing.</p>
+    `<p class="mb-3 text-sm text-ink-600">Print these and hand them out. Each board waits until it is attached to a shop; then a scan opens what it was set to (Google review, AI review, social media…).</p>
+    <a href="/admin/qr-codes.zip?codes=${encodeURIComponent(codes.join(","))}" class="btn-secondary mb-3 w-full py-2.5" data-download-all>${icon("download", { size: 15 })} Download all (ZIP of ${codes.length} QR ${codes.length === 1 ? "image" : "images"})</a>
     <div id="qr-board" class="grid grid-cols-2 gap-4"><p class="col-span-2 py-6 text-center text-sm text-ink-500">Rendering codes…</p></div>
     <button type="button" data-print class="btn-primary mt-4 w-full py-2.5">${icon("printer", { size: 15 })} Print sheet</button>`,
     { onClose },
@@ -488,9 +489,18 @@ function printSheet(codes, purpose, onClose) {
           <img src="${item.dataUrl}" alt="${esc(item.code)}" class="mx-auto my-1.5 h-28 w-28" />
           <p class="font-mono text-xs font-bold text-ink-900">${esc(item.code)}</p>
           <p class="text-[8px] uppercase tracking-wider text-ink-400">Powered by Markkito</p>
+          <button type="button" class="mt-1.5 inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold text-brand-700 hover:bg-brand-50 print:hidden" data-download-one="${esc(item.code)}">${icon("download", { size: 12 })} Download</button>
         </div>`,
         )
         .join("");
+      // Each QR on its own, as a large PNG named by its code.
+      $$("[data-download-one]", modal.body).forEach((b) =>
+        b.addEventListener("click", () =>
+          renderQrDataUrl(boardUrl(b.dataset.downloadOne))
+            .then((d) => downloadDataUrl(d, `${b.dataset.downloadOne}-qr.png`))
+            .catch(() => undefined),
+        ),
+      );
     })
     .catch(() => undefined);
   $("[data-print]", modal.body).addEventListener("click", () => window.print());

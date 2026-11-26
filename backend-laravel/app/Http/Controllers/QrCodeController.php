@@ -14,20 +14,20 @@ use Illuminate\Support\Facades\DB;
 
 class QrCodeController extends Controller
 {
-    // Unambiguous alphabet: no O/0, I/1, S/5 — these codes get read off a
-    // printed board and typed in by hand when a camera struggles.
-    private const ALPHABET = 'ABCDEFGHJKLMNPQRTUVWXYZ23456789';
+    // New boards are numbered: MK-100001, MK-100002, … — each batch carries on
+    // from the highest number issued so far (older boards with letter codes
+    // keep working as they are).
+    private const FIRST_NUMBER = 100001;
 
-    private const CODE_LENGTH = 6;
-
-    private function generateCode(): string
+    private function nextNumber(): int
     {
-        $body = '';
-        for ($i = 0; $i < self::CODE_LENGTH; $i++) {
-            $body .= self::ALPHABET[random_int(0, strlen(self::ALPHABET) - 1)];
-        }
+        $highest = ReviewQrCode::where('code', 'like', 'MK-%')->pluck('code')
+            ->map(fn ($code) => substr($code, 3))
+            ->filter(fn ($n) => $n !== '' && ctype_digit($n))
+            ->map(fn ($n) => (int) $n)
+            ->max();
 
-        return "MK-{$body}";
+        return max(self::FIRST_NUMBER, ($highest ?? 0) + 1);
     }
 
     // Normalise whatever the shop typed or scanned: "mk 7f3k2a" -> "MK-7F3K2A".
@@ -74,9 +74,11 @@ class QrCodeController extends Controller
         ]);
 
         $created = [];
+        $number = $this->nextNumber();
         for ($i = 0; $i < $data['count']; $i++) {
             for ($attempts = 0; ; $attempts++) {
-                $code = $this->generateCode();
+                // The next number; if someone else took it meanwhile, the one after.
+                $code = 'MK-'.$number++;
                 try {
                     ReviewQrCode::create([
                         'code' => $code,
@@ -357,6 +359,40 @@ class QrCodeController extends Controller
             ->get(['id', 'code', 'channel', 'status', 'scanCount', 'assignedAt']);
 
         return ApiResponse::ok($items);
+    }
+
+    /**
+     * The boards asked for as QR images, one PNG each (named by its code),
+     * in one ZIP — what the admin prints or sends to the printer. Each QR
+     * holds the board's scan address on this site (/r/q/<code>).
+     */
+    public function downloadZip(Request $request)
+    {
+        $wanted = collect(explode(',', (string) $request->query('codes')))
+            ->map(fn ($c) => $this->normalizeCode($c))->filter(fn ($c) => strlen($c) > 3)->unique()->take(500)->values();
+        $codes = ReviewQrCode::whereIn('code', $wanted)->pluck('code')->sort()->values();
+        abort_if($codes->isEmpty(), 404);
+
+        // The same address the admin page puts on its QR codes: this site, as the browser sees it.
+        // (The configured APP_URL when it's this site — behind an https proxy the request may look like http.)
+        $app = rtrim((string) config('app.url'), '/');
+        $base = parse_url($app, PHP_URL_HOST) === $request->getHost() ? $app : rtrim($request->getSchemeAndHttpHost(), '/');
+        $path = tempnam(sys_get_temp_dir(), 'qr');
+        $zip = new \ZipArchive;
+        $zip->open($path, \ZipArchive::OVERWRITE);
+        foreach ($codes as $code) {
+            $zip->addFromString("{$code}.png", (new \chillerlan\QRCode\QRCode(new \chillerlan\QRCode\QROptions([
+                'outputInterface' => \chillerlan\QRCode\Output\QRGdImagePNG::class,
+                'eccLevel' => \chillerlan\QRCode\Common\EccLevel::H,
+                'scale' => 16,
+                'quietzoneSize' => 2,
+                'outputBase64' => false,
+            ])))->render("{$base}/r/q/{$code}"));
+        }
+        $zip->close();
+        $name = $codes->count() === 1 ? "{$codes[0]}-qr.zip" : "qr-boards-{$codes->first()}-to-{$codes->last()}.zip";
+
+        return response()->download($path, $name, ['Content-Type' => 'application/zip'])->deleteFileAfterSend();
     }
 
     // --- Public scan -------------------------------------------------------

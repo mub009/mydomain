@@ -85,6 +85,8 @@ Route::middleware('web.role:BUSINESS_OWNER,DEALER,ADMIN')->group(function () {
 Route::middleware('web.role:ADMIN')->group(function () {
     Route::get('/admin', AdminPageController::class);
     Route::get('/admin/online', [AdminPageController::class, 'online']);
+    // QR boards as images, one PNG per code, in a ZIP (?codes=MK-100001,MK-100002).
+    Route::get('/admin/qr-codes.zip', [QrCodeController::class, 'downloadZip']);
     // The digital-visiting-card template editor.
     Route::get('/admin/card-templates/{id}', [AdminPageController::class, 'cardTemplate']);
     // A website template's CSS override editor, full screen.

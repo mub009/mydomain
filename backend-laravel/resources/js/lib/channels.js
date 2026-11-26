@@ -14,6 +14,9 @@ export const REVIEW_CHANNELS = [
   { value: "YOUTUBE", label: "YouTube" },
   { value: "WEBSITE", label: "Website" },
   { value: "DIRECTIONS", label: "Directions to shop" },
+  // The business's own review pages — when it has those features.
+  { value: "AI_REVIEW", label: "AI Google Review page" },
+  { value: "ONE_REVIEW", label: "One Review page" },
   { value: "MARKKITO_REVIEW", label: "Markkito review" },
   { value: "MARKKITO", label: "Markkito business page" },
 ];
