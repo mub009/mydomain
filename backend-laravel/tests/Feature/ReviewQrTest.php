@@ -231,6 +231,38 @@ class ReviewQrTest extends TestCase
         $this->get('/admin/qr-codes.zip?codes=MK-100001')->assertRedirect();
     }
 
+    public function test_a_dealer_generates_boards_and_lists_only_their_own(): void
+    {
+        $admin = $this->user(['role' => 'ADMIN']);
+        $this->postJson('/api/v1/admin/qr-codes/batch', ['count' => 2], ['Authorization' => 'Bearer '.$this->token($admin)])->assertStatus(201);
+        $dealer = $this->user(['role' => 'DEALER', 'privileges' => ['MANAGE_LISTINGS']]);
+        $auth = ['Authorization' => 'Bearer '.$this->token($dealer)];
+
+        // Numbered after the admin's boards.
+        $made = $this->postJson('/api/v1/qr-codes/mine/batch', ['count' => 3, 'batchLabel' => 'Kochi'], $auth)->assertStatus(201);
+        $this->assertSame(['MK-100003', 'MK-100004', 'MK-100005'], $made->json('data.codes'));
+        $this->assertSame($dealer->id, ReviewQrCode::where('code', 'MK-100003')->value('createdById'));
+        // Up to 100 at a time.
+        $this->postJson('/api/v1/qr-codes/mine/batch', ['count' => 101], $auth)->assertStatus(400);
+
+        $list = $this->getJson('/api/v1/qr-codes/mine', $auth)->assertOk();
+        $this->assertEqualsCanonicalizing(['MK-100003', 'MK-100004', 'MK-100005'], collect($list->json('data'))->pluck('code')->all());
+        $this->assertSame(['unassigned' => 3, 'assigned' => 0], $list->json('summary'));
+        // Not the admin's list, and not for shop owners.
+        $this->getJson('/api/v1/admin/qr-codes', $auth)->assertForbidden();
+        $owner = $this->user(['role' => 'BUSINESS_OWNER']);
+        $this->getJson('/api/v1/qr-codes/mine', ['Authorization' => 'Bearer '.$this->token($owner)])->assertForbidden();
+
+        // The dashboard tab, and the ZIP / share link with only their own boards.
+        $this->post('/login', ['email' => $dealer->email, 'password' => 'Password123!']);
+        $this->get('/dashboard?tab=qr')->assertOk()->assertSee('QR Boards')->assertSee('MK-100004')->assertDontSee('MK-100001')
+            ->assertSee('Generate boards');
+        $zip = $this->get('/qr-codes.zip?codes=MK-100001,MK-100003')->assertOk();
+        $this->assertStringContainsString('MK-100003-qr.zip', $zip->headers->get('Content-Disposition'));
+        $this->get('/qr-codes.zip?codes=MK-100001')->assertNotFound();
+        $this->assertStringContainsString('c=100003-100005&', $this->getJson('/qr-codes/share-link?codes=MK-100001,MK-100003,MK-100004,MK-100005')->json('url'));
+    }
+
     public function test_the_admin_shares_boards_as_one_link_where_each_qr_downloads(): void
     {
         $admin = $this->user(['role' => 'ADMIN']);
@@ -241,7 +273,7 @@ class ReviewQrTest extends TestCase
         $this->post('/login', ['email' => $admin->email, 'password' => 'Password123!']);
         $url = $this->getJson('/admin/qr-codes/share-link?codes=MK-100001,MK-100002,MK-100003,MK-7F3K2A')->assertOk()->json('url');
         // Short: the numbered boards as a range.
-        $this->assertStringContainsString('/qr-share?c=100001-100003_7F3K2A&s=', $url);
+        $this->assertStringStartsWith('https://mydomainbook.com/qr-share?c=100001-100003_7F3K2A&s=', $url);
         $this->post('/logout');
 
         // Anyone with the link — no login.

@@ -201,6 +201,10 @@
     @include('pages.dashboard.partials.commission-report')
   @endif
 
+  @if ($tab === 'qr')
+    @include('pages.dashboard.partials.qr-boards')
+  @endif
+
   @if ($tab === 'logins')
     @php
         $logins = $accounts['data'] ?? [];

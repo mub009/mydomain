@@ -1,7 +1,8 @@
 import { api, errorMessage } from "../lib/api";
 import { initCommissionCharts } from "../lib/commission-charts";
 import { icon } from "../lib/icons";
-import { $, $$, esc } from "../lib/ui";
+import { initQrBoards } from "../lib/qr-boards";
+import { $, $$, alertBox, esc } from "../lib/ui";
 import { copyField, initCloneButtons, initLiveSearch, resetPasswordModal, showFlash, statusBadgeClass, whatsappShareButton } from "../lib/widgets";
 
 showFlash();
@@ -66,3 +67,12 @@ $$("[data-status-update]").forEach((select) => {
 
 // Commission charts (Commission tab).
 initCommissionCharts();
+
+// A dealer's QR Boards tab: generate, print, download and share boards.
+if ($("[data-dealer-qr]")) {
+  initQrBoards({
+    batchUrl: "/qr-codes/mine/batch",
+    max: 100,
+    onError: (message) => ($("[data-qr-error]").innerHTML = alertBox(message)),
+  });
+}

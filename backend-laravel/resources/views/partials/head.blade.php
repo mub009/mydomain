@@ -6,6 +6,8 @@
      phrase becomes its own flex item and gets squeezed to a sliver). --}}
 <meta name="format-detection" content="telephone=no, date=no, address=no, email=no" />
 <meta name="csrf-token" content="{{ csrf_token() }}" />
+{{-- Printed QR boards point here: https://mydomainbook.com/r/q/<code>. --}}
+<meta name="qr-origin" content="{{ config('frontend.qr_origin') }}" />
 @if ($authUser)
   <meta name="auth-user" content="{{ json_encode(['id' => $authUser->id, 'role' => $authUser->role, 'firstName' => $authUser->firstName, 'privileges' => \App\Support\Privileges::normalize($authUser->privileges)]) }}" />
 @endif
