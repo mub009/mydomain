@@ -25,8 +25,10 @@ export const CHANNEL_LABELS = Object.fromEntries(REVIEW_CHANNELS.map((c) => [c.v
 
 // A printed board encodes this short URL. The server resolves it to the
 // shop's own link for the board's platform and records the scan.
+// It's on the QR domain (mydomainbook.com), set on the page by the server.
 export function boardUrl(code) {
-  return `${window.location.origin}/r/q/${code}`;
+  const origin = document.querySelector('meta[name="qr-origin"]')?.content || window.location.origin;
+  return `${origin}/r/q/${code}`;
 }
 
 // High error correction so a scuffed or partly covered board still scans.

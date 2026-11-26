@@ -376,13 +376,11 @@ class QrCodeController extends Controller
         return $this->zipResponse($codes, $this->publicBase($request));
     }
 
-    // The same address the admin page puts on its QR codes: this site, as the browser sees it.
-    // (The configured APP_URL when it's this site — behind an https proxy the request may look like http.)
+    // The address the QR codes carry: the QR domain (mydomainbook.com), so a
+    // board prints the same wherever it was made.
     private function publicBase(Request $request): string
     {
-        $app = rtrim((string) config('app.url'), '/');
-
-        return parse_url($app, PHP_URL_HOST) === $request->getHost() ? $app : rtrim($request->getSchemeAndHttpHost(), '/');
+        return rtrim((string) config('frontend.qr_origin'), '/') ?: rtrim($request->getSchemeAndHttpHost(), '/');
     }
 
     // A board's QR as a large PNG, high error correction so a scuffed board still scans.

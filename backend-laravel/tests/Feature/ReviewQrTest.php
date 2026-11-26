@@ -241,7 +241,7 @@ class ReviewQrTest extends TestCase
         $this->post('/login', ['email' => $admin->email, 'password' => 'Password123!']);
         $url = $this->getJson('/admin/qr-codes/share-link?codes=MK-100001,MK-100002,MK-100003,MK-7F3K2A')->assertOk()->json('url');
         // Short: the numbered boards as a range.
-        $this->assertStringContainsString('/qr-share?c=100001-100003_7F3K2A&s=', $url);
+        $this->assertStringStartsWith('https://mydomainbook.com/qr-share?c=100001-100003_7F3K2A&s=', $url);
         $this->post('/logout');
 
         // Anyone with the link — no login.
