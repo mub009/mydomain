@@ -31,13 +31,15 @@ export function boardUrl(code) {
   return `${origin}/r/q/${code}`;
 }
 
-// High error correction so a scuffed or partly covered board still scans.
-export function renderQrDataUrl(text, width = 512) {
+// A clear QR: medium error correction keeps it to 29×29 squares (bigger and
+// easier to scan than high's 37×37, still readable with 15% scuffed), with
+// the standard 4-square white border.
+export function renderQrDataUrl(text, width = 640) {
   return QRCode.toDataURL(text, {
-    errorCorrectionLevel: "H",
-    margin: 1,
+    errorCorrectionLevel: "M",
+    margin: 4,
     width,
-    color: { dark: "#0f172a", light: "#ffffff" },
+    color: { dark: "#000000", light: "#ffffff" },
   });
 }
 

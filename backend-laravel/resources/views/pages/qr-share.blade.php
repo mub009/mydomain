@@ -34,7 +34,7 @@
       @foreach ($boards as $board)
         <div class="rounded-xl border border-gray-200 bg-white p-3 text-center shadow-sm" data-share-board="{{ $board->code }}">
           <img src="/qr-share/{{ $board->code }}.png?{{ $query }}" alt="QR code {{ $board->code }}" loading="lazy"
-               width="200" height="200" class="mx-auto aspect-square w-full max-w-[200px]" />
+               width="200" height="200" class="mx-auto aspect-square w-full max-w-[220px] [image-rendering:pixelated]" />
           <p class="mt-1 font-mono text-sm font-bold text-ink-900">{{ $board->code }}</p>
           <p class="text-[11px] {{ $board->businessId ? 'text-green-700' : 'text-ink-500' }}">
             {{ $board->status === 'DISABLED' ? 'Disabled' : ($board->businessId ? 'Active' : 'Not assigned yet') }}
