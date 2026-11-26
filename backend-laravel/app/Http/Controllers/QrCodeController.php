@@ -406,14 +406,16 @@ class QrCodeController extends Controller
         return rtrim((string) config('frontend.qr_origin'), '/') ?: rtrim($request->getSchemeAndHttpHost(), '/');
     }
 
-    // A board's QR as a large PNG, high error correction so a scuffed board still scans.
+    // A board's QR as a large, clear PNG: medium error correction keeps it to
+    // 29×29 squares (bigger, easier to scan than the 37×37 of high), still
+    // readable with 15% of it scuffed, and the standard 4-square white border.
     private function qrPng(string $base, string $code): string
     {
         return (new \chillerlan\QRCode\QRCode(new \chillerlan\QRCode\QROptions([
             'outputInterface' => \chillerlan\QRCode\Output\QRGdImagePNG::class,
-            'eccLevel' => \chillerlan\QRCode\Common\EccLevel::H,
-            'scale' => 16,
-            'quietzoneSize' => 2,
+            'eccLevel' => \chillerlan\QRCode\Common\EccLevel::M,
+            'scale' => 20,
+            'quietzoneSize' => 4,
             'outputBase64' => false,
         ])))->render("{$base}/r/q/{$code}");
     }

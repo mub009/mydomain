@@ -51,14 +51,14 @@ export function printSheet(codes, purpose, onClose) {
       });
     })
     .catch(() => ($("[data-share-url]", shareBox).value = "Couldn't make the link — try again."));
-  Promise.all(codes.map((code) => renderQrDataUrl(boardUrl(code), 320).then((dataUrl) => ({ code, dataUrl }))))
+  Promise.all(codes.map((code) => renderQrDataUrl(boardUrl(code), 400).then((dataUrl) => ({ code, dataUrl }))))
     .then((images) => {
       $("#qr-board", modal.body).innerHTML = images
         .map(
           (item) => `<div class="rounded-xl border-2 border-dashed border-gray-200 p-3 text-center">
           <p class="text-[9px] font-bold uppercase tracking-widest text-brand-600">Loved your visit?</p>
           <p class="text-[11px] font-semibold text-ink-700">${esc(boardHeadline(purpose))}</p>
-          <img src="${item.dataUrl}" alt="${esc(item.code)}" class="mx-auto my-1.5 h-28 w-28" />
+          <img src="${item.dataUrl}" alt="${esc(item.code)}" class="mx-auto my-1.5 h-36 w-36 [image-rendering:pixelated]" />
           <p class="font-mono text-xs font-bold text-ink-900">${esc(item.code)}</p>
           <p class="text-[8px] uppercase tracking-wider text-ink-400">Powered by Markkito</p>
           <button type="button" class="mt-1.5 inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold text-brand-700 hover:bg-brand-50 print:hidden" data-download-one="${esc(item.code)}">${icon("download", { size: 12 })} Download</button>
