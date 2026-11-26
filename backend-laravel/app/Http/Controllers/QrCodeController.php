@@ -373,26 +373,162 @@ class QrCodeController extends Controller
         $codes = ReviewQrCode::whereIn('code', $wanted)->pluck('code')->sort()->values();
         abort_if($codes->isEmpty(), 404);
 
-        // The same address the admin page puts on its QR codes: this site, as the browser sees it.
-        // (The configured APP_URL when it's this site — behind an https proxy the request may look like http.)
+        return $this->zipResponse($codes, $this->publicBase($request));
+    }
+
+    // The same address the admin page puts on its QR codes: this site, as the browser sees it.
+    // (The configured APP_URL when it's this site — behind an https proxy the request may look like http.)
+    private function publicBase(Request $request): string
+    {
         $app = rtrim((string) config('app.url'), '/');
-        $base = parse_url($app, PHP_URL_HOST) === $request->getHost() ? $app : rtrim($request->getSchemeAndHttpHost(), '/');
+
+        return parse_url($app, PHP_URL_HOST) === $request->getHost() ? $app : rtrim($request->getSchemeAndHttpHost(), '/');
+    }
+
+    // A board's QR as a large PNG, high error correction so a scuffed board still scans.
+    private function qrPng(string $base, string $code): string
+    {
+        return (new \chillerlan\QRCode\QRCode(new \chillerlan\QRCode\QROptions([
+            'outputInterface' => \chillerlan\QRCode\Output\QRGdImagePNG::class,
+            'eccLevel' => \chillerlan\QRCode\Common\EccLevel::H,
+            'scale' => 16,
+            'quietzoneSize' => 2,
+            'outputBase64' => false,
+        ])))->render("{$base}/r/q/{$code}");
+    }
+
+    private function zipResponse(\Illuminate\Support\Collection $codes, string $base)
+    {
         $path = tempnam(sys_get_temp_dir(), 'qr');
         $zip = new \ZipArchive;
         $zip->open($path, \ZipArchive::OVERWRITE);
         foreach ($codes as $code) {
-            $zip->addFromString("{$code}.png", (new \chillerlan\QRCode\QRCode(new \chillerlan\QRCode\QROptions([
-                'outputInterface' => \chillerlan\QRCode\Output\QRGdImagePNG::class,
-                'eccLevel' => \chillerlan\QRCode\Common\EccLevel::H,
-                'scale' => 16,
-                'quietzoneSize' => 2,
-                'outputBase64' => false,
-            ])))->render("{$base}/r/q/{$code}"));
+            $zip->addFromString("{$code}.png", $this->qrPng($base, $code));
         }
         $zip->close();
         $name = $codes->count() === 1 ? "{$codes[0]}-qr.zip" : "qr-boards-{$codes->first()}-to-{$codes->last()}.zip";
 
         return response()->download($path, $name, ['Content-Type' => 'application/zip'])->deleteFileAfterSend();
+    }
+
+    // --- Shared QR links ---------------------------------------------------
+    // The admin can share a set of boards as one link (e.g. on WhatsApp).
+    // Whoever opens it sees every QR and can download each one, or all of them
+    // as a ZIP. The link carries the codes, packed short ("100001-100020"), and
+    // a signature, so it can't be edited to show other boards.
+
+    // MK-100001…MK-100020 -> "100001-100020"; other codes as they are, joined by "_".
+    private function packCodes(\Illuminate\Support\Collection $codes): string
+    {
+        $numbers = $codes->map(fn ($c) => substr($c, 3))->filter(fn ($n) => ctype_digit($n))->map(fn ($n) => (int) $n)->sort()->values();
+        $others = $codes->map(fn ($c) => substr($c, 3))->reject(fn ($n) => ctype_digit($n))->values();
+        $parts = [];
+        $from = $prev = null;
+        foreach ($numbers as $n) {
+            if ($prev !== null && $n === $prev + 1) {
+                $prev = $n;
+
+                continue;
+            }
+            if ($from !== null) {
+                $parts[] = $from === $prev ? "{$from}" : "{$from}-{$prev}";
+            }
+            $from = $prev = $n;
+        }
+        if ($from !== null) {
+            $parts[] = $from === $prev ? "{$from}" : "{$from}-{$prev}";
+        }
+
+        return implode('_', array_merge($parts, $others->all()));
+    }
+
+    private function unpackCodes(string $packed): \Illuminate\Support\Collection
+    {
+        $codes = collect();
+        foreach (explode('_', $packed) as $part) {
+            if (preg_match('/^(\d+)-(\d+)$/', $part, $m)) {
+                $from = (int) $m[1];
+                $to = min((int) $m[2], $from + 499);
+                for ($n = $from; $n <= $to; $n++) {
+                    $codes->push("MK-{$n}");
+                }
+            } elseif (preg_match('/^[A-Z0-9]+$/', $part)) {
+                $codes->push("MK-{$part}");
+            }
+            if ($codes->count() >= 500) {
+                break;
+            }
+        }
+
+        return $codes->take(500)->unique()->values();
+    }
+
+    private function shareSignature(string $packed): string
+    {
+        return substr(hash_hmac('sha256', "qr-share|{$packed}", (string) config('app.key')), 0, 24);
+    }
+
+    // The boards a shared link names — 404 when the link was changed or names none.
+    private function sharedBoards(Request $request): array
+    {
+        $packed = (string) $request->query('c');
+        abort_unless($packed !== '' && hash_equals($this->shareSignature($packed), (string) $request->query('s')), 404);
+        $boards = ReviewQrCode::whereIn('code', $this->unpackCodes($packed))->orderBy('code')->get();
+        abort_if($boards->isEmpty(), 404);
+
+        return [$packed, $boards];
+    }
+
+    private function shareQuery(string $packed): string
+    {
+        return http_build_query(['c' => $packed, 's' => $this->shareSignature($packed)]);
+    }
+
+    // Admin: the share link for a set of boards (?codes=MK-100001,MK-100002).
+    public function shareLink(Request $request)
+    {
+        $wanted = collect(explode(',', (string) $request->query('codes')))
+            ->map(fn ($c) => $this->normalizeCode($c))->filter(fn ($c) => strlen($c) > 3)->unique()->take(500)->values();
+        $codes = ReviewQrCode::whereIn('code', $wanted)->pluck('code')->values();
+        abort_if($codes->isEmpty(), 404);
+        $packed = $this->packCodes($codes);
+
+        return response()->json(['url' => $this->publicBase($request).'/qr-share?'.$this->shareQuery($packed), 'count' => $codes->count()]);
+    }
+
+    // Public: the shared page with every QR and its Download button.
+    public function sharePage(Request $request)
+    {
+        [$packed, $boards] = $this->sharedBoards($request);
+        $query = $this->shareQuery($packed);
+
+        return view('pages.qr-share', [
+            'boards' => $boards,
+            'query' => $query,
+            'shareUrl' => $this->publicBase($request).'/qr-share?'.$query,
+        ]);
+    }
+
+    // Public: one QR from a shared link, shown on the page or downloaded (?download=1).
+    public function sharePng(Request $request, string $code)
+    {
+        [, $boards] = $this->sharedBoards($request);
+        $code = $this->normalizeCode($code);
+        abort_unless($boards->contains('code', $code), 404);
+        $headers = ['Content-Type' => 'image/png', 'Cache-Control' => 'public, max-age=86400'];
+        if ($request->boolean('download')) {
+            $headers['Content-Disposition'] = "attachment; filename=\"{$code}-qr.png\"";
+        }
+
+        return response($this->qrPng($this->publicBase($request), $code), 200, $headers);
+    }
+
+    // Public: every QR from a shared link in one ZIP.
+    public function shareZip(Request $request)
+    {
+        [, $boards] = $this->sharedBoards($request);
+
+        return $this->zipResponse($boards->pluck('code')->sort()->values(), $this->publicBase($request));
     }
 
     // --- Public scan -------------------------------------------------------

@@ -231,6 +231,39 @@ class ReviewQrTest extends TestCase
         $this->get('/admin/qr-codes.zip?codes=MK-100001')->assertRedirect();
     }
 
+    public function test_the_admin_shares_boards_as_one_link_where_each_qr_downloads(): void
+    {
+        $admin = $this->user(['role' => 'ADMIN']);
+        $token = $this->token($admin);
+        $this->postJson('/api/v1/admin/qr-codes/batch', ['count' => 3], ['Authorization' => "Bearer {$token}"])->assertStatus(201);
+        ReviewQrCode::create(['code' => 'MK-7F3K2A', 'status' => 'UNASSIGNED', 'scanCount' => 0]);
+
+        $this->post('/login', ['email' => $admin->email, 'password' => 'Password123!']);
+        $url = $this->getJson('/admin/qr-codes/share-link?codes=MK-100001,MK-100002,MK-100003,MK-7F3K2A')->assertOk()->json('url');
+        // Short: the numbered boards as a range.
+        $this->assertStringContainsString('/qr-share?c=100001-100003_7F3K2A&s=', $url);
+        $this->post('/logout');
+
+        // Anyone with the link — no login.
+        $path = substr($url, strpos($url, '/qr-share'));
+        $query = substr($path, strpos($path, '?') + 1);
+        $page = $this->get($path)->assertOk()
+            ->assertSee('4 QR boards')->assertSee('MK-100002')->assertSee('MK-7F3K2A')
+            ->assertSee('Share on WhatsApp')->assertSee('https://wa.me/?text=', false);
+        $page->assertSee("/qr-share/MK-100003.png?".e($query)."&amp;download=1", false);
+
+        $png = $this->get("/qr-share/MK-100003.png?{$query}&download=1")->assertOk()->assertHeader('Content-Type', 'image/png');
+        $this->assertStringStartsWith("\x89PNG", $png->getContent());
+        $this->assertStringContainsString('MK-100003-qr.png', $png->headers->get('Content-Disposition'));
+        $zip = $this->get("/qr-share.zip?{$query}")->assertOk();
+        $this->assertStringContainsString('qr-boards-MK-100001-to-MK-7F3K2A.zip', $zip->headers->get('Content-Disposition'));
+
+        // An edited link, or a board outside it, shows nothing.
+        $this->get(str_replace('100003', '100009', $path))->assertNotFound();
+        $this->get("/qr-share/MK-100004.png?{$query}")->assertNotFound();
+        $this->get('/qr-share?c=100001-100003')->assertNotFound();
+    }
+
     public function test_a_board_can_open_the_ai_review_or_one_review_page(): void
     {
         $owner = $this->user(['role' => 'BUSINESS_OWNER']);
