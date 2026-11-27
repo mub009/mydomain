@@ -105,7 +105,7 @@ describe("Black Points Analyst", () => {
 });
 
 describe("Decision Agent with Black Points", () => {
-  const fd = new DecisionAgent();
+  const fd = new DecisionAgent(0); // these tests are about Black Points, not the minimum profit
   const withBp = (status: Record<string, string>) => row({ blackPoints: { symbol: "ACME", sector: "IT", passed: {}, findings: [], status, checkedAt: "", sample: false } as never });
 
   it("a verified exclusion overrides any score", () => {

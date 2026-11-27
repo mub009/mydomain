@@ -56,6 +56,10 @@ With the NSE Desk API (logged in):
 
 **Watchlist** (menu → Watchlist): stocks to keep an eye on, separate from holdings. Add any NSE stock by name or symbol, or press **☆ Watch** in a stock's window. Each row shows the current price, today's change, the move since you added it, the last analysis's verdict and buy-zone plan, your note, TradingView and Remove. Logged in, it's saved to your account (same list on every device); otherwise in this browser, and moved to your account when you log in.
 
+## Minimum profit to target (default 11%)
+
+Every pick, short swing and long swing, needs a target at least **11% above the entry** (setting **Min. profit** on the Overview: Off, 5, 8, 11, 15 or 20%). Targets are never stretched to reach it: a buy-rated stock whose target is below the minimum is left out of the picks with the reason ("Target only +8.0%, below the 11% minimum profit"), and the Decision Agent says in the chat how many fell short. Final Picks show the profit % under each target; the Screener has a *Profit to target* column and an "Only stocks with at least 11% profit to target" filter.
+
 ## The team
 
 | Agent | Role | What they do |

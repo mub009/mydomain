@@ -35,6 +35,8 @@ interface Settings {
   /** Saved groups of stocks. */
   groups: StockGroup[];
   top: number;
+  /** Picks need a target at least this % above the entry (0 = off). */
+  minProfit: number;
   capital: string;
   risk: number;
   demo: boolean;
@@ -113,7 +115,7 @@ export const useDesk = create<DeskState>((set, get) => {
 
   return {
     universe: "large", custom: "RELIANCE, TCS, INFY, HDFCBANK, ICICIBANK, SBIN, LT, ITC, MARUTI, TITAN", stockInfo: {}, groups: [],
-    top: 5, capital: "500000", risk: 1, demo: false, aiNotes: false, speed: "normal",
+    top: 5, minProfit: 11, capital: "500000", risk: 1, demo: false, aiNotes: false, speed: "normal",
     config: null, session: null, replayOf: null, running: false, progress: null, error: null,
     messages: [], shown: 0, typing: null, times: {}, result: null, seen: {}, drawerSymbol: null, lookups: {}, lookup: null,
 
@@ -159,7 +161,7 @@ export const useDesk = create<DeskState>((set, get) => {
         const res = await fetch("/api/analysis", {
           method: "POST", signal: abort.signal, headers: { "content-type": "application/json" },
           body: JSON.stringify({
-            symbols: symbolsOf(s), ...(isBigUniverse(s.universe) ? { universe: s.universe } : {}), top: s.top, demo: false, aiNotes: s.aiNotes && Boolean(s.config?.aiAvailable),
+            symbols: symbolsOf(s), ...(isBigUniverse(s.universe) ? { universe: s.universe } : {}), top: s.top, minProfitPct: s.minProfit, demo: false, aiNotes: s.aiNotes && Boolean(s.config?.aiAvailable),
             capital: Number(s.capital) > 0 ? Number(s.capital) : undefined, riskPerTrade: s.risk,
             sectors: s.universe === "custom" ? Object.fromEntries(symbolsOf(s).flatMap((k) => (s.stockInfo[k]?.sector ? [[k, s.stockInfo[k].sector]] : []))) : undefined,
           }),

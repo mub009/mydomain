@@ -79,7 +79,7 @@ export function FinalPicksTable({ picks, onSelect, empty }: { picks: Decision[];
                 <td className="px-1.5 py-2.5"><StockSparkline data={d.spark} width={64} showChange={false} /></td>
                 <td className="whitespace-nowrap px-1.5 py-2.5 text-right font-medium">{inr(d.entry)}</td>
                 <td className="whitespace-nowrap px-1.5 py-2.5 text-right text-neg">{inr(d.stopLoss)}</td>
-                <td className="whitespace-nowrap px-1.5 py-2.5 text-right text-pos">{inr(d.target)}</td>
+                <td className="whitespace-nowrap px-1.5 py-2.5 text-right text-pos">{inr(d.target)}<div className="text-[11px] font-semibold">+{upside(d).toFixed(1)}%</div></td>
                 <td className="whitespace-nowrap px-1.5 py-2.5 text-right" title={d.hold ? holdSentence(d.hold) : undefined}>
                   {d.hold ? <><div className="text-xs font-semibold">{holdShort(d.hold)}</div><div className="text-[11px] text-muted-foreground">by {shortDate(d.hold.exitBy)} · <span className={d.hold.expectedReturnPct >= 0 ? "text-pos" : "text-neg"}>{pct(d.hold.expectedReturnPct)}</span></div></> : <span className="text-xs text-muted-foreground">–</span>}
                 </td>

@@ -13,7 +13,22 @@ export const MAX_PER_SECTOR = 2;
 /** Most picks from one sector: 2 up to 15 picks, then 4 for 20 and 5 for 25, so the longer lists can fill. */
 export const sectorCap = (top: number) => (top <= 15 ? MAX_PER_SECTOR : Math.ceil(top / 5));
 
+/** Default minimum profit to the target for a pick, %. */
+export const MIN_PROFIT_PCT = 11;
+export const MIN_PROFIT_CHOICES = [0, 5, 8, 11, 15, 20] as const;
+/** % from the entry to the target. */
+export const upsidePct = (d: { entry: number; target: number }) => (d.entry > 0 ? (d.target / d.entry - 1) * 100 : 0);
+
 export class DecisionAgent {
+  /** Picks need a target at least this % above the entry (0 = no minimum). */
+  constructor(readonly minProfitPct = MIN_PROFIT_PCT) {}
+
+  /** Why a stock falls short of the minimum profit, or null when it's fine. */
+  belowMinimum(d: { entry: number; target: number }): string | null {
+    const up = upsidePct(d);
+    return this.minProfitPct > 0 && up < this.minProfitPct ? `Target only +${up.toFixed(1)}%, below the ${this.minProfitPct}% minimum profit` : null;
+  }
+
   verdict(r: Analysis): Verdict {
     const f = r.fundamentals;
     const loss = f?.epsTTM !== undefined && f.epsTTM < 0;
@@ -88,6 +103,8 @@ export class DecisionAgent {
     for (const d of all) {
       if (d.verdict !== "STRONG BUY" && d.verdict !== "BUY") continue;
       if (picks.length >= top) break;
+      const short = this.belowMinimum(d);
+      if (short) { d.passedOver = short; passed.push(d); continue; }
       if (charted && !d.chart) { d.passedOver = "Outside the chart-checked candidates"; passed.push(d); continue; }
       if ((perSector[d.sector] ?? 0) >= cap) {
         d.passedOver = `Sector cap: already ${cap} ${d.sector} picks`;
@@ -129,6 +146,7 @@ export class DecisionAgent {
     const out: Decision[] = [];
     const ok = (d: Decision) => {
       if (!d.bottom?.isSetup) return false;
+      if (this.belowMinimum(d.bottom)) return false;
       if (d.fundamentals?.epsTTM !== undefined && d.fundamentals.epsTTM < 0) return false;
       if (d.desk?.severe) return false;
       const st = d.blackPoints?.status;

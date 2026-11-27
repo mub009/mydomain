@@ -70,6 +70,8 @@ export interface DialogueInput {
   picks: Decision[];
   /** Long swing picks: turning up from a bottom. */
   longSwing?: Decision[];
+  /** Minimum profit to the target for any pick, %. */
+  minProfitPct?: number;
   /** Every stock with its final verdict (includes the Black Points rulings). */
   all: Decision[];
   /** What the Black Points Analyst could check this run. */
@@ -560,9 +562,9 @@ export async function runDialogue(bus: MessageBus, llm: LLM, d: DialogueInput) {
   bus.stage = "decide";
   bus.send("Decision", "ALL",
     d.picks.length
-      ? `Decision made. We go with ${list(names(d.picks))}.` + entryPlan(d.picks) +
+      ? `Decision made. We go with ${list(names(d.picks))}.` + entryPlan(d.picks) + minProfitLine(d) +
         (d.watchlist.length ? ` Watchlist: ${list(names(d.watchlist))}.` : "") + " Momentum Agent, Trend Agent, please confirm."
-      : `Decision made: no stock passes our buy rules today, so we stay in cash.` +
+      : `Decision made: no stock passes our buy rules today, so we stay in cash.` + minProfitLine(d) +
         (d.watchlist.length ? ` Watchlist: ${list(names(d.watchlist))}.` : ""),
     {
       kind: "decision", tickers: [...names(d.picks), ...names(d.watchlist)],
@@ -588,7 +590,7 @@ export async function runDialogue(bus: MessageBus, llm: LLM, d: DialogueInput) {
   const ls = d.longSwing ?? [];
   bus.send("Trend", "ALL",
     ls.length
-      ? `Long swing from the bottom: ${list(names(ls))}. These fell well below their 52-week highs, bounced off a low and are turning up. Stop-loss under the recent low, target part of the way back to the old high, held about 3 weeks to 3 months.`
+      ? `Long swing from the bottom: ${list(names(ls))}. These fell well below their 52-week highs, bounced off a low and are turning up. Stop-loss under the recent low, target part of the way back to the old high, held about 3 weeks to 3 months.${d.minProfitPct ? ` Each targets at least ${d.minProfitPct}% profit.` : ""}`
       : "Long swing from the bottom: no stock is clearly turning up from a low today (we look for a bounce off the low, a higher low, the averages turning up and RSI recovering).",
     {
       kind: "report", tickers: names(ls),
@@ -623,4 +625,12 @@ export function scanLine(s: QuickScanSummary): string {
       ` · ${n(s.shortlisted - (s.bottoms ?? 0))} strongest by 1- and 3-month gains, 52-week high and 50/200-day averages` +
       (s.bottoms ? ` and ${n(s.bottoms)} turning up from a bottom (long swing candidates)` : "") + ` went on to the full research` : " · all researched in full") +
     (s.note ? ` · ${s.note}` : "");
+}
+
+/** One sentence on the minimum-profit rule: how many buy-rated stocks fell short. */
+function minProfitLine(d: { minProfitPct?: number; passed: Decision[] }): string {
+  if (!d.minProfitPct) return "";
+  const short = d.passed.filter((p) => p.passedOver?.includes("minimum profit"));
+  return ` Every pick targets at least ${d.minProfitPct}% profit` +
+    (short.length ? `; ${short.length} buy-rated stock${short.length > 1 ? "s" : ""} fell short (${short.slice(0, 4).map((p) => `${p.symbol} +${((p.target / p.entry - 1) * 100).toFixed(1)}%`).join(", ")}${short.length > 4 ? "…" : ""}).` : ".");
 }

@@ -1,6 +1,6 @@
 /** Server-side orchestration: load market data, run the four agents, then
  *  stream their conversation and the result. */
-import { DecisionAgent } from "./agents/decision";
+import { DecisionAgent, MIN_PROFIT_PCT } from "./agents/decision";
 import { VolatilityAgent } from "./agents/volatility";
 import { NewsAgent } from "./agents/news";
 import { MomentumAgent } from "./agents/momentum";
@@ -103,7 +103,7 @@ export async function runAnalysis(o: RunRequest, emit: (e: StreamEvent) => void)
   const rows = mubashir.applyEntry(mubashir.applyCharts(checked, charts)).map((r) => (bottoms[r.symbol] ? { ...r, bottom: bottoms[r.symbol] } : r));
   // Macro Agent's global cues: the main world indices (live runs only).
   const cues = source.kind !== "demo" ? await worldQuotes().then(globalCues).catch(() => null) : null;
-  const fd = new DecisionAgent();
+  const fd = new DecisionAgent(o.minProfitPct ?? MIN_PROFIT_PCT);
   const conflicted = fd.conflicted(rows, o.top);
   const clarifications = Object.fromEntries(conflicted.map((r) => [r.symbol, mubashir.adviseOnConflict(r)]));
   const decided = fd.decide(rows, sparks, o.top, clarifications, o.capital, o.riskPerTrade);
@@ -127,13 +127,13 @@ export async function runAnalysis(o: RunRequest, emit: (e: StreamEvent) => void)
     aiLabel: llm.enabled ? `on (${aiModel()})` : "off",
     capital: o.capital, riskPerTrade: o.riskPerTrade,
     macro, sectors: sectorViews, excluded, minCapCr, news, vix, positive: morning.positive(news), negative: morning.negative(news),
-    snaps, lot, may, rows, conflicted, clarifications, picks, passed, watchlist, all, longSwing, bpCoverage: bp.summary.coverage, globalCues: cues, policy,
+    snaps, lot, may, rows, conflicted, clarifications, picks, passed, watchlist, all, longSwing, minProfitPct: fd.minProfitPct, bpCoverage: bp.summary.coverage, globalCues: cues, policy,
   });
 
   const result: RunResult = {
     source, generatedAt: new Date().toISOString(), simulatedAgents: !llm.enabled,
     capital: o.capital, riskPerTrade: o.riskPerTrade,
-    indexRet21d: Math.round(indexRet21d * 100) / 100, news, vix, blackPoints: bp.summary, policy, excluded, minCapCr, ...(scan ? { scan } : {}), longSwing, sectors: sectorViews, macro, picks, watchlist, all, skipped,
+    indexRet21d: Math.round(indexRet21d * 100) / 100, news, vix, blackPoints: bp.summary, policy, excluded, minCapCr, ...(scan ? { scan } : {}), longSwing, minProfitPct: fd.minProfitPct, sectors: sectorViews, macro, picks, watchlist, all, skipped,
   };
   emit({ type: "result", result });
   console.log(`[nse-agent-desk] run: ${rows.length} stocks, source=${source.kind}${source.seed !== undefined ? `#${source.seed}` : ""}, ` +

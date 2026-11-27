@@ -416,6 +416,8 @@ export interface RunResult {
   scan?: QuickScanSummary;
   /** Long swing picks: stocks turning up from a bottom, held ~3 weeks to 3 months (missing in older runs). */
   longSwing?: Decision[];
+  /** The minimum profit to target every pick needed, % (missing in older runs). */
+  minProfitPct?: number;
   sectors: SectorView[];
   macro: MacroReport | null;
   picks: Decision[];
@@ -441,6 +443,8 @@ export interface RunRequest {
   focus?: string[];
   /** A big list (Nifty 500 or all NSE): quick-scanned first, the best 150 get the full research. */
   universe?: "nifty500" | "allnse";
+  /** Picks (short and long swing) need a target at least this % above the entry. Default 11; 0 = off. */
+  minProfitPct?: number;
 }
 
 /** How a big list was narrowed down before the full research. */

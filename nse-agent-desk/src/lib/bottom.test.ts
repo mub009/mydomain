@@ -101,3 +101,27 @@ describe("quick scan keeps bottom candidates", () => {
     expect(rows).toHaveLength(12);
   });
 });
+
+describe("minimum profit to target", () => {
+  const buy = (symbol: string, target: number, extra: Partial<Decision> = {}) =>
+    dec(symbol, symbol, 10, { verdict: "STRONG BUY", combined: 80, agree: true, entry: 100, stopLoss: 95, target, bottom: undefined, ...extra });
+
+  it("leaves out picks whose target is below the minimum, with the reason", () => {
+    const a = new DecisionAgent(11);
+    const rows = [buy("A", 112), buy("B", 108), buy("C", 111)].map(({ verdict: _v, spark: _s, ...r }) => r);
+    const { picks, passed } = a.decide(rows, {}, 5, {});
+    expect(picks.map((p) => p.symbol)).toEqual(["A", "C"]);
+    expect(passed[0]).toMatchObject({ symbol: "B", passedOver: "Target only +8.0%, below the 11% minimum profit" });
+  });
+
+  it("can be switched off", () => {
+    const rows = [buy("A", 105)].map(({ verdict: _v, spark: _s, ...r }) => r);
+    expect(new DecisionAgent(0).decide(rows, {}, 5, {}).picks).toHaveLength(1);
+  });
+
+  it("applies to long swings too", () => {
+    const low = dec("LOW", "IT", 90, { bottom: { ...dec("X", "IT", 90).bottom!, entry: 100, target: 108 } });
+    const ok = dec("OK", "Banks", 85);
+    expect(new DecisionAgent(11).longSwing([low, ok], 5).map((d) => d.symbol)).toEqual(["OK"]);
+  });
+});

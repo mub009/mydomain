@@ -48,7 +48,7 @@ export function AnalysisToolbar() {
         <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary"><SlidersHorizontal className="size-4" /></span>
         <span className="min-w-0 flex-1">
           <span className="block text-[13px] font-semibold">Analysis settings</span>
-          <span className="block truncate text-xs text-muted-foreground">{UNI[s.universe]} · top {s.top} · {s.risk}% risk{s.capital ? ` · ₹${Number(s.capital).toLocaleString("en-IN")}` : ""}</span>
+          <span className="block truncate text-xs text-muted-foreground">{UNI[s.universe]} · top {s.top} · {s.minProfit ? `${s.minProfit}%+ profit` : "any profit"} · {s.risk}% risk{s.capital ? ` · ₹${Number(s.capital).toLocaleString("en-IN")}` : ""}</span>
         </span>
         <ChevronDown className={cn("size-4 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")} />
       </button>
@@ -62,6 +62,10 @@ export function AnalysisToolbar() {
 
       <Field label="Top picks">
         <Segmented label="Top N selections" value={s.top} onChange={(top) => s.set({ top })} options={[3, 5, 10, 15, 20, 25].map((v) => ({ value: v, label: String(v) }))} />
+      </Field>
+      <Field label="Min. profit">
+        <Segmented label="Minimum profit to target" value={s.minProfit} onChange={(minProfit) => s.set({ minProfit })}
+          options={[0, 5, 8, 11, 15, 20].map((v) => ({ value: v, label: v ? `${v}%` : "Off" }))} />
       </Field>
       <Field label="Capital (₹)">
         <input className={cn(inputClass, "w-32")} inputMode="numeric" value={s.capital} placeholder="optional"

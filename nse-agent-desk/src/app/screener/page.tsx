@@ -41,6 +41,8 @@ const columns: ColumnDef<Decision>[] = [
   { accessorKey: "entry", header: "Entry", meta: { num: true }, cell: ({ getValue }) => inr(getValue() as number) },
   { accessorKey: "stopLoss", header: "Stop-loss", meta: { num: true }, cell: ({ getValue }) => inr(getValue() as number) },
   { accessorKey: "target", header: "Target", meta: { num: true }, cell: ({ getValue }) => inr(getValue() as number) },
+  { id: "upside", header: "Profit to target", meta: { num: true }, accessorFn: (d) => (d.target / d.entry - 1) * 100,
+    cell: ({ getValue }) => <span className="font-semibold text-pos">+{(getValue() as number).toFixed(1)}%</span> },
   { id: "hold", header: "Hold", meta: { num: true }, accessorFn: (d) => d.hold?.expectedDays ?? 99,
     cell: ({ row: { original: d } }) => d.hold ? <span title={holdSentence(d.hold)}>{holdShort(d.hold)}<span className="block text-[11px] text-muted-foreground">by {shortDate(d.hold.exitBy)}</span></span> : "–" },
   { id: "longTerm", header: "Long term", meta: { num: true }, accessorFn: (d) => d.longTerm?.score ?? -1,
@@ -98,6 +100,8 @@ export default function ScreenerPage() {
   const [zone, setZone] = useState<ZoneFilter>("ALL");
   const [top, setTop] = useState(0);
   const [trade, setTrade] = useState<TradeFilter>("ALL");
+  const minProfit = r?.minProfitPct ?? 11;
+  const [profitOnly, setProfitOnly] = useState(false);
 
   const all = useMemo(() => r?.all ?? [], [r]);
   const flaggedCount = all.filter((d) => d.blackPoints && Object.values(d.blackPoints.status).some((s) => s !== "Eligible")).length;
@@ -111,13 +115,13 @@ export default function ScreenerPage() {
   const byVerdict = useMemo(() => (verdict === "ALL" ? base : base.filter((d) => d.verdict === verdict)).filter((d) => matchesTrade(d, trade)), [base, verdict, trade]);
   // Buy-zone filter, then "Top N" by combined score.
   const data = useMemo(() => {
-    const xs = byVerdict.filter((d) => matchesZone(d, zone));
+    const xs = byVerdict.filter((d) => matchesZone(d, zone) && (!profitOnly || (d.target / d.entry - 1) * 100 >= (minProfit || 11)));
     // Top N: by bottom score for long swings, by combined score otherwise.
     const rank = (d: Decision) => (trade === "Long swing" ? d.bottom?.score ?? 0 : d.combined);
     return top ? [...xs].sort((a, b) => rank(b) - rank(a)).slice(0, top) : xs;
-  }, [byVerdict, zone, top, trade]);
-  const filtered = q || sector !== "ALL" || risk !== "ALL" || size !== "ALL" || rsiMin || rsiMax || minScore > 0 || verdict !== "ALL" || zone !== "ALL" || top > 0 || trade !== "ALL";
-  const reset = () => { setQ(""); setSector("ALL"); setRisk("ALL"); setSize("ALL"); setRsiMin(""); setRsiMax(""); setMinScore(0); setVerdict("ALL"); setZone("ALL"); setTop(0); setTrade("ALL"); };
+  }, [byVerdict, zone, top, trade, profitOnly, minProfit]);
+  const filtered = q || sector !== "ALL" || risk !== "ALL" || size !== "ALL" || rsiMin || rsiMax || minScore > 0 || verdict !== "ALL" || zone !== "ALL" || top > 0 || trade !== "ALL" || profitOnly;
+  const reset = () => { setQ(""); setSector("ALL"); setRisk("ALL"); setSize("ALL"); setRsiMin(""); setRsiMax(""); setMinScore(0); setVerdict("ALL"); setZone("ALL"); setTop(0); setTrade("ALL"); setProfitOnly(false); };
   useQuotes(useMemo(() => all.map((d) => d.symbol), [all]));
 
   const picked = data.filter((d) => sel[d.symbol]);
@@ -191,6 +195,11 @@ export default function ScreenerPage() {
               <TradeChips value={trade} onChange={(t) => { setTrade(t); if (t === "Long swing") setSorting([{ id: "bottom", desc: true }]); }}
                 count={(t) => (verdict === "ALL" ? base : base.filter((d) => d.verdict === verdict)).filter((d) => matchesTrade(d, t)).length} />
               <ZoneAndTopFilter items={byVerdict} zone={zone} onZone={setZone} top={top} onTop={setTop} />
+              <label className="flex w-fit items-center gap-2 text-xs font-medium text-muted-foreground">
+                <input type="checkbox" checked={profitOnly} onChange={(e) => setProfitOnly(e.target.checked)} className="size-4 accent-[var(--primary)]" />
+                Only stocks with at least {minProfit || 11}% profit to target
+                <span className="tnum opacity-75">({byVerdict.filter((d) => (d.target / d.entry - 1) * 100 >= (minProfit || 11)).length})</span>
+              </label>
             </div>
             <div className="flex flex-wrap items-center gap-2 border-t border-[var(--edge)] px-4 py-2.5">
               <span className="text-xs text-muted-foreground">{picked.length ? `${picked.length} selected` : "Tick stocks to track them, or track every stock shown"}</span>
