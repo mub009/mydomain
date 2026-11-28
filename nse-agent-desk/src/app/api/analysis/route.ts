@@ -1,5 +1,6 @@
 import { isBigUniverse } from "@/lib/market/lists";
 import { MIN_PROFIT_CHOICES, MIN_PROFIT_PCT } from "@/lib/agents/decision";
+import { RESEARCH_CHOICES, SHORTLIST } from "@/lib/pipeline";
 import { runAnalysis } from "@/lib/pipeline";
 import type { RunRequest, StreamEvent } from "@/lib/types";
 
@@ -38,7 +39,9 @@ function validate(body: unknown): RunRequest | string {
   }
   const minProfitPct = b.minProfitPct === undefined ? MIN_PROFIT_PCT : Number(b.minProfitPct);
   if (!(MIN_PROFIT_CHOICES as readonly number[]).includes(minProfitPct)) return `minProfitPct must be one of ${MIN_PROFIT_CHOICES.join(", ")}`;
-  return { symbols, top, riskPerTrade, capital, minProfitPct, demo: Boolean(b.demo) && process.env.ALLOW_DEMO_DATA === "true", aiNotes: Boolean(b.aiNotes), sectors, ...(universe ? { universe } : {}) };
+  const research = b.research === undefined ? SHORTLIST : Number(b.research);
+  if (!(RESEARCH_CHOICES as readonly number[]).includes(research)) return `research must be one of ${RESEARCH_CHOICES.join(", ")}`;
+  return { symbols, top, riskPerTrade, capital, minProfitPct, research, demo: Boolean(b.demo) && process.env.ALLOW_DEMO_DATA === "true", aiNotes: Boolean(b.aiNotes), sectors, ...(universe ? { universe } : {}) };
 }
 
 /** Runs one analysis and streams progress, agent messages and the result as Server-Sent Events. */

@@ -91,14 +91,15 @@ async function yahooFundamentals(symbol: string, price: number): Promise<Fundame
 const unknown = (source: string): Fundamentals => ({ cap: "Unknown", epsHistory: [], source, sample: false });
 
 /** Fundamentals for every symbol. A symbol whose data can't be loaded gets cap "Unknown". */
-export async function loadFundamentals(prices: Record<string, number>, demo: boolean, seed = 0): Promise<Record<string, Fundamentals>> {
+export async function loadFundamentals(prices: Record<string, number>, demo: boolean, seed = 0, deadline = Infinity): Promise<Record<string, Fundamentals>> {
   const syms = Object.keys(prices);
   if (demo) return Object.fromEntries(syms.map((s) => [s, demoFundamentals(s, prices[s], seed)]));
   if ((process.env.FUNDAMENTALS_PROVIDER ?? "yahoo").toLowerCase() !== "yahoo") return Object.fromEntries(syms.map((s) => [s, unknown("Not configured")]));
   const out: Record<string, Fundamentals> = {};
   const queue = [...syms];
-  await Promise.all(Array.from({ length: 6 }, async () => {
+  await Promise.all(Array.from({ length: syms.length > 200 ? 9 : 6 }, async () => {
     for (let s = queue.shift(); s; s = queue.shift()) {
+      if (Date.now() > deadline) { out[s] = unknown("Not checked (time limit)"); continue; }
       try { out[s] = await yahooFundamentals(s, prices[s]); } catch { out[s] = unknown("Unavailable"); }
     }
   }));

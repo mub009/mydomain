@@ -63,6 +63,12 @@ export function AnalysisToolbar() {
       <Field label="Top picks">
         <Segmented label="Top N selections" value={s.top} onChange={(top) => s.set({ top })} options={[3, 5, 10, 15, 20, 25].map((v) => ({ value: v, label: String(v) }))} />
       </Field>
+      {big && (
+        <Field label="Full research">
+          <Segmented label="Stocks researched in full" value={s.research} onChange={(research) => s.set({ research })}
+            options={[150, 250, 400].map((v) => ({ value: v, label: String(v) }))} />
+        </Field>
+      )}
       <Field label="Min. profit">
         <Segmented label="Minimum profit to target" value={s.minProfit} onChange={(minProfit) => s.set({ minProfit })}
           options={[0, 5, 8, 11, 15, 20].map((v) => ({ value: v, label: v ? `${v}%` : "Off" }))} />
@@ -96,7 +102,7 @@ export function AnalysisToolbar() {
       {s.universe === "custom" && <div className="w-full border-t border-[var(--edge)] pt-3"><StockGroupPicker /></div>}
       {big && (
         <p className="w-full text-xs text-muted-foreground">
-          {BIG_UNIVERSES[s.universe as keyof typeof BIG_UNIVERSES].label}: a quick scan checks {known ? `${known.count.toLocaleString("en-IN")}${known.from === "nse" ? " NSE" : " built-in"}` : BIG_UNIVERSES[s.universe as keyof typeof BIG_UNIVERSES].about} stocks, then the agents research the strongest 150 in full. Takes 1-2 minutes.
+          {BIG_UNIVERSES[s.universe as keyof typeof BIG_UNIVERSES].label}: a quick scan checks {known ? `${known.count.toLocaleString("en-IN")}${known.from === "nse" ? " NSE" : " built-in"}` : BIG_UNIVERSES[s.universe as keyof typeof BIG_UNIVERSES].about} stocks, then the agents research the strongest {s.research} in full (including stocks turning up from a bottom). Takes {s.research >= 400 ? "2-4" : s.research >= 250 ? "1-3" : "1-2"} minutes.{s.research >= 400 && <b className="font-semibold text-[var(--watch-fg)]"> On slow data days some stocks may not load in time; the chat says how many.</b>}
         </p>
       )}
       {!valid && s.universe !== "custom" && <p className="w-full text-xs text-neg">Enter between 3 and 150 NSE symbols.</p>}

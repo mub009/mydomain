@@ -112,7 +112,7 @@ export async function runDialogue(bus: MessageBus, llm: LLM, d: DialogueInput) {
     `Analysis started · ${plural(d.stockCount, "stock")} · ${d.source.label}` +
     `${d.source.seed !== undefined ? ` · run #${d.source.seed}` : ""} · Nifty 50 1-month ${pct(d.indexRet21d)} · ` +
     `agent conversation is simulated from the analysis · AI notes ${d.aiLabel}` +
-    (d.skipped.length ? ` · skipped: ${d.skipped.join(", ")}` : "") +
+    skippedNote(d.skipped) +
     (d.excluded.length ? ` · left out below ₹${d.minCapCr} Cr market cap: ${d.excluded.map((e) => e.symbol).join(", ")}` : ""), { kind: "system" });
   if (d.scan) bus.send("System", "ALL", scanLine(d.scan), { kind: "system" });
 
@@ -633,4 +633,12 @@ function minProfitLine(d: { minProfitPct?: number; passed: Decision[] }): string
   const short = d.passed.filter((p) => p.passedOver?.includes("minimum profit"));
   return ` Every pick targets at least ${d.minProfitPct}% profit` +
     (short.length ? `; ${short.length} buy-rated stock${short.length > 1 ? "s" : ""} fell short (${short.slice(0, 4).map((p) => `${p.symbol} +${((p.target / p.entry - 1) * 100).toFixed(1)}%`).join(", ")}${short.length > 4 ? "…" : ""}).` : ".");
+}
+
+/** Skipped stocks for the opening line; ones left out by the time guard are counted, not listed. */
+export function skippedNote(skipped: string[]): string {
+  const late = skipped.filter((s) => s.endsWith("(time limit)"));
+  const other = skipped.filter((s) => !s.endsWith("(time limit)"));
+  return (other.length ? ` · skipped: ${other.join(", ")}` : "") +
+    (late.length ? ` · ${late.length} stock${late.length > 1 ? "s" : ""} not loaded in time (data sources were slow), so they weren't researched this run` : "");
 }

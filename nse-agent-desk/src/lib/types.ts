@@ -443,6 +443,8 @@ export interface RunRequest {
   focus?: string[];
   /** A big list (Nifty 500 or all NSE): quick-scanned first, the best 150 get the full research. */
   universe?: "nifty500" | "allnse";
+  /** Big lists: how many stocks get the full research after the quick scan (150, 250 or 400). */
+  research?: number;
   /** Picks (short and long swing) need a target at least this % above the entry. Default 11; 0 = off. */
   minProfitPct?: number;
 }

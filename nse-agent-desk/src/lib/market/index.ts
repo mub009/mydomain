@@ -65,6 +65,8 @@ export async function loadIntraday(symbols: string[], source: DataSource, frames
 
 export async function loadMarket(
   symbols: string[], demo: boolean, onProgress?: (done: number, total: number) => void,
+  /** Stop starting new downloads after this time (ms); the rest are skipped as "time limit". */
+  deadline = Infinity,
 ): Promise<Loaded> {
   if (demo) return loadDemo(symbols);
   const provider = getProvider();
@@ -77,6 +79,7 @@ export async function loadMarket(
   const queue = [...symbols];
   const worker = async () => {
     for (let sym = queue.shift(); sym; sym = queue.shift()) {
+      if (Date.now() > deadline) { skipped.push(`${sym} (time limit)`); onProgress?.(++done, symbols.length); continue; }
       try {
         let bars: Bar[] = [];
         try { bars = await provider.getDailyBars(sym); } catch (e) {
@@ -91,7 +94,8 @@ export async function loadMarket(
       onProgress?.(++done, symbols.length);
     }
   };
-  await Promise.all(Array.from({ length: provider.id === "nse" ? 12 : 6 }, worker));
+  // More at once for big lists, so 250-400 stocks still load in time.
+  await Promise.all(Array.from({ length: provider.id === "nse" ? 12 : symbols.length > 200 ? 9 : 6 }, worker));
   // Live data only: never swap in sample prices without the user asking for them.
   if (!Object.keys(frames).length) {
     throw new Error(`Couldn't load live prices from ${provider.label}${skipped[0] ? ` (${skipped[0]})` : ""}. Please try again in a minute.`);

@@ -103,12 +103,12 @@ export function rankQuick(rows: Omit<QuickRow, "score">[]): QuickRow[] {
 
 export const isThin = (r: Omit<QuickRow, "score">) => r.close < 10 || r.tradedCr < 1;
 
-/** Up to this many of the shortlist are kept for stocks turning up from a bottom (long swing). */
-export const BOTTOM_KEEP = 40;
+/** Share of the shortlist kept for stocks turning up from a bottom (long swing): 40 of 150, 66 of 250, 106 of 400. */
+export const BOTTOM_SHARE = 40 / 150;
 
 /** The strongest by trend and momentum, plus the clearest turns from a bottom (score 70+). */
 export function shortlist(ranked: QuickRow[], keep: number): { rows: QuickRow[]; bottoms: number } {
-  const bottomRows = ranked.filter((r) => r.bottom >= 70).sort((a, b) => b.bottom - a.bottom || b.ret21 - a.ret21).slice(0, Math.min(BOTTOM_KEEP, Math.floor(keep / 3)));
+  const bottomRows = ranked.filter((r) => r.bottom >= 70).sort((a, b) => b.bottom - a.bottom || b.ret21 - a.ret21).slice(0, Math.min(Math.round(keep * BOTTOM_SHARE), Math.floor(keep / 3)));
   const taken = new Set(bottomRows.map((r) => r.symbol));
   const strong = ranked.filter((r) => !taken.has(r.symbol)).slice(0, keep - bottomRows.length);
   return { rows: [...strong, ...bottomRows], bottoms: bottomRows.length };

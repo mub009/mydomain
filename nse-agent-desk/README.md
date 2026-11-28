@@ -20,7 +20,7 @@ The Universe setting on the Overview chooses what the agents scan:
 | **All NSE** | ~2,000+ | NSE's list of every main-board (EQ series) share |
 | My Stocks | 3-150 | Your own list or saved groups |
 
-For Nifty 500 and All NSE the server first runs a **quick scan**: one year of closing prices for 20 stocks per request (about 2 seconds for 2,000 stocks), scored on 1- and 3-month gains, distance from the 52-week high and the 50/200-day averages. Shares under ₹10 or with under ₹1 crore traded that day are left out. The **strongest 150** then get the full 16-agent research. The lists are downloaded once a day; if NSE can't be reached, the built-in 110 stocks are used and the agents' chat says so. `GET /api/universe?list=nifty500|allnse` shows the list size and where it came from.
+For Nifty 500 and All NSE the server first runs a **quick scan**: one year of closing prices for 20 stocks per request (about 2 seconds for 2,000 stocks), scored on 1- and 3-month gains, distance from the 52-week high and the 50/200-day averages. Shares under ₹10 or with under ₹1 crore traded that day are left out. The **strongest 150** (setting **Full research**: 150, 250 or 400) then get the full 16-agent research, including a share kept for stocks turning up from a bottom (40 of 150, 67 of 250, 107 of 400). A time guard keeps each run inside Vercel's 5-minute limit: prices must load within 140 s and fundamentals within 190 s; stocks not loaded by then are skipped and the chat says how many. The lists are downloaded once a day; if NSE can't be reached, the built-in 110 stocks are used and the agents' chat says so. `GET /api/universe?list=nifty500|allnse` shows the list size and where it came from.
 
 ## Current price, filters, copy and TradingView
 

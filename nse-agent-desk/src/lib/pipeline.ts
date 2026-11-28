@@ -41,11 +41,12 @@ export async function runAnalysis(o: RunRequest, emit: (e: StreamEvent) => void)
   if (o.universe) ({ o, scan } = await narrowDown(o, emit));
 
   emit({ type: "progress", text: "Loading prices…" });
+  // Time guard (Vercel stops a run at 5 minutes): prices by 140 s, fundamentals by 190 s, leaving time for the rest.
   const { frames, indexClose, vixClose, sectorIndex, source, skipped } = await loadMarket(o.symbols, o.demo,
-    (d, t) => emit({ type: "progress", text: `Loading prices ${d}/${t}` }));
+    (d, t) => emit({ type: "progress", text: `Loading prices ${d}/${t}` }), started + 140_000);
   // Research Agent's size filter: leave out companies below the minimum market cap (default ₹300 Cr).
   emit({ type: "progress", text: "Checking market cap and EPS…" });
-  const funds = await loadFundamentals(Object.fromEntries(Object.entries(frames).map(([k, v]) => [k, v[v.length - 1].close])), source.kind === "demo", source.seed);
+  const funds = await loadFundamentals(Object.fromEntries(Object.entries(frames).map(([k, v]) => [k, v[v.length - 1].close])), source.kind === "demo", source.seed, started + 190_000);
   const { min: minCapCr } = capThresholds();
   const excluded = Object.entries(funds).filter(([, f]) => f.cap === "Too small").map(([symbol, f]) => ({ symbol, marketCapCr: f.marketCapCr ?? 0 }));
   for (const e of excluded) delete frames[e.symbol];
@@ -141,8 +142,9 @@ export async function runAnalysis(o: RunRequest, emit: (e: StreamEvent) => void)
   return result;
 }
 
-/** Full research takes at most this many stocks from a big list. */
+/** Full research on a big list: 150 by default, or 250 / 400 (see RESEARCH_CHOICES). */
 export const SHORTLIST = 150;
+export const RESEARCH_CHOICES = [150, 250, 400] as const;
 
 async function narrowDown(o: RunRequest, emit: (e: StreamEvent) => void): Promise<{ o: RunRequest; scan: QuickScanSummary }> {
   const id = o.universe!;
@@ -153,10 +155,11 @@ async function narrowDown(o: RunRequest, emit: (e: StreamEvent) => void): Promis
   emit({ type: "progress", text: `Downloading the ${label} list from NSE…` });
   const list = await loadStockList(id);
   registerSectors(list.sectors);
-  if (list.symbols.length <= SHORTLIST) {
+  const keep = o.research ?? SHORTLIST;
+  if (list.symbols.length <= keep) {
     return { o: { ...o, symbols: list.symbols }, scan: { label, total: list.symbols.length, priced: list.symbols.length, thin: 0, shortlisted: list.symbols.length, from: list.from, note: list.note } };
   }
-  const q = await quickScan(list.symbols, SHORTLIST, (d, t) => emit({ type: "progress", text: `Quick scan of ${label}: ${d.toLocaleString("en-IN")}/${t.toLocaleString("en-IN")} stocks` }));
+  const q = await quickScan(list.symbols, keep, (d, t) => emit({ type: "progress", text: `Quick scan of ${label}: ${d.toLocaleString("en-IN")}/${t.toLocaleString("en-IN")} stocks` }));
   if (q.shortlist.length < 3) throw new Error(`The quick scan couldn't get prices for the ${label} list. Try again in a minute, or pick a smaller list.`);
   const symbols = [...new Set([...(o.focus ?? []), ...q.shortlist.map((r) => r.symbol)])];
   return {
