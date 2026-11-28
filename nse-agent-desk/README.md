@@ -60,6 +60,16 @@ With the NSE Desk API (logged in):
 
 Every pick, short swing and long swing, needs a target at least **11% above the entry** (setting **Min. profit** on the Overview: Off, 5, 8, 11, 15 or 20%). Targets are never stretched to reach it: a buy-rated stock whose target is below the minimum is left out of the picks with the reason ("Target only +8.0%, below the 11% minimum profit"), and the Decision Agent says in the chat how many fell short. Final Picks show the profit % under each target; the Screener has a *Profit to target* column and an "Only stocks with at least 11% profit to target" filter.
 
+## Geopolitics Agent (wars, conflicts, sanctions) and the Macro Agent fix
+
+**Macro Agent fix:** gold, Brent and USD/INR now always come from Yahoo. They were requested from the main price source, which on the live site is NSE's own data (NSE stocks only), so the Macro card was empty.
+
+**Geopolitics Agent** (`src/lib/geopolitics.ts`, reports to the Macro Agent): reads the last 2 days of Google News for four regions (Middle East & Gulf, Russia–Ukraine & Europe, India's borders, China/Taiwan & trade wars) with neutral searches. Each headline counts +2 for severe escalation (war, missile, airstrike, killed), +1 for milder tension (warns, sanctions, military), −1.5 for calming news (ceasefire, talks; not when a ceasefire "collapses"/"ends"); the average is scaled by how much news there is → 0-100 per region and Calm / Watch / Elevated / High overall. It checks Brent, gold and USD/INR over 5 days ("markets are pricing in some of it" or "aren't reacting yet").
+
+Stock effects (±3 at most, only when a region is 60+, or 45+ for oil regions when Brent is up 2%+): defence +2 (+3 when India's borders are 70+); oil producers (ONGC, OIL) up; oil marketers, refiners, paints, airlines and tyres down; gold lenders and shipping up; electronics makers down on China/Taiwan tension. Shown in a **World events** card on the Overview, its report to the Macro Agent in the chat, and a note in each affected stock's window.
+
+**Company summary** (stock window → Company): what the company does, sector and industry, head office, employees, key people, website, 52-week range, and key numbers (market cap, P/E, forward P/E, P/B, EPS, book value, dividend yield, ROE, profit margin, revenue and profit growth, debt/equity, beta, average volume), from Yahoo's company profile.
+
 ## The team
 
 | Agent | Role | What they do |

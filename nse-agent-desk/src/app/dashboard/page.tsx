@@ -10,7 +10,7 @@ import { MessageFeed } from "@/components/desk/message-feed";
 import { MorningNewsCard, VixCard } from "@/components/desk/morning-cards";
 import { DiversificationCard } from "@/components/desk/diversification-card";
 import { SectorStrengthCard } from "@/components/desk/sector-ui";
-import { MacroCard } from "@/components/desk/macro-ui";
+import { GeopoliticsCard, MacroCard } from "@/components/desk/macro-ui";
 import { PolicyCard } from "@/components/desk/policy-ui";
 import { BulkTrackButton } from "@/components/desk/positions-ui";
 import { diversify } from "@/lib/diversify";
@@ -19,6 +19,7 @@ import { DataBanner, KPICard, ResearchProgress } from "@/components/desk/primiti
 import { PageHeader } from "@/components/desk/shell";
 import { Button } from "@/components/ui/button";
 import { istDate, istTime, pct } from "@/lib/format";
+import { PEOPLE } from "@/lib/team";
 import { useBusy, useDecided, useDesk, useStage } from "@/store/desk";
 import { matchesTrade, matchesZone, TradeChips, ZoneAndTopFilter, type TradeFilter, type ZoneFilter } from "@/components/desk/stock-tools";
 import type { Decision } from "@/lib/types";
@@ -65,7 +66,7 @@ export default function OverviewPage() {
 
   return (
     <>
-      <PageHeader title="Overview" subtitle="Sixteen AI agents scan, analyse, debate and decide." />
+      <PageHeader title="Overview" subtitle={`${PEOPLE.length} AI agents scan, analyse, debate and decide.`} />
       <div className="space-y-4">
         {source && <DataBanner source={source} />}
         <AnalysisToolbar />
@@ -98,6 +99,7 @@ export default function OverviewPage() {
 
         <PolicyCard policy={result?.policy} revealed={Boolean(result) && said("CentralBank")} busy={busy && !said("CentralBank")} />
         <MacroCard macro={result?.macro} revealed={Boolean(result) && said("Macro")} busy={busy && !said("Macro")} />
+        <GeopoliticsCard geo={result?.geopolitics} revealed={Boolean(result) && said("Geopolitics")} busy={busy && !said("Geopolitics")} />
 
         {r && <SectorStrengthCard sectors={r.sectors} />}
 

@@ -5,6 +5,7 @@ import { Line, LineChart, YAxis } from "recharts";
 import { pct } from "@/lib/format";
 import { TEAM } from "@/lib/team";
 import type { MacroExposure, MacroFactor, MacroReport } from "@/lib/types";
+import type { GeoExposure, GeoLevel, GeoReport, GeoTheme } from "@/lib/geopolitics";
 import { cn } from "@/lib/utils";
 import { AgentAvatar } from "./agent-avatar";
 import { StockSymbolChip, TypingIndicator } from "./primitives";
@@ -128,6 +129,104 @@ export function MacroExposureSection({ exposures, factors }: { exposures: MacroE
           );
         })}
       </ul>
+    </section>
+  );
+}
+
+const LEVEL_STYLE: Record<GeoLevel, string> = {
+  Calm: "bg-[var(--buy-bg)] text-[var(--buy-fg)]", Watch: "bg-muted text-foreground",
+  Elevated: "bg-[var(--watch-bg)] text-[var(--watch-fg)]", High: "bg-[var(--avoid-bg)] text-[var(--avoid-fg)]",
+};
+const TREND_STYLE: Record<GeoTheme["trend"], string> = { Escalating: "text-neg", Easing: "text-pos", Steady: "text-muted-foreground" };
+
+function MoveChip({ label, v, upIsBad }: { label: string; v?: number; upIsBad?: boolean }) {
+  if (v === undefined) return null;
+  const bad = upIsBad ? v > 0 : v < 0;
+  return (
+    <span className="inline-flex items-center gap-1 rounded-lg bg-muted/70 px-2 py-1 text-[12px] tnum">
+      {label} <b className={cn(Math.abs(v) < 0.3 ? "text-foreground" : bad ? "text-neg" : "text-pos")}>{v >= 0 ? "+" : ""}{v.toFixed(1)}%</b>
+    </span>
+  );
+}
+
+/** Geopolitics Agent: wars, conflicts, sanctions, the market check and the stocks affected. */
+export function GeopoliticsCard({ geo, revealed, busy }: { geo: GeoReport | null | undefined; revealed: boolean; busy: boolean }) {
+  return (
+    <section className="card space-y-3 p-4" aria-label="World events">
+      <header className="flex items-start gap-3">
+        <AgentAvatar who="Geopolitics" size={34} />
+        <div className="min-w-0 flex-1">
+          <h2 className="text-[15px] font-semibold">World events · wars & sanctions</h2>
+          <p className="text-xs text-muted-foreground"><span className="font-semibold" style={{ color: TEAM.Geopolitics.color }}>Geopolitics Agent</span> · reports to the Macro Agent{geo?.sample ? " · sample headlines" : ""}</p>
+        </div>
+        {revealed && geo && <span className={cn("shrink-0 rounded-md px-2 py-0.5 text-[12px] font-bold", LEVEL_STYLE[geo.level])}>{geo.level} · {geo.score}</span>}
+      </header>
+      {!revealed ? (
+        <p className="flex items-center justify-center gap-2 py-4 text-[13px] text-muted-foreground">{busy ? <>Reading world news <TypingIndicator /></> : "Appears when the Geopolitics Agent reports."}</p>
+      ) : !geo ? (
+        <p className="py-2 text-[13px] text-muted-foreground">World news wasn&apos;t available for this run.</p>
+      ) : (
+        <>
+          <p className="text-[12.5px]">{geo.summary}</p>
+          <div className="flex flex-wrap gap-1.5" aria-label="5-day market moves">
+            <span className="self-center text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">5 days</span>
+            <MoveChip label="Brent" v={geo.markets.crudePct} upIsBad /><MoveChip label="Gold" v={geo.markets.goldPct} /><MoveChip label="USD/INR" v={geo.markets.usdinrPct} upIsBad />
+          </div>
+          <ul className="grid gap-2 sm:grid-cols-2">
+            {geo.themes.map((t) => (
+              <li key={t.id} className="rounded-xl border p-2.5">
+                <div className="flex items-center gap-2">
+                  <b className="min-w-0 flex-1 truncate text-[13px]">{t.name}</b>
+                  <span className={cn("text-[11.5px] font-semibold", TREND_STYLE[t.trend])}>{t.trend}</span>
+                  <span className="text-[11.5px] font-bold tnum">{t.score}</span>
+                </div>
+                <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted" aria-hidden>
+                  <span className={cn("block h-full rounded-full", t.score >= 75 ? "bg-neg" : t.score >= 50 ? "bg-[var(--watch-fg)]" : t.score >= 25 ? "bg-muted-foreground/60" : "bg-pos")} style={{ width: `${Math.max(3, t.score)}%` }} />
+                </div>
+                {t.headlines.length ? (
+                  <ul className="mt-1.5 space-y-1">
+                    {t.headlines.slice(0, 2).map((h) => (
+                      <li key={h.title} className="text-[11.5px] leading-snug">
+                        <span className={cn("mr-1 font-bold", h.tone === "escalation" ? "text-neg" : h.tone === "calming" ? "text-pos" : "text-muted-foreground")}>{h.tone === "escalation" ? "▲" : h.tone === "calming" ? "▼" : "•"}</span>
+                        {h.url ? <a href={h.url} target="_blank" rel="noopener noreferrer" className="hover:underline">{h.title}</a> : h.title}
+                        {h.source && <span className="text-muted-foreground"> · {h.source}</span>}
+                      </li>
+                    ))}
+                  </ul>
+                ) : <p className="mt-1.5 text-[11.5px] text-muted-foreground">Nothing notable in 2 days.</p>}
+                {t.score >= 25 && <p className="mt-1.5 text-[11px] text-muted-foreground">Usually: {t.effects.slice(0, 2).join("; ")}.</p>}
+              </li>
+            ))}
+          </ul>
+          {geo.exposures.length > 0 && (
+            <div className="overflow-x-auto scroll-thin">
+              <table className="w-full min-w-[460px] text-left text-[12.5px]">
+                <thead><tr className="text-[10.5px] uppercase tracking-wide text-muted-foreground">{["Stock", "Effect", "Why"].map((h) => <th key={h} className="px-1 py-1 font-semibold">{h}</th>)}</tr></thead>
+                <tbody>
+                  {geo.exposures.slice(0, 10).map((e) => (
+                    <tr key={e.symbol} className="border-t">
+                      <td className="px-1 py-1.5"><StockSymbolChip symbol={e.symbol} /></td>
+                      <td className="px-1 py-1.5"><EffectTag effect={e.effect} points={e.points} /></td>
+                      <td className="px-1 py-1.5 text-muted-foreground">{e.reason}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <p className="text-[11px] text-muted-foreground">From Google News headlines of the last 2 days: ▲ escalation (attacks, missiles, troops), ▼ calming (ceasefire, talks). Scores show the tone of the news, not a forecast; stock effects are capped at ±3 points.</p>
+        </>
+      )}
+    </section>
+  );
+}
+
+/** Drawer note for a stock the Geopolitics Agent flagged. */
+export function GeoExposureNote({ e }: { e: GeoExposure }) {
+  return (
+    <section className="flex gap-2.5 rounded-xl border p-3" aria-label="World events">
+      <AgentAvatar who="Geopolitics" size={22} />
+      <p className="text-[12.5px]"><b className="font-semibold">World events</b> <EffectTag effect={e.effect} points={e.points} /> <span className="text-muted-foreground">{e.reason}.</span></p>
     </section>
   );
 }

@@ -16,7 +16,7 @@ import { TrackTradeButton } from "./positions-ui";
 import { CompanyTab } from "./company-tab";
 import { ForecastTab } from "./forecast-tab";
 import { SectorCheck } from "./sector-ui";
-import { MacroExposureSection } from "./macro-ui";
+import { GeoExposureNote, MacroExposureSection } from "./macro-ui";
 import { MyPositionCard, useHolding } from "./my-position";
 import { holdShort, shortDate } from "@/lib/hold";
 import { LONG_TERM_LABEL } from "@/lib/long-term";
@@ -199,6 +199,7 @@ function Body({ d, isPick, price }: { d: Decision; isPick: boolean; price?: numb
       {sector ? <SectorCheck s={sector} total={sectors!.length} symbol={d.symbol} />
         : <p className="rounded-xl border border-dashed p-3 text-[12.5px] text-muted-foreground">{d.sector === "Other" ? "Sector unknown for this stock, so there's no sector check." : `Not enough ${d.sector} stocks in this run to judge the sector. Choose "All caps" for more.`}</p>}
       {d.macro && d.macro.length > 0 && <MacroExposureSection exposures={d.macro} factors={macroFactors} />}
+      {d.geo && <GeoExposureNote e={d.geo} />}
       <AgentView who="Momentum" score={d.lotappi} reasons={d.lotReasons} warnings={d.lotWarnings} />
       <AgentView who="Trend" score={d.mayavi} reasons={d.mayReasons} warnings={d.mayWarnings} />
       {d.fundamentals && <FundamentalsCard f={d.fundamentals} />}

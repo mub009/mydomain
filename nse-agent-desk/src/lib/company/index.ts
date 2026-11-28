@@ -13,7 +13,7 @@ import { demoFundamentals } from "../fundamentals";
 import { sectorOf } from "../market/universe";
 import { yahooSymbol, yahooTimeseries } from "../market/yahoo-timeseries";
 import { gradeQuality } from "./quality";
-import type { CompanyReport, PeerRow, Shareholding, YearFinancials } from "./types";
+import type { CompanyReport, PeerRow, Shareholding, YearFinancials, CompanyProfile } from "./types";
 
 const CR = 1e7; // ₹ per crore
 const links = (s: string) => [
@@ -182,6 +182,34 @@ export async function quoteSummary(symbol: string, modules: string, raw = false)
   throw new Error("Yahoo session rejected");
 }
 
+/** What the company does and its key numbers, from Yahoo's company profile. */
+export async function yahooProfile(symbol: string): Promise<CompanyProfile | null> {
+  const q = await quoteSummary(symbol, "assetProfile,summaryDetail,defaultKeyStatistics,price,financialData");
+  if (!q) return null;
+  const ap = q.assetProfile ?? {}, sd = q.summaryDetail ?? {}, ks = q.defaultKeyStatistics ?? {}, fd = q.financialData ?? {}, pr = q.price ?? {};
+  const n = (v?: { raw?: number }) => (typeof v?.raw === "number" && Number.isFinite(v.raw) ? v.raw : undefined);
+  const r2 = (v?: number) => (v === undefined ? undefined : Math.round(v * 100) / 100);
+  const pctOf = (v?: number) => (v === undefined ? undefined : Math.round(v * 10000) / 100);
+  const mcap = n(sd.marketCap) ?? n(pr.marketCap);
+  const de = n(fd.debtToEquity);
+  return {
+    name: pr.longName ?? pr.shortName, sector: ap.sector, industry: ap.industry,
+    about: typeof ap.longBusinessSummary === "string" ? ap.longBusinessSummary.trim() : undefined,
+    website: typeof ap.website === "string" && /^https?:\/\//.test(ap.website) ? ap.website : undefined,
+    city: [ap.city, ap.country].filter(Boolean).join(", ") || undefined, employees: ap.fullTimeEmployees,
+    people: ((ap.companyOfficers ?? []) as { name?: string; title?: string }[]).filter((o) => o.name).slice(0, 4).map((o) => ({ name: o.name!.replace(/\s+/g, " "), title: o.title ?? "" })),
+    stats: {
+      marketCapCr: mcap === undefined ? undefined : Math.round(mcap / CR), pe: r2(n(sd.trailingPE)), forwardPe: r2(n(sd.forwardPE)), pb: r2(n(ks.priceToBook)),
+      eps: r2(n(ks.trailingEps)), bookValue: r2(n(ks.bookValue)), dividendYield: pctOf(n(sd.dividendYield)), beta: r2(n(sd.beta) ?? n(ks.beta)),
+      high52: r2(n(sd.fiftyTwoWeekHigh)), low52: r2(n(sd.fiftyTwoWeekLow)), avgVolume: n(sd.averageVolume),
+      roe: pctOf(n(fd.returnOnEquity)), profitMargin: pctOf(n(fd.profitMargins)), revenueGrowth: pctOf(n(fd.revenueGrowth)), earningsGrowth: pctOf(n(fd.earningsGrowth)),
+      // Yahoo gives debt/equity as a percentage (44.3 = 0.44).
+      debtToEquity: de === undefined ? undefined : Math.round(de) / 100,
+    },
+    source: "Yahoo Finance (unofficial)",
+  };
+}
+
 async function yahooShareholding(symbol: string): Promise<Shareholding> {
   const q = await quoteSummary(symbol, "majorHoldersBreakdown,institutionOwnership,fundOwnership");
   if (!q) throw new Error("no holders data");
@@ -242,13 +270,14 @@ export async function companyReport(symbol: string, opts: { demo: boolean; price
     const { ratios, quality } = gradeQuality(years, sector);
     return { symbol, sector, years, quarters: [], ratios, quality, shareholding: demoShareholding(symbol, opts.seed), source: "Sample figures (demo)", sample: true, links: links(symbol) };
   }
-  const [years, quarters, shareholding] = await Promise.all([
+  const [years, quarters, shareholding, profile] = await Promise.all([
     cached(`fin:${symbol}`, () => yahooFinancials(symbol)).catch(() => [] as YearFinancials[]),
     cached(`finq:${symbol}`, () => yahooQuarters(symbol)).catch(() => [] as YearFinancials[]),
     cached(`sh:${symbol}`, () => yahooShareholding(symbol)).catch(() => null),
+    cached(`prof:${symbol}`, () => yahooProfile(symbol)).catch(() => null),
   ]);
   const { ratios, quality } = gradeQuality(years, sector);
-  return { symbol, sector, years, quarters, ratios, quality, shareholding, source: "Yahoo Finance (unofficial)", sample: false, links: links(symbol) };
+  return { symbol, sector, years, quarters, ratios, quality, shareholding, profile, source: "Yahoo Finance (unofficial)", sample: false, links: links(symbol) };
 }
 
 export async function peerRows(peers: { symbol: string; price: number }[], opts: { demo: boolean; seed: number }): Promise<PeerRow[]> {

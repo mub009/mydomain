@@ -3,7 +3,7 @@
 import { ExternalLink, Loader2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Bar, BarChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import type { CompanyReport, PeerRow, Quality, QualityCheck, Ratios, YearFinancials } from "@/lib/company/types";
+import type { CompanyProfile, CompanyReport, PeerRow, Quality, QualityCheck, Ratios, YearFinancials } from "@/lib/company/types";
 import { Segmented } from "@/components/ui/segmented";
 import type { Decision } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -125,6 +125,54 @@ const CASH_ROWS: Row[] = [
 
 const has = (ps: YearFinancials[], ks: Key[]) => ps.some((p) => ks.some((k) => p[k] !== undefined));
 
+/** Company summary: what the company does, who runs it, and its key numbers. */
+function ProfileSection({ p, price }: { p: CompanyProfile; price: number }) {
+  const [more, setMore] = useState(false);
+  const s = p.stats;
+  const num = (v: number | undefined, f: (v: number) => string) => (v === undefined ? "–" : f(v));
+  const rs = (v: number) => `₹${v.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+  const pc = (v: number) => `${v.toFixed(2)}%`;
+  const range = s.high52 && s.low52 ? Math.max(0, Math.min(100, ((price - s.low52) / (s.high52 - s.low52)) * 100)) : undefined;
+  const stats: [string, string][] = [
+    ["Market cap", num(s.marketCapCr, (v) => `₹${v.toLocaleString("en-IN")} Cr`)],
+    ["P/E (TTM)", num(s.pe, (v) => v.toFixed(2))], ["Forward P/E", num(s.forwardPe, (v) => v.toFixed(2))],
+    ["P/B", num(s.pb, (v) => v.toFixed(2))], ["EPS (TTM)", num(s.eps, rs)], ["Book value / share", num(s.bookValue, rs)],
+    ["Dividend yield", num(s.dividendYield, pc)], ["ROE", num(s.roe, pc)], ["Profit margin", num(s.profitMargin, pc)],
+    ["Revenue growth (YoY)", num(s.revenueGrowth, pc)], ["Profit growth (YoY)", num(s.earningsGrowth, pc)], ["Debt / equity", num(s.debtToEquity, (v) => v.toFixed(2))],
+    ["Beta", num(s.beta, (v) => v.toFixed(2))], ["Avg. volume", num(s.avgVolume, (v) => v.toLocaleString("en-IN"))],
+  ];
+  return (
+    <Section title="Company summary">
+      <div>
+        <b className="block text-[14px]">{p.name}</b>
+        <span className="text-[12px] text-muted-foreground">{[p.sector, p.industry].filter(Boolean).join(" · ")}{p.city ? ` · ${p.city}` : ""}{p.employees ? ` · ${p.employees.toLocaleString("en-IN")} employees` : ""}</span>
+      </div>
+      {p.about && (
+        <div>
+          <p className={cn("text-[12.5px] leading-relaxed", !more && "line-clamp-4")}>{p.about}</p>
+          {p.about.length > 280 && <button type="button" onClick={() => setMore((v) => !v)} className="text-[12px] font-semibold text-primary hover:underline">{more ? "Show less" : "Read more"}</button>}
+        </div>
+      )}
+      {range !== undefined && (
+        <div className="space-y-1" aria-label="52-week range">
+          <div className="flex justify-between text-[11px] text-muted-foreground tnum"><span>52-week low {rs(s.low52!)}</span><span>high {rs(s.high52!)}</span></div>
+          <div className="relative h-1.5 rounded-full bg-muted"><span className="absolute -top-[3px] size-3 -translate-x-1/2 rounded-full bg-primary ring-2 ring-card" style={{ left: `${range}%` }} title={`Now ${rs(price)}`} /></div>
+        </div>
+      )}
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[12.5px] tnum sm:grid-cols-3">
+        {stats.map(([l, v]) => <div key={l} className="flex justify-between gap-2 border-b border-[var(--edge)] py-1"><dt className="text-muted-foreground">{l}</dt><dd className="font-semibold">{v}</dd></div>)}
+      </dl>
+      {p.people.length > 0 && (
+        <p className="text-[12px] text-muted-foreground"><b className="font-semibold text-foreground">Key people:</b> {p.people.map((x) => `${x.name}${x.title ? ` (${x.title})` : ""}`).join(" · ")}</p>
+      )}
+      <p className="flex flex-wrap gap-x-3 text-[11px] text-muted-foreground">
+        {p.website && <a href={p.website} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-semibold text-primary hover:underline">Company website<ExternalLink className="size-3" /></a>}
+        <span>{p.source}; figures can lag the latest results.</span>
+      </p>
+    </Section>
+  );
+}
+
 const cache = new Map<string, { report: CompanyReport; peers: PeerRow[] }>();
 
 export function CompanyTab({ d }: { d: Decision }) {
@@ -158,7 +206,7 @@ export function CompanyTab({ d }: { d: Decision }) {
   }, [key, d.symbol, d.entry, demo, seed, peers]);
 
   if (err) return <p className="px-5 py-8 text-sm text-neg">Could not load company data: {err}</p>;
-  if (!data) return <p className="flex items-center justify-center gap-2 px-5 py-12 text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin" />Loading income statement, balance sheet, cash flow and shareholders…</p>;
+  if (!data) return <p className="flex items-center justify-center gap-2 px-5 py-12 text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin" />Loading the company summary, statements and shareholders…</p>;
 
   const { report: r, peers: peerData } = data;
   const peerBy = new Map(peerData.map((p) => [p.symbol, p]));
@@ -178,6 +226,10 @@ export function CompanyTab({ d }: { d: Decision }) {
   return (
     <div className="space-y-4 px-5 pb-6">
       {r.sample && <p className="rounded-lg border border-warn-border bg-warn-bg px-3 py-2 text-[12px] text-warn-fg"><b>Sample figures (demo).</b> Not real financials or holders.</p>}
+
+      {r.profile ? <ProfileSection p={r.profile} price={d.entry} /> : !r.sample && (
+        <Section title="Company summary"><p className="text-[12.5px] text-muted-foreground">The company profile isn&apos;t available from our data source right now. See the company&apos;s page on NSE (link below).</p></Section>
+      )}
 
       {/* Research Agent's quality view */}
       <Section title="Balance sheet & cash-flow quality" right={<GradeTag grade={r.quality.grade} className="h-6 min-w-7 text-sm" />}>

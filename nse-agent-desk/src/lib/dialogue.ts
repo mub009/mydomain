@@ -16,6 +16,7 @@ import type { LLM } from "./llm";
 import { NEWS_BOOST } from "./agents/news";
 import { SECTOR_ADJ } from "./sectors";
 import { factorName } from "./macro";
+import type { GeoReport } from "./geopolitics";
 import type { PolicyReport } from "./policy";
 import type { AgentReport, Analysis, DataSource, Decision, MacroReport, MessageTable, NewsBrief, NewsItem, Person, QuickScanSummary, SectorView, Snapshot, VixReport } from "./types";
 
@@ -24,6 +25,7 @@ const ROLE: Record<Person, string> = {
   Volatility: "volatility analyst who tracks India VIX",
   CentralBank: "central bank analyst who tracks RBI and US Federal Reserve policy and what it means for rate-sensitive sectors",
   Macro: "commodity and currency analyst who tracks gold, crude oil and USD/INR",
+  Geopolitics: "geopolitics analyst who tracks wars, conflicts and sanctions and how they move crude, gold, the rupee and Indian stocks",
   Momentum: "short-term (1-10 day) swing-trade scanner",
   Trend: "1-month positional trend scanner",
   Research: "analyst who combines the short-term and 1-month reports and checks risk",
@@ -46,6 +48,7 @@ const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
 
 export interface DialogueInput {
   macro: MacroReport | null;
+  geopolitics?: GeoReport | null;
   sectors: SectorView[];
   excluded: { symbol: string; marketCapCr: number }[];
   minCapCr: number;
@@ -211,6 +214,30 @@ export async function runDialogue(bus: MessageBus, llm: LLM, d: DialogueInput) {
   // ---------- Macro Agent: global markets ----------
   if (d.globalCues) {
     bus.send("Macro", "Research", `Global cues first: ${d.globalCues} in their latest sessions. Large overnight moves abroad often show up in the Nifty's opening; the Markets page has every country's index.`);
+  }
+
+  // ---------- Geopolitics Agent → Macro Agent: wars, conflicts, sanctions ----------
+  if (d.geopolitics) {
+    const g = d.geopolitics;
+    const hot = g.themes.filter((t) => t.score >= 25);
+    const lines = g.themes.map((t) => `• ${t.name}: ${t.score}/100, ${t.trend.toLowerCase()}${t.headlines[0] ? ` — "${t.headlines[0].title}"${t.headlines[0].source ? ` (${t.headlines[0].source})` : ""}` : " — nothing notable"}`);
+    bus.send("Geopolitics", "Macro",
+      `Macro Agent, the world picture.${g.sample ? " (Sample headlines in demo mode.)" : ""} ${g.summary}
+${lines.join("\n")}` +
+      (hot.length ? `
+What it usually means: ${hot[0].effects.slice(0, 3).join("; ")}.` : "") +
+      (g.exposures.length ? " Stocks in today's list that this helps or hurts:" : ""),
+      {
+        kind: "report", tickers: g.exposures.slice(0, 10).map((e) => e.symbol),
+        table: g.exposures.length ? {
+          columns: ["Symbol", "Effect", "Points", "Why"],
+          rows: g.exposures.slice(0, 10).map((e) => [e.symbol, e.effect, `${e.points > 0 ? "+" : ""}${e.points}`, e.reason]),
+        } : undefined,
+      });
+    bus.send("Macro", "Geopolitics",
+      g.exposures.length
+        ? `Thanks. I'll pass these to Research Agent with my crude, gold and rupee read${(g.markets.crudePct ?? 0) >= 2 ? `; Brent is already up ${g.markets.crudePct!.toFixed(1)}% in 5 days, so the oil effects count in full` : "; crude hasn't reacted much yet, so I've kept the oil effects small"}.`
+        : g.level === "Calm" ? "Noted: nothing that moves our stocks today." : "Noted. Nothing in today's list is directly exposed, but I'll watch crude and the rupee.");
   }
 
   // ---------- Macro Agent: gold, crude, USD/INR → Research Agent (before his analysis) ----------

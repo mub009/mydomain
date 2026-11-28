@@ -75,11 +75,15 @@ describe("in the full run", () => {
     const msgs: Message[] = [];
     const r = await runAnalysis({ symbols: ALL_CAPS, top: 5, demo: true, aiNotes: false, riskPerTrade: 1 }, (e) => { if (e.type === "message") msgs.push(e.message); });
     expect(r.macro?.factors.map((f) => f.id)).toEqual(["gold", "crude", "usdinr"]);
-    const macroAt = msgs.findIndex((m) => m.sender === "Macro");
+    const macroAt = msgs.findIndex((m) => m.sender === "Macro" && m.to === "Research");
     const followUp = msgs.findIndex((m) => m.sender === "Research" && m.to === "Momentum");
     expect(macroAt).toBeGreaterThan(0);
     expect(macroAt).toBeLessThan(followUp);
-    expect(msgs[macroAt].to).toBe("Research");
+    // The Geopolitics Agent reports to the Macro Agent first.
+    const geoAt = msgs.findIndex((m) => m.sender === "Geopolitics" && m.to === "Macro");
+    expect(geoAt).toBeGreaterThan(0);
+    expect(geoAt).toBeLessThan(macroAt);
+    expect(r.geopolitics?.themes).toHaveLength(4);
     for (const m of msgs) expect(m.text).not.toMatch(/undefined|NaN/);
     // Demo stocks with a known link really do move with their factor.
     const it = r.macro!.exposures.filter((e) => e.factor === "usdinr" && e.link === "benefits" && e.corr !== undefined);

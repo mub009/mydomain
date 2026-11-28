@@ -145,6 +145,8 @@ export interface Analysis {
   policy?: { points: number; effect: "Tailwind" | "Headwind" | "Mixed" | "Neutral"; reason: string };
   /** Black Points Analyst's downside-risk report (stocks that passed a scan). */
   blackPoints?: BPReport;
+  /** Geopolitics Agent: how today's wars and tensions usually affect this stock. */
+  geo?: import("./geopolitics").GeoExposure;
   /** Long swing check: is it turning up from a bottom? */
   bottom?: import("./bottom").BottomSetup;
 }
@@ -268,7 +270,7 @@ export interface Decision extends Analysis {
   longTerm?: import("./long-term").LongTermView;
 }
 
-export type Person = "News" | "Volatility" | "Macro" | "CentralBank" | "Momentum" | "Trend" | "Research" | DeskAgent | "BlackPoints" | "Decision";
+export type Person = "News" | "Volatility" | "Macro" | "Geopolitics" | "CentralBank" | "Momentum" | "Trend" | "Research" | DeskAgent | "BlackPoints" | "Decision";
 export type AgentName = Person | "System";
 export type Stage = "scan" | "analyze" | "debate" | "decide";
 
@@ -416,6 +418,8 @@ export interface RunResult {
   scan?: QuickScanSummary;
   /** Long swing picks: stocks turning up from a bottom, held ~3 weeks to 3 months (missing in older runs). */
   longSwing?: Decision[];
+  /** Geopolitics Agent's report: wars, conflicts, sanctions and their market effects (missing in older runs). */
+  geopolitics?: import("./geopolitics").GeoReport | null;
   /** The minimum profit to target every pick needed, % (missing in older runs). */
   minProfitPct?: number;
   sectors: SectorView[];

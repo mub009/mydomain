@@ -99,6 +99,28 @@ export interface Shareholding {
   note?: string;
 }
 
+/** Company summary: what it does and its key numbers (Yahoo Finance profile). */
+export interface CompanyProfile {
+  name?: string;
+  sector?: string;
+  industry?: string;
+  /** What the company does. */
+  about?: string;
+  website?: string;
+  city?: string;
+  employees?: number;
+  people: { name: string; title: string }[];
+  stats: {
+    marketCapCr?: number; pe?: number; forwardPe?: number; pb?: number; eps?: number; bookValue?: number;
+    /** % */
+    dividendYield?: number; beta?: number; high52?: number; low52?: number; avgVolume?: number;
+    /** % */
+    roe?: number; profitMargin?: number; revenueGrowth?: number; earningsGrowth?: number;
+    debtToEquity?: number;
+  };
+  source: string;
+}
+
 export interface CompanyReport {
   symbol: string;
   sector: string;
@@ -108,6 +130,8 @@ export interface CompanyReport {
   ratios: Ratios;
   quality: Quality;
   shareholding: Shareholding | null;
+  /** Company summary (missing in demo mode or when the source has none). */
+  profile?: CompanyProfile | null;
   source: string;
   sample: boolean;
   /** Official sources to double-check against. */

@@ -17,7 +17,7 @@
  * The total per stock is capped at ±4 and applied to Research Agent's combined score.
  */
 import type { Analysis, Bar, MacroExposure, MacroFactor, MacroReport } from "../types";
-import { getProvider } from "../market";
+import { yahooProvider } from "../market/yahoo";
 import { weekdays } from "../market/demo";
 import { EXPOSURES, demoFactorReturns, type FactorId } from "./exposure";
 
@@ -44,10 +44,9 @@ export async function loadMacro(demo: boolean, seed = 0, days = 260): Promise<{ 
     }
     return { series, sample: true };
   }
-  const p = getProvider();
-  if (!p) return null;
+  // Gold, Brent and USD/INR come from Yahoo whatever the stock-price source is (NSE's data has only NSE stocks).
   try {
-    const [gold, crude, fx] = await Promise.all(["GC=F", "BZ=F", "INR=X"].map((s) => p.getDailyBars(s)));
+    const [gold, crude, fx] = await Promise.all(["GC=F", "BZ=F", "INR=X"].map((s) => yahooProvider.getDailyBars(s)));
     const fxBy = new Map(fx.map((b: Bar) => [b.date, b.close]));
     let lastFx = fx[0]?.close;
     const goldInr = gold.map((b) => {

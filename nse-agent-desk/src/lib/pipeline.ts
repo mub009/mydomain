@@ -29,6 +29,7 @@ import type { Bar, QuickScanSummary, RunRequest, RunResult, StreamEvent } from "
 import { BIG_UNIVERSES, loadStockList } from "./market/lists";
 import { quickScan } from "./market/prescreen";
 import { ALL_CAPS } from "./market/universe";
+import { applyGeo, geoReport, loadGeoThemes } from "./geopolitics";
 import { bottomSetup, LONG_SWING_DAYS, type BottomSetup } from "./bottom";
 
 export async function runAnalysis(o: RunRequest, emit: (e: StreamEvent) => void): Promise<RunResult> {
@@ -76,14 +77,17 @@ export async function runAnalysis(o: RunRequest, emit: (e: StreamEvent) => void)
   // Research Agent's sector check: each sector against the Nifty; leading sectors lift their stocks.
   const sectors = analyseSectors(frames, snaps, sectorOf, indexClose, sectorIndex);
   // Macro Agent: gold, crude and USD/INR, and the stocks that depend on them — before Research Agent's analysis.
-  emit({ type: "progress", text: "Reading gold, crude and USD/INR…" });
-  const [macroData, policy] = await Promise.all([
+  emit({ type: "progress", text: "Reading gold, crude, USD/INR and world events…" });
+  const [macroData, policy, geoThemes] = await Promise.all([
     loadMacro(source.kind === "demo", source.seed),
     // Central Bank Agent: RBI and Fed policy from their own websites.
     loadPolicy(source.kind === "demo").catch(() => null),
+    // Geopolitics Agent: wars, conflicts and sanctions in the news (reports to the Macro Agent).
+    loadGeoThemes(source.kind === "demo").catch(() => null),
   ]);
   const macro = macroData ? analyseMacro(frames, macroData.series, macroData.sample) : null;
-  const first = applyPolicy(policy, applySectors(mubashir.applyFundamentals(applyMacro(mubashir.analyse(lot, may, snaps), macro), funds), sectors));
+  const geopolitics = geoThemes ? geoReport(geoThemes, macroData?.series, Object.keys(frames)) : null;
+  const first = applyGeo(applyPolicy(policy, applySectors(mubashir.applyFundamentals(applyMacro(mubashir.analyse(lot, may, snaps), macro), funds), sectors)), geopolitics);
   const focus = (o.focus ?? []).filter((s) => frames[s]);
   const candidates = [...new Set([...focus, ...first.slice(0, Math.max(12, o.top * 2)).map((r) => r.symbol), ...bottomTop])];
   // Research desk: Performance, Valuation and Growth Agents check the candidates for Research Agent.
@@ -127,14 +131,14 @@ export async function runAnalysis(o: RunRequest, emit: (e: StreamEvent) => void)
     source, stockCount: rows.length, skipped, indexRet21d, scan,
     aiLabel: llm.enabled ? `on (${aiModel()})` : "off",
     capital: o.capital, riskPerTrade: o.riskPerTrade,
-    macro, sectors: sectorViews, excluded, minCapCr, news, vix, positive: morning.positive(news), negative: morning.negative(news),
+    macro, geopolitics, sectors: sectorViews, excluded, minCapCr, news, vix, positive: morning.positive(news), negative: morning.negative(news),
     snaps, lot, may, rows, conflicted, clarifications, picks, passed, watchlist, all, longSwing, minProfitPct: fd.minProfitPct, bpCoverage: bp.summary.coverage, globalCues: cues, policy,
   });
 
   const result: RunResult = {
     source, generatedAt: new Date().toISOString(), simulatedAgents: !llm.enabled,
     capital: o.capital, riskPerTrade: o.riskPerTrade,
-    indexRet21d: Math.round(indexRet21d * 100) / 100, news, vix, blackPoints: bp.summary, policy, excluded, minCapCr, ...(scan ? { scan } : {}), longSwing, minProfitPct: fd.minProfitPct, sectors: sectorViews, macro, picks, watchlist, all, skipped,
+    indexRet21d: Math.round(indexRet21d * 100) / 100, news, vix, blackPoints: bp.summary, policy, excluded, minCapCr, ...(scan ? { scan } : {}), longSwing, geopolitics, minProfitPct: fd.minProfitPct, sectors: sectorViews, macro, picks, watchlist, all, skipped,
   };
   emit({ type: "result", result });
   console.log(`[nse-agent-desk] run: ${rows.length} stocks, source=${source.kind}${source.seed !== undefined ? `#${source.seed}` : ""}, ` +
