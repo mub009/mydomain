@@ -105,7 +105,7 @@ describe("Black Points Analyst", () => {
 });
 
 describe("Decision Agent with Black Points", () => {
-  const fd = new DecisionAgent();
+  const fd = new DecisionAgent(0); // these tests are about Black Points, not the minimum profit
   const withBp = (status: Record<string, string>) => row({ blackPoints: { symbol: "ACME", sector: "IT", passed: {}, findings: [], status, checkedAt: "", sample: false } as never });
 
   it("a verified exclusion overrides any score", () => {
@@ -129,7 +129,13 @@ describe("Black Points in a run", () => {
   it("checks every stock that passed a scan and never picks a held-out stock", async () => {
     const msgs: Message[] = [];
     const res = await runAnalysis({ symbols: ALL_CAPS, top: 10, demo: true, aiNotes: false, riskPerTrade: 1, capital: 500000 }, (e) => { if (e.type === "message") msgs.push(e.message); });
-    for (const d of res.all) expect(Boolean(d.blackPoints)).toBe(d.lotappi >= 60 || d.mayavi >= 60);
+    for (const d of res.all) {
+      const passed = d.lotappi >= 60 || d.mayavi >= 60;
+      if (passed) expect(d.blackPoints).toBeDefined();
+      // Beyond the scans, only long swing candidates (turning up from a bottom) are checked.
+      else if (d.blackPoints) expect(d.bottom?.isSetup).toBe(true);
+    }
+    for (const p of res.longSwing ?? []) expect(p.blackPoints?.status.positional ?? "Eligible").toBe("Eligible");
     for (const p of res.picks) {
       const st = p.blackPoints?.status ?? {};
       const periods = p.horizon.startsWith("Swing, then") ? ["swing", "positional"] : p.horizon.startsWith("Swing") ? ["swing"] : ["positional"];

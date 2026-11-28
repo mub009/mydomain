@@ -15,6 +15,9 @@ export const nseMcpEnabled = () => (process.env.NSE_MCP ?? "on").toLowerCase() !
 const url = () => process.env.NSE_MCP_URL ?? URL_DEFAULT;
 
 let session: Promise<string> | null = null;
+/** After a failed connection, NSE calls fail at once until this time, so each stock falls back to Yahoo without waiting. */
+let downUntil = 0;
+const COOL_DOWN_MS = 2 * 60_000;
 let rpcId = 0;
 const cache = new Map<string, { at: number; v: unknown }>();
 const TTL = 20 * 60_000;
@@ -51,7 +54,7 @@ function openSession(): Promise<string> {
     if (!sid) throw new Error("NSE MCP did not open a session");
     await post({ jsonrpc: "2.0", method: "notifications/initialized" }, sid).catch(() => {});
     return sid;
-  })().catch((e) => { session = null; throw e; });
+  })().catch((e) => { session = null; downUntil = Date.now() + COOL_DOWN_MS; throw e; });
   return session;
 }
 
@@ -60,9 +63,11 @@ export async function nseTool<T = Record<string, unknown>>(name: string, args: R
   const key = `${name}:${JSON.stringify(args)}`;
   const hit = cache.get(key);
   if (hit && Date.now() - hit.at < TTL) return hit.v as T;
+  if (Date.now() < downUntil) throw new Error("NSE MCP is not answering (trying again in a couple of minutes)");
   const v = await slot(async () => {
     let lastErr: unknown;
     for (let attempt = 0; attempt < 3; attempt++) {
+      if (attempt && Date.now() < downUntil) break; // the server is down: don't keep waiting
       try {
         const sid = await openSession();
         const res = await post({ jsonrpc: "2.0", id: ++rpcId, method: "tools/call", params: { name, arguments: args } }, sid);

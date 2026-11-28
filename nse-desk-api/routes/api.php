@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\WatchlistController;
 use App\Http\Controllers\ZerodhaController;
 use Illuminate\Support\Facades\Route;
 
@@ -22,8 +23,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/auth/account', [AuthController::class, 'destroy'])->middleware('throttle:10,1');
 
     Route::get('/zerodha', [ZerodhaController::class, 'index']);
+    Route::post('/zerodha/refresh', [ZerodhaController::class, 'refresh'])->middleware('throttle:20,1');
     Route::post('/zerodha/connect', [ZerodhaController::class, 'connect']);
     Route::post('/zerodha/apps', [ZerodhaController::class, 'storeApp'])->middleware('throttle:20,1');
     Route::delete('/zerodha/apps/{app}', [ZerodhaController::class, 'destroyApp']);
     Route::delete('/zerodha/accounts/{account}', [ZerodhaController::class, 'destroy']);
+
+    Route::get('/watchlist', [WatchlistController::class, 'index']);
+    Route::post('/watchlist', [WatchlistController::class, 'store'])->middleware('throttle:60,1');
+    Route::delete('/watchlist/{symbol}', [WatchlistController::class, 'destroy'])->where('symbol', '[A-Za-z0-9&\\-.%]+');
 });

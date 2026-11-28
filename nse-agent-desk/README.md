@@ -4,6 +4,62 @@ An AI stock research desk for the Indian market (NSE / Nifty 50). Four AI agents
 
 > Research tool only, not investment advice. Entry, stop-loss and target are research scenarios, not guaranteed prices. The scoring rules are simple technical signals and have not been backtested.
 
+## Home page and Overview
+
+- **`/` (home page):** what the desk does and why it helps: today's Nifty 50 (NSE), Sensex (BSE), Bank Nifty and gold with why each moved, the benefits, how the agents work, the whole team, data sources, who it's for, FAQ and a not-investment-advice notice.
+- **`/dashboard` (Overview):** the research desk itself (run the agents, final picks, market cards). The sidebar's Overview link and the logo go here.
+
+## Stock lists: from 3 stocks to every NSE share
+
+The Universe setting on the Overview chooses what the agents scan:
+
+| Choice | Stocks | How |
+|---|---|---|
+| Large / Mid / Small / All caps | 50 / 30 / 30 / 110 | Built-in lists, every stock researched in full |
+| **Nifty 500** | ~500 | Official list from NSE (niftyindices.com), with each company's industry |
+| **All NSE** | ~2,000+ | NSE's list of every main-board (EQ series) share |
+| My Stocks | 3-150 | Your own list or saved groups |
+
+For Nifty 500 and All NSE the server first runs a **quick scan**: one year of closing prices for 20 stocks per request (about 2 seconds for 2,000 stocks), scored on 1- and 3-month gains, distance from the 52-week high and the 50/200-day averages. Shares under ₹10 or with under ₹1 crore traded that day are left out. The **strongest 150** then get the full 16-agent research. The lists are downloaded once a day; if NSE can't be reached, the built-in 110 stocks are used and the agents' chat says so. `GET /api/universe?list=nifty500|allnse` shows the list size and where it came from.
+
+## Current price, filters, copy and TradingView
+
+- **Current price** on Final Picks (table and phone cards) and the Screener, with today's change. Delayed live prices come from `GET /api/quotes?symbols=…` (Yahoo, 20 stocks per request, kept 30 s), refreshed every minute while NSE is open. Without a quote the run's last close is shown. Positions, Sell check and Zerodha already show the current price.
+- **Filters** on Final Picks and the Screener: **Buy zone** (price inside the best buy area), **Buy on dip** (up to 6% above it) and **Extended** (further above), each with a count, and **Show Top 3 / 5 / 10 / 15 / 20 / 25** (the Screener ranks by combined score).
+- **Copy:** the copy icon next to every stock symbol (picks, screener, stock window, positions, Sell check, Zerodha) copies the NSE symbol.
+- **TradingView:** the stock window and its chart have a TradingView button that opens the same stock's chart in a new tab (`NSE:SYMBOL`; `&` and `-` become `_`, e.g. `NSE:M_M`).
+
+## Short swing and long swing (from the bottom)
+
+Every run now gives two kinds of trade:
+
+| Trade | Hold | Found by |
+|---|---|---|
+| **Short swing** | 1-10 days | Momentum Agent: breakouts, RSI, volume, MACD (the main Final Picks) |
+| **Positional** | about 1 month | Trend Agent: moving averages, relative strength |
+| **Long swing** | 3 weeks to 3 months | Bottom check: turning up from a low (`src/lib/bottom.ts`) |
+
+**Long swing check**, on daily prices: the stock is at least 15% below its 52-week high, made its lowest low of the last ~6 months at least a week ago, and has bounced 3-20% off it. Points (out of 100) for a higher low, being back above the 20-day average, the 20-day average turning up, reclaiming the 50-day average, RSI recovering from oversold (under 35) to 45-70, MACD turning up and more volume on up days. A setup needs 70+ and a stop-loss within 12%.
+
+**Plan:** buy near today's price; stop-loss under the low of the last 20 days (at least 1.5 ATR away); target the bigger of 2:1 and halfway back to the 52-week high; hold up to 60 trading days. The Decision Agent ranks setups by score and leaves out loss-making companies, severe red flags and stocks the Black Points Analyst didn't clear for a positional hold (same sector cap). BUY at 80+, otherwise WATCH.
+
+On Nifty 500 / All NSE, the quick scan keeps up to 40 stocks turning up from a bottom as well as the strongest ones, so long swings aren't filtered out before the full research.
+
+**Where:** a **Trade** filter (All / Short swing / Positional / Long swing) on Final Picks and the Screener; the Screener has a *From bottom* column; the stock window's Research tab has a *Long swing · from the bottom* card; Trend Agent announces the long swing list in the team chat.
+
+## Zerodha saved to your account, Refresh, and Watchlist
+
+With the NSE Desk API (logged in):
+- **Saved:** Zerodha holdings and positions are stored in the API's database. The Positions page loads them from there, so they still show after the daily 6:00 AM session end (with a *Session ended · Reconnect* notice).
+- **Refresh** fetches every connected account from Zerodha again and saves it. **Stocks you've sold are removed**, new ones added, and a note says exactly what changed ("Removed 1 sold: ITC (25 sh). New: TCS (4 sh)."). Saved data older than 10 minutes is refreshed quietly when the page opens, and every 5 minutes in market hours.
+- **Remove** deletes an account and its saved holdings.
+
+**Watchlist** (menu → Watchlist): stocks to keep an eye on, separate from holdings. Add any NSE stock by name or symbol, or press **☆ Watch** in a stock's window. Each row shows the current price, today's change, the move since you added it, the last analysis's verdict and buy-zone plan, your note, TradingView and Remove. Logged in, it's saved to your account (same list on every device); otherwise in this browser, and moved to your account when you log in.
+
+## Minimum profit to target (default 11%)
+
+Every pick, short swing and long swing, needs a target at least **11% above the entry** (setting **Min. profit** on the Overview: Off, 5, 8, 11, 15 or 20%). Targets are never stretched to reach it: a buy-rated stock whose target is below the minimum is left out of the picks with the reason ("Target only +8.0%, below the 11% minimum profit"), and the Decision Agent says in the chat how many fell short. Final Picks show the profit % under each target; the Screener has a *Profit to target* column and an "Only stocks with at least 11% profit to target" filter.
+
 ## The team
 
 | Agent | Role | What they do |
@@ -31,7 +87,7 @@ Rules worth knowing:
 
 **EPS over one year:** EPS for the last 12 months (sum of the last 4 quarters) against the 12 months before; if fewer than 8 quarters are available, the latest fiscal year against the one before. Score: +5 for growth of 20% or more, +3 for 10-20%, +1 for 0-10%, -4 if EPS fell, -6 if loss-making. Decision Agent never gives STRONG BUY with falling EPS, and never BUY while loss-making.
 
-With demo data off, market cap and EPS come from Yahoo Finance's fundamentals data (unofficial). If a stock's data can't be loaded it's marked "Unknown" and kept, with a note that its size wasn't verified.
+Market cap and EPS come from Yahoo Finance's fundamentals data (unofficial). If a stock's data can't be loaded it's marked "Unknown" and kept, with a note that its size wasn't verified.
 
 ## Central Bank Agent (RBI and Fed policy)
 
@@ -212,6 +268,16 @@ Score out of 100: how many "effective" sectors and stocks the money is spread ov
 
 ## Company: peers, balance sheet, cash flow, owners
 
+**Financial statements, Annual or Quarterly** (switch at the top of the statements):
+- **Income statement:** revenue, cost of revenue, gross profit, operating expenses, EBITDA, operating profit and margin, interest, profit before tax, tax, net profit and margin, EPS, and growth vs last year (annual) or vs the same quarter last year (quarterly). Banks and finance companies don't report gross profit or EBITDA, so those rows are hidden for them.
+- **Balance sheet** and **cash flow** follow the same switch. Indian companies publish the balance sheet every six months and the cash flow yearly or half-yearly, so the quarterly view says so where a quarter has no figures.
+- Annual: last 4 fiscal years (FY = April-March). Quarterly: last ~5 quarters (Q1 = April-June). If the newest quarter in the data is over ~5 months old, a note points to the company's results on NSE.
+- Tables open scrolled to the newest period, with the item names fixed while you scroll.
+- **Two decimals, no rounding:** every amount is in ₹ crore to two decimals (e.g. 493.03), EPS and book value in ₹.
+- **More lines:** income statement adds interest income, net interest income and fees & other income (banks and finance companies), total expenses, depreciation, tax rate and minority interest. Cash flow shows cash from operating, investing and financing activities, net change in cash, changes in working capital, capital expenditures, free cash flow, dividends paid, debt raised and repaid, and cash at the end of the period. Balance sheet adds fixed assets, goodwill, inventory, receivables, current assets and liabilities, net debt, retained earnings, working capital, shares issued and book value per share. Lines a company doesn't report are hidden.
+- Different data providers define a few lines differently (e.g. changes in working capital), so those can differ from other apps.
+
+
 Open any stock and choose the **Company** tab:
 
 - **Balance sheet & cash-flow quality:** Research Agent grades the company A-D on cash conversion (operating cash flow ÷ net profit over 3 years, counted double), free cash flow (years positive out of 4), debt/equity, current ratio, return on equity and interest cover. A loss-making company can't grade above C. Banks and NBFCs are graded only on ROE and profit growth, because debt and cash flow work differently for lenders.
@@ -220,7 +286,7 @@ Open any stock and choose the **Company** tab:
 - **Balance sheet:** revenue, profit, assets, liabilities, equity, debt, cash, capital spending, debt/equity and current ratio by fiscal year (₹ Cr).
 - **Who owns it:** holder groups, largest holders, promoter trend and pledges where available.
 
-Data: with demo data off, statements come from Yahoo Finance's annual fundamentals and holders from Yahoo's holders data (both unofficial). Yahoo groups FIIs and DIIs together as "institutions" and doesn't show the official promoter split or pledges; each stock links to its NSE page for the official quarterly shareholding pattern. In demo mode all figures are samples and holder names are generic placeholders.
+Data: statements come from Yahoo Finance's annual fundamentals and holders from Yahoo's holders data (both unofficial). Yahoo groups FIIs and DIIs together as "institutions" and doesn't show the official promoter split or pledges; each stock links to its NSE page for the official quarterly shareholding pattern. In demo mode all figures are samples and holder names are generic placeholders.
 
 ## Follow-up on trades you take
 
@@ -276,7 +342,7 @@ Light and dark themes, and a mobile layout with a bottom navigation bar.
 
 - **NSE's official data (default for prices):** daily prices for every stock, the Nifty 50, India VIX and 17 NSE sector indices come from **NSE's Bhavcopy MCP server** (`mcp.nseindia.in`, run by National Stock Exchange of India Ltd.). Raw bhavcopy prices are adjusted for splits and bonuses with NSE's own corporate-action factors. The same server gives the Volatility Agent NSE's market breadth and VIX range, the Valuation Agent each sector index's published P/E, and the Seasonality Agent official dividend ex-dates. If a stock can't be loaded from NSE, Yahoo Finance is used for that stock and the data label says which. A full Nifty 50 run takes about 35 seconds (NSE serves history in 3-month pieces). Settings: `NSE_MCP=off` to switch it off, `NSE_MCP_CONCURRENCY` (default 12), `MARKET_DATA_PROVIDER=yahoo` to use Yahoo for prices.
 - **Yahoo Finance (still used):** intraday bars and the stock window's chart, financial statements, holders and analyst targets; headlines from Google News; India VIX, gold, crude and USD/INR from Yahoo. Yahoo is unofficial and delayed, labelled as such in the UI; it is **not** real-time NSE data. Yahoo leaves today's daily close empty, so the latest price is used for today's bar. If live prices can't be loaded, the run stops with an error: it never switches to sample prices on its own.
-- **Demo data (switch on to use):** fictional sample prices, clearly labelled, for trying the app offline.
+- **Demo data:** removed from the app. Fictional sample prices are used only by the automated tests, and by the server when `ALLOW_DEMO_DATA=true` is set for local testing.
 - **Behind an HTTPS proxy** (for example a cloud sandbox), start the server with `NODE_USE_ENV_PROXY=1` so Node's `fetch` uses `HTTPS_PROXY`.
 - **ASM/GSM and pledges:** NSE's website blocks automated requests, so save the lists to `.data/surveillance.json` (see the research desk section) for a reliable check.
 - **Real-time NSE prices need a licensed source.** Implement `MarketDataProvider` (`src/lib/market/provider.ts`) for your data vendor or broker API and register it in `src/lib/market/index.ts`.
@@ -357,4 +423,41 @@ For every stock the Decision Agent runs 1,000 simulated price paths (the stock's
 - **Expected return:** the average exit across all paths, from the entry price.
 
 It appears in the Decision Agent's chat message after the picks, the Final Picks table and cards, the Screener (Hold and Expected columns), each stock's Agents tab and a "How long to hold" card in its Research tab. These are estimates, not guarantees.
+
+## Sell check (what to stop holding)
+
+On the Positions page, **Check my holdings** runs the agents on what you already own: your Zerodha holdings (all connected accounts), the trades you track, and any stock you add by hand with its quantity and buy price. Each stock gets a fresh analysis and one of:
+
+- **Sell (all):** a verified red flag from the Black Points Analyst, a severe red flag from the Red Flag Agent, a loss past the stop-loss (8% below your buy price, or 3 days' average range if larger) while the agents aren't positive on it, or a broken trend (rated AVOID, both scanners weak, price down over the month).
+- **Book profit (sell half):** up 15% or more while momentum fades or it's overbought, or the agents now rate it AVOID / WATCH; the rest is kept with the stop raised to at least your buy price.
+- **Hold:** everything else, with the stop-loss to keep and the target. A stock past its stop-loss that the agents still rate BUY with its trend holding is a Hold with a fresh, tighter stop.
+
+The same stock held in several places is checked once, at the weighted buy price. Research only, not investment advice.
+
+## Long-term view (1-3 years)
+
+Next to the short-term calls, every stock the research desk covers gets a long-term score out of 100: is it a business worth owning, whatever the chart does next? It starts at 50 and adds or takes points for quality (ROE, margins, cash: +20 to -12), 3-year growth (+18 to -20 for a loss-maker), valuation against the sector (+8 to -10; skipped when P/E is over 300, which means broken earnings data), the 5-year record (+8 to -8), safety (down to -30 for a verified red flag) and the 200-day trend (+4 / -6). 70+ **Accumulate**, 50-69 **Hold**, 35-49 **Reduce**, below 35 **Exit**.
+
+It appears in the Sell check (with a Short term / Long term switch and a line on what to do when the two disagree), in a "Long-term view" card in each stock's Research tab, as a Screener column, and in the Decision Agent's message in the Agents tab.
+
+## My position and improving your investments
+
+Tap any stock you hold (a tracked trade, a Zerodha holding, or a stock in the Sell check) to open its full report. Stocks you hold open on the Research tab with a **My position** card: your shares and buy price, profit/loss, its share of your portfolio, the decision for you (short term and long term), and **how to improve this investment**: average down in the agents' buy zone (only when the long-term case is good and the buy zone is above your stop-loss), add on dips, don't add, trim an oversized position, where to keep the stop-loss, and how the stock moves with gold, crude oil or the dollar. If the current run didn't research the stock in full, the full research loads automatically.
+
+After a Sell check, **Improve my portfolio** shows the split by sector, how much is tied to commodities and to gold, the largest holding, and suggestions: exit the weak holdings, build up the strongest, cut any stock over 25% or sector over 40%, keep 5-10% in gold (Gold ETF or Sovereign Gold Bonds) for balance, keep commodity stocks to 10-20%, and the commodity stocks (metals, energy) the agents rate BUY or better in the latest run.
+
+## Picking 20 or 25 stocks
+
+**Top picks** offers 3, 5, 10, 15, 20 and 25. The Decision Agent allows at most 2 picks per sector up to 15 picks, 4 for 20 and 5 for 25, so the longer lists can fill. Only BUY or STRONG BUY stocks become picks, so for 20-25 use a larger universe (All caps); a smaller one may give fewer. More picks means more stocks get the full research and chart check, so the run takes longer (about a minute for 25 from All caps).
+
+## Why the market and gold moved (daily)
+
+Markets → **Why it moved** (also a "Market today" card on the Overview) explains each day's move in the Nifty 50, Sensex, Bank Nifty, gold and silver, from data:
+
+- **Indices:** the sectors that moved most in the index's direction, Asian markets the same day, Wall Street's previous session (India trades before the US opens), NSE breadth (how many stocks rose and fell), India VIX, Brent crude and the rupee.
+- **Gold and silver** (international prices in rupees, without import duty and GST): the dollar-price move, the US dollar index, US 10-year bond yields, the rupee, and whether stocks fell (safe-haven buying).
+- Reasons that pushed the other way are listed separately under "Working against it", and the day's headlines (Google News) are shown with each.
+- **Day by day:** the last 10 sessions with Nifty, Bank Nifty, gold, USD/INR and crude, and the sector that drove each day.
+
+Refreshes every 5 minutes during market hours (cached for 10 minutes on the server).
 

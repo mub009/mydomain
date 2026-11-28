@@ -145,6 +145,8 @@ export interface Analysis {
   policy?: { points: number; effect: "Tailwind" | "Headwind" | "Mixed" | "Neutral"; reason: string };
   /** Black Points Analyst's downside-risk report (stocks that passed a scan). */
   blackPoints?: BPReport;
+  /** Long swing check: is it turning up from a bottom? */
+  bottom?: import("./bottom").BottomSetup;
 }
 
 export type DeskAgent = "Performance" | "Valuation" | "Growth" | "Profitability" | "Seasonal" | "Entry" | "RedFlag";
@@ -262,6 +264,8 @@ export interface Decision extends Analysis {
   spark: number[]; // last ~60 closes
   /** Decision Agent's holding plan: expected days to the target, hold-until date, odds and expected return. */
   hold?: import("./forecast").HoldPlan;
+  /** Long-term (1-3 years) view from the research desk: Accumulate / Hold / Reduce / Exit. */
+  longTerm?: import("./long-term").LongTermView;
 }
 
 export type Person = "News" | "Volatility" | "Macro" | "CentralBank" | "Momentum" | "Trend" | "Research" | DeskAgent | "BlackPoints" | "Decision";
@@ -408,6 +412,12 @@ export interface RunResult {
   /** Stocks left out for being below the minimum market cap. */
   excluded: { symbol: string; marketCapCr: number }[];
   minCapCr: number;
+  /** Set when a big list was quick-scanned first. */
+  scan?: QuickScanSummary;
+  /** Long swing picks: stocks turning up from a bottom, held ~3 weeks to 3 months (missing in older runs). */
+  longSwing?: Decision[];
+  /** The minimum profit to target every pick needed, % (missing in older runs). */
+  minProfitPct?: number;
   sectors: SectorView[];
   macro: MacroReport | null;
   picks: Decision[];
@@ -431,6 +441,24 @@ export interface RunRequest {
   sectors?: Record<string, string>;
   /** Stocks to research in full whatever their rank (single-stock search). */
   focus?: string[];
+  /** A big list (Nifty 500 or all NSE): quick-scanned first, the best 150 get the full research. */
+  universe?: "nifty500" | "allnse";
+  /** Picks (short and long swing) need a target at least this % above the entry. Default 11; 0 = off. */
+  minProfitPct?: number;
+}
+
+/** How a big list was narrowed down before the full research. */
+export interface QuickScanSummary {
+  label: string;
+  /** Stocks in the list, stocks with prices, and stocks left out as too cheap or barely traded. */
+  total: number;
+  priced: number;
+  thin: number;
+  shortlisted: number;
+  /** Of the shortlist, how many were kept as long swing (bottom) candidates. */
+  bottoms?: number;
+  from: "nse" | "built-in" | "demo";
+  note?: string;
 }
 
 export type StreamEvent =

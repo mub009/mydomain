@@ -86,6 +86,16 @@ describe("four agents", () => {
     }
   });
 
+  it("longer lists (20, 25 picks) allow more per sector so they can fill", async () => {
+    const { sectorCap } = await import("./agents/decision");
+    expect([3, 5, 10, 15, 20, 25].map(sectorCap)).toEqual([2, 2, 2, 2, 4, 5]);
+    const { result: res } = await run(undefined, 25);
+    const count: Record<string, number> = {};
+    for (const p of res.picks) count[p.sector] = (count[p.sector] ?? 0) + 1;
+    for (const n of Object.values(count)) expect(n).toBeLessThanOrEqual(5);
+    expect(res.picks.length).toBeLessThanOrEqual(25);
+  });
+
   it("different demo runs reach different conclusions", async () => {
     const sets = new Set<string>();
     for (let i = 0; i < 4; i++) sets.add((await run()).result.picks.map((p) => p.symbol).join(","));

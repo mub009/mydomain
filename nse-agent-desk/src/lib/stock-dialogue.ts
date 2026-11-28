@@ -127,7 +127,8 @@ export function stockConversation(d: Decision, r: RunResult): Message[] {
       : d.passedOver ? ` Buy-rated but left out: ${lc(d.passedOver)}.` : "") +
     (d.clarification ? `\nOn the scanners' disagreement: ${d.clarification}` : "") +
     (bp?.finalDecision ? `\nShortlists: ${bp.finalDecision}` : "") +
-    (d.hold ? `\nHow long to hold: ${holdSentence(d.hold)}` : ""), { kind: "decision", tickers: t });
+    (d.hold ? `\nHow long to hold: ${holdSentence(d.hold)}` : "") +
+    (d.longTerm ? `\nLong term (1-3 years): ${d.longTerm.summary} ${{ ACCUMULATE: "Worth accumulating on dips.", HOLD: "Fine to keep.", REDUCE: "Consider reducing.", EXIT: "Not one to own for years." }[d.longTerm.action]}` : ""), { kind: "decision", tickers: t });
   if (d.verdict === "STRONG BUY" || d.verdict === "BUY") {
     bus.send("Momentum", "ALL", `If you take it, track the trade and I'll alert you on a 3% loss, near the stop-loss (${inr(d.stopLoss)}) or if it's hit.`, { tickers: t });
     bus.send("Trend", "ALL", `And I'll tell you when it reaches the first exit and the target (${inr(d.target)}).`, { tickers: t });

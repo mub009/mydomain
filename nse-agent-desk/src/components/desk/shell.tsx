@@ -1,6 +1,6 @@
 "use client";
 
-import { Briefcase, CandlestickChart, Globe2, LayoutDashboard, MessagesSquare, Moon, SlidersHorizontal, Sun } from "lucide-react";
+import { Briefcase, CandlestickChart, Globe2, LayoutDashboard, MessagesSquare, Moon, SlidersHorizontal, Sun, Star } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
@@ -18,10 +18,11 @@ import { StockDrawer } from "./stock-drawer";
 import { StockFinder } from "./stock-finder";
 
 const NAV = [
-  { href: "/", label: "Overview", Icon: LayoutDashboard },
+  { href: "/dashboard", label: "Overview", Icon: LayoutDashboard },
   { href: "/chat", label: "Team Chat", Icon: MessagesSquare },
   { href: "/screener", label: "Screener", Icon: SlidersHorizontal },
   { href: "/positions", label: "Positions", Icon: Briefcase },
+  { href: "/watchlist", label: "Watchlist", Icon: Star },
   { href: "/markets", label: "Markets", Icon: Globe2 },
 ];
 
@@ -81,7 +82,7 @@ function Sidebar() {
   const last = (p: Person) => [...messages.slice(0, shown)].reverse().find((m) => m.sender === p)?.text;
   return (
     <aside className="sticky top-0 z-10 hidden h-dvh w-[250px] shrink-0 flex-col bg-[linear-gradient(180deg,#16244a,#0b1428_60%,#0a1124)] text-sidebar-foreground shadow-[inset_-1px_0_0_rgb(255_255_255/0.06),12px_0_32px_-12px_rgb(8_14_32/0.6)] lg:flex">
-      <Link href="/" className="flex items-center gap-2.5 border-b border-sidebar-border px-4 py-4">
+      <Link href="/dashboard" className="flex items-center gap-2.5 border-b border-sidebar-border px-4 py-4">
         <Logo />
         <span><b className="block text-[15px] font-bold leading-tight text-white">NSE Agent Desk</b><span className="text-[11.5px] text-sidebar-muted">AI stock research team</span></span>
       </Link>
@@ -123,7 +124,7 @@ function MobileBars() {
         <b className="min-w-0 truncate whitespace-nowrap text-sm font-bold">NSE Agent Desk</b>
         <div className="ml-auto flex items-center gap-2"><AccountMenu compact /><MarketStatusBadge className="h-7 border-sidebar-border bg-sidebar-hover px-2 text-[11px] text-white [&>span:last-child]:hidden min-[420px]:[&>span:last-child]:inline" /><AlertsBell className="border-sidebar-border bg-sidebar-hover text-white" /><ThemeToggle className="border-sidebar-border bg-sidebar-hover text-white" /></div>
       </header>
-      <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t bg-card pb-[env(safe-area-inset-bottom)] lg:hidden" aria-label="Main">
+      <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-6 border-t bg-card pb-[env(safe-area-inset-bottom)] lg:hidden" aria-label="Main">
         {NAV.map(({ href, label, Icon }) => {
           const on = pathname === href;
           return (
@@ -151,8 +152,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
     const t = setInterval(loadPositions, 20000);
     return () => clearInterval(t);
   }, [loadPositions]);
-  // Log in and sign up are full-screen, without the app's sidebar and bars.
-  if (pathname === "/login" || pathname === "/signup") return <>{children}</>;
+  // The home page, log in and sign up are full-screen, without the app's sidebar and bars.
+  if (pathname === "/" || pathname === "/login" || pathname === "/signup") return <>{children}</>;
   return (
     <div className="flex min-h-dvh">
       <Sidebar />

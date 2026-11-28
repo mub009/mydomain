@@ -13,12 +13,18 @@ API-only Laravel 11 backend for **NSE Agent Desk** (the Next.js app in `../nse-a
 | POST | `/api/auth/login` | – | `email, password` → `{ token, user }` |
 | GET | `/api/auth/me` | token | the logged-in user |
 | POST | `/api/auth/logout` | token | ends this device's login |
-| GET | `/api/zerodha` | token | connected accounts with holdings, positions, totals, and combined totals |
+| GET | `/api/zerodha` | token | accounts with their **saved** holdings and positions (from the database), totals and combined totals; an account never synced is synced first |
+| POST | `/api/zerodha/refresh` | token | fetch every connected account again from Zerodha and save it: sold stocks are removed, new ones added; returns the same as GET plus `refreshed: { removed, added, errors }` |
 | POST | `/api/zerodha/connect` | token | `{ slot? }` → `{ url }`: open it to log in on Zerodha |
 | GET | `/api/zerodha/callback` | – | Zerodha's Redirect URL; returns the browser to the web app |
-| DELETE | `/api/zerodha/accounts/{id}` | token | disconnect one account |
+| DELETE | `/api/zerodha/accounts/{id}` | token | remove one account and its saved holdings |
 | POST | `/api/zerodha/apps` | token | `label?, api_key, api_secret` → save your Kite Connect app |
 | DELETE | `/api/zerodha/apps/{id}` | token | remove an app (its accounts are disconnected) |
+| GET | `/api/watchlist` | token | `{ items: [{ symbol, note, addedPrice, addedAt }] }`, newest first |
+| POST | `/api/watchlist` | token | `symbol, note?, price?`: add a stock (up to 200), or update its note |
+| DELETE | `/api/watchlist/{symbol}` | token | remove a stock |
+
+**Saved holdings.** Zerodha holdings and positions are stored in `broker_holdings` (one row each, replaced on every refresh) with `broker_accounts.synced_at`. When a Kite session ends (06:00 IST daily) the account is kept with no token and its saved holdings stay visible until it is reconnected or removed.
 | PUT | `/api/auth/profile` | token | `name, email` |
 | PUT | `/api/auth/password` | token | `current_password, password, password_confirmation` (logs out other devices) |
 | GET | `/api/auth/devices` | token | how many devices are logged in |
@@ -56,7 +62,7 @@ Needs PHP 8.2+, Composer and MySQL (or MariaDB), like Markkito.
 
 ### On cPanel hosting
 
-- **Document root:** cPanel → *Domains* → `nse-api.<your-domain>` → *Manage* → set the document root to the project's `public` folder (e.g. `nse-api.markkito.com/public`). The `.htaccess` in the project folder is only a safety net if you can't.
+- **Document root:** cPanel → *Domains* → `nse-api.<your-domain>` → *Manage* → set the document root to the project's `public` folder (e.g. `nse-api.markkito.com/public`). If you can't, copy `htaccess.example` to `.htaccess` in the project folder as a safety net (it is git-ignored, so your server keeps its own copy).
 - **Imunify360 / bot protection:** the web app calls this API from the browser on another site, which can't pass a "One moment, please…" check. In cPanel → *Imunify360* (or ask the host), turn off bot protection / the anti-bot challenge for this subdomain, or allow-list it.
 - **Check:** `https://nse-api.<your-domain>/up` must show Laravel's "Application up" page, and `https://nse-api.<your-domain>/api/auth/me` must return `{"message":"Unauthenticated."}`. The bare domain must **not** show a file listing.
 

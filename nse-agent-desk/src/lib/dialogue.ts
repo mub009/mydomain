@@ -17,7 +17,7 @@ import { NEWS_BOOST } from "./agents/news";
 import { SECTOR_ADJ } from "./sectors";
 import { factorName } from "./macro";
 import type { PolicyReport } from "./policy";
-import type { AgentReport, Analysis, DataSource, Decision, MacroReport, MessageTable, NewsBrief, NewsItem, Person, SectorView, Snapshot, VixReport } from "./types";
+import type { AgentReport, Analysis, DataSource, Decision, MacroReport, MessageTable, NewsBrief, NewsItem, Person, QuickScanSummary, SectorView, Snapshot, VixReport } from "./types";
 
 const ROLE: Record<Person, string> = {
   News: "news scout who collects the morning stock news",
@@ -51,6 +51,7 @@ export interface DialogueInput {
   minCapCr: number;
   source: DataSource;
   stockCount: number;
+  scan?: QuickScanSummary;
   skipped: string[];
   indexRet21d: number;
   aiLabel: string;
@@ -67,6 +68,10 @@ export interface DialogueInput {
   conflicted: Analysis[];
   clarifications: Record<string, string>;
   picks: Decision[];
+  /** Long swing picks: turning up from a bottom. */
+  longSwing?: Decision[];
+  /** Minimum profit to the target for any pick, %. */
+  minProfitPct?: number;
   /** Every stock with its final verdict (includes the Black Points rulings). */
   all: Decision[];
   /** What the Black Points Analyst could check this run. */
@@ -109,6 +114,7 @@ export async function runDialogue(bus: MessageBus, llm: LLM, d: DialogueInput) {
     `agent conversation is simulated from the analysis · AI notes ${d.aiLabel}` +
     (d.skipped.length ? ` · skipped: ${d.skipped.join(", ")}` : "") +
     (d.excluded.length ? ` · left out below ₹${d.minCapCr} Cr market cap: ${d.excluded.map((e) => e.symbol).join(", ")}` : ""), { kind: "system" });
+  if (d.scan) bus.send("System", "ALL", scanLine(d.scan), { kind: "system" });
 
   // ---------- Step 0: News Agent hands over the news ----------
   if (d.news) {
@@ -539,7 +545,7 @@ export async function runDialogue(bus: MessageBus, llm: LLM, d: DialogueInput) {
     const syms = names(d.passed);
     bus.send("Decision", "Research",
       `On concentration: I'm leaving out ${list(d.passed.map((p) => `${p.symbol} (${p.sector})`))}. ` +
-      `We already hold ${MAX_PER_SECTOR} from ${d.passed.length === 1 ? "that sector" : "those sectors"}, and I won't put more than that in one sector.`, { tickers: syms });
+      `We already hold ${Number(/already (\d+)/.exec(d.passed.find((p) => p.passedOver?.startsWith("Sector cap"))?.passedOver ?? "")?.[1] ?? MAX_PER_SECTOR)} from ${d.passed.length === 1 ? "that sector" : "those sectors"}, and I won't put more than that in one sector.`, { tickers: syms });
     bus.send("Research", "Decision", `Agreed. ${list(syms)} ${syms.length === 1 ? "goes" : "go"} on the watchlist instead.`, { tickers: syms });
   }
   if (d.capital && d.picks.length) {
@@ -556,9 +562,9 @@ export async function runDialogue(bus: MessageBus, llm: LLM, d: DialogueInput) {
   bus.stage = "decide";
   bus.send("Decision", "ALL",
     d.picks.length
-      ? `Decision made. We go with ${list(names(d.picks))}.` + entryPlan(d.picks) +
+      ? `Decision made. We go with ${list(names(d.picks))}.` + entryPlan(d.picks) + minProfitLine(d) +
         (d.watchlist.length ? ` Watchlist: ${list(names(d.watchlist))}.` : "") + " Momentum Agent, Trend Agent, please confirm."
-      : `Decision made: no stock passes our buy rules today, so we stay in cash.` +
+      : `Decision made: no stock passes our buy rules today, so we stay in cash.` + minProfitLine(d) +
         (d.watchlist.length ? ` Watchlist: ${list(names(d.watchlist))}.` : ""),
     {
       kind: "decision", tickers: [...names(d.picks), ...names(d.watchlist)],
@@ -580,6 +586,22 @@ export async function runDialogue(bus: MessageBus, llm: LLM, d: DialogueInput) {
       { kind: "report", tickers: names(planned) });
   }
 
+  // Long swing: stocks turning up from a bottom, a separate list with a longer hold.
+  const ls = d.longSwing ?? [];
+  bus.send("Trend", "ALL",
+    ls.length
+      ? `Long swing from the bottom: ${list(names(ls))}. These fell well below their 52-week highs, bounced off a low and are turning up. Stop-loss under the recent low, target part of the way back to the old high, held about 3 weeks to 3 months.${d.minProfitPct ? ` Each targets at least ${d.minProfitPct}% profit.` : ""}`
+      : "Long swing from the bottom: no stock is clearly turning up from a low today (we look for a bounce off the low, a higher low, the averages turning up and RSI recovering).",
+    {
+      kind: "report", tickers: names(ls),
+      table: ls.length ? {
+        columns: ["Symbol", "Verdict", "Bottom", "Above low", "Below high", "Entry", "Stop-loss", "Target", "Hold", "Setup"],
+        rows: ls.map((p) => [p.symbol, p.verdict, `${inr(p.bottom!.low)} (${shortDate(p.bottom!.lowDate)})`, `+${p.bottom!.offLowPct.toFixed(1)}%`, `-${p.bottom!.offHighPct.toFixed(0)}%`,
+          inr(p.entry), inr(p.stopLoss), inr(p.target), holdShort(p.hold), `${p.bottom!.score}/100`]),
+      } : undefined,
+    });
+  if (ls.length) bus.send("Decision", "Trend", `Noted. The long swings are a separate list with their own stop-losses; size them smaller, because a bottom can still fail.`);
+
   if (d.picks.length) {
     const swing = d.picks.filter((p) => p.horizon.startsWith("Swing")).slice(0, 3);
     bus.send("Momentum", "ALL",
@@ -589,4 +611,26 @@ export async function runDialogue(bus: MessageBus, llm: LLM, d: DialogueInput) {
     bus.send("Momentum", "ALL", "Understood. I'll rescan tomorrow.");
     bus.send("Trend", "ALL", "Agreed. No trend worth holding today.");
   }
+}
+
+/** One line on how a big list was narrowed down to the stocks researched in full. */
+export function scanLine(s: QuickScanSummary): string {
+  const n = (x: number) => x.toLocaleString("en-IN");
+  if (s.from === "demo") return `${s.label}: ${s.note}`;
+  if (s.from === "built-in") return `${s.label}: ${s.note} All ${n(s.total)} were researched in full.`;
+  const left = s.priced - s.thin;
+  return `Quick scan of the ${s.label} list: ${n(s.total)} stocks` +
+    (s.shortlisted < s.total ? ` · ${n(left)} had a year of prices and traded at least ₹1 Cr today` +
+      `${s.thin ? ` (${n(s.thin)} too cheap, too new or barely traded)` : ""}` +
+      ` · ${n(s.shortlisted - (s.bottoms ?? 0))} strongest by 1- and 3-month gains, 52-week high and 50/200-day averages` +
+      (s.bottoms ? ` and ${n(s.bottoms)} turning up from a bottom (long swing candidates)` : "") + ` went on to the full research` : " · all researched in full") +
+    (s.note ? ` · ${s.note}` : "");
+}
+
+/** One sentence on the minimum-profit rule: how many buy-rated stocks fell short. */
+function minProfitLine(d: { minProfitPct?: number; passed: Decision[] }): string {
+  if (!d.minProfitPct) return "";
+  const short = d.passed.filter((p) => p.passedOver?.includes("minimum profit"));
+  return ` Every pick targets at least ${d.minProfitPct}% profit` +
+    (short.length ? `; ${short.length} buy-rated stock${short.length > 1 ? "s" : ""} fell short (${short.slice(0, 4).map((p) => `${p.symbol} +${((p.target / p.entry - 1) * 100).toFixed(1)}%`).join(", ")}${short.length > 4 ? "…" : ""}).` : ".");
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { Bell, BellOff, RefreshCw, Trash2 } from "lucide-react";
+import { CopySymbol } from "@/components/desk/stock-tools";
 import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/desk/shell";
 import { AlertItem } from "@/components/desk/positions-ui";
@@ -10,6 +11,7 @@ import { sectorOf } from "@/lib/market/universe";
 import { useDesk } from "@/store/desk";
 import { Button } from "@/components/ui/button";
 import { ZerodhaCard } from "@/components/desk/broker-ui";
+import { SellCheck } from "@/components/desk/sell-check";
 import { inr, istDate, istTime, pct } from "@/lib/format";
 import { health, progress, type Health } from "@/lib/positions/rules";
 import type { Position } from "@/lib/positions/types";
@@ -48,6 +50,7 @@ function PriceRail({ p }: { p: Position }) {
 }
 
 function PositionCard({ p }: { p: Position }) {
+  const searchStock = useDesk((s) => s.searchStock);
   const close = usePositions((s) => s.close);
   const remove = usePositions((s) => s.remove);
   const allAlerts = usePositions((s) => s.alerts);
@@ -61,7 +64,8 @@ function PositionCard({ p }: { p: Position }) {
       <header className="flex flex-wrap items-start gap-x-3 gap-y-2">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-base font-bold">{p.symbol}</h3>
+            <h3 className="text-base font-bold"><button type="button" onClick={() => searchStock(p.symbol)} className="text-primary hover:underline" title="Open the full report and decision">{p.symbol}</button></h3>
+            <CopySymbol symbol={p.symbol} className="-ml-1.5" />
             <span className={cn("rounded-md px-1.5 py-px text-[11px] font-bold", HEALTH_STYLE[h])}>{h}</span>
             {p.feed === "demo" && <span className="rounded-md bg-warn-bg px-1.5 py-px text-[10.5px] font-semibold text-warn-fg">Demo price</span>}
             {p.stopAtCost && p.status === "open" && <span className="rounded-md bg-primary-soft px-1.5 py-px text-[10.5px] font-semibold text-primary">Stop at cost</span>}
@@ -137,12 +141,14 @@ export default function PositionsPage() {
 
         <ZerodhaCard />
 
+        <SellCheck />
+
         <section className="card flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 text-[13px]">
           <span className="min-w-0 flex-1 basis-64">
             {monitor?.inApp
-              ? <>Positions are saved in this browser. While the app is open, live positions are checked every <b>{monitor.minutes} min</b> during NSE hours (09:15–15:30 IST) and demo positions every minute; press Check now any time. Prices from Yahoo are delayed.</>
+              ? <>Positions are saved in this browser. While the app is open, live positions are checked every <b>{monitor.minutes} min</b> during NSE hours (09:15–15:30 IST) Press Check now any time. Prices from Yahoo are delayed.</>
               : monitor?.enabled
-              ? <>Live positions are checked every <b>{monitor.minutes} min</b> during NSE hours (09:15–15:30 IST); demo positions every minute. Prices from Yahoo are delayed.</>
+              ? <>Live positions are checked every <b>{monitor.minutes} min</b> during NSE hours (09:15–15:30 IST). Prices from Yahoo are delayed.</>
               : <>The position monitor is off (POSITION_MONITOR_ENABLED=false). Use “Check now”.</>}
             {" "}Telegram alerts: <b>{monitor?.telegram ? "on" : "off"}</b>.
           </span>

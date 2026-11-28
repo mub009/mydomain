@@ -21,3 +21,6 @@ yarn-error.log
 /.nova
 /.vscode
 /.zed
+
+# Each server keeps its own (cPanel adds its PHP version lines here). Template: htaccess.example
+/.htaccess

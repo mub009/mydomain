@@ -1,3 +1,5 @@
+import { isBigUniverse } from "@/lib/market/lists";
+import { MIN_PROFIT_CHOICES, MIN_PROFIT_PCT } from "@/lib/agents/decision";
 import { runAnalysis } from "@/lib/pipeline";
 import type { RunRequest, StreamEvent } from "@/lib/types";
 
@@ -6,15 +8,18 @@ export const maxDuration = 300; // a full live run can take a few minutes on a h
 
 const SYMBOL = /^[A-Z0-9&.\-]{1,20}$/;
 
+/** Sample (demo) prices are only accepted where ALLOW_DEMO_DATA=true, e.g. for local testing. */
 function validate(body: unknown): RunRequest | string {
   const b = body as Partial<RunRequest>;
-  if (!b || !Array.isArray(b.symbols)) return "symbols must be a list";
-  const symbols = [...new Set(b.symbols.map((s) => String(s).trim().toUpperCase()))].filter(Boolean);
-  if (symbols.length < 3 || symbols.length > 150) return "Choose between 3 and 150 stocks";
+  if (!b) return "symbols must be a list";
+  const universe = isBigUniverse(b.universe) ? b.universe : undefined;
+  if (!universe && !Array.isArray(b.symbols)) return "symbols must be a list";
+  const symbols = universe ? [] : [...new Set((b.symbols ?? []).map((s) => String(s).trim().toUpperCase()))].filter(Boolean);
+  if (!universe && (symbols.length < 3 || symbols.length > 150)) return "Choose between 3 and 150 stocks";
   const bad = symbols.find((s) => !SYMBOL.test(s));
   if (bad) return `"${bad.slice(0, 20)}" is not a valid NSE symbol`;
   const top = Number(b.top);
-  if (![3, 5, 10, 15].includes(top)) return "top must be 3, 5, 10 or 15";
+  if (![3, 5, 10, 15, 20, 25].includes(top)) return "top must be 3, 5, 10, 15, 20 or 25";
   const riskPerTrade = Number(b.riskPerTrade);
   if (![0.5, 1, 2, 3].includes(riskPerTrade)) return "risk must be 0.5, 1, 2 or 3";
   let capital: number | undefined;
@@ -31,7 +36,9 @@ function validate(body: unknown): RunRequest | string {
       if (symbols.includes(sym) && typeof v === "string" && /^[A-Za-z &]{2,30}$/.test(v)) sectors[sym] = v;
     }
   }
-  return { symbols, top, riskPerTrade, capital, demo: Boolean(b.demo), aiNotes: Boolean(b.aiNotes), sectors };
+  const minProfitPct = b.minProfitPct === undefined ? MIN_PROFIT_PCT : Number(b.minProfitPct);
+  if (!(MIN_PROFIT_CHOICES as readonly number[]).includes(minProfitPct)) return `minProfitPct must be one of ${MIN_PROFIT_CHOICES.join(", ")}`;
+  return { symbols, top, riskPerTrade, capital, minProfitPct, demo: Boolean(b.demo) && process.env.ALLOW_DEMO_DATA === "true", aiNotes: Boolean(b.aiNotes), sectors, ...(universe ? { universe } : {}) };
 }
 
 /** Runs one analysis and streams progress, agent messages and the result as Server-Sent Events. */

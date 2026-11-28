@@ -2,6 +2,7 @@
  *  portfolio rules (sector concentration, capital) and chooses the picks. */
 import { PERIOD_LABEL } from "../black-points/analyst";
 import type { Analysis, BPStatus, Decision, HoldingPeriod, Verdict } from "../types";
+import { LONG_SWING } from "../bottom";
 
 const periodsOf = (horizon: string): HoldingPeriod[] =>
   horizon.startsWith("Swing, then") ? ["swing", "positional"] : horizon.startsWith("Swing") ? ["swing"] : ["positional"];
@@ -9,8 +10,25 @@ const HORIZON: Record<HoldingPeriod, string> = { swing: "Swing · 1-10 days", po
 const STOP_ATR: Record<HoldingPeriod, number> = { swing: 1.5, positional: 2.5 };
 
 export const MAX_PER_SECTOR = 2;
+/** Most picks from one sector: 2 up to 15 picks, then 4 for 20 and 5 for 25, so the longer lists can fill. */
+export const sectorCap = (top: number) => (top <= 15 ? MAX_PER_SECTOR : Math.ceil(top / 5));
+
+/** Default minimum profit to the target for a pick, %. */
+export const MIN_PROFIT_PCT = 11;
+export const MIN_PROFIT_CHOICES = [0, 5, 8, 11, 15, 20] as const;
+/** % from the entry to the target. */
+export const upsidePct = (d: { entry: number; target: number }) => (d.entry > 0 ? (d.target / d.entry - 1) * 100 : 0);
 
 export class DecisionAgent {
+  /** Picks need a target at least this % above the entry (0 = no minimum). */
+  constructor(readonly minProfitPct = MIN_PROFIT_PCT) {}
+
+  /** Why a stock falls short of the minimum profit, or null when it's fine. */
+  belowMinimum(d: { entry: number; target: number }): string | null {
+    const up = upsidePct(d);
+    return this.minProfitPct > 0 && up < this.minProfitPct ? `Target only +${up.toFixed(1)}%, below the ${this.minProfitPct}% minimum profit` : null;
+  }
+
   verdict(r: Analysis): Verdict {
     const f = r.fundamentals;
     const loss = f?.epsTTM !== undefined && f.epsTTM < 0;
@@ -76,7 +94,8 @@ export class DecisionAgent {
       ...this.fitHorizon(r), verdict: this.verdict(r), clarification: clarifications[r.symbol], spark: sparks[r.symbol] ?? [],
     }));
 
-    // Choose picks in score order, but never more than MAX_PER_SECTOR from one sector.
+    // Choose picks in score order, but never more than the sector cap from one sector.
+    const cap = sectorCap(top);
     const picks: Decision[] = [], passed: Decision[] = [];
     const perSector: Record<string, number> = {};
     // When the Research Agent chart-checked the leaders, only those can become picks.
@@ -84,9 +103,11 @@ export class DecisionAgent {
     for (const d of all) {
       if (d.verdict !== "STRONG BUY" && d.verdict !== "BUY") continue;
       if (picks.length >= top) break;
+      const short = this.belowMinimum(d);
+      if (short) { d.passedOver = short; passed.push(d); continue; }
       if (charted && !d.chart) { d.passedOver = "Outside the chart-checked candidates"; passed.push(d); continue; }
-      if ((perSector[d.sector] ?? 0) >= MAX_PER_SECTOR) {
-        d.passedOver = `Sector cap: already ${MAX_PER_SECTOR} ${d.sector} picks`;
+      if ((perSector[d.sector] ?? 0) >= cap) {
+        d.passedOver = `Sector cap: already ${cap} ${d.sector} picks`;
         passed.push(d);
         continue;
       }
@@ -111,5 +132,47 @@ export class DecisionAgent {
     for (const d of all) if (d.blackPoints) d.blackPoints = { ...d.blackPoints, finalDecision: this.ruling(d, picks.includes(d)) };
     const watchlist = [...passed, ...all.filter((d) => d.verdict === "WATCH")].slice(0, Math.max(top, 5));
     return { all, picks, watchlist, passed };
+  }
+
+  /**
+   * Long swing picks: stocks turning up from a bottom (a setup: score 70+), ranked by that score.
+   * Left out: loss-making companies, severe red flags, and anything the Black Points Analyst
+   * didn't clear for a positional hold. Same sector cap as the main picks.
+   * Each gets its own plan: buy near today's price, stop under the recent low, target part of the way back.
+   */
+  longSwing(all: Decision[], top: number, capital?: number, riskPerTrade = 1): Decision[] {
+    const cap = sectorCap(top);
+    const perSector: Record<string, number> = {};
+    const out: Decision[] = [];
+    const ok = (d: Decision) => {
+      if (!d.bottom?.isSetup) return false;
+      if (this.belowMinimum(d.bottom)) return false;
+      if (d.fundamentals?.epsTTM !== undefined && d.fundamentals.epsTTM < 0) return false;
+      if (d.desk?.severe) return false;
+      const st = d.blackPoints?.status;
+      return !st || st.positional === undefined || st.positional === "Eligible";
+    };
+    const ranked = all.filter(ok).sort((a, b) => (b.bottom!.score - a.bottom!.score) || (b.mayavi - a.mayavi));
+    for (const d of ranked) {
+      if (out.length >= top) break;
+      if ((perSector[d.sector] ?? 0) >= cap) continue;
+      perSector[d.sector] = (perSector[d.sector] ?? 0) + 1;
+      const b = d.bottom!;
+      const verdict: Verdict = b.score >= 80 && d.risk !== "HIGH" ? "BUY" : "WATCH";
+      out.push({
+        ...d, verdict, horizon: LONG_SWING, entry: b.entry, stopLoss: b.stopLoss, target: b.target,
+        quantity: undefined, investment: undefined, passedOver: undefined,
+        notes: [`Long swing from a bottom (score ${b.score}): ${b.signals.slice(0, 2).join("; ")}`, ...d.notes],
+      });
+    }
+    if (capital && capital > 0) {
+      let remaining = capital;
+      for (const p of out) {
+        const perShare = Math.max(p.entry - p.stopLoss, 0.01);
+        const qty = Math.max(0, Math.min(Math.floor((capital * riskPerTrade) / 100 / perShare), Math.floor(remaining / p.entry)));
+        p.quantity = qty; p.investment = Math.round(qty * p.entry * 100) / 100; remaining -= p.investment;
+      }
+    }
+    return out;
   }
 }

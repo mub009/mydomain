@@ -126,15 +126,18 @@ class ZerodhaTest extends TestCase
         $this->assertSame(0, BrokerAccount::count());
     }
 
-    public function test_ended_sessions_are_removed(): void
+    public function test_ended_sessions_keep_the_account_without_a_token(): void
     {
         $this->fakeKite();
         $u = User::factory()->create();
         $app = $this->addApp($u);
         BrokerAccount::create(['user_id' => $u->id, 'kite_app_id' => $app, 'client_id' => 'ZQ0001', 'access_token' => 'accDEAD', 'expires_at' => now()->addHour()]);
         BrokerAccount::create(['user_id' => $u->id, 'kite_app_id' => $app, 'client_id' => 'ZQ0002', 'access_token' => 'accZX1234', 'expires_at' => now()->subMinute()]);
-        $this->actingAs($u)->getJson('/api/zerodha')->assertOk()->assertJsonPath('expired', true)->assertJsonCount(0, 'accounts');
-        $this->assertSame(0, BrokerAccount::count());
+        // Ended sessions keep the account (and its saved holdings) but lose the token.
+        $r = $this->actingAs($u)->getJson('/api/zerodha')->assertOk()->assertJsonPath('expired', true)->assertJsonCount(2, 'accounts');
+        $r->assertJsonPath('accounts.0.connected', false)->assertJsonPath('accounts.1.connected', false);
+        $this->assertSame(2, BrokerAccount::count());
+        $this->assertNull(BrokerAccount::where('client_id', 'ZQ0001')->first()->access_token);
     }
 
     public function test_no_app_yet(): void

@@ -12,19 +12,23 @@ import { Button } from "@/components/ui/button";
 import { Field, inputClass } from "@/components/ui/segmented";
 import { BulkTrackButton } from "@/components/desk/positions-ui";
 import { holdSentence, holdShort, shortDate } from "@/lib/hold";
+import { LONG_TERM_LABEL } from "@/lib/long-term";
 import { inr, pct } from "@/lib/format";
 import type { Decision, Verdict } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { deskValue } from "@/components/desk/desk-ui";
 import { BPStatusChip, bpOverall, FlaggedStocks } from "@/components/desk/black-points-ui";
 import { useDecided, useDesk } from "@/store/desk";
+import { useQuotes } from "@/store/quotes";
+import { CopySymbol, lastClose, LivePriceCell, matchesTrade, matchesZone, TradeChips, ZoneAndTopFilter, type TradeFilter, type ZoneFilter } from "@/components/desk/stock-tools";
 
 const VERDICTS: ("ALL" | Verdict)[] = ["ALL", "STRONG BUY", "BUY", "WATCH", "AVOID"];
 const RISK_ORDER = { LOW: 0, MEDIUM: 1, HIGH: 2 };
 const signed = (v: number) => <span className={v >= 0 ? "text-pos" : "text-neg"}>{pct(v)}</span>;
 
 const columns: ColumnDef<Decision>[] = [
-  { accessorKey: "symbol", header: "Stock", cell: ({ row: { original: d } }) => <div><div className="font-semibold">{d.symbol}</div><div className="text-[11px] text-muted-foreground">{d.sector}</div></div> },
+  { accessorKey: "symbol", header: "Stock", cell: ({ row: { original: d } }) => <div><div className="flex items-center gap-0.5 font-semibold">{d.symbol}<CopySymbol symbol={d.symbol} /></div><div className="text-[11px] text-muted-foreground">{d.sector}</div></div> },
+  { id: "price", header: "Price", meta: { num: true }, accessorFn: (d) => lastClose(d).price, cell: ({ row: { original: d } }) => <LivePriceCell d={d} /> },
   { accessorKey: "verdict", header: "Verdict", enableSorting: false, cell: ({ row }) => <VerdictBadge verdict={row.original.verdict} /> },
   { accessorKey: "combined", header: "Combined", meta: { num: true }, cell: ({ getValue }) => <b>{(getValue() as number).toFixed(1)}</b> },
   { accessorKey: "lotappi", header: "Momentum", meta: { num: true }, cell: ({ getValue }) => (getValue() as number).toFixed(1) },
@@ -37,8 +41,12 @@ const columns: ColumnDef<Decision>[] = [
   { accessorKey: "entry", header: "Entry", meta: { num: true }, cell: ({ getValue }) => inr(getValue() as number) },
   { accessorKey: "stopLoss", header: "Stop-loss", meta: { num: true }, cell: ({ getValue }) => inr(getValue() as number) },
   { accessorKey: "target", header: "Target", meta: { num: true }, cell: ({ getValue }) => inr(getValue() as number) },
+  { id: "upside", header: "Profit to target", meta: { num: true }, accessorFn: (d) => (d.target / d.entry - 1) * 100,
+    cell: ({ getValue }) => <span className="font-semibold text-pos">+{(getValue() as number).toFixed(1)}%</span> },
   { id: "hold", header: "Hold", meta: { num: true }, accessorFn: (d) => d.hold?.expectedDays ?? 99,
     cell: ({ row: { original: d } }) => d.hold ? <span title={holdSentence(d.hold)}>{holdShort(d.hold)}<span className="block text-[11px] text-muted-foreground">by {shortDate(d.hold.exitBy)}</span></span> : "–" },
+  { id: "longTerm", header: "Long term", meta: { num: true }, accessorFn: (d) => d.longTerm?.score ?? -1,
+    cell: ({ row: { original: d } }) => d.longTerm ? <span title={d.longTerm.summary}>{LONG_TERM_LABEL[d.longTerm.action]}<span className="block text-[11px] text-muted-foreground">{d.longTerm.score}/100</span></span> : "–" },
   { id: "expected", header: "Expected", meta: { num: true }, accessorFn: (d) => d.hold?.expectedReturnPct ?? -99,
     cell: ({ row: { original: d } }) => d.hold ? <span title={`${d.hold.probTarget}% reach the target first, ${d.hold.probStop}% the stop-loss`}>{signed(d.hold.expectedReturnPct)}<span className="block text-[11px] text-muted-foreground">{d.hold.probTarget}% target</span></span> : "–" },
   { id: "size", header: "Size", accessorFn: (d) => d.fundamentals?.marketCapCr ?? -1,
@@ -65,6 +73,10 @@ const columns: ColumnDef<Decision>[] = [
     cell: ({ row: { original: d } }) => <span className="whitespace-nowrap text-xs font-medium">{d.desk?.entry?.verdict ?? "–"}</span> },
   { id: "charts", header: "Charts", accessorFn: (d) => (d.chart ? d.chart.bullish - d.chart.bearish : -99), meta: { num: false },
     cell: ({ row: { original: d } }) => (d.chart ? <TimeframeDots chart={d.chart} /> : <span className="text-xs text-muted-foreground">–</span>) },
+  { id: "bottom", header: "From bottom", meta: { num: true }, accessorFn: (d) => (d.bottom?.isSetup ? d.bottom.score : -1),
+    cell: ({ row: { original: d } }) => d.bottom?.isSetup
+      ? <span title={[...d.bottom.signals, ...d.bottom.warnings].join(" · ")}><span className="font-semibold text-pos">Turning up {d.bottom.score}</span><span className="block text-[11px] text-muted-foreground">+{d.bottom.offLowPct.toFixed(1)}% off low · -{d.bottom.offHighPct.toFixed(0)}% from high</span></span>
+      : <span className="text-xs text-muted-foreground" title={d.bottom?.warnings[0]}>–</span> },
   { id: "zone", header: "Buy zone", accessorFn: (d) => d.chart?.zone?.distancePct ?? 999,
     cell: ({ row: { original: d } }) => (d.chart?.zone ? <div><div className="text-xs font-medium">{inr(d.chart.zone.low, 0)}–{inr(d.chart.zone.high, 0)}</div><PlanTag zone={d.chart.zone} /></div> : <span className="text-xs text-muted-foreground">–</span>) },
   { id: "notes", header: "Notes", enableSorting: false, cell: ({ row: { original: d } }) => <span className="line-clamp-2 w-96 whitespace-normal text-xs text-muted-foreground" title={[d.passedOver, ...d.notes, ...d.lotWarnings.slice(0, 1), ...d.mayWarnings.slice(0, 1)].filter(Boolean).join(" · ") || undefined}>{[d.passedOver, ...d.notes, ...d.lotWarnings.slice(0, 1), ...d.mayWarnings.slice(0, 1)].filter(Boolean).join(" · ") || "–"}</span> },
@@ -85,6 +97,11 @@ export default function ScreenerPage() {
   const [sorting, setSorting] = useState<SortingState>([{ id: "combined", desc: true }]);
   const [view, setView] = useState<"all" | "flagged">("all");
   const [sel, setSel] = useState<Record<string, boolean>>({}); // rows ticked for "Track"
+  const [zone, setZone] = useState<ZoneFilter>("ALL");
+  const [top, setTop] = useState(0);
+  const [trade, setTrade] = useState<TradeFilter>("ALL");
+  const minProfit = r?.minProfitPct ?? 11;
+  const [profitOnly, setProfitOnly] = useState(false);
 
   const all = useMemo(() => r?.all ?? [], [r]);
   const flaggedCount = all.filter((d) => d.blackPoints && Object.values(d.blackPoints.status).some((s) => s !== "Eligible")).length;
@@ -95,9 +112,17 @@ export default function ScreenerPage() {
     (sector === "ALL" || d.sector === sector) && (risk === "ALL" || d.risk === risk) && (size === "ALL" || d.fundamentals?.cap === size) &&
     (rsiMin === "" || d.rsi >= Number(rsiMin)) && (rsiMax === "" || d.rsi <= Number(rsiMax)) && d.combined >= minScore),
   [all, q, sector, risk, size, rsiMin, rsiMax, minScore]);
-  const data = useMemo(() => (verdict === "ALL" ? base : base.filter((d) => d.verdict === verdict)), [base, verdict]);
-  const filtered = q || sector !== "ALL" || risk !== "ALL" || size !== "ALL" || rsiMin || rsiMax || minScore > 0 || verdict !== "ALL";
-  const reset = () => { setQ(""); setSector("ALL"); setRisk("ALL"); setSize("ALL"); setRsiMin(""); setRsiMax(""); setMinScore(0); setVerdict("ALL"); };
+  const byVerdict = useMemo(() => (verdict === "ALL" ? base : base.filter((d) => d.verdict === verdict)).filter((d) => matchesTrade(d, trade)), [base, verdict, trade]);
+  // Buy-zone filter, then "Top N" by combined score.
+  const data = useMemo(() => {
+    const xs = byVerdict.filter((d) => matchesZone(d, zone) && (!profitOnly || (d.target / d.entry - 1) * 100 >= (minProfit || 11)));
+    // Top N: by bottom score for long swings, by combined score otherwise.
+    const rank = (d: Decision) => (trade === "Long swing" ? d.bottom?.score ?? 0 : d.combined);
+    return top ? [...xs].sort((a, b) => rank(b) - rank(a)).slice(0, top) : xs;
+  }, [byVerdict, zone, top, trade, profitOnly, minProfit]);
+  const filtered = q || sector !== "ALL" || risk !== "ALL" || size !== "ALL" || rsiMin || rsiMax || minScore > 0 || verdict !== "ALL" || zone !== "ALL" || top > 0 || trade !== "ALL" || profitOnly;
+  const reset = () => { setQ(""); setSector("ALL"); setRisk("ALL"); setSize("ALL"); setRsiMin(""); setRsiMax(""); setMinScore(0); setVerdict("ALL"); setZone("ALL"); setTop(0); setTrade("ALL"); setProfitOnly(false); };
+  useQuotes(useMemo(() => all.map((d) => d.symbol), [all]));
 
   const picked = data.filter((d) => sel[d.symbol]);
   const allTicked = data.length > 0 && picked.length === data.length;
@@ -165,6 +190,16 @@ export default function ScreenerPage() {
                 );
               })}
               <span className="ml-auto text-xs text-muted-foreground tnum">{data.length} of {all.length} stocks</span>
+            </div>
+            <div className="space-y-2 border-t border-[var(--edge)] px-4 py-2.5">
+              <TradeChips value={trade} onChange={(t) => { setTrade(t); if (t === "Long swing") setSorting([{ id: "bottom", desc: true }]); }}
+                count={(t) => (verdict === "ALL" ? base : base.filter((d) => d.verdict === verdict)).filter((d) => matchesTrade(d, t)).length} />
+              <ZoneAndTopFilter items={byVerdict} zone={zone} onZone={setZone} top={top} onTop={setTop} />
+              <label className="flex w-fit items-center gap-2 text-xs font-medium text-muted-foreground">
+                <input type="checkbox" checked={profitOnly} onChange={(e) => setProfitOnly(e.target.checked)} className="size-4 accent-[var(--primary)]" />
+                Only stocks with at least {minProfit || 11}% profit to target
+                <span className="tnum opacity-75">({byVerdict.filter((d) => (d.target / d.entry - 1) * 100 >= (minProfit || 11)).length})</span>
+              </label>
             </div>
             <div className="flex flex-wrap items-center gap-2 border-t border-[var(--edge)] px-4 py-2.5">
               <span className="text-xs text-muted-foreground">{picked.length ? `${picked.length} selected` : "Tick stocks to track them, or track every stock shown"}</span>

@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import { UNIVERSES, type Universe } from "@/lib/market/universe";
+import { type BigUniverse, isBigUniverse } from "@/lib/market/lists";
 import { PEOPLE } from "@/lib/team";
 import type { AgentName, Decision, Message, Person, RunResult, Stage, StreamEvent } from "@/lib/types";
 
@@ -26,13 +27,16 @@ export interface StockInfo { name: string; sector?: string }
 export interface StockGroup { name: string; symbols: string[] }
 
 interface Settings {
-  universe: Universe;
+  /** A starter list, My Stocks, or a big list (Nifty 500, all NSE) that the server quick-scans. */
+  universe: Universe | BigUniverse;
   custom: string;
   /** Names and sectors of stocks picked with the search. */
   stockInfo: Record<string, StockInfo>;
   /** Saved groups of stocks. */
   groups: StockGroup[];
   top: number;
+  /** Picks need a target at least this % above the entry (0 = off). */
+  minProfit: number;
   capital: string;
   risk: number;
   demo: boolean;
@@ -87,8 +91,9 @@ function loadLocal(): Partial<Settings> {
   } catch { return {}; }
 }
 
-export const symbolsOf = (s: Pick<Settings, "universe" | "custom">) =>
-  s.universe !== "custom" ? UNIVERSES[s.universe].symbols
+export const symbolsOf = (s: Pick<Settings, "universe" | "custom">): string[] =>
+  isBigUniverse(s.universe) ? [] // the server downloads the list
+  : s.universe !== "custom" ? UNIVERSES[s.universe].symbols
     : [...new Set(s.custom.split(/[\s,]+/).map((x) => x.trim().toUpperCase()).filter(Boolean))];
 
 export const useDesk = create<DeskState>((set, get) => {
@@ -110,7 +115,7 @@ export const useDesk = create<DeskState>((set, get) => {
 
   return {
     universe: "large", custom: "RELIANCE, TCS, INFY, HDFCBANK, ICICIBANK, SBIN, LT, ITC, MARUTI, TITAN", stockInfo: {}, groups: [],
-    top: 5, capital: "500000", risk: 1, demo: false, aiNotes: false, speed: "normal",
+    top: 5, minProfit: 11, capital: "500000", risk: 1, demo: false, aiNotes: false, speed: "normal",
     config: null, session: null, replayOf: null, running: false, progress: null, error: null,
     messages: [], shown: 0, typing: null, times: {}, result: null, seen: {}, drawerSymbol: null, lookups: {}, lookup: null,
 
@@ -156,7 +161,7 @@ export const useDesk = create<DeskState>((set, get) => {
         const res = await fetch("/api/analysis", {
           method: "POST", signal: abort.signal, headers: { "content-type": "application/json" },
           body: JSON.stringify({
-            symbols: symbolsOf(s), top: s.top, demo: s.demo, aiNotes: s.aiNotes && Boolean(s.config?.aiAvailable),
+            symbols: symbolsOf(s), ...(isBigUniverse(s.universe) ? { universe: s.universe } : {}), top: s.top, minProfitPct: s.minProfit, demo: false, aiNotes: s.aiNotes && Boolean(s.config?.aiAvailable),
             capital: Number(s.capital) > 0 ? Number(s.capital) : undefined, riskPerTrade: s.risk,
             sectors: s.universe === "custom" ? Object.fromEntries(symbolsOf(s).flatMap((k) => (s.stockInfo[k]?.sector ? [[k, s.stockInfo[k].sector]] : []))) : undefined,
           }),
@@ -215,7 +220,9 @@ export const useDesk = create<DeskState>((set, get) => {
 
     searchStock: async (symbol, info) => {
       const s = get();
-      if (s.result?.all.some((d) => d.symbol === symbol) && s.shown >= s.messages.length) { set({ drawerSymbol: symbol, lookup: null }); return; }
+      // In the current run with the full research (research desk)? Open it straight away. Otherwise
+      // show what the run has (if anything) while the full research loads.
+      if (s.result?.all.some((d) => d.symbol === symbol && d.desk) && s.shown >= s.messages.length) { set({ drawerSymbol: symbol, lookup: null }); return; }
       if (s.lookups[symbol]) { set({ drawerSymbol: symbol, lookup: null }); return; }
       set({ drawerSymbol: symbol, lookup: { symbol, name: info?.name, loading: true } });
       try {
@@ -286,5 +293,6 @@ export const findStock = (r: RunResult | null, symbol: string | null): Decision 
 
 /** The run that holds the open stock: its own single-stock run when it was searched, else the current run. */
 export function useStockResult(): RunResult | null {
-  return useDesk((s) => (s.drawerSymbol && s.lookups[s.drawerSymbol] && !s.result?.all.some((d) => d.symbol === s.drawerSymbol) ? s.lookups[s.drawerSymbol] : s.result));
+  // A stock looked up on its own has the full research, so it wins over a lighter entry in the current run.
+  return useDesk((s) => (s.drawerSymbol && s.lookups[s.drawerSymbol] ? s.lookups[s.drawerSymbol] : s.result));
 }

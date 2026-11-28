@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\BrokerAccount;
+use App\Models\BrokerHolding;
 use App\Models\KiteApp;
 use App\Services\Kite;
 use App\Services\KiteException;
@@ -10,6 +11,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -21,47 +23,162 @@ use Illuminate\Validation\Rule;
  */
 class ZerodhaController extends Controller
 {
-    /** The user's apps and connected accounts with holdings and positions, plus totals across them. */
+    /**
+     * The user's apps and accounts with their saved holdings and positions (from the database,
+     * so they stay visible after the daily session ends), plus totals across accounts.
+     * An account connected but never synced is synced now.
+     */
     public function index(Request $request): JsonResponse
     {
         $user = $request->user();
-        $apps = $user->kiteApps()->orderBy('id')->get();
-        $expired = false;
-        $accounts = [];
-        foreach ($user->brokerAccounts()->where('broker', 'zerodha')->with('kiteApp')->orderBy('id')->get() as $acc) {
-            if (! $acc->kiteApp || $acc->expires_at->isPast()) {
-                $acc->delete();
-                $expired = true;
+        foreach ($this->accounts($user) as $acc) {
+            if ($acc->synced_at === null && $acc->connected()) {
+                $this->sync($acc);
+            }
+        }
+
+        return response()->json($this->payload($user));
+    }
+
+    /**
+     * Fetch every connected account again from Zerodha and save the result: stocks that were
+     * sold are removed, new ones added. Says what changed.
+     */
+    public function refresh(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $removed = [];
+        $added = [];
+        $errors = [];
+        foreach ($this->accounts($user) as $acc) {
+            if (! $acc->connected()) {
+                continue;
+            }
+            $r = $this->sync($acc);
+            if (isset($r['error'])) {
+                $errors[] = ['accountId' => $acc->id, 'clientId' => $acc->client_id, 'message' => $r['error']];
 
                 continue;
             }
-            $base = [
-                'id' => $acc->id, 'appId' => $acc->kite_app_id, 'connected' => true,
-                'user' => ['id' => $acc->client_id, 'name' => $acc->name], 'expiresAt' => $acc->expires_at->toIso8601String(),
-            ];
-            try {
-                $accounts[] = $base + Kite::portfolio($acc->kiteApp->credentials(), $acc->access_token);
-            } catch (KiteException $e) {
-                if ($e->sessionEnded()) {
-                    $acc->delete();
-                    $expired = true;
-                } else {
-                    $accounts[] = $base + ['error' => $e->getMessage()];
-                }
+            foreach ($r['removed'] as $h) {
+                $removed[] = ['accountId' => $acc->id, 'clientId' => $acc->client_id] + $h;
+            }
+            foreach ($r['added'] as $h) {
+                $added[] = ['accountId' => $acc->id, 'clientId' => $acc->client_id] + $h;
             }
         }
-        $t = array_values(array_filter(array_map(fn ($a) => $a['totals'] ?? null, $accounts)));
+
+        return response()->json($this->payload($user) + ['refreshed' => ['removed' => $removed, 'added' => $added, 'errors' => $errors]]);
+    }
+
+    /** @return \Illuminate\Support\Collection<int, BrokerAccount> */
+    private function accounts($user)
+    {
+        return $user->brokerAccounts()->where('broker', 'zerodha')->with('kiteApp')->orderBy('id')->get();
+    }
+
+    /**
+     * Replace an account's saved holdings and positions with what Zerodha has now.
+     * Returns the holdings removed (sold) and added, or an error. An ended session
+     * clears the token but keeps the saved data.
+     */
+    private function sync(BrokerAccount $acc): array
+    {
+        try {
+            $p = Kite::portfolio($acc->kiteApp->credentials(), $acc->access_token);
+        } catch (KiteException $e) {
+            if ($e->sessionEnded()) {
+                $acc->update(['access_token' => null, 'expires_at' => null]);
+
+                return ['error' => 'The Zerodha session has ended. Reconnect to refresh.'];
+            }
+
+            return ['error' => $e->getMessage()];
+        }
+        $key = fn (array $h, string $kind) => $kind.'|'.$h['exchange'].'|'.$h['symbol'].'|'.($h['product'] ?? '');
+        $before = $acc->holdings()->where('kind', 'holding')->get()->keyBy(fn ($h) => $h->exchange.'|'.$h->symbol);
+        $now = collect($p['holdings'])->keyBy(fn ($h) => $h['exchange'].'|'.$h['symbol']);
+        $removed = $before->diffKeys($now)->map(fn ($h) => ['symbol' => $h->symbol, 'exchange' => $h->exchange, 'qty' => $h->qty])->values()->all();
+        $added = $acc->synced_at === null ? [] : $now->diffKeys($before)->map(fn ($h) => ['symbol' => $h['symbol'], 'exchange' => $h['exchange'], 'qty' => $h['qty']])->values()->all();
+
+        DB::transaction(function () use ($acc, $p) {
+            $acc->holdings()->delete();
+            $rows = [];
+            $at = now();
+            foreach ($p['holdings'] as $h) {
+                $rows[] = [
+                    'broker_account_id' => $acc->id, 'kind' => 'holding', 'symbol' => $h['symbol'], 'exchange' => $h['exchange'], 'product' => '',
+                    'qty' => $h['qty'], 'avg_price' => $h['avgPrice'], 'last_price' => $h['lastPrice'], 'close_price' => $h['closePrice'],
+                    'pnl' => $h['pnl'], 'm2m' => null, 'day_change_pct' => $h['dayChangePct'], 'created_at' => $at, 'updated_at' => $at,
+                ];
+            }
+            foreach ($p['positions'] as $h) {
+                $rows[] = [
+                    'broker_account_id' => $acc->id, 'kind' => 'position', 'symbol' => $h['symbol'], 'exchange' => $h['exchange'], 'product' => $h['product'] ?? '',
+                    'qty' => $h['qty'], 'avg_price' => $h['avgPrice'], 'last_price' => $h['lastPrice'], 'close_price' => null,
+                    'pnl' => $h['pnl'], 'm2m' => $h['m2m'] ?? null, 'day_change_pct' => null, 'created_at' => $at, 'updated_at' => $at,
+                ];
+            }
+            foreach (array_chunk($rows, 200) as $chunk) {
+                BrokerHolding::insert($chunk);
+            }
+            $acc->update(['synced_at' => $at]);
+        });
+
+        return ['removed' => $removed, 'added' => $added];
+    }
+
+    /** The saved state for the page: apps, accounts with holdings and positions, and combined totals. */
+    private function payload($user): array
+    {
+        $apps = $user->kiteApps()->orderBy('id')->get();
+        $accounts = [];
+        $expired = false;
+        foreach ($this->accounts($user)->load('holdings') as $acc) {
+            $connected = $acc->connected();
+            $expired = $expired || ! $connected;
+            $holdings = $acc->holdings->where('kind', 'holding')->map(fn (BrokerHolding $h) => $this->holdingJson($h))->sortByDesc('value')->values()->all();
+            $positions = $acc->holdings->where('kind', 'position')->map(fn (BrokerHolding $h) => [
+                'symbol' => $h->symbol, 'exchange' => $h->exchange, 'product' => $h->product, 'qty' => $h->qty,
+                'avgPrice' => $h->avg_price, 'lastPrice' => $h->last_price, 'pnl' => $h->pnl, 'm2m' => $h->m2m ?? 0,
+            ])->values()->all();
+            $invested = array_sum(array_column($holdings, 'invested'));
+            $value = array_sum(array_column($holdings, 'value'));
+            $day = array_sum(array_map(fn ($h) => $h['qty'] * ($h['lastPrice'] - $h['closePrice']), $holdings));
+            $accounts[] = [
+                'id' => $acc->id, 'appId' => $acc->kite_app_id, 'connected' => $connected,
+                'user' => ['id' => $acc->client_id, 'name' => $acc->name],
+                'expiresAt' => $acc->expires_at?->toIso8601String(), 'syncedAt' => $acc->synced_at?->toIso8601String(),
+                'holdings' => $holdings, 'positions' => $positions,
+                'totals' => Kite::totals($invested, $value, $day, array_sum(array_column($positions, 'pnl'))),
+            ];
+        }
+        $t = array_column($accounts, 'totals');
         $combined = count($t) > 1 ? Kite::totals(
             array_sum(array_column($t, 'invested')), array_sum(array_column($t, 'value')),
             array_sum(array_column($t, 'dayPnl')), array_sum(array_column($t, 'positionsPnl')),
         ) : null;
 
-        return response()->json([
+        return [
             'configured' => $apps->isNotEmpty(),
             'apps' => $apps->map(fn (KiteApp $a) => $this->appJson($a))->values(),
             'redirectUrl' => url('/api/zerodha/callback'),
             'accounts' => $accounts, 'combined' => $combined, 'expired' => $expired, 'at' => now()->toIso8601String(),
-        ]);
+        ];
+    }
+
+    private function holdingJson(BrokerHolding $h): array
+    {
+        $invested = $h->qty * $h->avg_price;
+        $value = $h->qty * $h->last_price;
+
+        return [
+            'symbol' => $h->symbol, 'exchange' => $h->exchange, 'qty' => $h->qty,
+            'avgPrice' => $h->avg_price, 'lastPrice' => $h->last_price, 'closePrice' => $h->close_price ?? $h->last_price,
+            'invested' => round($invested, 2), 'value' => round($value, 2), 'pnl' => $h->pnl,
+            'pnlPct' => $invested ? round(($value - $invested) / $invested * 100, 2) : 0,
+            'dayChangePct' => $h->day_change_pct ?? 0,
+        ];
     }
 
     /** Save a Kite Connect app (API key and secret from developers.kite.trade). */
@@ -90,7 +207,9 @@ class ZerodhaController extends Controller
     {
         abort_unless($app->user_id === $request->user()->id, 404);
         foreach ($app->accounts as $acc) {
-            Kite::endSession($app->credentials(), $acc->access_token);
+            if ($acc->access_token) {
+                Kite::endSession($app->credentials(), $acc->access_token);
+            }
         }
         $app->delete();
 
@@ -135,19 +254,20 @@ class ZerodhaController extends Controller
 
             return $back('failed');
         }
-        BrokerAccount::updateOrCreate(
+        $acc = BrokerAccount::updateOrCreate(
             ['user_id' => $app->user_id, 'broker' => 'zerodha', 'client_id' => $s['client_id']],
             ['kite_app_id' => $app->id, 'name' => $s['name'], 'access_token' => $s['token'], 'expires_at' => Kite::sessionExpiry()],
         );
+        $this->sync($acc->load('kiteApp')); // save the holdings now; a failure here just leaves them for the next refresh
 
         return $back('connected');
     }
 
-    /** Disconnects one account (ends its Kite session). */
+    /** Removes one account: ends its Kite session and deletes its saved holdings. */
     public function destroy(Request $request, BrokerAccount $account): JsonResponse
     {
         abort_unless($account->user_id === $request->user()->id, 404);
-        if ($account->kiteApp) {
+        if ($account->kiteApp && $account->access_token) {
             Kite::endSession($account->kiteApp->credentials(), $account->access_token);
         }
         $account->delete();

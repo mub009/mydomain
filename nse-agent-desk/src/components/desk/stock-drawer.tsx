@@ -17,7 +17,9 @@ import { CompanyTab } from "./company-tab";
 import { ForecastTab } from "./forecast-tab";
 import { SectorCheck } from "./sector-ui";
 import { MacroExposureSection } from "./macro-ui";
+import { MyPositionCard, useHolding } from "./my-position";
 import { holdShort, shortDate } from "@/lib/hold";
+import { LONG_TERM_LABEL } from "@/lib/long-term";
 import { StockFinder } from "./stock-finder";
 import { Tabs } from "radix-ui";
 import { useEffect, useMemo } from "react";
@@ -42,6 +44,7 @@ function useQuote(symbol: string | undefined) {
   return q;
 }
 import { StockChart } from "./stock-chart";
+import { CopySymbol, TradingViewLink, WatchButton } from "./stock-tools";
 import { StockAgentsTab } from "./stock-agents-tab";
 import { useState } from "react";
 import { RiskTag, VerdictBadge } from "./primitives";
@@ -74,6 +77,33 @@ function AgentView({ who, score, reasons, warnings, children }: { who: Person; s
   );
 }
 
+/** Long-term (1-3 years) view from the research desk. */
+function LongTermCard({ d }: { d: Decision }) {
+  const lt = d.longTerm!;
+  const tone = { good: "text-pos", ok: "text-foreground", weak: "text-neg", "n/a": "text-muted-foreground" } as const;
+  const badge = { ACCUMULATE: "bg-pos/12 text-pos", HOLD: "bg-sky-500/12 text-sky-700 dark:text-sky-400", REDUCE: "bg-amber-500/12 text-amber-700 dark:text-amber-400", EXIT: "bg-neg/12 text-neg" }[lt.action];
+  return (
+    <section className="rounded-xl border p-3" aria-label="Long-term view">
+      <div className="flex items-center gap-2">
+        <AgentAvatar who="Research" size={22} />
+        <h3 className="text-[13px] font-semibold">Long-term view <span className="font-normal text-muted-foreground">1-3 years</span></h3>
+        <span className={cn("ml-auto rounded-full px-2 py-0.5 text-[11.5px] font-bold", badge)}>{LONG_TERM_LABEL[lt.action]} · {lt.score}/100</span>
+      </div>
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted"><div className={cn("h-full rounded-full", lt.score >= 70 ? "bg-pos" : lt.score >= 50 ? "bg-sky-500" : lt.score >= 35 ? "bg-amber-500" : "bg-neg")} style={{ width: `${lt.score}%` }} /></div>
+      <dl className="mt-2.5 grid gap-1 text-[12px]">
+        {lt.pillars.map((p) => (
+          <div key={p.name} className="flex gap-2">
+            <dt className="w-24 shrink-0 text-muted-foreground">{p.name}</dt>
+            <dd className={cn("min-w-0 flex-1", tone[p.tone])}>{p.text}</dd>
+            <dd className="shrink-0 tnum text-muted-foreground">{p.points > 0 ? "+" : ""}{p.points}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="mt-2 text-[11.5px] leading-snug text-muted-foreground">Business quality and value, not the chart: 70+ accumulate, 50-69 hold, 35-49 reduce, below 35 exit. Estimates, not advice.</p>
+    </section>
+  );
+}
+
 /** Decision Agent's holding plan: how long, until when, the odds and the expected return. */
 function HoldCard({ d }: { d: Decision }) {
   const h = d.hold!;
@@ -98,7 +128,44 @@ function HoldCard({ d }: { d: Decision }) {
   );
 }
 
-function Body({ d, isPick }: { d: Decision; isPick: boolean }) {
+/** Long swing: is the stock turning up from a bottom, and the plan if it is. */
+function BottomCard({ d }: { d: Decision }) {
+  const b = d.bottom!;
+  const long = useStockResult()?.longSwing?.find((x) => x.symbol === d.symbol);
+  return (
+    <section className="rounded-xl border p-3" aria-label="Long swing from the bottom">
+      <div className="flex items-center gap-2">
+        <AgentAvatar who="Trend" size={22} />
+        <h3 className="text-[13px] font-semibold">Long swing · from the bottom</h3>
+        <span className={cn("ml-auto rounded-md px-1.5 py-px text-[10.5px] font-bold", b.isSetup ? "bg-[var(--buy-bg)] text-[var(--buy-fg)]" : "bg-muted text-muted-foreground")}>
+          {b.isSetup ? `Turning up · ${b.score}/100` : `Not a setup · ${b.score}/100`}
+        </span>
+      </div>
+      <dl className="mt-2.5 grid grid-cols-3 gap-2 text-center tnum">
+        <div className="rounded-lg bg-muted/60 px-1 py-1.5"><dt className="text-[10.5px] text-muted-foreground">Bottom</dt><dd className="text-[14px] font-bold">{inr(b.low)}</dd><dd className="text-[10.5px] text-muted-foreground">{shortDate(b.lowDate)}</dd></div>
+        <div className="rounded-lg bg-muted/60 px-1 py-1.5"><dt className="text-[10.5px] text-muted-foreground">Above the low</dt><dd className="text-[14px] font-bold text-pos">+{b.offLowPct.toFixed(1)}%</dd></div>
+        <div className="rounded-lg bg-muted/60 px-1 py-1.5"><dt className="text-[10.5px] text-muted-foreground">Below 52-week high</dt><dd className="text-[14px] font-bold text-neg">-{b.offHighPct.toFixed(0)}%</dd><dd className="text-[10.5px] text-muted-foreground">{inr(b.high52w, 0)}</dd></div>
+      </dl>
+      {b.isSetup && (
+        <dl className="mt-2 grid grid-cols-3 gap-2 text-center tnum">
+          <div><dt className="text-[10.5px] text-muted-foreground">Entry</dt><dd className="text-[13px] font-semibold">{inr(b.entry)}</dd></div>
+          <div><dt className="text-[10.5px] text-muted-foreground">Stop (under the low)</dt><dd className="text-[13px] font-semibold text-neg">{inr(b.stopLoss)}</dd></div>
+          <div><dt className="text-[10.5px] text-muted-foreground">Target</dt><dd className="text-[13px] font-semibold text-pos">{inr(b.target)}</dd></div>
+        </dl>
+      )}
+      <ul className="mt-2 space-y-0.5 text-[12px] leading-snug">
+        {b.signals.map((s) => <li key={s} className="flex gap-1.5"><span className="text-pos">✓</span>{s}</li>)}
+        {b.warnings.map((s) => <li key={s} className="flex gap-1.5 text-muted-foreground"><span className="text-[var(--watch-fg)]">!</span>{s}</li>)}
+      </ul>
+      <p className="mt-1.5 text-[11.5px] leading-snug text-muted-foreground">
+        {long ? `In today's long swing list${long.hold ? `: hold up to ${long.hold.maxDays} trading days, exit by ${shortDate(long.hold.exitBy)}` : ""}. ` : b.isSetup ? "Turning up, but not in today's long swing list (sector cap, risk checks or the list was full). " : ""}
+        Held about 3 weeks to 3 months. A bottom can still fail, so keep the stop-loss.
+      </p>
+    </section>
+  );
+}
+
+function Body({ d, isPick, price }: { d: Decision; isPick: boolean; price?: number }) {
   const sectors = useStockResult()?.sectors;
   const sector = sectors?.find((s) => s.sector === d.sector);
   const macroFactors = useStockResult()?.macro?.factors ?? [];
@@ -112,7 +179,10 @@ function Body({ d, isPick }: { d: Decision; isPick: boolean }) {
       </dl>
       <p className="text-[11.5px] leading-snug text-muted-foreground">Research scenario, not guaranteed prices. Target = entry + 2 × (entry − stop-loss), a {pct((d.target / d.entry - 1) * 100)} move.{d.quantity !== undefined && ` Sized at ${d.quantity} shares (${inr(d.investment ?? 0, 0)}).`}</p>
 
+      <MyPositionCard d={d} price={price} />
       {d.hold && <HoldCard d={d} />}
+      {d.bottom && (d.bottom.isSetup || d.bottom.score >= 40) && <BottomCard d={d} />}
+      {d.longTerm && <LongTermCard d={d} />}
       {d.blackPoints && <BlackPointsSection bp={d.blackPoints} />}
       <div className="space-y-2.5">
         <ScoreBar label="Combined score" value={d.combined} color="var(--primary)" />
@@ -179,6 +249,8 @@ export function StockDrawer() {
   const [mtab, setMtab] = useState("chart"); // phones: one section at a time
   const [wide, setWide] = useState(false);
   const [finding, setFinding] = useState(false);
+  const held = Boolean(useHolding(d?.symbol));
+  useEffect(() => { if (held) { setTab("research"); setMtab("research"); } }, [held, d?.symbol]);
   const levels = useMemo(() => (d ? { entry: d.entry, stop: d.stopLoss, target: d.target, zoneLow: d.chart?.zone?.low, zoneHigh: d.chart?.zone?.high } : undefined), [d]);
   const demo = result?.source.kind === "demo";
   const quote = useQuote(d?.symbol);
@@ -190,7 +262,7 @@ export function StockDrawer() {
           <Dialog.Content className="card fixed left-1/2 top-1/2 z-50 w-[min(520px,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 p-6 outline-none">
             <div className="flex items-start gap-3">
               <div className="min-w-0 flex-1">
-                <Dialog.Title className="text-xl font-extrabold tracking-tight">{lookup.symbol}</Dialog.Title>
+                <Dialog.Title className="flex items-center gap-1 text-xl font-extrabold tracking-tight">{lookup.symbol}<CopySymbol symbol={lookup.symbol} size="md" /></Dialog.Title>
                 <Dialog.Description className="text-[13px] text-muted-foreground">{lookup.name ?? "NSE stock"}</Dialog.Description>
               </div>
               <Dialog.Close aria-label="Close" className="btn-3d grid size-9 place-items-center rounded-full text-muted-foreground hover:text-foreground"><X className="size-4" /></Dialog.Close>
@@ -217,7 +289,9 @@ export function StockDrawer() {
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <Dialog.Title className="text-xl font-extrabold tracking-tight">{d.symbol}</Dialog.Title>
+                  <CopySymbol symbol={d.symbol} size="md" className="-ml-1" />
                   <VerdictBadge verdict={d.verdict} />
+                  {lookup?.loading && lookup.symbol === d.symbol && <span className="flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground"><Loader2 className="size-3 animate-spin" />Loading full research…</span>}
                 </div>
                 <Dialog.Description className="text-[12.5px] text-muted-foreground max-sm:line-clamp-1">
                   {d.sector} · NSE{d.fundamentals?.marketCapCr ? ` · ${d.fundamentals.cap} cap ₹${d.fundamentals.marketCapCr.toLocaleString("en-IN")} Cr` : ""}
@@ -241,6 +315,8 @@ export function StockDrawer() {
                   className={cn("btn-3d grid size-9 place-items-center rounded-full text-muted-foreground hover:text-foreground", finding && "text-primary")}>
                   <Search className="size-4" />
                 </button>
+                <WatchButton symbol={d.symbol} price={quote?.last ?? d.entry} className="max-sm:w-9 max-sm:justify-center max-sm:px-0" />
+                <TradingViewLink symbol={d.symbol} compact className="max-sm:w-9 max-sm:justify-center max-sm:px-0" />
                 <TrackTradeButton d={d} className="h-9" />
                 <Dialog.Close aria-label="Close" className="btn-3d grid size-9 place-items-center sm:size-10 rounded-full text-muted-foreground hover:text-foreground">
                   <X className="size-5" />
@@ -263,7 +339,7 @@ export function StockDrawer() {
                   {result && <StockAgentsTab key={d.symbol} d={d} result={result} />}
                 </Tabs.Content>
                 <Tabs.Content value="research" className="flex min-h-0 flex-1 flex-col pt-2 outline-none">
-                  <Body d={d} isPick={Boolean(result?.picks.some((p) => p.symbol === d.symbol))} />
+                  <Body d={d} price={quote?.last} isPick={Boolean(result?.picks.some((p) => p.symbol === d.symbol))} />
                 </Tabs.Content>
                 <Tabs.Content value="forecast" className="min-h-0 flex-1 overflow-y-auto pt-2 outline-none scroll-thin">
                   <ForecastTab d={d} />
@@ -286,7 +362,7 @@ export function StockDrawer() {
                     {result && <StockAgentsTab key={d.symbol} d={d} result={result} />}
                   </Tabs.Content>
                   <Tabs.Content value="research" className="flex min-h-0 flex-1 flex-col outline-none">
-                    <Body d={d} isPick={Boolean(result?.picks.some((p) => p.symbol === d.symbol))} />
+                    <Body d={d} price={quote?.last} isPick={Boolean(result?.picks.some((p) => p.symbol === d.symbol))} />
                   </Tabs.Content>
                   <Tabs.Content value="forecast" className="min-h-0 flex-1 overflow-y-auto outline-none scroll-thin">
                     <ForecastTab d={d} />
